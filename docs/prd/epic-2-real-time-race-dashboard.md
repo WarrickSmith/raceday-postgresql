@@ -7,11 +7,13 @@
 **So that** I can easily scan upcoming races.
 
 #### Tasks
+
 - Query the backend for today's meetings and races.
 - Sort meetings by the earliest race start time.
 - Render the meeting list in the dashboard view.
 
 #### Acceptance Criteria
+
 - [ ] Meetings are displayed in chronological order.
 - [ ] The list updates in real-time as new meetings are added or removed.
 - [ ] No duplicate meetings are shown.
@@ -23,11 +25,13 @@
 **So that** I can view race details at a glance.
 
 #### Tasks
+
 - Implement expand/collapse UI for each meeting.
 - Fetch and display race details per meeting.
 - Ensure races are shown in order.
 
 #### Acceptance Criteria
+
 - [ ] Races are correctly grouped under their meetings.
 - [ ] Race details are shown when a meeting is expanded.
 - [ ] UI supports expand/collapse interaction.
@@ -39,11 +43,13 @@
 **So that** I know which races are active.
 
 #### Tasks
+
 - Subscribe to race status updates from backend.
 - Display current status for each race.
 - Visually differentiate race status.
 
 #### Acceptance Criteria
+
 - [ ] Status updates occur in real-time (<2s latency).
 - [ ] Status is visually clear and accessible.
 - [ ] Status matches backend values.
@@ -55,11 +61,13 @@
 **So that** I can see deeper race details.
 
 #### Tasks
+
 - Implement clickable race rows.
 - Route user to the detailed race view page.
 - Pass race ID as parameter.
 
 #### Acceptance Criteria
+
 - [ ] Clicking a race opens the correct detailed view.
 - [ ] URL updates to reflect selected race.
 - [ ] No navigation errors.

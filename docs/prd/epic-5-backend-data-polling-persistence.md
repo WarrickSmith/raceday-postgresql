@@ -7,11 +7,13 @@
 **So that** race data is always up to date.
 
 #### Tasks
+
 - Configure Appwrite Function with CRON schedule.
 - Fetch meetings and races from TAB API.
 - Store/update documents in database.
 
 #### Acceptance Criteria
+
 - [ ] Function runs at midnight UTC.
 - [ ] All meetings and races for the day are imported.
 - [ ] Errors are logged and surfaced.
@@ -23,11 +25,13 @@
 **So that** live data is accurate.
 
 #### Tasks
+
 - Schedule polling intervals per race.
 - Fetch latest race/entrant data from API.
 - Store updates in database.
 
 #### Acceptance Criteria
+
 - [ ] Polling adapts to race schedule.
 - [ ] Entrant data is current.
 - [ ] No missed updates.
@@ -39,11 +43,13 @@
 **So that** the frontend can display complete data.
 
 #### Tasks
+
 - Parse EventRaceDetails from API.
 - Map data to database schema.
 - Store/append data correctly.
 
 #### Acceptance Criteria
+
 - [ ] All collections are updated as needed.
 - [ ] Data matches API source.
 - [ ] No data loss or corruption.
@@ -55,11 +61,13 @@
 **So that** API credentials are not exposed.
 
 #### Tasks
+
 - Store API credentials in environment variables.
 - Access credentials in function code.
 - Prevent credential leaks/logging.
 
 #### Acceptance Criteria
+
 - [ ] Credentials are never exposed in logs.
 - [ ] API calls use correct credentials.
 - [ ] Security is validated.

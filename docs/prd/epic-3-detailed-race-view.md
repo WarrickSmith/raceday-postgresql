@@ -7,11 +7,13 @@
 **So that** I understand key race details instantly.
 
 #### Tasks
+
 - Design and implement race header component.
 - Fetch race metadata from backend.
 - Display all required fields.
 
 #### Acceptance Criteria
+
 - [ ] Race header shows correct name, distance, track, and time.
 - [ ] Header updates in real-time as race data changes.
 - [ ] Layout is consistent with UI spec.
@@ -23,11 +25,13 @@
 **So that** I can compare runners easily.
 
 #### Tasks
+
 - Design data grid per UI spec.
 - Fetch and display entrant data.
 - Support sorting/filtering (if required).
 
 #### Acceptance Criteria
+
 - [ ] All entrants are displayed with required columns.
 - [ ] Data grid updates in real-time.
 - [ ] No missing or duplicate entrants.
@@ -39,11 +43,13 @@
 **So that** I can track market interest.
 
 #### Tasks
+
 - Add Money Flow column to entrants grid.
 - Fetch and display hold_percentage for each entrant.
 - Format values per design.
 
 #### Acceptance Criteria
+
 - [ ] Money Flow column is present for every entrant.
 - [ ] Values match backend data.
 - [ ] Column is visually distinct.
@@ -55,11 +61,13 @@
 **So that** I can spot trends quickly.
 
 #### Tasks
+
 - Integrate sparkline chart library.
 - Fetch odds history for each entrant.
 - Render sparkline in grid row.
 
 #### Acceptance Criteria
+
 - [ ] Sparkline chart appears for every entrant.
 - [ ] Data matches odds history.
 - [ ] Charts update in real-time.
@@ -71,11 +79,13 @@
 **So that** I always see the latest info.
 
 #### Tasks
+
 - Subscribe to Appwrite Realtime for data changes.
 - Update grid in response to backend events.
 - Test for real-time update speed.
 
 #### Acceptance Criteria
+
 - [ ] No manual refresh needed for updates.
 - [ ] Data latency is below 2 seconds.
 - [ ] No stale data displayed.
@@ -87,11 +97,13 @@
 **So that** I can quickly scan races.
 
 #### Tasks
+
 - Design and implement navigation buttons.
 - Handle edge cases (first/last race).
 - Ensure buttons update view and URL.
 
 #### Acceptance Criteria
+
 - [ ] Navigation buttons work for all races.
 - [ ] Correct race view is displayed after navigation.
 - [ ] Buttons are accessible.

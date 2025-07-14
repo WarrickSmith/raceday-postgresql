@@ -7,11 +7,13 @@
 **So that** I can focus on relevant races.
 
 #### Tasks
+
 - Design multi-select dropdowns for filters.
 - Implement filter logic on frontend.
 - Persist filter state in session.
 
 #### Acceptance Criteria
+
 - [ ] Filters are visible and usable.
 - [ ] Filter selections update dashboard view.
 - [ ] Filters persist during session.
@@ -23,11 +25,13 @@
 **So that** I see only preferred locations.
 
 #### Tasks
+
 - Add Country filter control.
 - Update dashboard data per filter.
 - Test multi-country selection.
 
 #### Acceptance Criteria
+
 - [ ] Only selected countries are shown.
 - [ ] Filter updates in real-time.
 - [ ] No data bleed from other countries.
@@ -39,11 +43,13 @@
 **So that** I see only the races I care about.
 
 #### Tasks
+
 - Add Race Type filter control.
 - Update dashboard data per filter.
 - Support multiple race types.
 
 #### Acceptance Criteria
+
 - [ ] Only selected race types are shown.
 - [ ] Filter updates in real-time.
 - [ ] No data bleed from other types.
@@ -55,11 +61,13 @@
 **So that** navigation respects my preferences.
 
 #### Tasks
+
 - Update navigation logic to respect filters.
 - Test navigation with multiple filters.
 - Handle edge cases.
 
 #### Acceptance Criteria
+
 - [ ] Navigation only moves to filtered races.
 - [ ] No skipped or duplicate races.
 - [ ] Filters persist in navigation.
@@ -71,11 +79,13 @@
 **So that** my view is consistent.
 
 #### Tasks
+
 - Store filter state in session/local storage.
 - Restore filters on reload.
 - Clear filters on logout.
 
 #### Acceptance Criteria
+
 - [ ] Filters persist during session.
 - [ ] Filters reset on logout.
 - [ ] No stale filters remain.
