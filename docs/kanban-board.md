@@ -4,8 +4,6 @@
 
 ### Epic 1: Project Scaffolding
 
-- [ ] Story 1.3: Scaffold Appwrite Cloud project and database
-
 ### Epic 2: Real-Time Race Dashboard
 
 - [ ] Story 2.1: Display race meetings chronologically
@@ -52,6 +50,8 @@
 - [ ] Story 7.5: Persist filters during session
 
 ## To Do
+
+- [ ] Story 1.3: Scaffold Appwrite Cloud project and database
 
 ## In Progress
 
