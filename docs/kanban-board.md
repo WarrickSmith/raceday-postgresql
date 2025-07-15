@@ -53,10 +53,9 @@
 
 ## To Do
 
-- [ ] Story 1.2: Appwrite Environment and CI/CD Pipeline Setup
-
 ## In Progress
 
 ## Done
 
+- [x] Story 1.2: Appwrite Environment and CI/CD Pipeline Setup
 - [x] Story 1.1: Next.js Initialization - Brownfield Addition
