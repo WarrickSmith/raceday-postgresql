@@ -86,7 +86,7 @@ jest.mock('node-appwrite', () => ({
 const mockLog = jest.spyOn(console, 'log').mockImplementation(() => {})
 
 // Mock process.exit
-const mockExit = jest
+jest
   .spyOn(process, 'exit')
   .mockImplementation((code?: string | number | null | undefined) => {
     throw new Error(`Process exit called with code: ${code}`)
@@ -382,10 +382,10 @@ describe('Appwrite Setup Script', () => {
   describe('Error Handling', () => {
     it('should handle database creation errors', async () => {
       const mockDatabases = {
-        get: jest.fn().mockRejectedValue({ code: 404 }) as any,
+        get: jest.fn().mockRejectedValue({ code: 404 } as never),
         create: jest
           .fn()
-          .mockRejectedValue(new Error('Database creation failed')) as any,
+          .mockRejectedValue(new Error('Database creation failed') as never),
         getCollection: jest.fn(),
         createCollection: jest.fn(),
         createStringAttribute: jest.fn(),
@@ -443,9 +443,9 @@ describe('Appwrite Setup Script', () => {
 
     it('should handle collection creation errors', async () => {
       const mockDatabases = {
-        get: jest.fn().mockResolvedValue({}) as any,
-        create: jest.fn() as jest.MockedFunction<any>,
-        getCollection: jest.fn().mockRejectedValue({ code: 404 }) as any,
+        get: jest.fn().mockResolvedValue({} as never),
+        create: jest.fn(),
+        getCollection: jest.fn().mockRejectedValue({ code: 404 } as never),
         createCollection: jest
           .fn()
           .mockImplementation(() =>
