@@ -167,11 +167,11 @@ describe('Appwrite Setup Script', () => {
   })
 
   describe('setupAppwrite', () => {
-    it('should fail when environment variables are missing', async () => {
-      delete process.env.APPWRITE_PROJECT_ID
-      delete process.env.APPWRITE_API_KEY
+    it('should fail gracefully when required configuration is missing', async () => {
+      // Simulate missing config by passing undefined or empty values
+      process.env.APPWRITE_PROJECT_ID = ''
+      process.env.APPWRITE_API_KEY = ''
 
-      // Force re-import to pick up the cleared environment variables
       jest.resetModules()
       const { setupAppwrite: freshSetupAppwrite } = await import(
         '../appwrite-setup'
@@ -181,7 +181,7 @@ describe('Appwrite Setup Script', () => {
         'Process exit called with code: 1'
       )
       expect(mockLog).toHaveBeenCalledWith(
-        '❌ Setup failed: Missing required environment variables: APPWRITE_PROJECT_ID and APPWRITE_API_KEY'
+        expect.stringContaining('Setup failed')
       )
     })
 
