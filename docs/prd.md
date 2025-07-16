@@ -108,9 +108,85 @@ All development work must reference the latest official documentation for our ke
 
 ---
 
-## Epic 2: Real-Time Race Dashboard
+## Epic 2: Backend Data Polling & Persistence
 
-### Story 2.1: Display race meetings chronologically
+### Story 2.1: Create daily race import function
+
+**As the** system  
+**I need** a serverless function that runs daily to fetch all meetings and races from the TAB API for the current day  
+**So that** race data is always up to date.
+
+##### Tasks
+
+- Configure Appwrite Function with CRON schedule.
+- Fetch meetings and races from TAB API.
+- Store/update documents in database.
+
+##### Acceptance Criteria
+
+- [ ] Function runs at midnight UTC.
+- [ ] All meetings and races for the day are imported.
+- [ ] Errors are logged and surfaced.
+
+### Story 2.2: Implement dynamic polling function
+
+**As the** system  
+**I need** to trigger a dynamic polling process for each race based on its start time  
+**So that** live data is accurate.
+
+##### Tasks
+
+- Schedule polling intervals per race.
+- Fetch latest race/entrant data from API.
+- Store updates in database.
+
+##### Acceptance Criteria
+
+- [ ] Polling adapts to race schedule.
+- [ ] Entrant data is current.
+- [ ] No missed updates.
+
+### Story 2.3: Implement data persistence logic
+
+**As the** system  
+**I need** to parse EventRaceDetails and store relevant data into Meetings, Races, Entrants, OddsHistory, and MoneyFlowHistory collections  
+**So that** the frontend can display complete data.
+
+##### Tasks
+
+- Parse EventRaceDetails from API.
+- Map data to database schema.
+- Store/append data correctly.
+
+##### Acceptance Criteria
+
+- [ ] All collections are updated as needed.
+- [ ] Data matches API source.
+- [ ] No data loss or corruption.
+
+### Story 2.4: Implement secure API credential handling
+
+**As the** system  
+**I need** to securely use affiliate credentials stored as environment variables within Appwrite Function  
+**So that** API credentials are not exposed.
+
+##### Tasks
+
+- Store API credentials in environment variables.
+- Access credentials in function code.
+- Prevent credential leaks/logging.
+
+##### Acceptance Criteria
+
+- [ ] Credentials are never exposed in logs.
+- [ ] API calls use correct credentials.
+- [ ] Security is validated.
+
+---
+
+## Epic 3: Real-Time Race Dashboard
+
+### Story 3.1: Display race meetings chronologically
 
 **As a** user  
 **I want** to see a list of all race meetings for the current day, ordered chronologically by the first race of the meeting  
@@ -128,7 +204,7 @@ All development work must reference the latest official documentation for our ke
 - [ ] The list updates in real-time as new meetings are added or removed.
 - [ ] No duplicate meetings are shown.
 
-### Story 2.2: Expand meetings to show races
+### Story 3.2: Expand meetings to show races
 
 **As a** user  
 **I want** to expand a meeting to see all races within it, showing the race number, race name, and start time  
@@ -146,7 +222,7 @@ All development work must reference the latest official documentation for our ke
 - [ ] Race details are shown when a meeting is expanded.
 - [ ] UI supports expand/collapse interaction.
 
-### Story 2.3: Display real-time race status
+### Story 3.3: Display real-time race status
 
 **As a** user  
 **I want** to see the status of each race (Open, Closed, Running, Finalized) update in real-time on the dashboard  
@@ -164,7 +240,7 @@ All development work must reference the latest official documentation for our ke
 - [ ] Status is visually clear and accessible.
 - [ ] Status matches backend values.
 
-### Story 2.4: Navigate to Detailed Race View
+### Story 3.4: Navigate to Detailed Race View
 
 **As a** user  
 **I want** to be able to click on a race to navigate to its Detailed Race View  
@@ -184,9 +260,9 @@ All development work must reference the latest official documentation for our ke
 
 ---
 
-## Epic 3: Detailed Race View
+## Epic 4: Detailed Race View
 
-### Story 3.1: Display detailed race header
+### Story 4.1: Display detailed race header
 
 **As a** user  
 **I want** to see a header for the selected race with its name, distance, track condition, and time to start  
@@ -204,7 +280,7 @@ All development work must reference the latest official documentation for our ke
 - [ ] Header updates in real-time as race data changes.
 - [ ] Layout is consistent with UI spec.
 
-### Story 3.2: Create entrants data grid
+### Story 4.2: Create entrants data grid
 
 **As a** user  
 **I want** to see a grid of all entrants in the race, with columns for Runner Name, Saddlecloth #, Jockey, Trainer, current Win Odds, and current Place Odds  
@@ -222,7 +298,7 @@ All development work must reference the latest official documentation for our ke
 - [ ] Data grid updates in real-time.
 - [ ] No missing or duplicate entrants.
 
-### Story 3.3: Display Money Flow column
+### Story 4.3: Display Money Flow column
 
 **As a** user  
 **I want** to see a dedicated column displaying the current "Money Flow" (hold_percentage) for each entrant  
@@ -240,7 +316,7 @@ All development work must reference the latest official documentation for our ke
 - [ ] Values match backend data.
 - [ ] Column is visually distinct.
 
-### Story 3.4: Display odds history sparkline
+### Story 4.4: Display odds history sparkline
 
 **As a** user  
 **I want** to see a sparkline visualization in each row that charts the recent history of the Win odds  
@@ -258,7 +334,7 @@ All development work must reference the latest official documentation for our ke
 - [ ] Data matches odds history.
 - [ ] Charts update in real-time.
 
-### Story 3.5: Implement automatic data updates
+### Story 4.5: Implement automatic data updates
 
 **As a** user  
 **I want** to see all data in the grid update automatically without a page refresh  
@@ -276,7 +352,7 @@ All development work must reference the latest official documentation for our ke
 - [ ] Data latency is below 2 seconds.
 - [ ] No stale data displayed.
 
-### Story 3.6: Implement race navigation buttons
+### Story 4.6: Implement race navigation buttons
 
 **As a** user  
 **I want** navigation buttons to move to Previous Race, Next Race, and Next Scheduled Race  
@@ -296,9 +372,9 @@ All development work must reference the latest official documentation for our ke
 
 ---
 
-## Epic 4: Alerting System
+## Epic 5: Alerting System
 
-### Story 4.1: Create Alerts Configuration UI
+### Story 5.1: Create Alerts Configuration UI
 
 **As a** user  
 **I want** to access an "Alerts Configuration" modal or screen from the Detailed Race View  
@@ -316,7 +392,7 @@ All development work must reference the latest official documentation for our ke
 - [ ] User can configure and save alerts.
 - [ ] Saved alerts persist for user.
 
-### Story 4.2: Configure odds change alert
+### Story 5.2: Configure odds change alert
 
 **As a** user  
 **I want** to set a percentage increase/decrease threshold for Win odds over a specific time window  
@@ -334,7 +410,7 @@ All development work must reference the latest official documentation for our ke
 - [ ] Alert triggers when condition is met.
 - [ ] Notification is delivered to user.
 
-### Story 4.3: Configure money flow alert
+### Story 5.3: Configure money flow alert
 
 **As a** user  
 **I want** to set a percentage increase threshold for Money Flow (hold_percentage)  
@@ -352,7 +428,7 @@ All development work must reference the latest official documentation for our ke
 - [ ] Alert triggers when condition is met.
 - [ ] Notification is delivered to user.
 
-### Story 4.4: Implement visual row flash alert
+### Story 5.4: Implement visual row flash alert
 
 **As a** user  
 **I want** the corresponding row in the race grid to flash visually for 5 seconds when an alert triggers  
@@ -369,7 +445,7 @@ All development work must reference the latest official documentation for our ke
 - [ ] Flash lasts 5 seconds.
 - [ ] No false positives.
 
-### Story 4.5: Implement toast notifications for alerts
+### Story 5.5: Implement toast notifications for alerts
 
 **As a** user  
 **I want** a toast notification to appear on my screen with a summary when an alert triggers  
@@ -387,7 +463,7 @@ All development work must reference the latest official documentation for our ke
 - [ ] Summary is accurate and complete.
 - [ ] Toast is dismissible.
 
-### Story 4.6: Implement global audible alert toggle
+### Story 5.6: Implement global audible alert toggle
 
 **As a** user  
 **I want** to enable/disable a global, audible alert that triggers one minute before the start of any race in my filtered view  
@@ -405,81 +481,7 @@ All development work must reference the latest official documentation for our ke
 - [ ] User can toggle alert on/off.
 - [ ] Alert only applies to filtered races.
 
----
 
-## Epic 5: Backend Data Polling & Persistence
-
-### Story 5.1: Create daily race import function
-
-**As the** system  
-**I need** a serverless function that runs daily to fetch all meetings and races from the TAB API for the current day  
-**So that** race data is always up to date.
-
-##### Tasks
-
-- Configure Appwrite Function with CRON schedule.
-- Fetch meetings and races from TAB API.
-- Store/update documents in database.
-
-##### Acceptance Criteria
-
-- [ ] Function runs at midnight UTC.
-- [ ] All meetings and races for the day are imported.
-- [ ] Errors are logged and surfaced.
-
-### Story 5.2: Implement dynamic polling function
-
-**As the** system  
-**I need** to trigger a dynamic polling process for each race based on its start time  
-**So that** live data is accurate.
-
-##### Tasks
-
-- Schedule polling intervals per race.
-- Fetch latest race/entrant data from API.
-- Store updates in database.
-
-##### Acceptance Criteria
-
-- [ ] Polling adapts to race schedule.
-- [ ] Entrant data is current.
-- [ ] No missed updates.
-
-### Story 5.3: Implement data persistence logic
-
-**As the** system  
-**I need** to parse EventRaceDetails and store relevant data into Meetings, Races, Entrants, OddsHistory, and MoneyFlowHistory collections  
-**So that** the frontend can display complete data.
-
-##### Tasks
-
-- Parse EventRaceDetails from API.
-- Map data to database schema.
-- Store/append data correctly.
-
-##### Acceptance Criteria
-
-- [ ] All collections are updated as needed.
-- [ ] Data matches API source.
-- [ ] No data loss or corruption.
-
-### Story 5.4: Implement secure API credential handling
-
-**As the** system  
-**I need** to securely use affiliate credentials stored as environment variables within Appwrite Function  
-**So that** API credentials are not exposed.
-
-##### Tasks
-
-- Store API credentials in environment variables.
-- Access credentials in function code.
-- Prevent credential leaks/logging.
-
-##### Acceptance Criteria
-
-- [ ] Credentials are never exposed in logs.
-- [ ] API calls use correct credentials.
-- [ ] Security is validated.
 
 ---
 

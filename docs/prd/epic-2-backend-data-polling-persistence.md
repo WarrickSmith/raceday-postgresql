@@ -1,6 +1,6 @@
-# Epic 5: Backend Data Polling & Persistence
+# Epic 2: Backend Data Polling & Persistence
 
-## Story 5.1: Create daily race import function
+## Story 2.1: Create daily race import function
 
 **As the** system  
 **I need** a serverless function that runs daily to fetch all meetings and races from the TAB API for the current day  
@@ -18,7 +18,7 @@
 - [ ] All meetings and races for the day are imported.
 - [ ] Errors are logged and surfaced.
 
-## Story 5.2: Implement dynamic polling function
+## Story 2.2: Implement dynamic polling function
 
 **As the** system  
 **I need** to trigger a dynamic polling process for each race based on its start time  
@@ -36,7 +36,7 @@
 - [ ] Entrant data is current.
 - [ ] No missed updates.
 
-## Story 5.3: Implement data persistence logic
+## Story 2.3: Implement data persistence logic
 
 **As the** system  
 **I need** to parse EventRaceDetails and store relevant data into Meetings, Races, Entrants, OddsHistory, and MoneyFlowHistory collections  
@@ -54,7 +54,7 @@
 - [ ] Data matches API source.
 - [ ] No data loss or corruption.
 
-## Story 5.4: Implement secure API credential handling
+## Story 2.4: Implement secure API credential handling
 
 **As the** system  
 **I need** to securely use affiliate credentials stored as environment variables within Appwrite Function  
