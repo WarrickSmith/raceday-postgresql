@@ -269,9 +269,10 @@ describe('Appwrite Setup Script', () => {
     })
 
     it('should handle existing resources (idempotent)', async () => {
-      // Ensure required environment variables are set
+      // Ensure required environment variables are set and modules are reset
       process.env.APPWRITE_PROJECT_ID = 'test-project-id'
       process.env.APPWRITE_API_KEY = 'test-api-key'
+      jest.resetModules()
 
       // Mock that resources already exist
       mockDatabases.get.mockResolvedValue({}) // Database exists
@@ -288,7 +289,12 @@ describe('Appwrite Setup Script', () => {
         indexes: [],
       }) // Collections exist with attributes
 
-      await expect(setupAppwrite()).rejects.toThrow(
+      // Re-import setupAppwrite after env and mocks are set
+      const { setupAppwrite: freshSetupAppwrite } = await import(
+        '../appwrite-setup'
+      )
+
+      await expect(freshSetupAppwrite()).rejects.toThrow(
         'Process exit called with code: 1'
       )
 
