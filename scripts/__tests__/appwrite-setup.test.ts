@@ -269,6 +269,10 @@ describe('Appwrite Setup Script', () => {
     })
 
     it('should handle existing resources (idempotent)', async () => {
+      // Ensure required environment variables are set
+      process.env.APPWRITE_PROJECT_ID = 'test-project-id'
+      process.env.APPWRITE_API_KEY = 'test-api-key'
+
       // Mock that resources already exist
       mockDatabases.get.mockResolvedValue({}) // Database exists
       mockDatabases.getCollection.mockResolvedValue({
