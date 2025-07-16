@@ -1424,8 +1424,8 @@ const setupAppwrite = async () => {
     await createUserAlertConfigsCollection()
     await createNotificationsCollection()
 
-    // Setup user labels
-    await createUserLabels()
+    // Note: User labels will be created later as part of actual user creation
+    // No need to set them up in this script
 
     log('🎉 Appwrite setup completed successfully!', 'success')
   } catch (error: unknown) {
