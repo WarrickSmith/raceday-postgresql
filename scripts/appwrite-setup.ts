@@ -105,7 +105,7 @@ const isAttributeAvailable = async (
       (attr: { key: string; status?: string }) => attr.key === attributeKey
     )
     return attribute?.status === 'available'
-  } catch (error: unknown) {
+  } catch {
     return false
   }
 }
@@ -1320,40 +1320,8 @@ const createNotificationsCollection = async () => {
   log('Notifications collection created successfully', 'success')
 }
 
-// Create user labels (requires manual setup in console)
-const createUserLabels = async () => {
-  log('Setting up user role labels...')
-
-  try {
-    // Note: User labels must be created manually in the Appwrite console
-    // These labels will be used for role-based routing and access control
-    log(
-      'User role labels must be created manually in Appwrite console:',
-      'info'
-    )
-    log('1. Go to Auth > Labels in your Appwrite console', 'info')
-    log(
-      '2. Create label: "user" with color #3B82F6 (default user role)',
-      'info'
-    )
-    log('3. Create label: "admin" with color #EF4444 (admin role)', 'info')
-    log('', 'info')
-    log(
-      'These labels will be assigned to users during registration/creation',
-      'info'
-    )
-    log(
-      'Use the assignUserRole() helper function in your application code',
-      'info'
-    )
-    log('User role labels setup instructions provided', 'success')
-  } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error'
-    log(`Error with user role labels setup: ${errorMessage}`, 'error')
-    throw error
-  }
-}
+// User labels must be created manually in the Appwrite console.
+// See instructions in documentation for setting up user role labels.
 
 // Helper function to assign user roles (for use in application code)
 const assignUserRole = async (
