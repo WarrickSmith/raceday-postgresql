@@ -4,8 +4,6 @@
 
 ### Epic 1: Project Scaffolding
 
-- [ ] Story 1.3: Scaffold Appwrite Cloud project and database
-
 ### Epic 2: Real-Time Race Dashboard
 
 - [ ] Story 2.1: Display race meetings chronologically
@@ -57,5 +55,6 @@
 
 ## Done
 
+- [x] Story 1.3: Scaffold Appwrite Cloud project and database
 - [x] Story 1.2: Appwrite Environment and CI/CD Pipeline Setup
 - [x] Story 1.1: Next.js Initialization - Brownfield Addition

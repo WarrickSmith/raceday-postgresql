@@ -1,4 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RaceDay - Real-time Horse Racing Dashboard
+
+This is a [Next.js](https://nextjs.org) project for real-time horse racing data visualization, built with Appwrite as the backend.
+
+## Prerequisites
+
+- Node.js v22.17.0+
+- Appwrite Cloud account
+- New Zealand TAB API access (for data polling)
+
+## Setup
+
+### 1. Appwrite Configuration
+
+Before running the application, you need to set up your Appwrite project:
+
+1. Create a new project in [Appwrite Cloud](https://cloud.appwrite.io)
+2. Copy your Project ID and API Key
+3. Create a `.env.local` file in the root directory:
+
+```bash
+APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
+APPWRITE_PROJECT_ID=your_project_id_here
+APPWRITE_API_KEY=your_api_key_here
+```
+
+### 2. Database Setup
+
+Run the Appwrite setup script to create the database and collections:
+
+```bash
+# Install dependencies first
+npm install
+
+# Run the setup script
+npm run setup:appwrite
+```
+
+This script will:
+
+- Create the `raceday-db` database
+- Create all required collections (Meetings, Races, Entrants, etc.)
+- Set up relationships between collections
+- Create indexes for optimal querying
+- Provide instructions for setting up user role labels
+
+**Important**: After running the script, you must manually create user role labels in your Appwrite console:
+
+1. Go to Auth > Labels in your Appwrite console
+2. Create label: "user" with color #3B82F6 (default user role)
+3. Create label: "admin" with color #EF4444 (admin role)
+
+The script is **idempotent** - safe to run multiple times without duplicating resources.
+
+### 3. User Role Management
+
+The application uses Appwrite user labels for role-based access control. Use the provided helper functions:
+
+```typescript
+import { assignUserRole, getUserRole } from './scripts/appwrite-setup'
+
+// Assign role to a user (during registration)
+await assignUserRole(userId, 'user') // or 'admin'
+
+// Get user role (for route protection)
+const role = await getUserRole(userId)
+```
 
 ## Getting Started
 
@@ -19,6 +85,38 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Project Structure
+
+```
+/
+├── scripts/
+│   └── appwrite-setup.ts          # Database setup script
+├── src/
+│   ├── app/                       # Next.js App Router
+│   ├── components/                # React components
+│   ├── lib/
+│   │   └── appwrite.ts           # Appwrite client configuration
+│   └── services/                  # Backend service interactions
+├── docs/                          # Project documentation
+└── public/                        # Static assets
+```
+
+## Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
+- `npm run test` - Run tests
+- `npx tsx scripts/appwrite-setup.ts` - Set up Appwrite database
+
+## Tech Stack
+
+- **Frontend**: Next.js 15.4+, React 19, TypeScript, Tailwind CSS
+- **Backend**: Appwrite Cloud
+- **Real-time**: Appwrite Realtime Subscriptions
+- **Data Source**: New Zealand TAB API
 
 ## Learn More
 
