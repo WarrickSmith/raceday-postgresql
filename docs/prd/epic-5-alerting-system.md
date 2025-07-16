@@ -1,6 +1,6 @@
-# Epic 4: Alerting System
+# Epic 5: Alerting System
 
-## Story 4.1: Create Alerts Configuration UI
+## Story 5.1: Create Alerts Configuration UI
 
 **As a** user  
 **I want** to access an "Alerts Configuration" modal or screen from the Detailed Race View  
@@ -18,7 +18,7 @@
 - [ ] User can configure and save alerts.
 - [ ] Saved alerts persist for user.
 
-## Story 4.2: Configure odds change alert
+## Story 5.2: Configure odds change alert
 
 **As a** user  
 **I want** to set a percentage increase/decrease threshold for Win odds over a specific time window  
@@ -36,7 +36,7 @@
 - [ ] Alert triggers when condition is met.
 - [ ] Notification is delivered to user.
 
-## Story 4.3: Configure money flow alert
+## Story 5.3: Configure money flow alert
 
 **As a** user  
 **I want** to set a percentage increase threshold for Money Flow (hold_percentage)  
@@ -54,7 +54,7 @@
 - [ ] Alert triggers when condition is met.
 - [ ] Notification is delivered to user.
 
-## Story 4.4: Implement visual row flash alert
+## Story 5.4: Implement visual row flash alert
 
 **As a** user  
 **I want** the corresponding row in the race grid to flash visually for 5 seconds when an alert triggers  
@@ -71,7 +71,7 @@
 - [ ] Flash lasts 5 seconds.
 - [ ] No false positives.
 
-## Story 4.5: Implement toast notifications for alerts
+## Story 5.5: Implement toast notifications for alerts
 
 **As a** user  
 **I want** a toast notification to appear on my screen with a summary when an alert triggers  
@@ -89,7 +89,7 @@
 - [ ] Summary is accurate and complete.
 - [ ] Toast is dismissible.
 
-## Story 4.6: Implement global audible alert toggle
+## Story 5.6: Implement global audible alert toggle
 
 **As a** user  
 **I want** to enable/disable a global, audible alert that triggers one minute before the start of any race in my filtered view  

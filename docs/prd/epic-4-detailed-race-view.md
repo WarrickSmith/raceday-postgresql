@@ -1,6 +1,6 @@
-# Epic 3: Detailed Race View
+# Epic 4: Detailed Race View
 
-## Story 3.1: Display detailed race header
+## Story 4.1: Display detailed race header
 
 **As a** user  
 **I want** to see a header for the selected race with its name, distance, track condition, and time to start  
@@ -18,7 +18,7 @@
 - [ ] Header updates in real-time as race data changes.
 - [ ] Layout is consistent with UI spec.
 
-## Story 3.2: Create entrants data grid
+## Story 4.2: Create entrants data grid
 
 **As a** user  
 **I want** to see a grid of all entrants in the race, with columns for Runner Name, Saddlecloth #, Jockey, Trainer, current Win Odds, and current Place Odds  
@@ -36,7 +36,7 @@
 - [ ] Data grid updates in real-time.
 - [ ] No missing or duplicate entrants.
 
-## Story 3.3: Display Money Flow column
+## Story 4.3: Display Money Flow column
 
 **As a** user  
 **I want** to see a dedicated column displaying the current "Money Flow" (hold_percentage) for each entrant  
@@ -54,7 +54,7 @@
 - [ ] Values match backend data.
 - [ ] Column is visually distinct.
 
-## Story 3.4: Display odds history sparkline
+## Story 4.4: Display odds history sparkline
 
 **As a** user  
 **I want** to see a sparkline visualization in each row that charts the recent history of the Win odds  
@@ -72,7 +72,7 @@
 - [ ] Data matches odds history.
 - [ ] Charts update in real-time.
 
-## Story 3.5: Implement automatic data updates
+## Story 4.5: Implement automatic data updates
 
 **As a** user  
 **I want** to see all data in the grid update automatically without a page refresh  
@@ -90,7 +90,7 @@
 - [ ] Data latency is below 2 seconds.
 - [ ] No stale data displayed.
 
-## Story 3.6: Implement race navigation buttons
+## Story 4.6: Implement race navigation buttons
 
 **As a** user  
 **I want** navigation buttons to move to Previous Race, Next Race, and Next Scheduled Race  

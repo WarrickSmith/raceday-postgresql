@@ -1,6 +1,6 @@
-# Epic 2: Real-Time Race Dashboard
+# Epic 3: Real-Time Race Dashboard
 
-## Story 2.1: Display race meetings chronologically
+## Story 3.1: Display race meetings chronologically
 
 **As a** user  
 **I want** to see a list of all race meetings for the current day, ordered chronologically by the first race of the meeting  
@@ -18,7 +18,7 @@
 - [ ] The list updates in real-time as new meetings are added or removed.
 - [ ] No duplicate meetings are shown.
 
-## Story 2.2: Expand meetings to show races
+## Story 3.2: Expand meetings to show races
 
 **As a** user  
 **I want** to expand a meeting to see all races within it, showing the race number, race name, and start time  
@@ -36,7 +36,7 @@
 - [ ] Race details are shown when a meeting is expanded.
 - [ ] UI supports expand/collapse interaction.
 
-## Story 2.3: Display real-time race status
+## Story 3.3: Display real-time race status
 
 **As a** user  
 **I want** to see the status of each race (Open, Closed, Running, Finalized) update in real-time on the dashboard  
@@ -54,7 +54,7 @@
 - [ ] Status is visually clear and accessible.
 - [ ] Status matches backend values.
 
-## Story 2.4: Navigate to Detailed Race View
+## Story 3.4: Navigate to Detailed Race View
 
 **As a** user  
 **I want** to be able to click on a race to navigate to its Detailed Race View  

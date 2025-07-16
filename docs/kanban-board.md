@@ -4,36 +4,37 @@
 
 ### Epic 1: Project Scaffolding
 
-### Epic 2: Real-Time Race Dashboard
+### Epic 2: Backend Data Polling & Persistence
 
-- [ ] Story 2.1: Display race meetings chronologically
-- [ ] Story 2.2: Expand meetings to show races
-- [ ] Story 2.3: Display real-time race status
+- [ ] Story 2.1: Create daily race import function
+- [ ] Story 2.2: Implement dynamic polling function
+- [ ] Story 2.3: Implement data persistence logic
+- [ ] Story 2.4: Implement secure API credential handling
 
-### Epic 3: Detailed Race View
+### Epic 3: Real-Time Race Dashboard
 
-- [ ] Story 3.1: Create detailed race view grid
-- [ ] Story 3.2: Display key entrant data
-- [ ] Story 3.3: Display money flow data
-- [ ] Story 3.4: Display odds history sparkline
-- [ ] Story 3.5: Implement automatic data updates
-- [ ] Story 3.6: Implement race navigation buttons
+- [ ] Story 3.1: Display race meetings chronologically
+- [ ] Story 3.2: Expand meetings to show races
+- [ ] Story 3.3: Display real-time race status
+- [ ] Story 3.4: Navigate to Detailed Race View
 
-### Epic 4: Alerting System
+### Epic 4: Detailed Race View
 
-- [ ] Story 4.1: Create Alerts Configuration UI
-- [ ] Story 4.2: Configure odds change alert
-- [ ] Story 4.3: Configure money flow alert
-- [ ] Story 4.4: Implement visual row flash alert
-- [ ] Story 4.5: Implement toast notifications for alerts
-- [ ] Story 4.6: Implement global audible alert toggle
+- [ ] Story 4.1: Display detailed race header
+- [ ] Story 4.2: Create entrants data grid
+- [ ] Story 4.3: Display Money Flow column
+- [ ] Story 4.4: Display odds history sparkline
+- [ ] Story 4.5: Implement automatic data updates
+- [ ] Story 4.6: Implement race navigation buttons
 
-### Epic 5: Backend Data Polling & Persistence
+### Epic 5: Alerting System
 
-- [ ] Story 5.1: Create daily race import function
-- [ ] Story 5.2: Implement dynamic polling function
-- [ ] Story 5.3: Implement data persistence logic
-- [ ] Story 5.4: Implement secure API credential handling
+- [ ] Story 5.1: Create Alerts Configuration UI
+- [ ] Story 5.2: Configure odds change alert
+- [ ] Story 5.3: Configure money flow alert
+- [ ] Story 5.4: Implement visual row flash alert
+- [ ] Story 5.5: Implement toast notifications for alerts
+- [ ] Story 5.6: Implement global audible alert toggle
 
 ### Epic 6: User Authentication
 
