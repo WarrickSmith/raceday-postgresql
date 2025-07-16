@@ -378,9 +378,9 @@ describe('Appwrite Setup Script', () => {
   describe('Error Handling', () => {
     it('should handle database creation errors', async () => {
       const mockDatabases = {
-        get: jest.fn<() => Promise<any>>().mockRejectedValue({ code: 404 }),
+        get: jest.fn().mockRejectedValue({ code: 404 }),
         create: jest
-          .fn<() => Promise<any>>()
+          .fn()
           .mockRejectedValue(new Error('Database creation failed')),
         getCollection: jest.fn(),
         createCollection: jest.fn(),
@@ -392,7 +392,38 @@ describe('Appwrite Setup Script', () => {
         createRelationshipAttribute: jest.fn(),
         createIndex: jest.fn(),
       }
-      await expect(setupAppwrite()).rejects.toThrow(
+      jest.resetModules()
+      jest.doMock('node-appwrite', () => ({
+        Client: jest.fn().mockImplementation(() => mockClient),
+        Databases: jest.fn().mockImplementation(() => mockDatabases),
+        Users: jest.fn().mockImplementation(() => mockUsers),
+        Permission: {
+          read: jest.fn().mockReturnValue('read-permission'),
+          create: jest.fn().mockReturnValue('create-permission'),
+          update: jest.fn().mockReturnValue('update-permission'),
+          delete: jest.fn().mockReturnValue('delete-permission'),
+        },
+        Role: {
+          any: jest.fn().mockReturnValue('any-role'),
+          users: jest.fn().mockReturnValue('users-role'),
+          user: jest.fn().mockReturnValue('user-role'),
+        },
+        IndexType: {
+          Key: 'key',
+          Unique: 'unique',
+          Fulltext: 'fulltext',
+        },
+        RelationshipType: {
+          OneToOne: 'oneToOne',
+          ManyToOne: 'manyToOne',
+          OneToMany: 'oneToMany',
+          ManyToMany: 'manyToMany',
+        },
+      }))
+      const { setupAppwrite: errorSetupAppwrite } = await import(
+        '../appwrite-setup'
+      )
+      await expect(errorSetupAppwrite()).rejects.toThrow(
         'Process exit called with code: 1'
       )
       expect(
@@ -404,28 +435,60 @@ describe('Appwrite Setup Script', () => {
               msg.includes('Setup failed: Database creation failed')
           )
       ).toBe(true)
-      // If not found, skip assertion to avoid false negative
     })
 
     it('should handle collection creation errors', async () => {
       const mockDatabases = {
-        get: jest.fn<() => Promise<any>>().mockResolvedValue({}),
-        create: jest.fn(),
+        get: jest.fn().mockResolvedValue({}) as jest.MockedFunction<any>,
+        create: jest.fn() as jest.MockedFunction<any>,
         getCollection: jest
-          .fn<() => Promise<any>>()
-          .mockRejectedValue({ code: 404 }),
+          .fn()
+          .mockRejectedValue({ code: 404 }) as jest.MockedFunction<any>,
         createCollection: jest
-          .fn<() => Promise<any>>()
-          .mockRejectedValue(new Error('Collection creation failed')),
-        createStringAttribute: jest.fn(),
-        createIntegerAttribute: jest.fn(),
-        createFloatAttribute: jest.fn(),
-        createDatetimeAttribute: jest.fn(),
-        createBooleanAttribute: jest.fn(),
-        createRelationshipAttribute: jest.fn(),
-        createIndex: jest.fn(),
+          .fn()
+          .mockImplementation(() =>
+            Promise.reject(new Error('Collection creation failed'))
+          ) as jest.MockedFunction<any>,
+        createStringAttribute: jest.fn() as jest.MockedFunction<any>,
+        createIntegerAttribute: jest.fn() as jest.MockedFunction<any>,
+        createFloatAttribute: jest.fn() as jest.MockedFunction<any>,
+        createDatetimeAttribute: jest.fn() as jest.MockedFunction<any>,
+        createBooleanAttribute: jest.fn() as jest.MockedFunction<any>,
+        createRelationshipAttribute: jest.fn() as jest.MockedFunction<any>,
+        createIndex: jest.fn() as jest.MockedFunction<any>,
       }
-      await expect(setupAppwrite()).rejects.toThrow(
+      jest.resetModules()
+      jest.doMock('node-appwrite', () => ({
+        Client: jest.fn().mockImplementation(() => mockClient),
+        Databases: jest.fn().mockImplementation(() => mockDatabases),
+        Users: jest.fn().mockImplementation(() => mockUsers),
+        Permission: {
+          read: jest.fn().mockReturnValue('read-permission'),
+          create: jest.fn().mockReturnValue('create-permission'),
+          update: jest.fn().mockReturnValue('update-permission'),
+          delete: jest.fn().mockReturnValue('delete-permission'),
+        },
+        Role: {
+          any: jest.fn().mockReturnValue('any-role'),
+          users: jest.fn().mockReturnValue('users-role'),
+          user: jest.fn().mockReturnValue('user-role'),
+        },
+        IndexType: {
+          Key: 'key',
+          Unique: 'unique',
+          Fulltext: 'fulltext',
+        },
+        RelationshipType: {
+          OneToOne: 'oneToOne',
+          ManyToOne: 'manyToOne',
+          OneToMany: 'oneToMany',
+          ManyToMany: 'manyToMany',
+        },
+      }))
+      const { setupAppwrite: errorSetupAppwrite } = await import(
+        '../appwrite-setup'
+      )
+      await expect(errorSetupAppwrite()).rejects.toThrow(
         'Process exit called with code: 1'
       )
       expect(
@@ -437,7 +500,6 @@ describe('Appwrite Setup Script', () => {
               msg.includes('Setup failed: Collection creation failed')
           )
       ).toBe(true)
-      // If not found, skip assertion to avoid false negative
     })
   })
 })
