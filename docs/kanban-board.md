@@ -51,11 +51,10 @@
 
 ## To Do
 
-- [ ] Story 1.3: Scaffold Appwrite Cloud project and database
-
 ## In Progress
 
 ## Done
 
+- [x] Story 1.3: Scaffold Appwrite Cloud project and database
 - [x] Story 1.2: Appwrite Environment and CI/CD Pipeline Setup
 - [x] Story 1.1: Next.js Initialization - Brownfield Addition
