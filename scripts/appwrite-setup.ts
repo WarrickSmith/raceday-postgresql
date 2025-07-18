@@ -171,23 +171,21 @@ const createMeetingsCollection = async () => {
   }
 
   // Create attributes (check if they exist first)
-  if (
-    !(await attributeExists(config.collections.meetings, 'meetingIdentifier'))
-  ) {
+  if (!(await attributeExists(config.collections.meetings, 'meetingId'))) {
     await databases.createStringAttribute(
       config.databaseId,
       config.collections.meetings,
-      'meetingIdentifier',
+      'meetingId',
       50,
       true
     )
   }
 
-  if (!(await attributeExists(config.collections.meetings, 'name'))) {
+  if (!(await attributeExists(config.collections.meetings, 'meetingName'))) {
     await databases.createStringAttribute(
       config.databaseId,
       config.collections.meetings,
-      'name',
+      'meetingName',
       255,
       true
     )
@@ -198,7 +196,7 @@ const createMeetingsCollection = async () => {
       config.databaseId,
       config.collections.meetings,
       'country',
-      50,
+      10,
       true
     )
   }
@@ -213,31 +211,22 @@ const createMeetingsCollection = async () => {
     )
   }
 
-  log('Checking if meetingDate attribute exists...')
-  const meetingDateExists = await attributeExists(
-    config.collections.meetings,
-    'meetingDate'
-  )
-  log(`meetingDate exists: ${meetingDateExists}`)
-
-  if (!meetingDateExists) {
-    log('Creating meetingDate attribute...')
+  if (!(await attributeExists(config.collections.meetings, 'date'))) {
     await databases.createDatetimeAttribute(
       config.databaseId,
       config.collections.meetings,
-      'meetingDate',
+      'date',
       true
     )
-    log('meetingDate attribute created successfully')
   }
 
-  if (!(await attributeExists(config.collections.meetings, 'venue'))) {
+  if (!(await attributeExists(config.collections.meetings, 'trackCondition'))) {
     await databases.createStringAttribute(
       config.databaseId,
       config.collections.meetings,
-      'venue',
-      255,
-      true
+      'trackCondition',
+      50,
+      false
     )
   }
 
@@ -260,16 +249,16 @@ const createMeetingsCollection = async () => {
   if (
     !collection.indexes.some((idx: { key: string }) => idx.key === 'idx_date')
   ) {
-    log('Creating idx_date index on meetingDate...')
+    log('Creating idx_date index on date...')
 
-    // Wait for meetingDate attribute to be available
+    // Wait for date attribute to be available
     const isAvailable = await waitForAttributeAvailable(
       config.collections.meetings,
-      'meetingDate'
+      'date'
     )
     if (!isAvailable) {
       log(
-        'meetingDate attribute is not available for index creation, skipping idx_date index',
+        'date attribute is not available for index creation, skipping idx_date index',
         'error'
       )
     } else {
@@ -279,7 +268,7 @@ const createMeetingsCollection = async () => {
           config.collections.meetings,
           'idx_date',
           IndexType.Key,
-          ['meetingDate']
+          ['date']
         )
         log('idx_date index created successfully')
       } catch (error) {
@@ -356,7 +345,7 @@ const createMeetingsCollection = async () => {
   ) {
     const isAvailable = await waitForAttributeAvailable(
       config.collections.meetings,
-      'meetingIdentifier'
+      'meetingId'
     )
     if (isAvailable) {
       try {
@@ -365,7 +354,7 @@ const createMeetingsCollection = async () => {
           config.collections.meetings,
           'idx_meeting_id',
           IndexType.Unique,
-          ['meetingIdentifier']
+          ['meetingId']
         )
         log('idx_meeting_id index created successfully')
       } catch (error) {
@@ -373,7 +362,7 @@ const createMeetingsCollection = async () => {
       }
     } else {
       log(
-        'meetingIdentifier attribute is not available for index creation, skipping idx_meeting_id index',
+        'meetingId attribute is not available for index creation, skipping idx_meeting_id index',
         'error'
       )
     }
@@ -407,11 +396,11 @@ const createRacesCollection = async () => {
   }
 
   // Create attributes (check if they exist first)
-  if (!(await attributeExists(config.collections.races, 'raceIdentifier'))) {
+  if (!(await attributeExists(config.collections.races, 'raceId'))) {
     await databases.createStringAttribute(
       config.databaseId,
       config.collections.races,
-      'raceIdentifier',
+      'raceId',
       50,
       true
     )
@@ -446,21 +435,30 @@ const createRacesCollection = async () => {
   }
 
   if (!(await attributeExists(config.collections.races, 'distance'))) {
-    await databases.createStringAttribute(
+    await databases.createIntegerAttribute(
       config.databaseId,
       config.collections.races,
       'distance',
-      50,
       false
     )
   }
 
-  if (!(await attributeExists(config.collections.races, 'track'))) {
+  if (!(await attributeExists(config.collections.races, 'trackCondition'))) {
     await databases.createStringAttribute(
       config.databaseId,
       config.collections.races,
-      'track',
+      'trackCondition',
       100,
+      false
+    )
+  }
+
+  if (!(await attributeExists(config.collections.races, 'weather'))) {
+    await databases.createStringAttribute(
+      config.databaseId,
+      config.collections.races,
+      'weather',
+      50,
       false
     )
   }
@@ -472,15 +470,6 @@ const createRacesCollection = async () => {
       'status',
       50,
       true
-    )
-  }
-
-  if (!(await attributeExists(config.collections.races, 'totalPool'))) {
-    await databases.createFloatAttribute(
-      config.databaseId,
-      config.collections.races,
-      'totalPool',
-      false
     )
   }
 
@@ -510,7 +499,7 @@ const createRacesCollection = async () => {
   ) {
     const isAvailable = await waitForAttributeAvailable(
       config.collections.races,
-      'raceIdentifier'
+      'raceId'
     )
     if (isAvailable) {
       try {
@@ -519,7 +508,7 @@ const createRacesCollection = async () => {
           config.collections.races,
           'idx_race_id',
           IndexType.Unique,
-          ['raceIdentifier']
+          ['raceId']
         )
         log('idx_race_id index created successfully')
       } catch (error) {
@@ -527,7 +516,7 @@ const createRacesCollection = async () => {
       }
     } else {
       log(
-        'raceIdentifier attribute is not available for index creation, skipping idx_race_id index',
+        'raceId attribute is not available for index creation, skipping idx_race_id index',
         'error'
       )
     }
@@ -621,36 +610,35 @@ const createEntrantsCollection = async () => {
   }
 
   // Create attributes (check if they exist first)
-  if (
-    !(await attributeExists(config.collections.entrants, 'entrantIdentifier'))
-  ) {
+  if (!(await attributeExists(config.collections.entrants, 'entrantId'))) {
     await databases.createStringAttribute(
       config.databaseId,
       config.collections.entrants,
-      'entrantIdentifier',
+      'entrantId',
       50,
       true
     )
   }
 
-  if (!(await attributeExists(config.collections.entrants, 'horseName'))) {
+  if (!(await attributeExists(config.collections.entrants, 'name'))) {
     await databases.createStringAttribute(
       config.databaseId,
       config.collections.entrants,
-      'horseName',
+      'name',
       255,
       true
     )
   }
 
-  if (!(await attributeExists(config.collections.entrants, 'number'))) {
+  if (!(await attributeExists(config.collections.entrants, 'runnerNumber'))) {
     await databases.createIntegerAttribute(
       config.databaseId,
       config.collections.entrants,
-      'number',
+      'runnerNumber',
       true
     )
   }
+
   if (!(await attributeExists(config.collections.entrants, 'jockey'))) {
     await databases.createStringAttribute(
       config.databaseId,
@@ -661,50 +649,60 @@ const createEntrantsCollection = async () => {
     )
   }
 
-  if (!(await attributeExists(config.collections.entrants, 'trainer'))) {
+  if (!(await attributeExists(config.collections.entrants, 'trainerName'))) {
     await databases.createStringAttribute(
       config.databaseId,
       config.collections.entrants,
-      'trainer',
+      'trainerName',
       255,
       false
     )
   }
 
   if (!(await attributeExists(config.collections.entrants, 'weight'))) {
-    await databases.createFloatAttribute(
-      config.databaseId,
-      config.collections.entrants,
-      'weight',
-      false
-    )
-  }
-
-  if (!(await attributeExists(config.collections.entrants, 'currentOdds'))) {
-    await databases.createFloatAttribute(
-      config.databaseId,
-      config.collections.entrants,
-      'currentOdds',
-      false
-    )
-  }
-
-  if (!(await attributeExists(config.collections.entrants, 'moneyFlow'))) {
-    await databases.createFloatAttribute(
-      config.databaseId,
-      config.collections.entrants,
-      'moneyFlow',
-      false
-    )
-  }
-
-  if (!(await attributeExists(config.collections.entrants, 'status'))) {
     await databases.createStringAttribute(
       config.databaseId,
       config.collections.entrants,
-      'status',
+      'weight',
       50,
-      true
+      false
+    )
+  }
+
+  if (!(await attributeExists(config.collections.entrants, 'winOdds'))) {
+    await databases.createFloatAttribute(
+      config.databaseId,
+      config.collections.entrants,
+      'winOdds',
+      false
+    )
+  }
+
+  if (!(await attributeExists(config.collections.entrants, 'placeOdds'))) {
+    await databases.createFloatAttribute(
+      config.databaseId,
+      config.collections.entrants,
+      'placeOdds',
+      false
+    )
+  }
+
+  if (!(await attributeExists(config.collections.entrants, 'holdPercentage'))) {
+    await databases.createFloatAttribute(
+      config.databaseId,
+      config.collections.entrants,
+      'holdPercentage',
+      false
+    )
+  }
+
+  if (!(await attributeExists(config.collections.entrants, 'isScratched'))) {
+    await databases.createBooleanAttribute(
+      config.databaseId,
+      config.collections.entrants,
+      'isScratched',
+      false,
+      false
     )
   }
 
@@ -734,7 +732,7 @@ const createEntrantsCollection = async () => {
   ) {
     const isAvailable = await waitForAttributeAvailable(
       config.collections.entrants,
-      'entrantIdentifier'
+      'entrantId'
     )
     if (isAvailable) {
       try {
@@ -743,7 +741,7 @@ const createEntrantsCollection = async () => {
           config.collections.entrants,
           'idx_entrant_id',
           IndexType.Unique,
-          ['entrantIdentifier']
+          ['entrantId']
         )
         log('idx_entrant_id index created successfully')
       } catch (error) {
@@ -751,35 +749,35 @@ const createEntrantsCollection = async () => {
       }
     } else {
       log(
-        'entrantIdentifier attribute is not available for index creation, skipping idx_entrant_id index',
+        'entrantId attribute is not available for index creation, skipping idx_entrant_id index',
         'error'
       )
     }
   }
 
   if (
-    !collection.indexes.some((idx: { key: string }) => idx.key === 'idx_number')
+    !collection.indexes.some((idx: { key: string }) => idx.key === 'idx_runner_number')
   ) {
     const isAvailable = await waitForAttributeAvailable(
       config.collections.entrants,
-      'number'
+      'runnerNumber'
     )
     if (isAvailable) {
       try {
         await databases.createIndex(
           config.databaseId,
           config.collections.entrants,
-          'idx_number',
+          'idx_runner_number',
           IndexType.Key,
-          ['number']
+          ['runnerNumber']
         )
-        log('idx_number index created successfully')
+        log('idx_runner_number index created successfully')
       } catch (error) {
-        log(`Failed to create idx_number index: ${error}`, 'error')
+        log(`Failed to create idx_runner_number index: ${error}`, 'error')
       }
     } else {
       log(
-        'number attribute is not available for index creation, skipping idx_number index',
+        'runnerNumber attribute is not available for index creation, skipping idx_runner_number index',
         'error'
       )
     }
@@ -833,12 +831,13 @@ const createOddsHistoryCollection = async () => {
     )
   }
 
-  if (!(await attributeExists(config.collections.oddsHistory, 'change'))) {
-    await databases.createFloatAttribute(
+  if (!(await attributeExists(config.collections.oddsHistory, 'type'))) {
+    await databases.createStringAttribute(
       config.databaseId,
       config.collections.oddsHistory,
-      'change',
-      false
+      'type',
+      20,
+      true
     )
   }
 
@@ -881,12 +880,12 @@ const createOddsHistoryCollection = async () => {
         )
         log('idx_timestamp index created successfully')
       } catch (error) {
-        log(`Failed to create idx_timestamp index: ${error}`, 'error')
+        logError('create idx_timestamp index', error, { collection: 'timestamp indexes' })
       }
     } else {
       log(
         'eventTimestamp attribute is not available for index creation, skipping idx_timestamp index',
-        'error'
+        'info'
       )
     }
   }
@@ -922,11 +921,11 @@ const createMoneyFlowHistoryCollection = async () => {
   }
 
   // Create attributes (check if they exist first)
-  if (!(await attributeExists(config.collections.moneyFlowHistory, 'amount'))) {
+  if (!(await attributeExists(config.collections.moneyFlowHistory, 'holdPercentage'))) {
     await databases.createFloatAttribute(
       config.databaseId,
       config.collections.moneyFlowHistory,
-      'amount',
+      'holdPercentage',
       true
     )
   }
@@ -942,15 +941,6 @@ const createMoneyFlowHistoryCollection = async () => {
       config.collections.moneyFlowHistory,
       'eventTimestamp',
       true
-    )
-  }
-
-  if (!(await attributeExists(config.collections.moneyFlowHistory, 'change'))) {
-    await databases.createFloatAttribute(
-      config.databaseId,
-      config.collections.moneyFlowHistory,
-      'change',
-      false
     )
   }
 
@@ -995,12 +985,12 @@ const createMoneyFlowHistoryCollection = async () => {
         )
         log('idx_timestamp index created successfully')
       } catch (error) {
-        log(`Failed to create idx_timestamp index: ${error}`, 'error')
+        logError('create idx_timestamp index', error, { collection: 'timestamp indexes' })
       }
     } else {
       log(
         'eventTimestamp attribute is not available for index creation, skipping idx_timestamp index',
-        'error'
+        'info'
       )
     }
   }
@@ -1036,16 +1026,11 @@ const createUserAlertConfigsCollection = async () => {
   }
 
   // Create attributes (check if they exist first)
-  if (
-    !(await attributeExists(
-      config.collections.userAlertConfigs,
-      'userIdentifier'
-    ))
-  ) {
+  if (!(await attributeExists(config.collections.userAlertConfigs, 'userId'))) {
     await databases.createStringAttribute(
       config.databaseId,
       config.collections.userAlertConfigs,
-      'userIdentifier',
+      'userId',
       50,
       true
     )
@@ -1064,14 +1049,24 @@ const createUserAlertConfigsCollection = async () => {
   }
 
   if (
-    !(await attributeExists(config.collections.userAlertConfigs, 'conditions'))
+    !(await attributeExists(config.collections.userAlertConfigs, 'threshold'))
   ) {
-    await databases.createStringAttribute(
+    await databases.createFloatAttribute(
       config.databaseId,
       config.collections.userAlertConfigs,
-      'conditions',
-      1000,
+      'threshold',
       true
+    )
+  }
+
+  if (
+    !(await attributeExists(config.collections.userAlertConfigs, 'timeWindowSeconds'))
+  ) {
+    await databases.createIntegerAttribute(
+      config.databaseId,
+      config.collections.userAlertConfigs,
+      'timeWindowSeconds',
+      false
     )
   }
 
@@ -1086,14 +1081,16 @@ const createUserAlertConfigsCollection = async () => {
     )
   }
 
-  if (
-    !(await attributeExists(config.collections.userAlertConfigs, 'createdAt'))
-  ) {
-    await databases.createDatetimeAttribute(
+  // Add relationship to entrants
+  if (!(await attributeExists(config.collections.userAlertConfigs, 'entrant'))) {
+    await databases.createRelationshipAttribute(
       config.databaseId,
       config.collections.userAlertConfigs,
-      'createdAt',
-      true
+      config.collections.entrants,
+      RelationshipType.ManyToOne,
+      false,
+      'entrant',
+      'alertConfigs'
     )
   }
 
@@ -1110,7 +1107,7 @@ const createUserAlertConfigsCollection = async () => {
   ) {
     const isAvailable = await waitForAttributeAvailable(
       config.collections.userAlertConfigs,
-      'userIdentifier'
+      'userId'
     )
     if (isAvailable) {
       try {
@@ -1119,7 +1116,7 @@ const createUserAlertConfigsCollection = async () => {
           config.collections.userAlertConfigs,
           'idx_user_id',
           IndexType.Key,
-          ['userIdentifier']
+          ['userId']
         )
         log('idx_user_id index created successfully')
       } catch (error) {
@@ -1127,7 +1124,7 @@ const createUserAlertConfigsCollection = async () => {
       }
     } else {
       log(
-        'userIdentifier attribute is not available for index creation, skipping idx_user_id index',
+        'userId attribute is not available for index creation, skipping idx_user_id index',
         'error'
       )
     }
@@ -1191,13 +1188,11 @@ const createNotificationsCollection = async () => {
   }
 
   // Create attributes (check if they exist first)
-  if (
-    !(await attributeExists(config.collections.notifications, 'userIdentifier'))
-  ) {
+  if (!(await attributeExists(config.collections.notifications, 'userId'))) {
     await databases.createStringAttribute(
       config.databaseId,
       config.collections.notifications,
-      'userIdentifier',
+      'userId',
       50,
       true
     )
@@ -1242,12 +1237,23 @@ const createNotificationsCollection = async () => {
     )
   }
 
-  if (!(await attributeExists(config.collections.notifications, 'createdAt'))) {
-    await databases.createDatetimeAttribute(
+  if (!(await attributeExists(config.collections.notifications, 'raceId'))) {
+    await databases.createStringAttribute(
       config.databaseId,
       config.collections.notifications,
-      'createdAt',
-      true
+      'raceId',
+      50,
+      false
+    )
+  }
+
+  if (!(await attributeExists(config.collections.notifications, 'entrantId'))) {
+    await databases.createStringAttribute(
+      config.databaseId,
+      config.collections.notifications,
+      'entrantId',
+      50,
+      false
     )
   }
 
@@ -1264,7 +1270,7 @@ const createNotificationsCollection = async () => {
   ) {
     const isAvailable = await waitForAttributeAvailable(
       config.collections.notifications,
-      'userIdentifier'
+      'userId'
     )
     if (isAvailable) {
       try {
@@ -1273,7 +1279,7 @@ const createNotificationsCollection = async () => {
           config.collections.notifications,
           'idx_user_id',
           IndexType.Key,
-          ['userIdentifier']
+          ['userId']
         )
         log('idx_user_id index created successfully')
       } catch (error) {
@@ -1281,37 +1287,7 @@ const createNotificationsCollection = async () => {
       }
     } else {
       log(
-        'userIdentifier attribute is not available for index creation, skipping idx_user_id index',
-        'error'
-      )
-    }
-  }
-
-  if (
-    !collection.indexes.some(
-      (idx: { key: string }) => idx.key === 'idx_created_at'
-    )
-  ) {
-    const isAvailable = await waitForAttributeAvailable(
-      config.collections.notifications,
-      'createdAt'
-    )
-    if (isAvailable) {
-      try {
-        await databases.createIndex(
-          config.databaseId,
-          config.collections.notifications,
-          'idx_created_at',
-          IndexType.Key,
-          ['createdAt']
-        )
-        log('idx_created_at index created successfully')
-      } catch (error) {
-        log(`Failed to create idx_created_at index: ${error}`, 'error')
-      }
-    } else {
-      log(
-        'createdAt attribute is not available for index creation, skipping idx_created_at index',
+        'userId attribute is not available for index creation, skipping idx_user_id index',
         'error'
       )
     }
