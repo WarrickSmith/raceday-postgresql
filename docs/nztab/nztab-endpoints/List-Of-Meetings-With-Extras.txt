@@ -1,0 +1,640 @@
+{
+    "header": {
+        "title": "List Extras",
+        "generated_time": "2025-07-17T11:11:10.406526191Z",
+        "url": "/affiliates/v1/racing/extras?date_from=today"
+    },
+    "params": {
+        "country": null,
+        "date_from": "2025-07-17T00:00:00Z",
+        "date_to": "2025-07-17T23:59:59.999999999Z",
+        "enc": "json",
+        "categories": null,
+        "page_token": ""
+    },
+    "data": {
+        "extras": [
+            {
+                "meeting": {
+                    "meeting_id": "59b07ee9-ffb2-46d7-a7e3-a2f5eb8ced27",
+                    "meeting_name": "Addington",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "NZ",
+                    "state": "NZ",
+                    "category": "G"
+                },
+                "markets": [
+                    {
+                        "market_id": "6117b40d-9550-4104-9410-8adaaa01913a",
+                        "market_name": "Box Challenge - Addington"
+                    },
+                    {
+                        "market_id": "fd7d71ca-b97e-4c34-b87a-a063db42156e",
+                        "market_name": "Box To Have 3+ Winners"
+                    },
+                    {
+                        "market_id": "b9aa259e-9868-4082-8784-3e9bd2953d55",
+                        "market_name": "Box To Have 4+ Winners"
+                    },
+                    {
+                        "market_id": "f7f8121f-1798-46d6-9627-a9aef7cafb00",
+                        "market_name": "Most Points - Box 6 vs Box 5"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "e9f2039d-d489-4a7d-aae1-d66225f1a5f4",
+                    "meeting_name": "Awapuni Synthetic",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "NZ",
+                    "state": "NZ",
+                    "category": "T"
+                },
+                "markets": [
+                    {
+                        "market_id": "b3b4dc0e-7527-4772-aa34-4fae8c03ec0b",
+                        "market_name": "Jockey Challenge - Awapuni Synthetic"
+                    },
+                    {
+                        "market_id": "d58db133-91eb-45b9-93dd-bc461bb993ae",
+                        "market_name": "Most Points - Bruno Queiroz vs Kate Hercock"
+                    },
+                    {
+                        "market_id": "6189097c-9a58-460e-a6d9-ea4194cb12ee",
+                        "market_name": "Most Points - Jonathan Riddell vs Liam Kauri"
+                    },
+                    {
+                        "market_id": "4a40d50b-7fec-4bf6-957e-9723a0b7b0ea",
+                        "market_name": "Most Points - Kavish Chowdhoory vs Kelly Myers"
+                    },
+                    {
+                        "market_id": "5ce73bec-76d4-4428-843f-8ad7a5c66c81",
+                        "market_name": "To Ride A Winner in Last 4 Races"
+                    },
+                    {
+                        "market_id": "b44df4bc-68fb-4318-b8e4-8f92db12318b",
+                        "market_name": "To Train 1+ Winners"
+                    },
+                    {
+                        "market_id": "cbb21709-3889-41d7-9263-7557cae25131",
+                        "market_name": "To Train 2+ Winners"
+                    },
+                    {
+                        "market_id": "84791593-a7a9-4e6c-b4a8-1b2dba5a4ed5",
+                        "market_name": "To Train 3+ Winners"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "91ffd4a7-8b85-4362-a461-6b9bdae95e16",
+                    "meeting_name": "Bunbury Fibre Sand",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "AUS",
+                    "state": "WA",
+                    "category": "T"
+                },
+                "markets": [
+                    {
+                        "market_id": "89c11a13-49c5-45e7-bc30-20c173e7050a",
+                        "market_name": "Jockey Challenge - Bunbury Fibre Sand"
+                    },
+                    {
+                        "market_id": "8d00c304-49d4-4eb0-9741-e98d6cae1f56",
+                        "market_name": "To Ride 3+ Winners"
+                    },
+                    {
+                        "market_id": "1b3e5932-4850-4772-808d-1d1a09181a80",
+                        "market_name": "To Ride A Winner in Last 4 Races"
+                    },
+                    {
+                        "market_id": "73dd6b46-8988-4a70-a0a5-8982cc0977da",
+                        "market_name": "To Train 1+ Winners"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "3e1a5626-dd98-4498-be68-4ed46de9c006",
+                    "meeting_name": "Cambridge",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "NZ",
+                    "state": "NZ",
+                    "category": "H"
+                },
+                "markets": [
+                    {
+                        "market_id": "34f8b1be-5513-4cfc-a41e-6b137276c586",
+                        "market_name": "Driver Challenge - Cambridge"
+                    },
+                    {
+                        "market_id": "3f266882-22d5-4a32-b6be-22328e086dbc",
+                        "market_name": "To Drive 1+ Winners"
+                    },
+                    {
+                        "market_id": "b13440b3-27b0-42e6-b4ce-31ad9689b4f7",
+                        "market_name": "To Drive 2+ Winners"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "0274bcea-2819-4855-a51e-b77074dc6af0",
+                    "meeting_name": "Cambridge (G)",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "NZ",
+                    "state": "NZ",
+                    "category": "G"
+                },
+                "markets": [
+                    {
+                        "market_id": "cdb3c143-138b-4478-b40a-61bc452eb3e0",
+                        "market_name": "Box Challenge - Cambridge (G)"
+                    },
+                    {
+                        "market_id": "7fdc9672-aa2f-4107-814c-891dc944278e",
+                        "market_name": "Box To Have 3+ Winners"
+                    },
+                    {
+                        "market_id": "e6b48176-1b6c-42b4-88c2-bb68fc4fac9c",
+                        "market_name": "Most Points - Box 2 vs Box 4"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "9dc80909-78c7-4796-baed-6ee977cebc78",
+                    "meeting_name": "Casino",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "AUS",
+                    "state": "NSW",
+                    "category": "G"
+                },
+                "markets": [
+                    {
+                        "market_id": "a2514edb-4fed-425a-bda6-eaa137048d22",
+                        "market_name": "Box Challenge - Casino"
+                    },
+                    {
+                        "market_id": "abf36713-b4e9-40d9-a062-3ff9b84d7d60",
+                        "market_name": "Box To Have 3+ Winners"
+                    },
+                    {
+                        "market_id": "4b05dba5-ab16-420a-b6a8-df47a3ef09ab",
+                        "market_name": "Box To Have 4+ Winners"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "5d9ee8a1-e5de-4639-b8cf-665ee609ac6e",
+                    "meeting_name": "Cranbourne",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "AUS",
+                    "state": "VIC",
+                    "category": "T"
+                },
+                "markets": [
+                    {
+                        "market_id": "53b8ed4e-11af-4221-aedc-344f5ca1c15f",
+                        "market_name": "Jockey Challenge - Cranbourne"
+                    },
+                    {
+                        "market_id": "ffaf7e76-7e92-47b3-8ee4-a92df523d3c0",
+                        "market_name": "Most Points - Jye McNeil vs Jamie Mott"
+                    },
+                    {
+                        "market_id": "2b6f8add-e8f9-4538-a540-42743d7f65b1",
+                        "market_name": "Most Points - Stephanie Hateley vs Jordan Childs"
+                    },
+                    {
+                        "market_id": "11fb4979-2888-4091-9887-bad3a1df94d7",
+                        "market_name": "To Ride A Winner in First 4 & Last 4 Races"
+                    },
+                    {
+                        "market_id": "6f851b9e-4b6c-40fe-9cd0-3dae656f1625",
+                        "market_name": "To Ride A Winner in Last 4 Races"
+                    },
+                    {
+                        "market_id": "eaca6325-cbba-465e-8aca-eabd35511da6",
+                        "market_name": "To Train 1+ Winners"
+                    },
+                    {
+                        "market_id": "cfe17fae-279e-4bb0-88f8-0bfa807ad5fa",
+                        "market_name": "To Train 2+ Winners"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "d3f82a25-7acb-4a07-a942-e5fb36a1e426",
+                    "meeting_name": "Grafton",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "AUS",
+                    "state": "NSW",
+                    "category": "T"
+                },
+                "markets": [
+                    {
+                        "market_id": "bbfa161a-4919-4755-af2c-82f74ffa6b27",
+                        "market_name": "Jockey Challenge - Grafton"
+                    },
+                    {
+                        "market_id": "e86cdeda-6acd-49dc-bec1-5d3400c30322",
+                        "market_name": "Most Points - Blake Shinn vs Ben Looker"
+                    },
+                    {
+                        "market_id": "4137d61d-a12f-4735-8246-39d57c78a6b7",
+                        "market_name": "To Ride A Winner in First 4 & Last 4 Races"
+                    },
+                    {
+                        "market_id": "10b931e2-5d35-45ac-a9dc-882b153d6cfe",
+                        "market_name": "To Ride A Winner in Last 4 Races"
+                    },
+                    {
+                        "market_id": "ff73f5fe-4e56-4c51-a3af-13d8d2698c3f",
+                        "market_name": "To Train 1+ Winners"
+                    },
+                    {
+                        "market_id": "66373ca5-8514-44eb-baf1-f0070be4010f",
+                        "market_name": "To Train 2+ Winners"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "c919da74-facb-4d9f-ad15-3dc57811034f",
+                    "meeting_name": "Ipswich",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "AUS",
+                    "state": "QLD",
+                    "category": "T"
+                },
+                "markets": [
+                    {
+                        "market_id": "9e8267d8-585f-4e3a-9772-48cb2126841d",
+                        "market_name": "Jockey Challenge - Ipswich"
+                    },
+                    {
+                        "market_id": "6e7fc355-e506-4589-935c-5c81b0551940",
+                        "market_name": "To Ride 3+ Winners"
+                    },
+                    {
+                        "market_id": "31e66436-f681-4425-975c-6920302928aa",
+                        "market_name": "To Ride A Winner in Last 4 Races"
+                    },
+                    {
+                        "market_id": "97fef2eb-26d3-4d64-81f5-18923ba42a00",
+                        "market_name": "To Train 1+ Winners"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "00c48b5a-e00e-4c5a-bf5c-8371bd9fc112",
+                    "meeting_name": "Kembla Grange",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "AUS",
+                    "state": "NSW",
+                    "category": "T"
+                },
+                "markets": [
+                    {
+                        "market_id": "3521aa84-1c52-4ad6-973a-f1bc0465cf1b",
+                        "market_name": "Jockey Challenge - Kembla Grange"
+                    },
+                    {
+                        "market_id": "0765c062-a507-4b3b-b3d5-1ec4e66e3021",
+                        "market_name": "To Ride 3+ Winners"
+                    },
+                    {
+                        "market_id": "400eb727-bbd1-40e9-9950-583efa9a06e5",
+                        "market_name": "To Ride 4+ Winners"
+                    },
+                    {
+                        "market_id": "2dbaeb5e-5da7-4d6d-b676-2bf42454b57a",
+                        "market_name": "To Ride A Winner in First 4 & Last 4 Races"
+                    },
+                    {
+                        "market_id": "f68d810a-59f3-4ef9-bc01-5d509922a7e2",
+                        "market_name": "To Ride A Winner in Last 4 Races"
+                    },
+                    {
+                        "market_id": "e6ee7e77-bf1c-4302-be4a-ccfb01a4a43f",
+                        "market_name": "To Train 1+ Winners"
+                    },
+                    {
+                        "market_id": "fe781889-fe4d-40a6-8377-8505bf74909f",
+                        "market_name": "To Train 2+ Winners"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "1f1e2624-97c2-42da-a16b-913186111c2e",
+                    "meeting_name": "Kilmore",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "AUS",
+                    "state": "VIC",
+                    "category": "H"
+                },
+                "markets": [
+                    {
+                        "market_id": "b09d525b-2d2c-4add-bb25-90a65e81db95",
+                        "market_name": "Driver Challenge - Kilmore"
+                    },
+                    {
+                        "market_id": "23ab9243-0a75-4202-b73d-74bc0815a4a9",
+                        "market_name": "To Drive 1+ Winners"
+                    },
+                    {
+                        "market_id": "1b6922bb-31c8-4919-9f88-96d62c4188f2",
+                        "market_name": "To Train 1+ Winners"
+                    },
+                    {
+                        "market_id": "5e363c5e-202e-4ac4-9281-9dc4eb559144",
+                        "market_name": "To Train 2+ Winners"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "26234dd3-1390-427e-b01d-8ee569c036e6",
+                    "meeting_name": "Mount Gambier",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "AUS",
+                    "state": "SA",
+                    "category": "G"
+                },
+                "markets": [
+                    {
+                        "market_id": "72506de6-7f41-4cd6-8f0d-467f8427a0b7",
+                        "market_name": "Box Challenge - Mount Gambier"
+                    },
+                    {
+                        "market_id": "9ad45a71-851b-4bb2-aef9-23425d0ee3c4",
+                        "market_name": "Box To Have 3+ Winners"
+                    },
+                    {
+                        "market_id": "7a854852-252c-4868-b740-7efbdd6b73e0",
+                        "market_name": "Box To Have 4+ Winners"
+                    },
+                    {
+                        "market_id": "6ee15ca2-0756-491f-982a-3c31d4852763",
+                        "market_name": "Box To Have 5+ Winners"
+                    },
+                    {
+                        "market_id": "6b24f5b9-0137-4bfe-807d-c358609829d7",
+                        "market_name": "Most Points - Box 1 vs Box 7"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "ae166a49-cff6-4f57-83af-218ca6602069",
+                    "meeting_name": "Q Straight",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "AUS",
+                    "state": "QLD",
+                    "category": "G"
+                },
+                "markets": [
+                    {
+                        "market_id": "adbc8189-7955-44a5-a1fb-8ac43eaab85d",
+                        "market_name": "Box Challenge - Q Straight"
+                    },
+                    {
+                        "market_id": "761579d6-dbc1-4946-a643-09a8eb0ae8c0",
+                        "market_name": "Box To Have 3+ Winners"
+                    },
+                    {
+                        "market_id": "9508d26b-49f4-4524-967c-fc14ee4ab3f8",
+                        "market_name": "Most Points - Box 7 vs Box 8"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "09058efc-c2b2-4a6e-9a32-a3c857e96f4c",
+                    "meeting_name": "Redcliffe",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "AUS",
+                    "state": "QLD",
+                    "category": "H"
+                },
+                "markets": [
+                    {
+                        "market_id": "b79ec701-d718-4d65-81f3-a9c020f0caef",
+                        "market_name": "Driver Challenge - Redcliffe"
+                    },
+                    {
+                        "market_id": "f28da95d-c84f-4a0b-a928-38f1c96bb92e",
+                        "market_name": "To Drive 1+ Winners"
+                    },
+                    {
+                        "market_id": "0bd2c4f4-2a94-42e5-901b-35d5d41abd59",
+                        "market_name": "To Drive 2+ Winners"
+                    },
+                    {
+                        "market_id": "47b190cc-9290-45b0-9490-f29bb8b51c61",
+                        "market_name": "To Drive 3+ Winners"
+                    },
+                    {
+                        "market_id": "6f568db1-1570-4b8c-897b-249b48af0da6",
+                        "market_name": "To Train 1+ Winners"
+                    },
+                    {
+                        "market_id": "0c74f6f8-4c36-401c-ab40-941b12ce0d2c",
+                        "market_name": "To Train 3+ Winners"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "ceadaf6b-5901-40ef-976b-839d22ed863b",
+                    "meeting_name": "Richmond Straight",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "AUS",
+                    "state": "NSW",
+                    "category": "G"
+                },
+                "markets": [
+                    {
+                        "market_id": "6c0b0c4f-37f5-4abd-b816-ed4d26b76f13",
+                        "market_name": "Box Challenge - Richmond Straight"
+                    },
+                    {
+                        "market_id": "44f0e8bb-886a-4b7c-bf46-c7c0a85b5189",
+                        "market_name": "Box To Have 3+ Winners"
+                    },
+                    {
+                        "market_id": "f1d05000-4350-42aa-b406-bd1e123e8295",
+                        "market_name": "Box To Have 4+ Winners"
+                    },
+                    {
+                        "market_id": "1725d650-7c75-4a82-850b-dc791e9d4f37",
+                        "market_name": "Most Points - Box 6 vs Box 2"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "7bfb3fa2-13c6-45a2-8127-ab9d3e8289b7",
+                    "meeting_name": "Shepparton",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "AUS",
+                    "state": "VIC",
+                    "category": "G"
+                },
+                "markets": [
+                    {
+                        "market_id": "0555faa3-b495-42a7-91de-cb5a23dfd6cc",
+                        "market_name": "Box Challenge - Shepparton"
+                    },
+                    {
+                        "market_id": "599e832c-0e15-41ac-9a6a-ae683b9e1034",
+                        "market_name": "Box To Have 3+ Winners"
+                    },
+                    {
+                        "market_id": "14c325f1-7b14-4f85-be09-4a2bffce1ca9",
+                        "market_name": "Box To Have 5+ Winners"
+                    },
+                    {
+                        "market_id": "7763facb-94d7-48fd-87c5-9708cc4af233",
+                        "market_name": "Most Points - Box 1 vs Box 5"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "202a8c51-b41f-4edc-ab34-8a67d29b5612",
+                    "meeting_name": "Tamworth",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "AUS",
+                    "state": "NSW",
+                    "category": "H"
+                },
+                "markets": [
+                    {
+                        "market_id": "4a5b5052-b982-451b-82e2-dd303aa9e6ab",
+                        "market_name": "Driver Challenge - Tamworth"
+                    },
+                    {
+                        "market_id": "c09420a8-4fd3-4948-ae49-4a96d52143fd",
+                        "market_name": "To Drive 1+ Winners"
+                    },
+                    {
+                        "market_id": "7f3dc11f-7e4d-4e04-aa50-6c02e241974a",
+                        "market_name": "To Drive 2+ Winners"
+                    },
+                    {
+                        "market_id": "04d6a401-e690-4ec2-a912-e6ae663d16b0",
+                        "market_name": "To Drive 4+ Winners"
+                    },
+                    {
+                        "market_id": "5d6295d2-6c72-431b-ab18-c0ee8a8dae0a",
+                        "market_name": "To Train 1+ Winners"
+                    },
+                    {
+                        "market_id": "654bca40-edcb-4d6e-92f8-e22c41b0632d",
+                        "market_name": "To Train 2+ Winners"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "2b03e71b-8ec3-4c31-be1d-9e0cac1b3aae",
+                    "meeting_name": "Warragul",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "AUS",
+                    "state": "VIC",
+                    "category": "G"
+                },
+                "markets": [
+                    {
+                        "market_id": "884e0327-eeb7-4670-a305-9883c99a7132",
+                        "market_name": "Box Challenge - Warragul"
+                    },
+                    {
+                        "market_id": "861aa92b-8cb7-4ed2-b5aa-e2baca097141",
+                        "market_name": "Box To Have 4+ Winners"
+                    },
+                    {
+                        "market_id": "7caf55eb-a537-4857-8a9e-7dea46289154",
+                        "market_name": "Box To Have 5+ Winners"
+                    },
+                    {
+                        "market_id": "6aec7e19-bb27-476b-9ade-a64c4b3bcad4",
+                        "market_name": "Most Points - Box 1 vs Box 8"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "b4de09f9-a108-4567-8bf8-06ad916aff52",
+                    "meeting_name": "Warrnambool",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "AUS",
+                    "state": "VIC",
+                    "category": "G"
+                },
+                "markets": [
+                    {
+                        "market_id": "f18a0210-8e96-4e8f-b73c-586476de3b59",
+                        "market_name": "Box Challenge - Warrnambool"
+                    },
+                    {
+                        "market_id": "b4050d7d-e8a8-4c5f-a856-39746c1bc999",
+                        "market_name": "Box To Have 3+ Winners"
+                    },
+                    {
+                        "market_id": "2a5cda9e-8e21-4a7d-98e8-9be7769b804f",
+                        "market_name": "Box To Have 4+ Winners"
+                    },
+                    {
+                        "market_id": "cac6b910-a40f-4627-8473-9bf6572704b2",
+                        "market_name": "Box To Have 5+ Winners"
+                    },
+                    {
+                        "market_id": "383c9c62-6707-4b86-8757-e1513dbf9ed3",
+                        "market_name": "Most Points - Box 1 vs Box 8"
+                    }
+                ]
+            },
+            {
+                "meeting": {
+                    "meeting_id": "85fc0c65-6b71-4aaf-a879-51aaefe4b746",
+                    "meeting_name": "Winton",
+                    "advertised_start": "2025-07-17T00:00:00Z",
+                    "country": "NZ",
+                    "state": "NZ",
+                    "category": "H"
+                },
+                "markets": [
+                    {
+                        "market_id": "c64b44b9-cfd5-43a2-886d-35b6812efb09",
+                        "market_name": "Driver Challenge - Winton Nz"
+                    },
+                    {
+                        "market_id": "fffb2ae2-ea3a-475e-a84d-aed14521056d",
+                        "market_name": "To Drive 1+ Winners"
+                    },
+                    {
+                        "market_id": "ffc9bc91-3266-40a1-a53b-ee9a0ec37c27",
+                        "market_name": "To Drive 2+ Winners"
+                    },
+                    {
+                        "market_id": "b07cab57-cf17-4530-88ed-b0bab885c960",
+                        "market_name": "To Drive 3+ Winners"
+                    },
+                    {
+                        "market_id": "24ae24f1-5c17-4119-89c2-720614e62947",
+                        "market_name": "To Drive 4+ Winners"
+                    }
+                ]
+            }
+        ],
+        "next_page_token": "eyJwYWdlX251bWJlciI6MiwicGFnZV9yZXF1ZXN0X2hhc2giOiIzOGs3bnZ4MnFuZGFkIn0"
+    }
+}
