@@ -880,7 +880,7 @@ const createOddsHistoryCollection = async () => {
         )
         log('idx_timestamp index created successfully')
       } catch (error) {
-        logError('create idx_timestamp index', error, { collection: 'timestamp indexes' })
+        log(`Failed to create idx_timestamp index: ${error}`, 'error')
       }
     } else {
       log(
@@ -985,7 +985,7 @@ const createMoneyFlowHistoryCollection = async () => {
         )
         log('idx_timestamp index created successfully')
       } catch (error) {
-        logError('create idx_timestamp index', error, { collection: 'timestamp indexes' })
+        log(`Failed to create idx_timestamp index: ${error}`, 'error')
       }
     } else {
       log(
