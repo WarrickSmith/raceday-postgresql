@@ -19,7 +19,7 @@ Before running the application, you need to set up your Appwrite project:
 3. Create a `.env.local` file in the root directory:
 
 ```bash
-APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
+APPWRITE_ENDPOINT=https://appwrite.warricksmith.com/v1
 APPWRITE_PROJECT_ID=your_project_id_here
 APPWRITE_API_KEY=your_api_key_here
 ```
