@@ -1,4 +1,5 @@
 import { Client, Databases } from 'node-appwrite';
+import { ensureDatabaseSetup } from './database-setup.js';
 
 interface NZTABMeeting {
   meeting: string;
@@ -94,6 +95,14 @@ export default async function main(context: any) {
 
     const databases = new Databases(client);
     const databaseId = 'raceday-db';
+
+    // Ensure database and collections exist before proceeding
+    await ensureDatabaseSetup({
+      endpoint,
+      projectId,
+      apiKey,
+      databaseId
+    }, context);
 
     // Fetch racing data from NZTAB API
     const meetings = await fetchRacingData(nztabBaseUrl, context);
