@@ -94,51 +94,68 @@ The function interacts with these Appwrite database collections:
 
 ## Deployment Guide
 
-### Prerequisites
+### Automated Deployment (Recommended)
 
-1. **Appwrite Cloud Project**: Ensure you have an active Appwrite Cloud project
-2. **Database Setup**: Run the database setup script from the main project:
+This function includes automated deployment scripts and database setup verification. See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
+
+#### Quick Deployment
+
+1. **Configure Environment**:
    ```bash
-   cd client
-   npm run setup:appwrite
+   export APPWRITE_ENDPOINT="https://cloud.appwrite.io/v1"
+   export APPWRITE_PROJECT_ID="your-project-id"
+   export APPWRITE_API_KEY="your-api-key"
    ```
 
-### Deployment Steps
-
-1. **Install Appwrite CLI** (if not already installed):
+2. **Install Dependencies**:
    ```bash
-   npm install -g appwrite-cli
+   npm install
+   npm install -g appwrite-cli  # If not already installed
    ```
 
-2. **Login to Appwrite**:
+3. **Configure Appwrite CLI**:
    ```bash
-   appwrite login
+   appwrite client --endpoint $APPWRITE_ENDPOINT --project-id $APPWRITE_PROJECT_ID --key $APPWRITE_API_KEY
    ```
 
-3. **Deploy Function**:
+4. **Deploy Function**:
    ```bash
-   cd server/daily-race-importer
-   appwrite deploy function
+   npm run deploy
    ```
 
-4. **Configure Environment Variables**:
-   - Go to your Appwrite Console
-   - Navigate to Functions > daily-race-importer > Settings
-   - Add the required environment variables listed above
+#### Available NPM Scripts
 
-5. **Enable Function**:
-   - Ensure the function is enabled in the Appwrite Console
-   - Verify the CRON schedule is set correctly: `0 17 * * *`
+- `npm run deploy` - Deploy functions interactively
+- `npm run deploy:check` - List functions and validate CLI connection
+- `npm run dev` - Run function locally for testing
 
-### Alternative Manual Deployment
+#### Database Setup
 
-If using the Appwrite Console directly:
+The function includes **automatic database setup verification**:
+- Checks if database and collections exist before processing data
+- Automatically creates missing database infrastructure
+- Ensures all required collections and attributes are available
+- Safe to run multiple times (idempotent operations)
+
+No manual database setup is required - the function will create everything it needs.
+
+### Manual Deployment (Alternative)
+
+If you prefer manual deployment through the Appwrite Console:
 
 1. Create a new function in your Appwrite project
 2. Upload the contents of this directory as a ZIP file
 3. Configure environment variables in the function settings
 4. Set the schedule to `0 17 * * *`
 5. Enable the function
+
+### Deployment Verification
+
+After deployment, the function will:
+1. **Verify database setup** on first run
+2. **Create required collections** if they don't exist
+3. **Log detailed execution information** for monitoring
+4. **Run on schedule** at 6:00 AM NZ time daily
 
 ## Monitoring and Troubleshooting
 
