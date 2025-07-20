@@ -16,7 +16,7 @@ Before running the application, you need to set up your Appwrite project:
 
 1. Create a new project in [Appwrite Cloud](https://cloud.appwrite.io)
 2. Copy your Project ID and API Key
-3. Create a `.env.local` file in the root directory:
+3. Create a `.env.local` file in the `client/` directory:
 
 ```bash
 APPWRITE_ENDPOINT=https://appwrite.warricksmith.com/v1
@@ -29,6 +29,9 @@ APPWRITE_API_KEY=your_api_key_here
 Run the Appwrite setup script to create the database and collections:
 
 ```bash
+# Navigate to client directory
+cd client
+
 # Install dependencies first
 npm install
 
@@ -68,9 +71,10 @@ const role = await getUserRole(userId)
 
 ## Getting Started
 
-First, run the development server:
+First, navigate to the client directory and run the development server:
 
 ```bash
+cd client
 npm run dev
 # or
 yarn dev
@@ -82,7 +86,7 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+You can start editing the page by modifying `client/src/app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
@@ -90,26 +94,37 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ```
 /
-├── scripts/
-│   └── appwrite-setup.ts          # Database setup script
-├── src/
-│   ├── app/                       # Next.js App Router
-│   ├── components/                # React components
-│   ├── lib/
-│   │   └── appwrite.ts           # Appwrite client configuration
-│   └── services/                  # Backend service interactions
-├── docs/                          # Project documentation
-└── public/                        # Static assets
+├── client/                        # Next.js Frontend
+│   ├── scripts/
+│   │   └── appwrite-setup.ts     # Database setup script
+│   ├── src/
+│   │   ├── app/                  # Next.js App Router
+│   │   ├── components/           # React components
+│   │   ├── lib/
+│   │   │   └── appwrite.ts      # Appwrite client configuration
+│   │   └── services/             # Backend service interactions
+│   ├── public/                   # Static assets
+│   ├── package.json             # Frontend dependencies
+│   └── .env.local              # Environment variables
+├── server/                       # Appwrite Functions
+│   └── daily-race-importer/     # Daily race data import function
+├── docs/                         # Project documentation
+└── README.md                    # This file
 ```
 
 ## Available Scripts
 
+### Frontend (run from `client/` directory)
 - `npm run dev` - Start development server
 - `npm run build` - Build for production
 - `npm run start` - Start production server
 - `npm run lint` - Run ESLint
 - `npm run test` - Run tests
-- `npx tsx scripts/appwrite-setup.ts` - Set up Appwrite database
+- `npm run setup:appwrite` - Set up Appwrite database
+
+### Backend (Appwrite Functions)
+- Functions are deployed directly to Appwrite Cloud
+- Configuration files located in `server/` directory
 
 ## Tech Stack
 
