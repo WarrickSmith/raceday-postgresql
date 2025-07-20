@@ -16,16 +16,18 @@ The project follows a client-server split architecture:
 
 Key architectural components:
 - **Frontend**: Next.js App Router with real-time Appwrite subscriptions
-- **Backend**: Appwrite Cloud with serverless functions for data polling
+- **Backend**: Appwrite Cloud with serverless functions for data polling (`daily-race-importer`, `race-data-poller`, `alert-evaluator`)
 - **Database**: Appwrite database with collections for Meetings, Races, Entrants, OddsHistory, MoneyFlowHistory, UserAlertConfigs, and Notifications
 - **Data Source**: New Zealand TAB API integration
+- **Real-time**: Appwrite Realtime channels for live dashboard updates
 
 ## Development Commands
 
-### Client Development (run from /client directory)
+### Essential Commands (run from /client directory)
+- `cd client` - **Always navigate to client directory first**
+- `npm install` - Install dependencies after pulling changes
 - `npm run dev` - Start development server with Turbopack
 - `npm run build` - Build for production
-- `npm run start` - Start production server
 - `npm run lint` - Run ESLint linting
 - `npm run test` - Run Jest test suite
 - `npm run test:watch` - Run tests in watch mode
@@ -34,6 +36,10 @@ Key architectural components:
 ### Database Setup
 - `npm run setup:appwrite` - Initialize Appwrite database and collections (idempotent)
 - `npx tsx scripts/appwrite-setup.ts` - Alternative way to run setup script
+
+### Single Test Execution
+- `npm test -- --testNamePattern="test name"` - Run specific test by name
+- `npm test -- src/path/to/test.test.ts` - Run specific test file
 
 ## Environment Configuration
 
@@ -73,6 +79,25 @@ All collections use relationship attributes for data linking and include proper 
 - **Styling**: Tailwind CSS utility classes
 - **State Management**: Appwrite SDK with SWR for client-side data fetching
 - **Real-time**: Appwrite Realtime subscriptions for live data updates
+
+## Project Structure & Key Files
+
+### Configuration Files
+- `next.config.ts` - Next.js configuration with security headers and Docker optimization
+- `jest.config.js` - Test configuration with Appwrite SDK mocking
+- `eslint.config.mjs` - ESLint configuration using Next.js recommended rules
+
+### Critical Directories
+- `client/src/app/` - Next.js App Router pages and API routes
+- `client/scripts/` - Database setup and utility scripts  
+- `docs/` - Comprehensive project documentation including architecture specs
+- `docs/architecture/` - Detailed system architecture documentation
+
+### Authentication & User Management
+The application uses Appwrite user labels for role-based access:
+- "user" label (default user role)  
+- "admin" label (admin role)
+User roles must be manually configured in Appwrite console after running setup script.
 
 ## Key Integration Points
 
