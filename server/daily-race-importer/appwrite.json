@@ -732,13 +732,21 @@
             "events": [],
             "scopes": [
                 "databases.read",
-                "databases.write"
+                "databases.write",
+                "collections.read",
+                "collections.write",
+                "attributes.read",
+                "attributes.write",
+                "indexes.read",
+                "indexes.write",
+                "documents.read",
+                "documents.write"
             ],
             "schedule": "0 17 * * *",
             "timeout": 300,
             "enabled": true,
             "logging": true,
-            "entrypoint": "dist/main.js",
+            "entrypoint": "src/main.js",
             "commands": "npm install",
             "path": "functions/daily-race-importer"
         }
