@@ -4,19 +4,24 @@ This guide covers the available deployment methods for the daily race importer f
 
 ## Prerequisites
 
-1. **Appwrite CLI**: Install globally if not already installed
+1. **Node.js**: Version 22.x or higher required for function runtime compatibility
+   ```bash
+   node --version  # Should be 22.x or higher
+   ```
+
+2. **Appwrite CLI**: Install globally if not already installed
    ```bash
    npm install -g appwrite-cli
    ```
 
-2. **Environment Variables**: Configure your Appwrite credentials
+3. **Environment Variables**: Configure your Appwrite credentials
    ```bash
    export APPWRITE_ENDPOINT="https://cloud.appwrite.io/v1"
    export APPWRITE_PROJECT_ID="your-project-id"
    export APPWRITE_API_KEY="your-api-key"
    ```
 
-3. **Appwrite CLI Configuration**: Configure the CLI (one-time setup)
+4. **Appwrite CLI Configuration**: Configure the CLI (one-time setup)
    ```bash
    appwrite client \
      --endpoint $APPWRITE_ENDPOINT \
@@ -78,6 +83,25 @@ Use the provided deployment script for more control:
 ./deploy.sh --help
 ```
 
+## Runtime Configuration
+
+This function is configured to run on **Node.js 22** runtime for optimal performance and security. The runtime configuration is specified in `appwrite.json`:
+
+```json
+{
+  "functions": [{
+    "runtime": "node-22",
+    "name": "daily-race-importer"
+  }]
+}
+```
+
+**Runtime Features:**
+- Enhanced performance with Node.js 22 improvements
+- Latest security patches and bug fixes
+- Support for modern JavaScript features
+- Better memory management and garbage collection
+
 ## Deployment Process
 
 When you run any deployment method, the following happens:
@@ -85,7 +109,7 @@ When you run any deployment method, the following happens:
 1. **Build**: TypeScript code is compiled to JavaScript in the `dist/` directory
 2. **Package**: Appwrite CLI packages the function code and dependencies
 3. **Upload**: Function is uploaded to your Appwrite project
-4. **Deploy**: Function is deployed and becomes available for execution
+4. **Deploy**: Function is deployed and becomes available for execution on Node.js 22 runtime
 
 ## Environment Configuration
 

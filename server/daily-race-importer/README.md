@@ -5,7 +5,7 @@ This Appwrite Cloud Function automatically imports horse and harness racing data
 ## Overview
 
 - **Function Name**: `daily-race-importer`
-- **Runtime**: Node.js v22.17.0+
+- **Runtime**: Node.js 22 (latest)
 - **Schedule**: Daily at 6:00 AM New Zealand time (17:00 UTC / 18:00 UTC during DST)
 - **Purpose**: Import AU/NZ Horse and Harness racing meetings and races, excluding Greyhound racing
 
@@ -34,7 +34,7 @@ NZTAB_API_BASE_URL=https://api.tab.co.nz
     {
       "$id": "daily-race-importer",
       "name": "Daily Race Importer",
-      "runtime": "node-22.0",
+      "runtime": "node-22",
       "execute": ["any"],
       "events": [],
       "schedule": "0 17 * * *",
