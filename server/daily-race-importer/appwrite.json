@@ -724,7 +724,7 @@
         {
             "$id": "687c8695002e32d4272b",
             "name": "daily-race-importer",
-            "runtime": "node-22.0",
+            "runtime": "node-16.0",
             "specification": "s-1vcpu-1gb",
             "execute": [
                 "any"
