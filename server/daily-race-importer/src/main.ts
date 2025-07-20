@@ -218,9 +218,36 @@ async function processMeetingsAndRaces(
   let meetingsProcessed = 0;
   let racesProcessed = 0;
 
-  for (const meeting of meetings) {
+  // Helper function for performant upsert using the manual approach
+  const performantUpsert = async (
+    collectionId: string,
+    documentId: string,
+    data: any,
+    context: any
+  ): Promise<boolean> => {
     try {
-      // Upsert meeting document - following recommendations from docs/nztab/1-Initial-Data-review-reccomendations.txt
+      // Try to update existing document first (faster for existing documents)
+      await databases.updateDocument(databaseId, collectionId, documentId, data);
+      return true;
+    } catch (error) {
+      // If update fails (document doesn't exist), create new document
+      try {
+        await databases.createDocument(databaseId, collectionId, documentId, data);
+        return true;
+      } catch (createError) {
+        context.error(`Failed to create ${collectionId} document`, {
+          documentId,
+          error: createError instanceof Error ? createError.message : 'Unknown error'
+        });
+        return false;
+      }
+    }
+  };
+
+  // Process all meetings concurrently  
+  const meetingPromises = meetings.map(async (meeting) => {
+    try {
+      // Prepare meeting document - following recommendations from docs/nztab/1-Initial-Data-review-reccomendations.txt
       const meetingDoc: MeetingDocument = {
         meetingId: meeting.meeting,
         meetingName: meeting.name,
@@ -230,36 +257,12 @@ async function processMeetingsAndRaces(
         status: 'active'
       };
 
-      await upsertMeeting(databases, databaseId, meetingDoc, context);
-      meetingsProcessed++;
-
-      // Process races for this meeting
-      for (const race of meeting.races) {
-        try {
-          // Following field mapping recommendations from docs/nztab/1-Initial-Data-review-reccomendations.txt
-          const raceDoc: RaceDocument = {
-            raceId: race.id, // Changed from raceIdentifier per recommendations
-            name: race.name,
-            raceNumber: race.race_number,
-            startTime: race.start_time, // Using advertised_start_string per recommendations
-            ...(race.distance !== undefined && { distance: race.distance }), // Type corrected to Integer per recommendations
-            ...(race.track_condition !== undefined && { trackCondition: race.track_condition }), // Changed from 'track' per recommendations
-            ...(race.weather !== undefined && { weather: race.weather }),
-            status: race.status,
-            meeting: meeting.meeting
-          };
-
-          await upsertRace(databases, databaseId, raceDoc, context);
-          racesProcessed++;
-
-        } catch (error) {
-          context.error('Failed to process race', {
-            raceId: race.id,
-            raceName: race.name,
-            meetingId: meeting.meeting,
-            error: error instanceof Error ? error.message : 'Unknown error'
-          });
-        }
+      const success = await performantUpsert('meetings', meeting.meeting, meetingDoc, context);
+      if (success) {
+        context.log('Upserted meeting', { meetingId: meeting.meeting, name: meeting.name });
+        return { success: true, meetingId: meeting.meeting };
+      } else {
+        return { success: false, meetingId: meeting.meeting };
       }
 
     } catch (error) {
@@ -268,58 +271,76 @@ async function processMeetingsAndRaces(
         meetingName: meeting.name,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
+      return { success: false, meetingId: meeting.meeting, error };
     }
+  });
+
+  // Process all meetings concurrently
+  const meetingResults = await Promise.all(meetingPromises);
+  meetingsProcessed = meetingResults.filter(result => result.success).length;
+
+  // Prepare all race documents for batch processing
+  const allRaces: Array<{ meeting: string; race: NZTABRace }> = [];
+  meetings.forEach(meeting => {
+    meeting.races.forEach(race => {
+      allRaces.push({ meeting: meeting.meeting, race });
+    });
+  });
+
+  // Process races in batches for better performance and error handling
+  const batchSize = 15; // Process 15 races at a time for optimal performance
+  for (let i = 0; i < allRaces.length; i += batchSize) {
+    const batch = allRaces.slice(i, i + batchSize);
+    
+    const racePromises = batch.map(async ({ meeting, race }) => {
+      try {
+        // Following field mapping recommendations from docs/nztab/1-Initial-Data-review-reccomendations.txt
+        const raceDoc: RaceDocument = {
+          raceId: race.id, // Changed from raceIdentifier per recommendations
+          name: race.name,
+          raceNumber: race.race_number,
+          startTime: race.start_time, // Using advertised_start_string per recommendations
+          ...(race.distance !== undefined && { distance: race.distance }), // Type corrected to Integer per recommendations
+          ...(race.track_condition !== undefined && { trackCondition: race.track_condition }), // Changed from 'track' per recommendations
+          ...(race.weather !== undefined && { weather: race.weather }),
+          status: race.status,
+          meeting: meeting
+        };
+
+        const success = await performantUpsert('races', race.id, raceDoc, context);
+        if (success) {
+          context.log('Upserted race', { raceId: race.id, name: race.name });
+          return { success: true, raceId: race.id };
+        } else {
+          return { success: false, raceId: race.id };
+        }
+
+      } catch (error) {
+        context.error('Failed to process race', {
+          raceId: race.id,
+          raceName: race.name,
+          meetingId: meeting,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+        return { success: false, raceId: race.id, error };
+      }
+    });
+
+    // Process this batch concurrently
+    const batchResults = await Promise.all(racePromises);
+    const successfulRaces = batchResults.filter(result => result.success).length;
+    racesProcessed += successfulRaces;
+
+    // Log batch progress
+    context.log('Processed race batch', {
+      batchNumber: Math.floor(i / batchSize) + 1,
+      batchSize: batch.length,
+      successful: successfulRaces,
+      failed: batch.length - successfulRaces,
+      totalProcessed: racesProcessed
+    });
   }
 
   return { meetingsProcessed, racesProcessed };
 }
 
-async function upsertMeeting(
-  databases: Databases,
-  databaseId: string,
-  meeting: MeetingDocument,
-  context: any
-): Promise<void> {
-  try {
-    // Try to update existing meeting first
-    await databases.updateDocument(databaseId, 'meetings', meeting.meetingId, meeting);
-    context.log('Updated existing meeting', { meetingId: meeting.meetingId, name: meeting.meetingName });
-  } catch (error) {
-    // If update fails (document doesn't exist), create new meeting
-    try {
-      await databases.createDocument(databaseId, 'meetings', meeting.meetingId, meeting);
-      context.log('Created new meeting', { meetingId: meeting.meetingId, name: meeting.meetingName });
-    } catch (createError) {
-      context.error('Failed to create meeting', {
-        meetingId: meeting.meetingId,
-        error: createError instanceof Error ? createError.message : 'Unknown error'
-      });
-      throw createError;
-    }
-  }
-}
-
-async function upsertRace(
-  databases: Databases,
-  databaseId: string,
-  race: RaceDocument,
-  context: any
-): Promise<void> {
-  try {
-    // Try to update existing race first
-    await databases.updateDocument(databaseId, 'races', race.raceId, race);
-    context.log('Updated existing race', { raceId: race.raceId, name: race.name });
-  } catch (error) {
-    // If update fails (document doesn't exist), create new race
-    try {
-      await databases.createDocument(databaseId, 'races', race.raceId, race);
-      context.log('Created new race', { raceId: race.raceId, name: race.name });
-    } catch (createError) {
-      context.error('Failed to create race', {
-        raceId: race.raceId,
-        error: createError instanceof Error ? createError.message : 'Unknown error'
-      });
-      throw createError;
-    }
-  }
-}
