@@ -123,8 +123,23 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 - `npm run setup:appwrite` - Set up Appwrite database
 
 ### Backend (Appwrite Functions)
-- Functions are deployed directly to Appwrite Cloud
-- Configuration files located in `server/` directory
+
+The backend consists of Appwrite Cloud Functions located in the `server/` directory:
+
+#### Daily Race Importer Function
+- **Location**: `server/daily-race-importer/`
+- **Purpose**: Automatically imports daily racing data from NZ TAB API
+- **Schedule**: Runs daily at 6:00 AM New Zealand time
+- **Data**: Imports AU/NZ Horse and Harness racing (excludes Greyhounds)
+
+To deploy functions:
+```bash
+cd server/daily-race-importer
+npm install
+appwrite deploy function
+```
+
+See `server/daily-race-importer/README.md` for detailed deployment instructions.
 
 ## Tech Stack
 
