@@ -159,7 +159,10 @@ async function fetchRacingData(baseUrl: string, context: any): Promise<NZTABMeet
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'RaceDay-Daily-Importer/1.0.0'
+        'User-Agent': 'RaceDay-Daily-Importer/1.0.0',
+        'From': 'ws@baybox.co.nz',
+        'X-Partner': 'Warrick Smith',
+        'X-Partner-ID': 'Private Developer'
       }
     });
 
