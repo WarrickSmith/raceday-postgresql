@@ -190,8 +190,8 @@ async function fetchRacingData(baseUrl: string, context: any): Promise<NZTABMeet
 
 
 function filterMeetings(meetings: NZTABMeeting[], context: any): NZTABMeeting[] {
-  const allowedCountries = ['AUS', 'NZ'];  // NZ uses 'NZ' not 'NZL'
-  const allowedCategories = ['Thoroughbred Horse Racing', 'Harness Horse Racing'];  // Harness is 'Harness Horse Racing'
+  const allowedCountries = ['AUS', 'NZ'];  // API uses 'NZ' for New Zealand, not 'NZL'
+  const allowedCategories = ['Thoroughbred Horse Racing', 'Harness Horse Racing'];  // API uses full names
 
 
   const filtered = meetings.filter(meeting => {

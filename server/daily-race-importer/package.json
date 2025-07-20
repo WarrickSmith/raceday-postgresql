@@ -2,10 +2,11 @@
   "name": "daily-race-importer",
   "version": "1.0.0",
   "description": "Daily race data import function for RaceDay application",
-  "main": "src/main.js",
+  "main": "dist/main.js",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc",
     "dev": "npm run build && node local-runner.js",
     "watch": "tsc --watch",
     "deploy": "npm run build && appwrite push functions",

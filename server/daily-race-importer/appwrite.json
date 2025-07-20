@@ -724,20 +724,21 @@
         {
             "$id": "687c8695002e32d4272b",
             "name": "daily-race-importer",
-            "runtime": "node-16.0",
+            "runtime": "node-22.0",
             "specification": "s-1vcpu-1gb",
             "execute": [
                 "any"
             ],
             "events": [],
             "scopes": [
-                "users.read"
+                "databases.read",
+                "databases.write"
             ],
-            "schedule": "",
-            "timeout": 15,
+            "schedule": "0 17 * * *",
+            "timeout": 300,
             "enabled": true,
             "logging": true,
-            "entrypoint": "src/main.js",
+            "entrypoint": "dist/main.js",
             "commands": "npm install",
             "path": "functions/daily-race-importer"
         }
