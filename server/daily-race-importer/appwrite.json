@@ -740,7 +740,13 @@
                 "indexes.read",
                 "indexes.write",
                 "documents.read",
-                "documents.write"
+                "documents.write",
+                "functions.read",
+                "functions.write",
+                "execution.read",
+                "execution.write",
+                "migrations.read",
+                "migrations.write"
             ],
             "schedule": "0 17 * * *",
             "timeout": 300,
