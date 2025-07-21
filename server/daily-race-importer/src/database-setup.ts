@@ -1,4 +1,4 @@
-import { Client, Databases, Permission, Role, RelationshipType } from 'node-appwrite';
+import { Client, Databases, Permission, Role, RelationshipType, IndexType } from 'node-appwrite';
 
 interface SetupConfig {
   endpoint: string;
@@ -49,6 +49,44 @@ const attributeExists = async (
     }
     throw error;
   }
+};
+
+// Check if attribute is available for index creation
+const isAttributeAvailable = async (
+  databases: Databases,
+  databaseId: string,
+  collectionId: string,
+  attributeKey: string
+): Promise<boolean> => {
+  try {
+    const collection = await databases.getCollection(databaseId, collectionId);
+    const attribute = collection.attributes.find(
+      (attr: { key: string; status?: string }) => attr.key === attributeKey
+    );
+    return attribute?.status === 'available';
+  } catch {
+    return false;
+  }
+};
+
+// Wait for attribute to become available
+const waitForAttributeAvailable = async (
+  databases: Databases,
+  databaseId: string,
+  collectionId: string,
+  attributeKey: string,
+  context: any,
+  maxRetries: number = 10,
+  delayMs: number = 1000
+): Promise<boolean> => {
+  for (let i = 0; i < maxRetries; i++) {
+    if (await isAttributeAvailable(databases, databaseId, collectionId, attributeKey)) {
+      return true;
+    }
+    context.log(`Waiting for attribute ${attributeKey} to become available... (${i + 1}/${maxRetries})`);
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  return false;
 };
 
 // Setup database and all collections for the race day application
@@ -146,6 +184,66 @@ async function ensureMeetingsCollection(databases: Databases, config: SetupConfi
       }
     }
   }
+
+  // Create indexes (check if they exist first)
+  const collection = await databases.getCollection(config.databaseId, collectionId);
+
+  if (!collection.indexes.some((idx: { key: string }) => idx.key === 'idx_date')) {
+    context.log('Creating idx_date index on date...');
+    const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'date', context);
+    if (!isAvailable) {
+      context.log('date attribute is not available for index creation, skipping idx_date index');
+    } else {
+      try {
+        await databases.createIndex(config.databaseId, collectionId, 'idx_date', IndexType.Key, ['date']);
+        context.log('idx_date index created successfully');
+      } catch (error) {
+        context.error(`Failed to create idx_date index: ${error}`);
+      }
+    }
+  }
+
+  if (!collection.indexes.some((idx: { key: string }) => idx.key === 'idx_country')) {
+    const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'country', context);
+    if (isAvailable) {
+      try {
+        await databases.createIndex(config.databaseId, collectionId, 'idx_country', IndexType.Key, ['country']);
+        context.log('idx_country index created successfully');
+      } catch (error) {
+        context.error(`Failed to create idx_country index: ${error}`);
+      }
+    } else {
+      context.log('country attribute is not available for index creation, skipping idx_country index');
+    }
+  }
+
+  if (!collection.indexes.some((idx: { key: string }) => idx.key === 'idx_race_type')) {
+    const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'raceType', context);
+    if (isAvailable) {
+      try {
+        await databases.createIndex(config.databaseId, collectionId, 'idx_race_type', IndexType.Key, ['raceType']);
+        context.log('idx_race_type index created successfully');
+      } catch (error) {
+        context.error(`Failed to create idx_race_type index: ${error}`);
+      }
+    } else {
+      context.log('raceType attribute is not available for index creation, skipping idx_race_type index');
+    }
+  }
+
+  if (!collection.indexes.some((idx: { key: string }) => idx.key === 'idx_meeting_id')) {
+    const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'meetingId', context);
+    if (isAvailable) {
+      try {
+        await databases.createIndex(config.databaseId, collectionId, 'idx_meeting_id', IndexType.Unique, ['meetingId']);
+        context.log('idx_meeting_id index created successfully');
+      } catch (error) {
+        context.error(`Failed to create idx_meeting_id index: ${error}`);
+      }
+    } else {
+      context.log('meetingId attribute is not available for index creation, skipping idx_meeting_id index');
+    }
+  }
 }
 
 async function ensureRacesCollection(databases: Databases, config: SetupConfig, context: any): Promise<void> {
@@ -225,6 +323,51 @@ async function ensureRacesCollection(databases: Databases, config: SetupConfig, 
       'meeting',
       'races'
     );
+  }
+
+  // Create indexes for races collection
+  const racesCollection = await databases.getCollection(config.databaseId, collectionId);
+
+  if (!racesCollection.indexes.some((idx: { key: string }) => idx.key === 'idx_race_id')) {
+    const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'raceId', context);
+    if (isAvailable) {
+      try {
+        await databases.createIndex(config.databaseId, collectionId, 'idx_race_id', IndexType.Unique, ['raceId']);
+        context.log('idx_race_id index created successfully');
+      } catch (error) {
+        context.error(`Failed to create idx_race_id index: ${error}`);
+      }
+    } else {
+      context.log('raceId attribute is not available for index creation, skipping idx_race_id index');
+    }
+  }
+
+  if (!racesCollection.indexes.some((idx: { key: string }) => idx.key === 'idx_start_time')) {
+    const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'startTime', context);
+    if (isAvailable) {
+      try {
+        await databases.createIndex(config.databaseId, collectionId, 'idx_start_time', IndexType.Key, ['startTime']);
+        context.log('idx_start_time index created successfully');
+      } catch (error) {
+        context.error(`Failed to create idx_start_time index: ${error}`);
+      }
+    } else {
+      context.log('startTime attribute is not available for index creation, skipping idx_start_time index');
+    }
+  }
+
+  if (!racesCollection.indexes.some((idx: { key: string }) => idx.key === 'idx_race_number')) {
+    const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'raceNumber', context);
+    if (isAvailable) {
+      try {
+        await databases.createIndex(config.databaseId, collectionId, 'idx_race_number', IndexType.Key, ['raceNumber']);
+        context.log('idx_race_number index created successfully');
+      } catch (error) {
+        context.error(`Failed to create idx_race_number index: ${error}`);
+      }
+    } else {
+      context.log('raceNumber attribute is not available for index creation, skipping idx_race_number index');
+    }
   }
 }
 
@@ -316,6 +459,37 @@ async function ensureEntrantsCollection(databases: Databases, config: SetupConfi
       'entrants'
     );
   }
+
+  // Create indexes for entrants collection
+  const entrantsCollection = await databases.getCollection(config.databaseId, collectionId);
+
+  if (!entrantsCollection.indexes.some((idx: { key: string }) => idx.key === 'idx_entrant_id')) {
+    const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'entrantId', context);
+    if (isAvailable) {
+      try {
+        await databases.createIndex(config.databaseId, collectionId, 'idx_entrant_id', IndexType.Unique, ['entrantId']);
+        context.log('idx_entrant_id index created successfully');
+      } catch (error) {
+        context.error(`Failed to create idx_entrant_id index: ${error}`);
+      }
+    } else {
+      context.log('entrantId attribute is not available for index creation, skipping idx_entrant_id index');
+    }
+  }
+
+  if (!entrantsCollection.indexes.some((idx: { key: string }) => idx.key === 'idx_runner_number')) {
+    const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'runnerNumber', context);
+    if (isAvailable) {
+      try {
+        await databases.createIndex(config.databaseId, collectionId, 'idx_runner_number', IndexType.Key, ['runnerNumber']);
+        context.log('idx_runner_number index created successfully');
+      } catch (error) {
+        context.error(`Failed to create idx_runner_number index: ${error}`);
+      }
+    } else {
+      context.log('runnerNumber attribute is not available for index creation, skipping idx_runner_number index');
+    }
+  }
 }
 
 async function ensureOddsHistoryCollection(databases: Databases, config: SetupConfig, context: any): Promise<void> {
@@ -391,6 +565,23 @@ async function ensureOddsHistoryCollection(databases: Databases, config: SetupCo
       'oddsHistory'
     );
   }
+
+  // Create indexes for odds history collection
+  const oddsCollection = await databases.getCollection(config.databaseId, collectionId);
+
+  if (!oddsCollection.indexes.some((idx: { key: string }) => idx.key === 'idx_timestamp')) {
+    const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'eventTimestamp', context);
+    if (isAvailable) {
+      try {
+        await databases.createIndex(config.databaseId, collectionId, 'idx_timestamp', IndexType.Key, ['eventTimestamp']);
+        context.log('idx_timestamp index created successfully for odds history');
+      } catch (error) {
+        context.error(`Failed to create idx_timestamp index for odds history: ${error}`);
+      }
+    } else {
+      context.log('eventTimestamp attribute is not available for index creation, skipping idx_timestamp index');
+    }
+  }
 }
 
 async function ensureMoneyFlowHistoryCollection(databases: Databases, config: SetupConfig, context: any): Promise<void> {
@@ -456,6 +647,23 @@ async function ensureMoneyFlowHistoryCollection(databases: Databases, config: Se
       'entrant',
       'moneyFlowHistory'
     );
+  }
+
+  // Create indexes for money flow history collection
+  const moneyFlowCollection = await databases.getCollection(config.databaseId, collectionId);
+
+  if (!moneyFlowCollection.indexes.some((idx: { key: string }) => idx.key === 'idx_timestamp')) {
+    const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'eventTimestamp', context);
+    if (isAvailable) {
+      try {
+        await databases.createIndex(config.databaseId, collectionId, 'idx_timestamp', IndexType.Key, ['eventTimestamp']);
+        context.log('idx_timestamp index created successfully for money flow history');
+      } catch (error) {
+        context.error(`Failed to create idx_timestamp index for money flow history: ${error}`);
+      }
+    } else {
+      context.log('eventTimestamp attribute is not available for index creation, skipping idx_timestamp index');
+    }
   }
 }
 
@@ -541,6 +749,37 @@ async function ensureUserAlertConfigsCollection(databases: Databases, config: Se
       'alertConfigs'
     );
   }
+
+  // Create indexes for user alert configs collection
+  const alertConfigsCollection = await databases.getCollection(config.databaseId, collectionId);
+
+  if (!alertConfigsCollection.indexes.some((idx: { key: string }) => idx.key === 'idx_user_id')) {
+    const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'userId', context);
+    if (isAvailable) {
+      try {
+        await databases.createIndex(config.databaseId, collectionId, 'idx_user_id', IndexType.Key, ['userId']);
+        context.log('idx_user_id index created successfully for user alert configs');
+      } catch (error) {
+        context.error(`Failed to create idx_user_id index for user alert configs: ${error}`);
+      }
+    } else {
+      context.log('userId attribute is not available for index creation, skipping idx_user_id index');
+    }
+  }
+
+  if (!alertConfigsCollection.indexes.some((idx: { key: string }) => idx.key === 'idx_alert_type')) {
+    const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'alertType', context);
+    if (isAvailable) {
+      try {
+        await databases.createIndex(config.databaseId, collectionId, 'idx_alert_type', IndexType.Key, ['alertType']);
+        context.log('idx_alert_type index created successfully for user alert configs');
+      } catch (error) {
+        context.error(`Failed to create idx_alert_type index for user alert configs: ${error}`);
+      }
+    } else {
+      context.log('alertType attribute is not available for index creation, skipping idx_alert_type index');
+    }
+  }
 }
 
 async function ensureNotificationsCollection(databases: Databases, config: SetupConfig, context: any): Promise<void> {
@@ -598,6 +837,23 @@ async function ensureNotificationsCollection(databases: Databases, config: Setup
           attr.default
         );
       }
+    }
+  }
+
+  // Create indexes for notifications collection
+  const notificationsCollection = await databases.getCollection(config.databaseId, collectionId);
+
+  if (!notificationsCollection.indexes.some((idx: { key: string }) => idx.key === 'idx_user_id')) {
+    const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'userId', context);
+    if (isAvailable) {
+      try {
+        await databases.createIndex(config.databaseId, collectionId, 'idx_user_id', IndexType.Key, ['userId']);
+        context.log('idx_user_id index created successfully for notifications');
+      } catch (error) {
+        context.error(`Failed to create idx_user_id index for notifications: ${error}`);
+      }
+    } else {
+      context.log('userId attribute is not available for index creation, skipping idx_user_id index');
     }
   }
 }
