@@ -150,10 +150,26 @@ export default async function main(context: any) {
 
 async function fetchRacingData(baseUrl: string, context: any): Promise<NZTABMeeting[]> {
   try {
-    // Use the meetings endpoint - default date is today when not specified
-    const apiUrl = `${baseUrl}/affiliates/v1/racing/meetings`;
+    // Get today's date in New Zealand timezone (NZST/NZDT)
+    const nzDate = new Date().toLocaleDateString('en-CA', {
+      timeZone: 'Pacific/Auckland',
+    }); // Returns YYYY-MM-DD format
+
+    // Build API URL with explicit date only - filter countries client-side for better performance
+    // API doesn't accept comma-separated values, so client-side filtering is more efficient
+    // than making multiple API calls (5 countries × 2 categories = 10 requests)
+    const params = new URLSearchParams({
+      date_from: nzDate,
+      date_to: nzDate,
+    });
+
+    const apiUrl = `${baseUrl}/affiliates/v1/racing/meetings?${params.toString()}`;
     
-    context.log('Fetching racing data from NZTAB API', { apiUrl });
+    context.log('Fetching racing data from NZTAB API', { 
+      apiUrl, 
+      nzDate,
+      timezone: 'Pacific/Auckland'
+    });
 
     const response = await fetch(apiUrl, {
       method: 'GET',
@@ -193,9 +209,12 @@ async function fetchRacingData(baseUrl: string, context: any): Promise<NZTABMeet
 
 
 function filterMeetings(meetings: NZTABMeeting[], context: any): NZTABMeeting[] {
-  const allowedCountries = ['AUS', 'NZ'];  // API uses 'NZ' for New Zealand, not 'NZL'
-  const allowedCategories = ['Thoroughbred Horse Racing', 'Harness Horse Racing'];  // API uses full names
+  const allowedCountries = ['AUS', 'NZ'];
+  const allowedCategories = ['Thoroughbred Horse Racing', 'Harness Horse Racing'];
 
+  // Log what countries we're seeing in the data
+  const countriesFound = [...new Set(meetings.map(meeting => meeting.country))];
+  const categoriesFound = [...new Set(meetings.map(meeting => meeting.category_name))];
 
   const filtered = meetings.filter(meeting => {
     // Filter by country (Australia and New Zealand only)
@@ -211,11 +230,16 @@ function filterMeetings(meetings: NZTABMeeting[], context: any): NZTABMeeting[] 
     return true;
   });
 
-  context.log('Filtered meetings for AU/NZ Horse/Harness racing only', {
+  context.log('Filtered meetings for AU/NZ Horse/Harness racing', {
     originalCount: meetings.length,
     filteredCount: filtered.length,
     allowedCountries,
-    allowedCategories
+    allowedCategories,
+    countriesFound,
+    categoriesFound,
+    countriesFiltered: meetings.length - filtered.length > 0 ? 
+      `Filtered out: ${meetings.length - filtered.length} meetings` : 
+      'No filtering needed'
   });
 
   return filtered;
