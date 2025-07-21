@@ -10,6 +10,7 @@
     "dev": "npm run build && node local-runner.js",
     "watch": "tsc --watch",
     "deploy": "npm run build && cp dist/* functions/daily-race-importer/src/ && appwrite push functions",
+    "deploy:env": "node deploy-with-env.js",
     "execute": "appwrite functions list && echo 'Enter function ID to execute:' && read FUNC_ID && appwrite functions create-execution --function-id $FUNC_ID",
     "execute:this": "appwrite functions create-execution --function-id 687c8695002e32d4272b",
     "login": "node login.js",
