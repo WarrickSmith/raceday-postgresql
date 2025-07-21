@@ -1,0 +1,29 @@
+{
+  "projectId": "racedaytest250701",
+  "projectName": "RaceDayTest",
+  "functions": [
+    {
+      "$id": "race-data-poller",
+      "name": "race-data-poller",
+      "runtime": "node-22",
+      "specification": "s-1vcpu-1gb",
+      "execute": ["any"],
+      "events": [],
+      "scopes": [
+        "databases.read",
+        "databases.write",
+        "collections.read",
+        "collections.write",
+        "documents.read",
+        "documents.write"
+      ],
+      "schedule": "",
+      "timeout": 300,
+      "enabled": true,
+      "logging": true,
+      "entrypoint": "src/main.js",
+      "commands": "npm install",
+      "path": "functions/race-data-poller"
+    }
+  ]
+}
