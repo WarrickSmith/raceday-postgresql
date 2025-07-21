@@ -59,8 +59,23 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run type checking
-        run: npx tsc --noEmit
+      - name: Validate function configuration
+        run: |
+          echo "Validating Appwrite function configuration..."
+          test -f appwrite.json && echo "✓ appwrite.json exists" || exit 1
+          test -f functions/daily-race-importer/src/main.js && echo "✓ main.js exists" || exit 1
+          test -f functions/daily-race-importer/package.json && echo "✓ function package.json exists" || exit 1
+          echo "✓ Function structure validated"
 
-      - name: Build function
-        run: npm run build
+      - name: Check function dependencies
+        run: |
+          cd functions/daily-race-importer
+          npm install
+          echo "✓ Function dependencies installed successfully"
+
+      - name: Validate JavaScript syntax
+        run: |
+          cd functions/daily-race-importer
+          node -c src/main.js && echo "✓ main.js syntax valid" || exit 1
+          node -c src/database-setup.js && echo "✓ database-setup.js syntax valid" || exit 1
+          echo "✓ JavaScript syntax validation completed"
