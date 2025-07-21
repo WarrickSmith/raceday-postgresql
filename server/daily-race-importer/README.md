@@ -1,13 +1,22 @@
-# Daily Race Importer Function
+# Daily Race Importer Function ✅ Production Deployed
 
-This Appwrite Cloud Function automatically imports horse and harness racing data from the New Zealand TAB API on a daily schedule.
+This Appwrite Cloud Function automatically imports horse and harness racing data from the New Zealand TAB API on a daily schedule. **Status: Production deployed and operational** with comprehensive enhancements including timezone handling, automated deployment, and Node.js 22 runtime.
 
 ## Overview
 
 - **Function Name**: `daily-race-importer`
-- **Runtime**: Node.js 22 (latest)
-- **Schedule**: Daily at 6:00 AM New Zealand time (17:00 UTC / 18:00 UTC during DST)
+- **Runtime**: Node.js 22 (upgraded from Node.js 16)
+- **Implementation**: JavaScript-only (migrated from TypeScript for simplified deployment)
+- **Schedule**: Daily at 6:00 AM New Zealand time (17:00 UTC)
 - **Purpose**: Import AU/NZ Horse and Harness racing meetings and races, excluding Greyhound racing
+- **Status**: ✅ **Production deployed and operational**
+
+### Key Features
+- **Timezone-aware date handling**: Uses `Pacific/Auckland` timezone for accurate local date determination
+- **Automated database setup**: Creates required collections and indexes automatically  
+- **Comprehensive logging**: Detailed execution logs with country/category statistics
+- **Idempotent operations**: Safe to run multiple times without data duplication
+- **Enhanced error handling**: Robust error recovery and detailed error reporting
 
 ## Configuration
 
@@ -42,11 +51,18 @@ NZTAB_API_BASE_URL=https://api.tab.co.nz
       "enabled": true,
       "logging": true,
       "entrypoint": "src/main.js",
-      "commands": "npm install"
+      "commands": "npm install",
+      "scopes": ["databases.read", "databases.write"]
     }
   ]
 }
 ```
+
+**Recent Configuration Updates**:
+- ✅ Runtime upgraded from `node-16.0` to `node-22`
+- ✅ Timeout increased from 15 to 300 seconds for reliable execution
+- ✅ Proper database scopes configured
+- ✅ CRON schedule properly set for daily execution
 
 ## Data Flow
 
@@ -96,15 +112,16 @@ The function interacts with these Appwrite database collections:
 
 ### Automated Deployment (Recommended)
 
-This function includes automated deployment scripts and database setup verification. See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
+**✅ Enhanced Deployment Process**: This function includes automated deployment scripts with environment management and database setup verification. See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
 
 #### Quick Deployment
 
-1. **Configure Environment**:
+1. **Configure Environment** (create `.env` file):
    ```bash
-   export APPWRITE_ENDPOINT="https://cloud.appwrite.io/v1"
-   export APPWRITE_PROJECT_ID="your-project-id"
-   export APPWRITE_API_KEY="your-api-key"
+   APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
+   APPWRITE_PROJECT_ID=your-project-id
+   APPWRITE_API_KEY=your-api-key
+   NZTAB_API_BASE_URL=https://api.tab.co.nz
    ```
 
 2. **Install Dependencies**:
@@ -113,21 +130,24 @@ This function includes automated deployment scripts and database setup verificat
    npm install -g appwrite-cli  # If not already installed
    ```
 
-3. **Configure Appwrite CLI**:
+3. **Deploy with Environment Management**:
    ```bash
-   appwrite client --endpoint $APPWRITE_ENDPOINT --project-id $APPWRITE_PROJECT_ID --key $APPWRITE_API_KEY
+   npm run deploy  # Uses automated script with .env parsing
    ```
 
-4. **Deploy Function**:
-   ```bash
-   npm run deploy
-   ```
+**New Deployment Features**:
+- 🚀 **Automated environment variable injection** from `.env` files
+- 📋 **Pre-deployment validation** of configuration and connectivity
+- 🗄️ **Automatic database setup** with collection creation and indexing
+- 📊 **Deployment verification** with connection testing
 
 #### Available NPM Scripts
 
-- `npm run deploy` - Deploy functions interactively
-- `npm run deploy:check` - List functions and validate CLI connection
+- `npm run deploy` - **Enhanced deployment** with automated environment setup
+- `npm run deploy:check` - List functions and validate CLI connection  
 - `npm run dev` - Run function locally for testing
+- `npm test` - Run comprehensive test suite
+- `npm run build` - Compile TypeScript (if using TS version)
 
 #### Database Setup
 
@@ -177,7 +197,8 @@ Function execution logs are available in the Appwrite Console:
 **Error**: `Missing required environment variables`
 
 **Solution**: 
-- Verify all required environment variables are set in the function configuration
+- Use the automated deployment script: `npm run deploy`
+- Verify `.env` file contains all required variables
 - Check that variable names match exactly (case-sensitive)
 
 #### 2. API Connection Errors
@@ -186,7 +207,7 @@ Function execution logs are available in the Appwrite Console:
 
 **Solutions**:
 - Check NZTAB API status
-- Verify `NZTAB_API_BASE_URL` is correct
+- Verify `NZTAB_API_BASE_URL` is correct: `https://api.tab.co.nz`
 - Review API rate limiting
 
 #### 3. Database Connection Errors
@@ -194,17 +215,30 @@ Function execution logs are available in the Appwrite Console:
 **Error**: `Failed to create meeting` or `Failed to create race`
 
 **Solutions**:
+- Use `npm run deploy` which includes database setup verification
 - Verify Appwrite credentials are correct
-- Check that the database and collections exist
-- Ensure API key has appropriate permissions
+- Ensure API key has `databases.read` and `databases.write` scopes
 
-#### 4. Data Filtering Issues
+#### 4. Date/Timezone Issues (**Recently Fixed**)
+
+**Previous Issue**: Function missing race data due to UTC/local time misalignment
+
+**✅ Fixed**: Function now uses `Pacific/Auckland` timezone for accurate date determination
+
+#### 5. Runtime Version Issues (**Recently Fixed**)
+
+**Previous Issue**: Function deployment failures due to Node.js 16 deprecation
+
+**✅ Fixed**: Function upgraded to Node.js 22 runtime
+
+#### 6. Data Filtering Issues
 
 **Symptom**: No data imported despite API returning results
 
 **Check**:
-- Verify filtering logic for country (`AUS`, `NZL`) and category (`Thoroughbred Horse Racing`, `Harness`)
-- Check API response format hasn't changed
+- Function now logs detailed country/category statistics for debugging
+- Verify filtering logic for country (`AUS`, `NZ`) and category (`Thoroughbred Horse Racing`, `Harness`)
+- Check logs for detailed filtering information
 
 ### Expected Execution Statistics
 
@@ -262,13 +296,17 @@ The function is designed to be idempotent:
 - **Upsert Operations**: Uses update-or-create pattern for database operations
 - **Safe Re-runs**: Can be run multiple times for the same date without duplicating data
 - **Error Recovery**: Failed executions can be safely retried
+- **Database Setup**: Automatic collection and index creation is idempotent
+- **Environment Management**: Deployment scripts safely update configurations
 
 ## Performance Considerations
 
-- **Timeout**: Set to 300 seconds (5 minutes) to handle large datasets
+- **Timeout**: Upgraded to 300 seconds (5 minutes) to handle large datasets reliably
 - **Memory**: Optimized for processing typical daily race datasets
 - **API Rate Limiting**: Includes appropriate delays if needed
-- **Database Efficiency**: Uses batch operations where possible
+- **Database Efficiency**: Uses batch operations with optimized indexing
+- **Runtime Performance**: Node.js 22 provides improved performance over Node.js 16
+- **Logging Efficiency**: Structured logging with minimal performance impact
 
 ## Security
 
