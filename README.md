@@ -1,12 +1,20 @@
 # RaceDay - Real-time Horse Racing Dashboard
 
-This is a [Next.js](https://nextjs.org) project for real-time horse racing data visualization, built with Appwrite as the backend.
+A real-time horse racing dashboard built with Next.js 15+ and Appwrite Cloud. The application automatically polls New Zealand TAB API for race data and provides live updates through Appwrite's realtime subscriptions.
+
+## Features
+
+- **Automated Data Import**: Daily race data import from NZ TAB API (6:00 AM NZ time)
+- **Real-time Updates**: Live race data through Appwrite Realtime subscriptions  
+- **Selective Racing Data**: AU/NZ Horse and Harness racing (excludes Greyhounds)
+- **Modern Stack**: Next.js 15+, React 19, TypeScript, Tailwind CSS
 
 ## Prerequisites
 
 - Node.js v22.17.0+
-- Appwrite Cloud account
-- New Zealand TAB API access (for data polling)
+- Appwrite Cloud account with project created
+- Appwrite CLI installed globally (`npm install -g appwrite-cli`)
+- New Zealand TAB API access (for automated data polling)
 
 ## Setup
 
@@ -126,27 +134,43 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 The backend consists of Appwrite Cloud Functions located in the `server/` directory:
 
-#### Daily Race Importer Function
+#### Daily Race Importer Function (✅ Production Deployed)
 - **Location**: `server/daily-race-importer/`
 - **Purpose**: Automatically imports daily racing data from NZ TAB API
-- **Schedule**: Runs daily at 6:00 AM New Zealand time
+- **Schedule**: Runs daily at 6:00 AM New Zealand time (17:00 UTC)
+- **Runtime**: Node.js 22 (upgraded from Node.js 16)
 - **Data**: Imports AU/NZ Horse and Harness racing (excludes Greyhounds)
+- **Features**: 
+  - Timezone-aware date handling for accurate NZ local time
+  - Automated database setup and indexing
+  - Comprehensive error handling and logging
+  - Idempotent operations for safe re-runs
+  - JavaScript-only implementation for simplified deployment
 
-To deploy functions:
+**Quick Deployment**:
 ```bash
 cd server/daily-race-importer
 npm install
-appwrite deploy function
+npm run deploy  # Uses automated deployment script
 ```
 
-See `server/daily-race-importer/README.md` for detailed deployment instructions.
+**Development/Testing**:
+```bash
+npm run dev      # Local testing
+npm test         # Run tests
+```
+
+See `server/daily-race-importer/README.md` and `server/daily-race-importer/DEPLOYMENT.md` for comprehensive deployment and troubleshooting guides.
 
 ## Tech Stack
 
-- **Frontend**: Next.js 15.4+, React 19, TypeScript, Tailwind CSS
-- **Backend**: Appwrite Cloud
-- **Real-time**: Appwrite Realtime Subscriptions
+- **Frontend**: Next.js 15+, React 19, TypeScript, Tailwind CSS
+- **Backend**: Appwrite Cloud Functions (Node.js 22)
+- **Database**: Appwrite Database with automatic indexing
+- **Real-time**: Appwrite Realtime Subscriptions  
 - **Data Source**: New Zealand TAB API
+- **Deployment**: Automated deployment scripts with environment management
+- **Testing**: Jest with comprehensive test coverage
 
 ## Learn More
 
