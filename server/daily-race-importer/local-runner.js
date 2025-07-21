@@ -60,7 +60,7 @@ console.log('─'.repeat(60));
 async function runFunction() {
   try {
     // Import the main function
-    const { default: main } = await import('./dist/main.js');
+    const { default: main } = await import('./functions/daily-race-importer/src/main.js');
     
     // Execute the function with mock context
     const result = await main(mockContext);

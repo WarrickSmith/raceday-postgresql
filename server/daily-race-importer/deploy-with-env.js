@@ -172,25 +172,23 @@ async function deployWithEnvironmentVariables() {
     });
     console.log('');
     
-    // Step 1: Build the project
-    console.log('📦 Building project...');
-    await executeCommand('npm', ['run', 'build']);
-    console.log('✅ Build completed\n');
+    // Deploy the function (no build step needed for JavaScript-only functions)
+    console.log('📦 Function ready (JavaScript source, no build required)\n');
     
-    // Step 2: Copy files to functions directory
-    console.log('📋 Copying built files to functions directory...');
-    await executeCommand('cp', ['dist/*', 'functions/daily-race-importer/src/']);
-    console.log('✅ Files copied\n');
+    // Step 1: Deploy the function first to create it
+    console.log('🚀 Initial deployment to create function...');
+    await executeCommand('appwrite', ['push', 'functions']);
+    console.log('✅ Function created successfully\n');
     
-    // Step 3: Deploy the function first
-    console.log('🚀 Deploying function...');
-    await executeCommand('appwrite', ['push', 'functions', '--function-id', FUNCTION_ID]);
-    console.log('✅ Function deployed successfully\n');
-    
-    // Step 4: Set environment variables after deployment
+    // Step 2: Set environment variables on the created function
     await setEnvironmentVariables(functionEnvVars);
     
-    // Step 5: Try to activate the latest deployment (simplified)
+    // Step 3: Redeploy to apply environment variables
+    console.log('🔄 Redeploying to apply environment variables...');
+    await executeCommand('appwrite', ['push', 'functions', '--function-id', FUNCTION_ID]);
+    console.log('✅ Function redeployed with environment variables live\n');
+    
+    // Step 4: Check deployment status
     console.log('🔄 Checking deployment status...');
     try {
       await executeCommand('appwrite', [
@@ -204,11 +202,11 @@ async function deployWithEnvironmentVariables() {
     
     console.log('🎉 Deployment completed successfully!');
     console.log('📊 Summary:');
-    console.log(`   - Environment variables processed: ${Object.keys(functionEnvVars).length}`);
-    console.log('   - Function deployed with latest code');
+    console.log(`   - Function created and deployed`);
+    console.log(`   - Environment variables set: ${Object.keys(functionEnvVars).length}`);
+    console.log('   - Function redeployed with live environment variables');
     console.log('   - Ready for execution');
     console.log('\n💡 Next steps:');
-    console.log('   - Check the Appwrite console to manually activate the deployment if needed');
     console.log('   - Run: npm run execute:this');
     
   } catch (error) {
