@@ -41,6 +41,11 @@ Key architectural components:
 - `npm test -- --testNamePattern="test name"` - Run specific test by name
 - `npm test -- src/path/to/test.test.ts` - Run specific test file
 
+### Server Functions Deployment
+- `cd server/daily-race-importer && npm run deploy` - Deploy daily race importer function
+- `cd server/daily-race-importer && npm run dev` - Local testing of function
+- `cd server/daily-race-importer && npm test` - Run function tests
+
 ## Environment Configuration
 
 Required environment variables in `.env.local`:
@@ -110,4 +115,11 @@ User roles must be manually configured in Appwrite console after running setup s
 
 - Node.js v22.17.0+
 - Appwrite Cloud account with configured project
+- Appwrite CLI installed globally (`npm install -g appwrite-cli`)
 - NZ TAB API access for data polling
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
