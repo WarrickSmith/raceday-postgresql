@@ -25,7 +25,7 @@ Local development uses Node.js directly with mock Appwrite context for testing.
 
 ### CLI-Based Deployment (Recommended)
 
-Deploy functions with configuration and environment variables:
+Deploy functions with configuration:
 
 ```bash
 npm run deploy:daily     # Deploy daily-race-importer
@@ -33,29 +33,37 @@ npm run deploy:poller    # Deploy race-data-poller
 npm run deploy          # Deploy all functions (basic)
 ```
 
-The deployment script (`scripts/deploy-with-vars.js`) performs:
+The deployment script (`scripts/deploy.js`) performs:
 1. Deploys function code and configuration from `appwrite.json`
-2. Adds environment variables from `.env` file
-3. Preserves CRON schedules, scopes, and timeout settings
+2. Preserves CRON schedules, scopes, and timeout settings
 
-### Post-Deployment Step Required
+### Environment Variables Setup Required
 
-After deploying via CLI, you must manually **redeploy the function** in the Appwrite console to activate the latest configuration. This is a known limitation of the CLI deployment process.
+**Important**: After deployment, you must configure environment variables. Choose one option:
 
-1. Go to Appwrite Functions console
-2. Select your deployed function
-3. Click "Redeploy" or "Deploy" to activate the latest configuration
-4. Verify the function shows as "Live"
+**Option 1 (Recommended): Global Project Variables**
+1. Go to Appwrite Console → Project Settings → Variables
+2. Add your environment variables globally (applies to all functions)
+
+**Option 2: Function-specific Variables** 
+1. Go to Appwrite Console → Functions → [Your Function] → Variables
+2. Add environment variables specific to each function
+
+Using global project variables is recommended as it simplifies management across multiple functions.
 
 ## Environment Variables Management
 
-Update environment variables only (without full deployment):
+With global project variables configured in the Appwrite console, environment variables are automatically available to all functions. No additional deployment steps are required for variable updates.
+
+If you need to update variables for individual functions only:
 
 ```bash
 npm run vars:daily      # Update daily-race-importer variables
 npm run vars:poller     # Update race-data-poller variables  
 npm run vars:all        # Update all function variables
 ```
+
+**Note**: These scripts are primarily for legacy support. Global project variables are the recommended approach.
 
 ## Function Configuration
 
