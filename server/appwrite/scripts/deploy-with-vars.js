@@ -41,7 +41,7 @@ async function deployWithPreservedConfig() {
           const existingVar = variables.variables?.find(v => v.key === key);
           
           if (existingVar) {
-            await execCommand(`appwrite functions update-variable --function-id ${functionId} --variable-id ${existingVar.$id} --value "${value}"`);
+            await execCommand(`appwrite functions update-variable --function-id ${functionId} --variable-id ${existingVar.$id} --key "${key}" --value "${value}"`);
             console.log(`   ✅ Updated ${key}`);
           } else {
             console.log(`   ⚠️ Failed to set ${key}: Variable not found`);
