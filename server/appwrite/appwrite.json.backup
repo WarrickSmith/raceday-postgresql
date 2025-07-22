@@ -17,6 +17,12 @@
       "logging": true,
       "entrypoint": "src/main.js",
       "commands": "npm install",
+      "variables": {
+        "APPWRITE_ENDPOINT": "https://appwrite.warricksmith.com/v1",
+        "APPWRITE_PROJECT_ID": "racedaytest250701",
+        "APPWRITE_API_KEY": "standard_e06a0642118fc9dfd3a8f97f310abcb467437b45f4b6161a6adb01084439cf0ca814a1e48a740f30b2fa16d920ad0924a86c11975183806de93498a84b30659603fa418bcdfa2a65e39a8c07052e057f7ca4e1727d9541859f350b513ba658285a70299d585409502f05d4dc3f172cb202f414615e1f6906ec67d63052a62533",
+        "NZTAB_API_BASE_URL": "https://api.tab.co.nz"
+      },
       "scopes": [
         "databases.read",
         "databases.write",
@@ -45,6 +51,12 @@
       "logging": true,
       "entrypoint": "src/main.js",
       "commands": "npm install",
+      "variables": {
+        "APPWRITE_ENDPOINT": "https://appwrite.warricksmith.com/v1",
+        "APPWRITE_PROJECT_ID": "racedaytest250701",
+        "APPWRITE_API_KEY": "standard_e06a0642118fc9dfd3a8f97f310abcb467437b45f4b6161a6adb01084439cf0ca814a1e48a740f30b2fa16d920ad0924a86c11975183806de93498a84b30659603fa418bcdfa2a65e39a8c07052e057f7ca4e1727d9541859f350b513ba658285a70299d585409502f05d4dc3f172cb202f414615e1f6906ec67d63052a62533",
+        "NZTAB_API_BASE_URL": "https://api.tab.co.nz"
+      },
       "scopes": [
         "databases.read",
         "databases.write",

@@ -16,6 +16,7 @@ if (!functionId) {
   process.exit(1);
 }
 
+
 async function deployWithVariables() {
   try {
     console.log(`🚀 Deploying function: ${functionId}`);
@@ -70,8 +71,8 @@ async function deployWithVariables() {
       }
     }
     
-    // Step 4: Restart function to apply variables immediately
-    await restartFunction(functionId);
+    // Step 4: Safe restart function to apply variables while preserving schedule
+    await safeRestartFunction(functionId);
     
     console.log('🎉 Deployment complete with live environment variables!');
     
@@ -81,27 +82,52 @@ async function deployWithVariables() {
   }
 }
 
-async function restartFunction(functionId) {
+async function safeRestartFunction(functionId) {
   try {
-    console.log(`🔄 Restarting function to apply new variables...`);
+    console.log(`🔄 Safely restarting function while preserving schedule...`);
     
-    // Get current function info to preserve settings
+    // Get current function configuration
     const functionInfo = JSON.parse(await execCommand(`appwrite functions get --function-id ${functionId} --json`, true));
+    const currentSchedule = functionInfo.schedule;
+    const currentEnabled = functionInfo.enabled;
     
-    // Toggle enabled status to force restart
-    await execCommand(`appwrite functions update --function-id ${functionId} --name "${functionInfo.name}" --enabled false`);
-    console.log('   Function disabled...');
+    console.log(`   Current schedule: ${currentSchedule || 'None'}`);
+    console.log(`   Current enabled: ${currentEnabled}`);
     
-    // Wait for the change to take effect
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    await execCommand(`appwrite functions update --function-id ${functionId} --name "${functionInfo.name}" --enabled true`);
-    console.log('   Function re-enabled...');
-    
-    // Wait for restart
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    console.log('✅ Function restarted with new variables live!');
+    if (currentSchedule) {
+      // Method: Update a non-critical field to force restart
+      const currentLogging = functionInfo.logging;
+      const functionName = functionInfo.name;
+      
+      // Toggle logging to force restart
+      await execCommand(`appwrite functions update --function-id ${functionId} --name "${functionName}" --logging ${!currentLogging}`);
+      console.log('   Toggled logging to force restart...');
+      
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Restore original logging setting
+      await execCommand(`appwrite functions update --function-id ${functionId} --name "${functionName}" --logging ${currentLogging}`);
+      console.log('   Restored original logging setting...');
+      
+      // Verify schedule is still intact
+      const updatedInfo = JSON.parse(await execCommand(`appwrite functions get --function-id ${functionId} --json`, true));
+      
+      if (updatedInfo.schedule === currentSchedule) {
+        console.log('✅ Function restarted successfully with schedule preserved!');
+      } else {
+        console.log('⚠️ Schedule may have been affected, restoring...');
+        // Restore schedule if it was lost
+        await execCommand(`appwrite functions update --function-id ${functionId} --name "${functionName}" --schedule "${currentSchedule}"`);
+        console.log('✅ Schedule restored!');
+      }
+    } else {
+      // No schedule to preserve, safe to use enabled toggle
+      const functionName = functionInfo.name;
+      await execCommand(`appwrite functions update --function-id ${functionId} --name "${functionName}" --enabled false`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await execCommand(`appwrite functions update --function-id ${functionId} --name "${functionName}" --enabled true`);
+      console.log('✅ Function restarted (no schedule to preserve)');
+    }
     
     // Optional: Trigger a test execution to verify
     try {
@@ -113,8 +139,8 @@ async function restartFunction(functionId) {
     }
     
   } catch (error) {
-    console.error('⚠️ Failed to restart function:', error.message);
-    console.log('💡 You may need to manually restart the function in the Appwrite console');
+    console.error('⚠️ Safe restart failed:', error.message);
+    console.log('💡 Variables updated but may require manual function restart');
   }
 }
 

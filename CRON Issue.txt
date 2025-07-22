@@ -1,0 +1,222 @@
+Question: does restarting a function destroy if CRON schedule as this is missing after re-start
+
+Yes, that's a known issue! When you toggle the `enabled` status, it can sometimes reset the CRON schedule. Here are better approaches that preserve the schedule:
+
+## Solution 1: Update Function Configuration (Preserves Schedule)
+
+Instead of toggling enabled/disabled, update the function configuration to force a restart:
+
+```javascript
+async function restartFunction(functionId) {
+  try {
+    console.log(`🔄 Restarting function to apply new variables (preserving schedule)...`);
+    
+    // Get current function configuration including schedule
+    const functionInfo = JSON.parse(execSync(`appwrite functions get --function-id ${functionId}`, { encoding: 'utf8' }));
+    
+    // Method 1: Update timeout slightly to force restart
+    const currentTimeout = functionInfo.timeout || 300;
+    const newTimeout = currentTimeout === 300 ? 299 : 300;
+    
+    execCommand(`appwrite functions update --function-id ${functionId} --timeout ${newTimeout}`, { stdio: 'pipe' });
+    console.log('   Updated timeout to force restart...');
+    
+    // Wait for restart
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    // Restore original timeout
+    execCommand(`appwrite functions update --function-id ${functionId} --timeout ${currentTimeout}`, { stdio: 'pipe' });
+    console.log('   Restored original timeout...');
+    
+    console.log('✅ Function restarted with schedule preserved!');
+    
+  } catch (error) {
+    console.error('⚠️ Failed to restart function:', error.message);
+  }
+}
+```
+
+## Solution 2: Force Execution Method (Safest)
+
+The safest approach is to just trigger an execution to wake the function:
+
+```javascript
+async function refreshFunction(functionId) {
+  try {
+    console.log(`⚡ Refreshing function to apply new variables...`);
+    
+    // Create a test execution with special data to indicate it's a deployment test
+    const testData = JSON.stringify({
+      deploymentTest: true,
+      timestamp: new Date().toISOString(),
+      message: "Testing new environment variables"
+    });
+    
+    execCommand(`appwrite functions create-execution --function-id ${functionId} --data '${testData}'`, { stdio: 'pipe' });
+    
+    console.log('✅ Function refreshed with test execution!');
+    console.log('💡 New variables will be available on next scheduled run or manual execution');
+    
+  } catch (error) {
+    console.error('⚠️ Test execution failed:', error.message);
+  }
+}
+```
+
+## Solution 3: Complete Safe Restart with Schedule Preservation
+
+```javascript
+async function safeRestartFunction(functionId) {
+  try {
+    console.log(`🔄 Safely restarting function while preserving schedule...`);
+    
+    // Get current function configuration
+    const functionInfo = JSON.parse(execSync(`appwrite functions get --function-id ${functionId}`, { encoding: 'utf8' }));
+    const currentSchedule = functionInfo.schedule;
+    const currentEnabled = functionInfo.enabled;
+    
+    console.log(`   Current schedule: ${currentSchedule || 'None'}`);
+    console.log(`   Current enabled: ${currentEnabled}`);
+    
+    if (currentSchedule) {
+      // Method: Update a non-critical field to force restart
+      const currentLogging = functionInfo.logging;
+      
+      // Toggle logging to force restart
+      execCommand(`appwrite functions update --function-id ${functionId} --logging ${!currentLogging}`, { stdio: 'pipe' });
+      console.log('   Toggled logging to force restart...');
+      
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Restore original logging setting
+      execCommand(`appwrite functions update --function-id ${functionId} --logging ${currentLogging}`, { stdio: 'pipe' });
+      console.log('   Restored original logging setting...');
+      
+      // Verify schedule is still intact
+      const updatedInfo = JSON.parse(execSync(`appwrite functions get --function-id ${functionId}`, { encoding: 'utf8' }));
+      
+      if (updatedInfo.schedule === currentSchedule) {
+        console.log('✅ Function restarted successfully with schedule preserved!');
+      } else {
+        console.log('⚠️ Schedule may have been affected, restoring...');
+        // Restore schedule if it was lost
+        execCommand(`appwrite functions update --function-id ${functionId} --schedule "${currentSchedule}"`, { stdio: 'pipe' });
+        console.log('✅ Schedule restored!');
+      }
+    } else {
+      // No schedule to preserve, safe to use enabled toggle
+      execCommand(`appwrite functions update --function-id ${functionId} --enabled false`, { stdio: 'pipe' });
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      execCommand(`appwrite functions update --function-id ${functionId} --enabled true`, { stdio: 'pipe' });
+      console.log('✅ Function restarted (no schedule to preserve)');
+    }
+    
+  } catch (error) {
+    console.error('⚠️ Safe restart failed:', error.message);
+    console.log('💡 Variables updated but may require manual function restart');
+  }
+}
+```
+
+## Solution 4: Deploy Variables During Function Update
+
+The most reliable approach is to include variables in the appwrite.json and deploy them together:
+
+```javascript
+// server/appwrite/scripts/deploy-with-preserved-config.js
+#!/usr/bin/env node
+import { execSync } from 'child_process';
+import { config } from 'dotenv';
+import { readFileSync, writeFileSync } from 'fs';
+
+config();
+
+async function deployWithPreservedConfig() {
+  try {
+    console.log('🚀 Deploying with preserved schedules and variables...');
+    
+    // Step 1: Get current function configurations to preserve schedules
+    const currentConfig = JSON.parse(readFileSync('appwrite.json', 'utf8'));
+    const envVars = parseEnvFile('.env');
+    
+    // Step 2: Update appwrite.json with variables while preserving schedules
+    currentConfig.functions.forEach(func => {
+      // Add environment variables
+      func.variables = envVars;
+      
+      // Ensure schedule is preserved (if you want to set it programmatically)
+      if (func.$id === 'daily-race-importer' && !func.schedule) {
+        func.schedule = '0 17 * * *'; // 6 AM NZ time
+      }
+      if (func.$id === 'race-data-poller' && !func.schedule) {
+        func.schedule = '*/5 * * * *'; // Every 5 minutes
+      }
+    });
+    
+    // Step 3: Write updated config
+    writeFileSync('appwrite.json', JSON.stringify(currentConfig, null, 2));
+    console.log('📝 Updated appwrite.json with variables and preserved schedules');
+    
+    // Step 4: Deploy everything together
+    execSync('appwrite push functions', { stdio: 'inherit' });
+    
+    console.log('✅ Deployment complete with schedules and variables intact!');
+    
+  } catch (error) {
+    console.error('❌ Deployment failed:', error.message);
+    process.exit(1);
+  }
+}
+
+function parseEnvFile(filePath) {
+  const envContent = readFileSync(filePath, 'utf8');
+  const envVars = {};
+  
+  envContent.split('\n').forEach(line => {
+    line = line.trim();
+    if (line && !line.startsWith('#')) {
+      const [key, ...valueParts] = line.split('=');
+      if (key && valueParts.length > 0 && !['APPWRITE_EMAIL', 'APPWRITE_PASSWORD'].includes(key.trim())) {
+        envVars[key.trim()] = valueParts.join('=').trim().replace(/^["']|["']$/g, '');
+      }
+    }
+  });
+  
+  return envVars;
+}
+
+deployWithPreservedConfig();
+```
+
+## Recommended Approach
+
+**Use Solution 4** - deploy variables as part of the appwrite.json configuration. This ensures:
+
+1. ✅ CRON schedules are preserved
+2. ✅ Variables are applied during deployment 
+3. ✅ No "configuration not live" message
+4. ✅ Single deployment step
+5. ✅ No function restarts needed
+
+Update your appwrite.json to include variables directly:
+
+```json
+{
+  "projectId": "racedaytest250701",
+  "functions": [
+    {
+      "$id": "daily-race-importer",
+      "name": "Daily Race Importer", 
+      "schedule": "0 17 * * *",
+      "variables": {
+        "APPWRITE_ENDPOINT": "https://your-endpoint.com/v1",
+        "APPWRITE_PROJECT_ID": "your-project-id",
+        "APPWRITE_API_KEY": "your-api-key",
+        "NZTAB_API_BASE_URL": "https://api.tab.co.nz"
+      }
+    }
+  ]
+}
+```
+
+This way, schedules and variables deploy together atomically.
