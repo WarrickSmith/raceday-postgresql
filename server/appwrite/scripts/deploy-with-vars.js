@@ -35,7 +35,11 @@ async function deployWithVariables() {
       if (line && !line.startsWith('#')) {
         const [key, ...valueParts] = line.split('=');
         if (key && valueParts.length > 0) {
-          envVars[key.trim()] = valueParts.join('=').trim().replace(/^["']|["']$/g, '');
+          // Skip deployment-only variables that shouldn't be in function runtime
+          const keyName = key.trim();
+          if (!['APPWRITE_EMAIL', 'APPWRITE_PASSWORD'].includes(keyName)) {
+            envVars[keyName] = valueParts.join('=').trim().replace(/^["']|["']$/g, '');
+          }
         }
       }
     });
@@ -50,7 +54,7 @@ async function deployWithVariables() {
         // If create fails, try to update existing variable
         try {
           // List variables to get the variable ID
-          const listOutput = await execCommand(`appwrite functions list-variables --function-id ${functionId}`, true);
+          const listOutput = await execCommand(`appwrite functions list-variables --function-id ${functionId} --json`, true);
           const variables = JSON.parse(listOutput);
           const existingVar = variables.variables?.find(v => v.key === key);
           
@@ -66,11 +70,51 @@ async function deployWithVariables() {
       }
     }
     
-    console.log('✅ Function deployed and environment variables updated!');
+    // Step 4: Restart function to apply variables immediately
+    await restartFunction(functionId);
+    
+    console.log('🎉 Deployment complete with live environment variables!');
     
   } catch (error) {
     console.error('❌ Deployment failed:', error.message);
     process.exit(1);
+  }
+}
+
+async function restartFunction(functionId) {
+  try {
+    console.log(`🔄 Restarting function to apply new variables...`);
+    
+    // Get current function info to preserve settings
+    const functionInfo = JSON.parse(await execCommand(`appwrite functions get --function-id ${functionId} --json`, true));
+    
+    // Toggle enabled status to force restart
+    await execCommand(`appwrite functions update --function-id ${functionId} --name "${functionInfo.name}" --enabled false`);
+    console.log('   Function disabled...');
+    
+    // Wait for the change to take effect
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    await execCommand(`appwrite functions update --function-id ${functionId} --name "${functionInfo.name}" --enabled true`);
+    console.log('   Function re-enabled...');
+    
+    // Wait for restart
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    console.log('✅ Function restarted with new variables live!');
+    
+    // Optional: Trigger a test execution to verify
+    try {
+      console.log('🧪 Testing function with new variables...');
+      await execCommand(`appwrite functions create-execution --function-id ${functionId} --data '{"deploymentTest": true}'`);
+      console.log('✅ Test execution successful!');
+    } catch (testError) {
+      console.log('⚠️ Test execution failed, but function should be running with new variables');
+    }
+    
+  } catch (error) {
+    console.error('⚠️ Failed to restart function:', error.message);
+    console.log('💡 You may need to manually restart the function in the Appwrite console');
   }
 }
 

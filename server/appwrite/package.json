@@ -14,6 +14,8 @@
     "vars:daily": "node scripts/update-vars-only.js daily-race-importer",
     "vars:poller": "node scripts/update-vars-only.js race-data-poller",
     "vars:all": "npm run vars:daily && npm run vars:poller",
+    "restart:daily": "node scripts/restart-function.js daily-race-importer",
+    "restart:poller": "node scripts/restart-function.js race-data-poller",
     "daily": "node scripts/run-function.js daily-race-importer",
     "poller": "node scripts/run-function.js race-data-poller",
     "execute": "node scripts/execute-function.js"
