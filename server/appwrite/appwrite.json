@@ -1,0 +1,56 @@
+{
+    "projectId": "racedaytest250701",
+    "projectName": "RaceDayTest",
+    "functions": [
+        {
+            "$id": "daily-race-importer",
+            "name": "Daily Race Importer",
+            "runtime": "node-22",
+            "path": "functions/daily-race-importer",
+            "execute": [
+                "any"
+            ],
+            "events": [],
+            "schedule": "0 17 * * *",
+            "timeout": 300,
+            "enabled": true,
+            "logging": true,
+            "entrypoint": "src/main.js",
+            "commands": "npm install",
+            "scopes": [
+                "databases.read",
+                "databases.write",
+                "collections.read",
+                "collections.write",
+                "attributes.read",
+                "attributes.write",
+                "indexes.read",
+                "indexes.write",
+                "documents.read",
+                "documents.write"
+            ]
+        },
+        {
+            "$id": "race-data-poller",
+            "name": "Race Data Poller",
+            "runtime": "node-22",
+            "path": "functions/race-data-poller",
+            "execute": [
+                "any"
+            ],
+            "events": [],
+            "schedule": "*/5 * * * *",
+            "timeout": 300,
+            "enabled": true,
+            "logging": true,
+            "entrypoint": "src/main.js",
+            "commands": "npm install",
+            "scopes": [
+                "databases.read",
+                "databases.write",
+                "documents.read",
+                "documents.write"
+            ]
+        }
+    ]
+}

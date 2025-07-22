@@ -1,0 +1,25 @@
+{
+  "name": "appwrite-functions",
+  "version": "1.0.0",
+  "description": "Consolidated Appwrite functions for RaceDay application",
+  "type": "module",
+  "scripts": {
+    "install-cli": "npm install -g appwrite-cli",
+    "login": "node scripts/login.js",
+    "logout": "appwrite logout",
+    "status": "appwrite functions list",
+    "deploy": "appwrite push functions",
+    "deploy:daily": "appwrite push functions --function-id daily-race-importer",
+    "deploy:poller": "appwrite push functions --function-id race-data-poller",
+    "daily": "node scripts/run-function.js daily-race-importer",
+    "poller": "node scripts/run-function.js race-data-poller",
+    "execute": "node scripts/execute-function.js"
+  },
+  "dependencies": {
+    "node-appwrite": "^17.0.0",
+    "dotenv": "^16.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
