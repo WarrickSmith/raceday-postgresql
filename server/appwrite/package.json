@@ -9,8 +9,11 @@
     "logout": "appwrite logout",
     "status": "appwrite functions list",
     "deploy": "appwrite push functions",
-    "deploy:daily": "appwrite push functions --function-id daily-race-importer",
-    "deploy:poller": "appwrite push functions --function-id race-data-poller",
+    "deploy:daily": "node scripts/deploy-with-vars.js daily-race-importer",
+    "deploy:poller": "node scripts/deploy-with-vars.js race-data-poller",
+    "vars:daily": "node scripts/update-vars-only.js daily-race-importer",
+    "vars:poller": "node scripts/update-vars-only.js race-data-poller",
+    "vars:all": "npm run vars:daily && npm run vars:poller",
     "daily": "node scripts/run-function.js daily-race-importer",
     "poller": "node scripts/run-function.js race-data-poller",
     "execute": "node scripts/execute-function.js"
