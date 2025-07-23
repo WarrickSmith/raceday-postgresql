@@ -312,7 +312,11 @@ async function pollRaceData(
  */
 async function fetchRaceEventFromNZTAB(nztabBaseUrl, raceId, context) {
   try {
-    const apiUrl = `${nztabBaseUrl}/affiliates/v1/racing/events/${raceId}`;
+    // Add parameters to get more complete race data including entrants
+    const params = new URLSearchParams({
+      'with_tote_trends_data': 'true'
+    });
+    const apiUrl = `${nztabBaseUrl}/affiliates/v1/racing/events/${raceId}?${params.toString()}`;
 
     context.log("Fetching race event data from NZTAB API", {
       apiUrl,
@@ -358,12 +362,33 @@ async function fetchRaceEventFromNZTAB(nztabBaseUrl, raceId, context) {
       return null;
     }
 
+    // Log response structure for debugging entrants issue
+    const entrantsCount = data.data.entrants ? data.data.entrants.length : 0;
+    const runnersCount = data.data.runners ? data.data.runners.length : 0;
+    
     context.log("Successfully fetched race event data from NZTAB API", {
       raceId,
-      entrantsCount: data.data.entrants ? data.data.entrants.length : 0,
+      entrantsCount,
+      runnersCount,
       raceStatus: data.data.race.status,
       generatedTime: data.header ? data.header.generated_time : "unknown",
+      dataKeys: Object.keys(data.data),
+      // Log response structure if no entrants but has other data
+      responseStructure: entrantsCount === 0 ? {
+        hasEntrants: !!data.data.entrants,
+        hasRunners: !!data.data.runners,
+        hasRace: !!data.data.race,
+        hasTotePools: !!data.data.tote_pools,
+        entrantsType: typeof data.data.entrants,
+        runnersType: typeof data.data.runners
+      } : null
     });
+
+    // If no entrants but has runners, use runners as entrants
+    if (entrantsCount === 0 && runnersCount > 0) {
+      context.log(`Converting ${runnersCount} runners to entrants format`, { raceId });
+      data.data.entrants = data.data.runners;
+    }
 
     return data.data;
   } catch (error) {
@@ -411,12 +436,42 @@ async function updateRaceStatus(
 
     // Check for actual start time (if race has started)
     if (raceEventData.race.actual_start && !race.actualStart) {
-      updatedFields.actualStart = raceEventData.race.actual_start;
-      hasChanges = true;
-      context.log(`Actual start time detected for ${race.raceId}`, {
-        raceId: race.raceId,
-        actualStart: raceEventData.race.actual_start,
-      });
+      try {
+        // Convert Unix timestamp to ISO string format
+        let actualStartDate;
+        
+        if (typeof raceEventData.race.actual_start === 'number') {
+          // Handle Unix timestamp (seconds since epoch)
+          actualStartDate = new Date(raceEventData.race.actual_start * 1000);
+        } else {
+          // Handle ISO string or other date formats
+          actualStartDate = new Date(raceEventData.race.actual_start);
+        }
+        
+        // Validate the date
+        if (isNaN(actualStartDate.getTime())) {
+          context.error(`Invalid actual_start date format for race ${race.raceId}`, {
+            raceId: race.raceId,
+            rawActualStart: raceEventData.race.actual_start,
+            type: typeof raceEventData.race.actual_start
+          });
+        } else {
+          // Convert to ISO string format that Appwrite expects
+          updatedFields.actualStart = actualStartDate.toISOString();
+          hasChanges = true;
+          context.log(`Actual start time detected for ${race.raceId}`, {
+            raceId: race.raceId,
+            rawActualStart: raceEventData.race.actual_start,
+            formattedActualStart: actualStartDate.toISOString(),
+          });
+        }
+      } catch (error) {
+        context.error(`Failed to parse actual_start date for race ${race.raceId}`, {
+          raceId: race.raceId,
+          rawActualStart: raceEventData.race.actual_start,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
     }
 
     if (hasChanges) {

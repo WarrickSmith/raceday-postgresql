@@ -473,6 +473,25 @@ const createRacesCollection = async () => {
     )
   }
 
+  if (!(await attributeExists(config.collections.races, 'actualStart'))) {
+    await databases.createDatetimeAttribute(
+      config.databaseId,
+      config.collections.races,
+      'actualStart',
+      false
+    )
+  }
+
+  if (!(await attributeExists(config.collections.races, 'silkUrl'))) {
+    await databases.createStringAttribute(
+      config.databaseId,
+      config.collections.races,
+      'silkUrl',
+      500,
+      false
+    )
+  }
+
   // Relationship to meetings (check if it exists first)
   if (!(await attributeExists(config.collections.races, 'meeting'))) {
     await databases.createRelationshipAttribute(
@@ -702,6 +721,16 @@ const createEntrantsCollection = async () => {
       config.collections.entrants,
       'isScratched',
       false,
+      false
+    )
+  }
+
+  if (!(await attributeExists(config.collections.entrants, 'silkUrl'))) {
+    await databases.createStringAttribute(
+      config.databaseId,
+      config.collections.entrants,
+      'silkUrl',
+      500,
       false
     )
   }

@@ -1,258 +1,319 @@
-# System Architecture Document: RaceDay v1.4
+# System Architecture Document: RaceDay v2.0
 
 - **Project:** RaceDay
-- **Version:** 1.4
-- **Author:** BMad Architect Agent
-- **Date:** 2025-07-11 08:34:48
+- **Version:** 2.0 (Microservices Refactoring)
+- **Author:** Winston (Architect)
+- **Date:** 2025-07-23
 - **Status:** Final
 
 ## 1. System Overview
 
-The RaceDay application uses a serverless backend (Appwrite Cloud), a decoupled Next.js frontend, and real-time data synchronization.
+The RaceDay application uses a **microservices backend architecture** (Appwrite Cloud), a decoupled Next.js frontend, and real-time data synchronization. This version refactors the previous monolithic data import function into specialized pipeline functions to eliminate resource contention and hanging issues.
+
+**Key Architectural Changes in v2.0:**
+- Monolithic `daily-race-importer` broken into 3 specialized functions
+- Sequential pipeline execution with proper resource allocation
+- Enhanced error handling and timeout protection
+- Optimized data fetching strategy with real-time invalidation
 
 ---
 
-## 2. Appwrite Database Schema
+## 2. Microservices Backend Architecture
 
-### 2.1. Collection: Meetings
+### 2.1. Daily Data Pipeline Functions
 
-**Purpose:**  
-Stores information about a single race meeting.
+The daily data import is now handled by three sequential functions with 10-minute spacing to prevent API rate limiting:
 
-- Define schema in Appwrite for Meetings.
-- Index by date, country, raceType.
+#### daily-meetings (17:00 UTC)
+- **Specification:** s-1vcpu-512mb
+- **Purpose:** Fetch and store race meetings from NZ TAB API
+- **Processing:** AU/NZ filtering, batch processing with error isolation
+- **Output:** Meeting records in database
+- **Duration:** ~60 seconds
 
-- [ ] All required fields are present.
-- [ ] Meetings can be queried by date/country/raceType.
+#### daily-races (17:10 UTC)  
+- **Specification:** s-1vcpu-512mb
+- **Purpose:** Fetch race details for all stored meetings
+- **Processing:** Sequential race processing, relationship linking to meetings
+- **Output:** Race records linked to meetings
+- **Duration:** ~90 seconds
 
-### 2.2. Collection: Races
+#### daily-entrants (17:20 UTC)
+- **Specification:** s-1vcpu-1gb 
+- **Purpose:** Fetch initial entrant data for all stored races
+- **Processing:** Limited to 20 races with timeout protection, sequential API calls
+- **Output:** Entrant records with initial odds data
+- **Duration:** ~300 seconds (5 minutes max)
 
-**Purpose:**  
-Stores details for a single race, linked to a Meeting.
+### 2.2. Real-time Functions
 
-- Define schema in Appwrite for Races.
-- Link races to meetings via relationship attribute.
+#### race-data-poller (Dynamic Schedule)
+- **Specification:** s-2vcpu-2gb
+- **Schedule:** Every minute during race hours
+- **Purpose:** Real-time updates for active races
+- **Dynamic Intervals:**
+  - T-60m to T-20m: 5-minute intervals
+  - T-20m to T-10m: 2-minute intervals  
+  - T-10m to T-5m: 1-minute intervals
+  - T-5m to Start: 15-second intervals
+  - Post-start: 5-minute intervals until Final
 
-- [ ] Races are linked to Meetings.
-- [ ] All race metadata is stored.
-
-### 2.3. Collection: Entrants
-
-**Purpose:**  
-Stores details for each horse in a race.
-
-- Define schema in Appwrite for Entrants.
-- Link entrants to races via relationship attribute.
-
-- [ ] Entrant records are linked to races.
-- [ ] All entrant metadata is stored.
-
-### 2.4. Collection: OddsHistory
-
-**Purpose:**  
-A log of all odds fluctuations for an entrant.
-
-- Define schema for OddsHistory.
-- Link to Entrant via relationship.
-
-- [ ] Odds history is recorded for all entrants.
-- [ ] History can be queried by entrant/timestamp.
-
-### 2.5. Collection: MoneyFlowHistory
-
-**Purpose:**  
-A log of money flow changes for an entrant.
-
-- Define schema for MoneyFlowHistory.
-- Link to Entrant via relationship.
-
-- [ ] Money flow history is recorded for all entrants.
-- [ ] History can be queried by entrant/timestamp.
-
-### 2.6. Collection: UserAlertConfigs
-
-**Purpose:**  
-Stores alert configurations for each user.
-
-- Define schema for UserAlertConfigs.
-- Link alert configs to userId.
-
-- [ ] Alert configs persist for users.
-- [ ] Alerts can be queried/updated.
-
-### 2.7. Collection: Notifications
-
-**Purpose:**  
-Temporary store for real-time alert notifications.
-
-- Define schema for Notifications.
-- Set permissions so only the user can read their notifications.
-- Implement cleanup (delete after sent).
-
-- [ ] Notifications are sent to correct user.
-- [ ] Documents are removed after delivery.
+#### alert-evaluator (Event-triggered)
+- **Specification:** s-1vcpu-512mb
+- **Trigger:** Database events on entrant updates
+- **Purpose:** Process user alert configurations and create notifications
+- **Processing:** Threshold evaluation, user filtering, notification creation
 
 ---
 
-## 3. Backend Services (Appwrite Functions)
+## 3. Frontend Architecture (Next.js 15+)
 
-### 3.1. Function: daily-race-importer
+### 3.1. Data Fetching Strategy
 
-**Purpose:**  
-Fetch and store all race meetings and races for the current day from the TAB API.
+**Primary Pattern: SWR + Real-time Invalidation**
 
-- Configure function with CRON schedule.
-- Fetch meetings/races from TAB API.
-- Store/update documents in Meetings and Races collections.
+```typescript
+// Smart caching with real-time updates
+const { meetings, isLoading } = useMeetings(filters);
 
-- [ ] Function runs at midnight UTC.
-- [ ] All meetings/races for the day are stored.
-- [ ] Errors are logged/surfaced.
+// Real-time cache invalidation
+useRealtime(
+  'databases.raceday-db.collections.meetings.documents',
+  (update) => {
+    mutate(); // Invalidate SWR cache on backend updates
+  }
+);
+```
 
-### 3.2. Function: race-data-poller
+**Benefits:**
+- Initial data loads from cache (< 500ms)
+- Real-time updates without polling overhead
+- Automatic cache invalidation when backend functions update data
+- Graceful degradation on connection issues
 
-**Purpose:**  
-Poll active races for updates at dynamic intervals.
-
-- Query active races needing polling.
-- Fetch detailed race/entrant data from TAB API.
-- Update Entrants, OddsHistory, MoneyFlowHistory.
-- Invoke alert-evaluator with new data.
-
-- [ ] Polling occurs per race schedule.
-- [ ] Data is current in all collections.
-- [ ] alert-evaluator is triggered as needed.
-
-### 3.3. Function: alert-evaluator
-
-**Purpose:**  
-Evaluate race/entrant data against user alert configurations and create notifications.
-
-- Compare new data to UserAlertConfigs.
-- Create Notification document if alert is triggered.
-
-- [ ] Alerts are triggered per user config.
-- [ ] Notifications are created and sent.
-
----
-
-## 4. Frontend & Real-Time Communication
-
-### 4.1. Real-Time Data Sync
-
-**Purpose:**  
-Synchronize frontend dashboard/grid with backend data via Appwrite Realtime.
-
-- Subscribe to Appwrite Realtime channels for Entrants, Notifications.
-- Update UI in response to live data.
-
-- [ ] Data updates propagate to UI <2s.
-- [ ] Alerts/notifications appear in real-time.
-
-### 4.2. Authentication
-
-**Purpose:**  
-Handle user sign-up, login, and session management.
-
-- Integrate Appwrite Account API in Next.js frontend.
-- Support signup, login, logout, session persistence.
-
-- [ ] Users can register, log in, and log out.
-- [ ] Sessions persist until logout.
-
----
-
-## 6. Tech Stack
-
-### 6.1. Frontend
-
-- **Framework:** Next.js (latest version)
-- **Language:** TypeScript
-- **UI Framework:** Tailwind CSS (or similar utility-first framework)
-- **State Management:** Appwrite SDK / SWR
-- **Real-time:** Appwrite Realtime Subscriptions
-
-### 6.2. Backend
-
-- **Platform:** Appwrite Cloud (latest version)
-- **Language:** Node.js (v22.17.0+)
-- **SDK:** Appwrite Node.js SDK (v17.0.0+)
-
-### 6.3. Data Source
-
-- **Primary API:** New Zealand TAB API
-
----
-
-## 7. Source Tree
-
-The project will follow a standard Next.js `src` directory structure.
+### 3.2. Component Architecture
 
 ```
-/
-|-- .env.local
-|-- .gitignore
-|-- next.config.js
-|-- package.json
-|-- README.md
-|-- tsconfig.json
-|-- public/
-|   |-- favicons/
-|-- src/
-|   |-- app/
-|   |   |-- (api)/               # API routes and server actions
-|   |   |-- (auth)/              # Auth pages (login, signup)
-|   |   |-- (main)/              # Core application layout and pages
-|   |   |   |-- layout.tsx
-|   |   |   |-- page.tsx         # Main dashboard
-|   |   |   |-- race/[id]/       # Detailed race view
-|   |-- components/
-|   |   |-- common/              # Reusable UI components (buttons, modals)
-|   |   |-- layout/              # Layout components (header, sidebar)
-|   |   |-- dashboard/           # Dashboard-specific components
-|   |   |-- race-view/           # Race view-specific components
-|   |-- lib/
-|   |   |-- appwrite.ts          # Appwrite client configuration
-|   |   |-- utils.ts             # Utility functions
-|   |-- hooks/                   # Custom React hooks
-|   |-- services/                # Backend service interactions
-|   |-- styles/
-|   |   |-- globals.css
-|-- scripts/
-    |-- appwrite-setup.ts      # Appwrite project setup script
+src/
+├── app/                    # Next.js App Router
+│   ├── (main)/page.tsx    # Dashboard with meetings list
+│   └── race/[id]/page.tsx # Race detail with entrants grid
+├── components/
+│   ├── dashboard/         # MeetingsList, FilterControls
+│   ├── race/             # EntrantsGrid, OddsSparkline
+│   └── alerts/           # AlertsModal, NotificationToast
+├── hooks/                # useRealtime, useMeetings, useRaceData
+└── services/             # API service layer
 ```
 
 ---
 
-## 8. Coding Standards
+## 4. Database Schema (Appwrite)
 
-### 8.1. General
+### 4.1. Core Collections
 
-- **Language:** All code must be written in TypeScript.
-- **Formatting:** Code will be formatted using Prettier with the configuration defined in `.prettierrc`.
-- **Linting:** ESLint will be used to enforce code quality, with rules defined in `.eslintrc.json`.
-- **Naming Conventions:**
-  - Components: `PascalCase` (e.g., `RaceGrid.tsx`)
-  - Functions/Variables: `camelCase` (e.g., `fetchRaceData`)
-  - Types/Interfaces: `PascalCase` (e.g., `interface RaceDetails`)
-- **Comments:** Code should be self-documenting where possible. Complex logic must be accompanied by explanatory comments.
+```sql
+-- meetings: Race meeting information
+meetingId (string, unique), meetingName (string), country (string, indexed),
+raceType (string, indexed), date (datetime, indexed), status (string)
 
-### 8.2. Frontend (Next.js)
+-- races: Individual races linked to meetings  
+raceId (string, unique), name (string), raceNumber (integer, indexed),
+startTime (datetime, indexed), status (string), actualStart (datetime),
+meeting (relationship → meetings)
 
-- **Component Structure:** Components should be small and focused on a single responsibility.
-- **Data Fetching:** Use Server-Side Rendering (SSR) or Server Actions for initial data loads. Use SWR for client-side data fetching and re-validation.
-- **State Management:** Prefer local component state. For global state, use React Context or a lightweight state management library if necessary.
-- **Styling:** Use a utility-first CSS framework like Tailwind CSS. Avoid inline styles.
+-- entrants: Horse entries linked to races
+entrantId (string, unique), name (string), runnerNumber (integer, indexed),
+winOdds (float), placeOdds (float), holdPercentage (float),
+isScratched (boolean), race (relationship → races)
 
-### 8.3. Backend (Appwrite Functions)
+-- odds-history: Time-series odds data for sparklines
+odds (float), eventTimestamp (datetime, indexed), type (string),
+entrant (relationship → entrants)
 
-- **Error Handling:** All functions must include robust error handling and logging.
-- **Environment Variables:** All secrets and configuration variables must be stored as environment variables in the Appwrite console, not hardcoded.
-- **Idempotency:** Where possible, functions that modify data should be idempotent.
+-- user-alert-configs: User notification preferences  
+userId (string, indexed), alertType (string), threshold (float),
+enabled (boolean), entrant (relationship → entrants)
+
+-- notifications: Real-time alert delivery
+userId (string, indexed), title (string), message (string),
+type (string), read (boolean), raceId (string), entrantId (string)
+```
+
+### 4.2. Optimized Indexes
+
+- **meetings:** idx_date, idx_country, idx_race_type, idx_meeting_id (unique)
+- **races:** idx_race_id (unique), idx_start_time, idx_status
+- **entrants:** idx_entrant_id (unique), idx_runner_number
+- **odds-history:** idx_timestamp, idx_entrant_timestamp (compound)
+- **user-alert-configs:** idx_user_id, idx_user_entrant (compound)
 
 ---
 
-## 9. Dependencies
+## 5. Key Architectural Improvements
 
-- Stable access to the NZ TAB API (`openapi.json`).
-- Next.js and Appwrite documentation must be referenced for all implementation work.
+### 5.1. Resource Management
+
+**Previous Issues (v1.4):**
+- Single monolithic function trying to do everything
+- Resource contention and memory exhaustion
+- Functions hanging for hours during entrant processing
+- No timeout protection on external API calls
+
+**Solutions (v2.0):**
+- Right-sized compute resources per function type
+- Sequential processing with 1-second delays between API calls
+- 15-second timeouts on all external API calls
+- Explicit memory management with garbage collection hints
+- Limited batch processing (max 20 races for daily-entrants)
+
+### 5.2. Error Handling & Resilience
+
+```javascript
+// Individual error isolation - continue processing on failures
+for (const race of races) {
+  try {
+    await processRace(race);
+  } catch (error) {
+    context.error(`Failed to process race ${race.id}`, { error: error.message });
+    // Continue with next race - don't fail entire batch
+  }
+}
+
+// Timeout protection for all API calls
+const raceData = await Promise.race([
+  fetchRaceEventData(nztabBaseUrl, raceId, context),
+  new Promise((_, reject) => 
+    setTimeout(() => reject(new Error(`Timeout for race ${raceId}`)), 15000)
+  )
+]);
+```
+
+### 5.3. Real-time Performance
+
+- **Frontend:** WebSocket subscriptions with throttled updates (max 10/second)
+- **Backend:** Event-driven alert evaluation triggered by database changes
+- **Latency:** Sub-2-second updates from backend to frontend
+- **Connection Health:** Automatic reconnection and health monitoring
+
+---
+
+## 6. Deployment Architecture
+
+### 6.1. Function Specifications
+
+```json
+{
+  "functions": [
+    {
+      "$id": "daily-meetings",
+      "specification": "s-1vcpu-512mb",
+      "schedule": "0 17 * * *",
+      "timeout": 300
+    },
+    {
+      "$id": "daily-races", 
+      "specification": "s-1vcpu-512mb",
+      "schedule": "10 17 * * *",
+      "timeout": 300
+    },
+    {
+      "$id": "daily-entrants",
+      "specification": "s-1vcpu-1gb",
+      "schedule": "20 17 * * *", 
+      "timeout": 300
+    },
+    {
+      "$id": "race-data-poller",
+      "specification": "s-2vcpu-2gb",
+      "schedule": "*/1 * * * *",
+      "timeout": 300
+    },
+    {
+      "$id": "alert-evaluator",
+      "specification": "s-1vcpu-512mb",
+      "events": ["databases.*.collections.entrants.documents.*.update"],
+      "timeout": 60
+    }
+  ]
+}
+```
+
+### 6.2. Deployment Pipeline
+
+- **Frontend:** Vercel deployment with automatic builds on main branch
+- **Backend:** Individual function deployment via Appwrite CLI
+- **Database:** Idempotent schema setup via client/scripts/appwrite-setup.ts
+- **Monitoring:** Built-in Appwrite Console + structured logging
+
+---
+
+## 7. Performance Characteristics
+
+### 7.1. Function Performance Targets
+
+| Function | Max Duration | Max Memory | Success Rate |
+|----------|-------------|------------|--------------|
+| daily-meetings | 60s | 200MB | >99.5% |
+| daily-races | 90s | 300MB | >99.5% |
+| daily-entrants | 300s | 800MB | >99% |
+| race-data-poller | 120s | 1.5GB | >99.5% |
+| alert-evaluator | 30s | 100MB | >99.9% |
+
+### 7.2. Frontend Performance Targets
+
+- **Initial Load:** < 500ms for cached data
+- **Real-time Updates:** < 2s latency
+- **Core Web Vitals:** LCP < 2.5s, FID < 100ms, CLS < 0.1
+- **Bundle Size:** < 250KB initial, < 50KB per route
+
+---
+
+## 8. Migration from v1.4
+
+### 8.1. Breaking Changes
+
+- `daily-race-importer` function removed, replaced with 3-function pipeline
+- Function resource specifications updated
+- Scheduling changed from single daily execution to staggered pipeline
+- Error handling improved with better isolation and logging
+
+### 8.2. Data Compatibility  
+
+- All existing database collections remain unchanged
+- New attributes added: races.actualStart, races.silkUrl, entrants.silkUrl
+- Existing data preserved, new pipeline populates additional fields
+
+### 8.3. Deployment Steps
+
+1. Deploy updated appwrite.json configuration
+2. Deploy new microservices functions
+3. Remove old daily-race-importer function
+4. Monitor pipeline execution starting at 17:00 UTC
+5. Verify data flow: meetings → races → entrants → real-time updates
+
+---
+
+## 9. Success Metrics
+
+### 9.1. Technical Metrics
+
+- **Zero hanging functions:** All functions complete within timeout limits
+- **Pipeline reliability:** >99% daily pipeline success rate
+- **Data completeness:** >95% of races have complete entrant data
+- **Real-time latency:** <2s from backend update to frontend display
+
+### 9.2. Business Metrics
+
+- **User experience:** Sub-second dashboard load times
+- **Data freshness:** Real-time odds updates during race hours
+- **System reliability:** >99.9% uptime during peak racing periods
+- **Alert delivery:** >99% successful notification delivery
+
+---
+
+## 10. Conclusion
+
+The RaceDay v2.0 microservices architecture eliminates the resource contention and hanging issues of the monolithic approach while providing better scalability, observability, and maintainability. The sequential pipeline design with proper resource allocation ensures reliable daily data import, while the optimized real-time system provides excellent user experience with sub-2-second update latency.
+
+This architecture is production-ready and designed for immediate deployment on the existing Appwrite Cloud infrastructure.

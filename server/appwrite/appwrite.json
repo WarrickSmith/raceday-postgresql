@@ -6,6 +6,7 @@
       "$id": "daily-race-importer",
       "name": "Daily Race Importer",
       "runtime": "node-22",
+      "specification": "s-2vcpu-2gb",
       "path": "functions/daily-race-importer",
       "execute": [
         "any"
@@ -34,6 +35,7 @@
       "$id": "race-data-poller",
       "name": "Race Data Poller",
       "runtime": "node-22",
+      "specification": "s-1vcpu-512mb",
       "path": "functions/race-data-poller",
       "execute": [
         "any"

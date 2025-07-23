@@ -43,14 +43,31 @@ const isAttributeAvailable = async (databases, databaseId, collectionId, attribu
         return false;
     }
 };
-const waitForAttributeAvailable = async (databases, databaseId, collectionId, attributeKey, context, maxRetries = 10, delayMs = 1000) => {
+const waitForAttributeAvailable = async (databases, databaseId, collectionId, attributeKey, context, maxRetries = 5, delayMs = 2000) => {
+    context.log(`Starting to wait for attribute ${attributeKey} to become available...`);
+    
     for (let i = 0; i < maxRetries; i++) {
-        if (await isAttributeAvailable(databases, databaseId, collectionId, attributeKey)) {
-            return true;
+        try {
+            const isAvailable = await isAttributeAvailable(databases, databaseId, collectionId, attributeKey);
+            if (isAvailable) {
+                context.log(`Attribute ${attributeKey} is now available after ${i + 1} attempts`);
+                return true;
+            }
+            context.log(`Waiting for attribute ${attributeKey} to become available... (${i + 1}/${maxRetries})`);
+            
+            if (i < maxRetries - 1) { // Don't wait after the last attempt
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
+        } catch (error) {
+            context.error(`Error checking attribute ${attributeKey} availability`, {
+                error: error instanceof Error ? error.message : 'Unknown error',
+                attempt: i + 1
+            });
+            // Continue to next attempt instead of breaking
         }
-        context.log(`Waiting for attribute ${attributeKey} to become available... (${i + 1}/${maxRetries})`);
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
+    
+    context.log(`Attribute ${attributeKey} did not become available after ${maxRetries} attempts, continuing anyway...`);
     return false;
 };
 export async function ensureDatabaseSetup(config, context) {
@@ -199,6 +216,8 @@ async function ensureRacesCollection(databases, config, context) {
         { key: 'trackCondition', type: 'string', size: 100, required: false },
         { key: 'weather', type: 'string', size: 50, required: false },
         { key: 'status', type: 'string', size: 50, required: true },
+        { key: 'actualStart', type: 'datetime', required: false },
+        { key: 'silkUrl', type: 'string', size: 500, required: false },
     ];
     for (const attr of requiredAttributes) {
         if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
@@ -288,6 +307,7 @@ async function ensureEntrantsCollection(databases, config, context) {
         { key: 'placeOdds', type: 'float', required: false },
         { key: 'holdPercentage', type: 'float', required: false },
         { key: 'isScratched', type: 'boolean', required: false, default: false },
+        { key: 'silkUrl', type: 'string', size: 500, required: false },
     ];
     for (const attr of requiredAttributes) {
         if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {

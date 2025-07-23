@@ -16,7 +16,7 @@ The project follows a client-server split architecture:
 
 Key architectural components:
 - **Frontend**: Next.js App Router with real-time Appwrite subscriptions
-- **Backend**: Appwrite Cloud with serverless functions for data polling (`daily-race-importer`, `race-data-poller`, `alert-evaluator`)
+- **Backend**: Appwrite Cloud with serverless functions for data polling (`daily-meetings`, `daily-races`, `daily-entrants`, `race-data-poller`, `alert-evaluator`)
 - **Database**: Appwrite database with collections for Meetings, Races, Entrants, OddsHistory, MoneyFlowHistory, UserAlertConfigs, and Notifications
 - **Data Source**: New Zealand TAB API integration
 - **Real-time**: Appwrite Realtime channels for live dashboard updates
@@ -42,9 +42,19 @@ Key architectural components:
 - `npm test -- src/path/to/test.test.ts` - Run specific test file
 
 ### Server Functions Deployment
-- `cd server/daily-race-importer && npm run deploy` - Deploy daily race importer function
-- `cd server/daily-race-importer && npm run dev` - Local testing of function
-- `cd server/daily-race-importer && npm test` - Run function tests
+
+#### Daily Data Pipeline Functions (v2.0 Microservices)
+- `cd server/daily-meetings && npm run deploy` - Deploy daily meetings function (17:00 UTC)
+- `cd server/daily-races && npm run deploy` - Deploy daily races function (17:10 UTC)  
+- `cd server/daily-entrants && npm run deploy` - Deploy daily entrants function (17:20 UTC)
+
+#### Real-time Functions
+- `cd server/race-data-poller && npm run deploy` - Deploy race data poller function
+- `cd server/alert-evaluator && npm run deploy` - Deploy alert evaluator function
+
+#### Development & Testing
+- `cd server/[function-name] && npm run dev` - Local testing of specific function
+- `cd server/[function-name] && npm test` - Run function tests
 
 ## Environment Configuration
 
@@ -107,7 +117,9 @@ User roles must be manually configured in Appwrite console after running setup s
 ## Key Integration Points
 
 - **NZ TAB API**: Primary data source for race information
-- **Appwrite Functions**: Serverless functions for data polling (`daily-race-importer`, `race-data-poller`, `alert-evaluator`)
+- **Appwrite Functions**: Microservices architecture with specialized functions:
+  - **Daily Pipeline**: `daily-meetings` (17:00) → `daily-races` (17:10) → `daily-entrants` (17:20)
+  - **Real-time**: `race-data-poller` (every minute), `alert-evaluator` (event-triggered)
 - **Real-time Updates**: Appwrite Realtime channels for live dashboard updates
 - **Authentication**: Appwrite Account API with user role labels
 
