@@ -8,5 +8,5 @@
   - **Metric:** User feedback indicates the tool provides actionable insights.
 - **Goal 3:** Provide robust filtering to allow users to focus on relevant races.
   - **Metric:** Over 50% of user sessions utilize the filtering functionality, indicating its value.
-- **Goal 4:** Establish a scalable and reliable technical foundation for future feature growth.
-  - **Metric:** The architecture (as defined by the Architect) is successfully implemented with no critical deviations.
+- **Goal 4:** Establish a scalable and reliable microservices foundation for future feature growth.
+  - **Metric:** The v2.0 microservices architecture (as defined by the Architect) is successfully implemented with >99% daily pipeline success rate and zero hanging functions.

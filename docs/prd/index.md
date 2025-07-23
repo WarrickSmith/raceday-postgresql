@@ -1,8 +1,8 @@
-# Product Requirements Document: RaceDay v1.5 (MVP)
+# Product Requirements Document: RaceDay v2.0 (MVP)
 
 ## Table of Contents
 
-- [Product Requirements Document: RaceDay v1.5 (MVP)](#table-of-contents)
+- [Product Requirements Document: RaceDay v2.0 (MVP)](#table-of-contents)
   - [1. Introduction & Vision](./1-introduction-vision.md)
     - [1.1. Vision](./1-introduction-vision.md#11-vision)
     - [1.2. Problem Statement](./1-introduction-vision.md#12-problem-statement)
@@ -20,10 +20,10 @@
         - [Tasks](./epic-1-project-scaffolding.md#tasks)
         - [Acceptance Criteria](./epic-1-project-scaffolding.md#acceptance-criteria)
   - [Epic 2: Backend Data Polling & Persistence](./epic-2-backend-data-polling-persistence.md)
-    - [Story 2.1: Create daily race import function](./epic-2-backend-data-polling-persistence.md#story-21-create-daily-race-import-function)
+    - [Story 2.1: Create daily data pipeline functions](./epic-2-backend-data-polling-persistence.md#story-21-create-daily-data-pipeline-functions)
         - [Tasks](./epic-2-backend-data-polling-persistence.md#tasks)
         - [Acceptance Criteria](./epic-2-backend-data-polling-persistence.md#acceptance-criteria)
-    - [Story 2.2: Implement dynamic polling function](./epic-2-backend-data-polling-persistence.md#story-22-implement-dynamic-polling-function)
+    - [Story 2.2: Implement dynamic real-time polling function](./epic-2-backend-data-polling-persistence.md#story-22-implement-dynamic-real-time-polling-function)
         - [Tasks](./epic-2-backend-data-polling-persistence.md#tasks)
         - [Acceptance Criteria](./epic-2-backend-data-polling-persistence.md#acceptance-criteria)
     - [Story 2.3: Implement data persistence logic](./epic-2-backend-data-polling-persistence.md#story-23-implement-data-persistence-logic)
