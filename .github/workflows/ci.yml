@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./server/daily-race-importer
+        working-directory: ./server/appwrite
 
     steps:
       - name: Checkout code
@@ -54,7 +54,7 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: ./server/daily-race-importer/package-lock.json
+          cache-dependency-path: ./server/appwrite/package-lock.json
 
       - name: Install dependencies
         run: npm install
@@ -63,19 +63,31 @@ jobs:
         run: |
           echo "Validating Appwrite function configuration..."
           test -f appwrite.json && echo "✓ appwrite.json exists" || exit 1
-          test -f functions/daily-race-importer/src/main.js && echo "✓ main.js exists" || exit 1
-          test -f functions/daily-race-importer/package.json && echo "✓ function package.json exists" || exit 1
+          test -f functions/daily-race-importer/src/main.js && echo "✓ daily-race-importer main.js exists" || exit 1
+          test -f functions/daily-race-importer/package.json && echo "✓ daily-race-importer package.json exists" || exit 1
+          test -f functions/race-data-poller/src/main.js && echo "✓ race-data-poller main.js exists" || exit 1
+          test -f functions/race-data-poller/package.json && echo "✓ race-data-poller package.json exists" || exit 1
           echo "✓ Function structure validated"
 
-      - name: Check function dependencies
+      - name: Check daily-race-importer dependencies
         run: |
           cd functions/daily-race-importer
           npm install
-          echo "✓ Function dependencies installed successfully"
+          echo "✓ daily-race-importer dependencies installed successfully"
+
+      - name: Check race-data-poller dependencies
+        run: |
+          cd functions/race-data-poller
+          npm install
+          echo "✓ race-data-poller dependencies installed successfully"
 
       - name: Validate JavaScript syntax
         run: |
+          echo "Validating daily-race-importer..."
           cd functions/daily-race-importer
-          node -c src/main.js && echo "✓ main.js syntax valid" || exit 1
-          node -c src/database-setup.js && echo "✓ database-setup.js syntax valid" || exit 1
+          node -c src/main.js && echo "✓ daily-race-importer main.js syntax valid" || exit 1
+          node -c src/database-setup.js && echo "✓ daily-race-importer database-setup.js syntax valid" || exit 1
+          cd ../race-data-poller
+          echo "Validating race-data-poller..."
+          node -c src/main.js && echo "✓ race-data-poller main.js syntax valid" || exit 1
           echo "✓ JavaScript syntax validation completed"
