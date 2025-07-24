@@ -39,55 +39,102 @@ jobs:
       - name: Build application
         run: npm run build
 
-  backend:
+  backend-daily-entrants:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./server/appwrite
-
+        working-directory: ./server/daily-entrants
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: ./server/appwrite/package-lock.json
-
-      - name: Install dependencies
-        run: npm install
-
+          cache-dependency-path: ./server/daily-entrants/package-lock.json
       - name: Validate function configuration
         run: |
-          echo "Validating Appwrite function configuration..."
           test -f appwrite.json && echo "✓ appwrite.json exists" || exit 1
-          test -f functions/daily-race-importer/src/main.js && echo "✓ daily-race-importer main.js exists" || exit 1
-          test -f functions/daily-race-importer/package.json && echo "✓ daily-race-importer package.json exists" || exit 1
-          test -f functions/race-data-poller/src/main.js && echo "✓ race-data-poller main.js exists" || exit 1
-          test -f functions/race-data-poller/package.json && echo "✓ race-data-poller package.json exists" || exit 1
-          echo "✓ Function structure validated"
-
-      - name: Check daily-race-importer dependencies
-        run: |
-          cd functions/daily-race-importer
-          npm install
-          echo "✓ daily-race-importer dependencies installed successfully"
-
-      - name: Check race-data-poller dependencies
-        run: |
-          cd functions/race-data-poller
-          npm install
-          echo "✓ race-data-poller dependencies installed successfully"
-
+          test -f src/main.js && echo "✓ main.js exists" || exit 1
+          test -f package.json && echo "✓ package.json exists" || exit 1
+      - name: Install dependencies
+        run: npm install
       - name: Validate JavaScript syntax
         run: |
-          echo "Validating daily-race-importer..."
-          cd functions/daily-race-importer
-          node -c src/main.js && echo "✓ daily-race-importer main.js syntax valid" || exit 1
-          node -c src/database-setup.js && echo "✓ daily-race-importer database-setup.js syntax valid" || exit 1
-          cd ../race-data-poller
-          echo "Validating race-data-poller..."
-          node -c src/main.js && echo "✓ race-data-poller main.js syntax valid" || exit 1
-          echo "✓ JavaScript syntax validation completed"
+          node -c src/main.js && echo "✓ main.js syntax valid" || exit 1
+
+  backend-daily-meetings:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server/daily-meetings
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: ./server/daily-meetings/package-lock.json
+      - name: Validate function configuration
+        run: |
+          test -f appwrite.json && echo "✓ appwrite.json exists" || exit 1
+          test -f src/main.js && echo "✓ main.js exists" || exit 1
+          test -f package.json && echo "✓ package.json exists" || exit 1
+      - name: Install dependencies
+        run: npm install
+      - name: Validate JavaScript syntax
+        run: |
+          node -c src/main.js && echo "✓ main.js syntax valid" || exit 1
+
+  backend-daily-races:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server/daily-races
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: ./server/daily-races/package-lock.json
+      - name: Validate function configuration
+        run: |
+          test -f appwrite.json && echo "✓ appwrite.json exists" || exit 1
+          test -f src/main.js && echo "✓ main.js exists" || exit 1
+          test -f package.json && echo "✓ package.json exists" || exit 1
+      - name: Install dependencies
+        run: npm install
+      - name: Validate JavaScript syntax
+        run: |
+          node -c src/main.js && echo "✓ main.js syntax valid" || exit 1
+
+  backend-race-data-poller:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server/race-data-poller
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: ./server/race-data-poller/package-lock.json
+      - name: Validate function configuration
+        run: |
+          test -f appwrite.json && echo "✓ appwrite.json exists" || exit 1
+          test -f src/main.js && echo "✓ main.js exists" || exit 1
+          test -f package.json && echo "✓ package.json exists" || exit 1
+      - name: Install dependencies
+        run: npm install
+      - name: Validate JavaScript syntax
+        run: |
+          node -c src/main.js && echo "✓ main.js syntax valid" || exit 1
