@@ -41,20 +41,28 @@ Key architectural components:
 - `npm test -- --testNamePattern="test name"` - Run specific test by name
 - `npm test -- src/path/to/test.test.ts` - Run specific test file
 
-### Server Functions Deployment
+### Server Functions Deployment (run from /server directory)
 
 #### Daily Data Pipeline Functions (v2.0 Microservices)
-- `cd server/daily-meetings && npm run deploy` - Deploy daily meetings function (17:00 UTC)
-- `cd server/daily-races && npm run deploy` - Deploy daily races function (17:10 UTC)  
-- `cd server/daily-entrants && npm run deploy` - Deploy daily entrants function (17:20 UTC)
-
-#### Real-time Functions
-- `cd server/race-data-poller && npm run deploy` - Deploy race data poller function
-- `cd server/alert-evaluator && npm run deploy` - Deploy alert evaluator function
+- `cd server` - **Always navigate to server directory first**
+- `npm run deploy:meetings` - Deploy daily meetings function (17:00 UTC)
+- `npm run deploy:races` - Deploy daily races function (17:10 UTC)  
+- `npm run deploy:entrants` - Deploy daily entrants function (17:20 UTC)
+- `npm run deploy:poller` - Deploy race data poller function (every minute)
+- `npm run deploy` - Deploy all functions
 
 #### Development & Testing
-- `cd server/[function-name] && npm run dev` - Local testing of specific function
-- `cd server/[function-name] && npm test` - Run function tests
+- `npm run meetings` - Run daily-meetings function locally with mock context
+- `npm run races` - Run daily-races function locally with mock context
+- `npm run entrants` - Run daily-entrants function locally with mock context
+- `npm run poller` - Run race-data-poller function locally with mock context
+
+#### Environment Variables
+- `npm run vars:all` - Update environment variables for all functions
+- `npm run vars:meetings` - Update variables for daily-meetings only
+- `npm run vars:races` - Update variables for daily-races only
+- `npm run vars:entrants` - Update variables for daily-entrants only
+- `npm run vars:poller` - Update variables for race-data-poller only
 
 ## Environment Configuration
 

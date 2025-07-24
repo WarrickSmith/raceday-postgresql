@@ -46,7 +46,7 @@ console.log(`🚀 Starting ${functionName} locally (non-Docker)...`);
 
 async function runFunction() {
   try {
-    const { default: main } = await import(`../functions/${functionName}/src/main.js`);
+    const { default: main } = await import(`../${functionName}/src/main.js`);
     const result = await main(mockContext);
     console.log('✅ Function completed successfully!');
     console.log('📊 Result:', JSON.stringify(result, null, 2));

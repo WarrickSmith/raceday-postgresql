@@ -1,0 +1,34 @@
+{
+  "name": "raceday-appwrite-functions",
+  "version": "2.0.0",
+  "description": "Nested Appwrite functions for RaceDay microservices architecture",
+  "type": "module",
+  "scripts": {
+    "install-cli": "npm install -g appwrite-cli",
+    "login": "node scripts/login.js",
+    "logout": "appwrite logout",
+    "status": "appwrite functions list",
+    "deploy": "appwrite push functions",
+    "deploy:meetings": "node scripts/deploy.js daily-meetings",
+    "deploy:races": "node scripts/deploy.js daily-races",
+    "deploy:entrants": "node scripts/deploy.js daily-entrants",
+    "deploy:poller": "node scripts/deploy.js race-data-poller",
+    "meetings": "node scripts/run-function.js daily-meetings",
+    "races": "node scripts/run-function.js daily-races",
+    "entrants": "node scripts/run-function.js daily-entrants",
+    "poller": "node scripts/run-function.js race-data-poller",
+    "execute": "node scripts/execute-function.js",
+    "vars:meetings": "node scripts/update-vars-only.js daily-meetings",
+    "vars:races": "node scripts/update-vars-only.js daily-races",
+    "vars:entrants": "node scripts/update-vars-only.js daily-entrants",
+    "vars:poller": "node scripts/update-vars-only.js race-data-poller",
+    "vars:all": "npm run vars:meetings && npm run vars:races && npm run vars:entrants && npm run vars:poller"
+  },
+  "dependencies": {
+    "node-appwrite": "^17.0.0",
+    "dotenv": "^16.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

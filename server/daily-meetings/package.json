@@ -1,6 +1,6 @@
 {
-  "name": "daily-race-importer",
-  "version": "1.0.0",
+  "name": "daily-meetings",
+  "version": "2.0.0",
   "type": "module",
   "main": "src/main.js",
   "dependencies": {
