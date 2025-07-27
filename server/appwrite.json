@@ -1,114 +1,122 @@
 {
-  "projectId": "racedaytest250701",
-  "projectName": "RaceDayTest",
-  "functions": [
-    {
-      "$id": "daily-meetings",
-      "name": "Daily Meetings Import",
-      "runtime": "node-22",
-      "specification": "s-1vcpu-512mb",
-      "path": "daily-meetings",
-      "execute": ["any"],
-      "events": [],
-      "schedule": "0 17 * * *",
-      "timeout": 300,
-      "enabled": true,
-      "logging": true,
-      "entrypoint": "src/main.js",
-      "commands": "npm install",
-      "scopes": [
-        "databases.read",
-        "databases.write",
-        "collections.read",
-        "collections.write",
-        "attributes.read",
-        "attributes.write",
-        "indexes.read",
-        "indexes.write",
-        "documents.read",
-        "documents.write"
-      ]
-    },
-    {
-      "$id": "daily-races",
-      "name": "Daily Races Import",
-      "runtime": "node-22",
-      "specification": "s-1vcpu-512mb",
-      "path": "daily-races",
-      "execute": ["any"],
-      "events": [],
-      "schedule": "10 17 * * *",
-      "timeout": 300,
-      "enabled": true,
-      "logging": true,
-      "entrypoint": "src/main.js",
-      "commands": "npm install",
-      "scopes": [
-        "databases.read",
-        "databases.write",
-        "collections.read",
-        "collections.write",
-        "attributes.read",
-        "attributes.write",
-        "indexes.read",
-        "indexes.write",
-        "documents.read",
-        "documents.write"
-      ]
-    },
-    {
-      "$id": "daily-entrants",
-      "name": "Daily Entrants Import",
-      "runtime": "node-22",
-      "specification": "s-1vcpu-1gb",
-      "path": "daily-entrants",
-      "execute": ["any"],
-      "events": [],
-      "schedule": "20 17 * * *",
-      "timeout": 300,
-      "enabled": true,
-      "logging": true,
-      "entrypoint": "src/main.js",
-      "commands": "npm install",
-      "scopes": [
-        "databases.read",
-        "databases.write",
-        "collections.read",
-        "collections.write",
-        "attributes.read",
-        "attributes.write",
-        "indexes.read",
-        "indexes.write",
-        "documents.read",
-        "documents.write"
-      ]
-    },
-    {
-      "$id": "race-data-poller",
-      "name": "Race Data Poller",
-      "runtime": "node-22",
-      "specification": "s-2vcpu-2gb",
-      "path": "race-data-poller",
-      "execute": ["any"],
-      "events": [],
-      "schedule": "*/1 * * * *",
-      "timeout": 300,
-      "enabled": true,
-      "logging": true,
-      "entrypoint": "src/main.js",
-      "commands": "npm install",
-      "scopes": [
-        "databases.read",
-        "databases.write",
-        "collections.read",
-        "collections.write",
-        "attributes.read",
-        "attributes.write",
-        "indexes.read",
-        "indexes.write",
-        "documents.read",
-        "documents.write"
-      ]
-    }
-  ]
+    "projectId": "racedaytest111",
+    "projectName": "RaceDayTest",
+    "functions": [
+        {
+            "$id": "daily-meetings",
+            "name": "Daily Meetings Import",
+            "runtime": "node-22",
+            "specification": "s-1vcpu-512mb",
+            "path": "daily-meetings",
+            "execute": [
+                "any"
+            ],
+            "events": [],
+            "schedule": "0 17 * * *",
+            "timeout": 300,
+            "enabled": true,
+            "logging": true,
+            "entrypoint": "src/main.js",
+            "commands": "npm install",
+            "scopes": [
+                "databases.read",
+                "databases.write",
+                "collections.read",
+                "collections.write",
+                "attributes.read",
+                "attributes.write",
+                "indexes.read",
+                "indexes.write",
+                "documents.read",
+                "documents.write"
+            ]
+        },
+        {
+            "$id": "daily-races",
+            "name": "Daily Races Import",
+            "runtime": "node-22",
+            "specification": "s-1vcpu-512mb",
+            "path": "daily-races",
+            "execute": [
+                "any"
+            ],
+            "events": [],
+            "schedule": "10 17 * * *",
+            "timeout": 300,
+            "enabled": true,
+            "logging": true,
+            "entrypoint": "src/main.js",
+            "commands": "npm install",
+            "scopes": [
+                "databases.read",
+                "databases.write",
+                "collections.read",
+                "collections.write",
+                "attributes.read",
+                "attributes.write",
+                "indexes.read",
+                "indexes.write",
+                "documents.read",
+                "documents.write"
+            ]
+        },
+        {
+            "$id": "daily-entrants",
+            "name": "Daily Entrants Import",
+            "runtime": "node-22",
+            "specification": "s-1vcpu-1gb",
+            "path": "daily-entrants",
+            "execute": [
+                "any"
+            ],
+            "events": [],
+            "schedule": "20 17 * * *",
+            "timeout": 300,
+            "enabled": true,
+            "logging": true,
+            "entrypoint": "src/main.js",
+            "commands": "npm install",
+            "scopes": [
+                "databases.read",
+                "databases.write",
+                "collections.read",
+                "collections.write",
+                "attributes.read",
+                "attributes.write",
+                "indexes.read",
+                "indexes.write",
+                "documents.read",
+                "documents.write"
+            ]
+        },
+        {
+            "$id": "race-data-poller",
+            "name": "Race Data Poller",
+            "runtime": "node-22",
+            "specification": "s-2vcpu-2gb",
+            "path": "race-data-poller",
+            "execute": [
+                "any"
+            ],
+            "events": [],
+            "schedule": "*/1 * * * *",
+            "timeout": 300,
+            "enabled": true,
+            "logging": true,
+            "entrypoint": "src/main.js",
+            "commands": "npm install",
+            "scopes": [
+                "databases.read",
+                "databases.write",
+                "collections.read",
+                "collections.write",
+                "attributes.read",
+                "attributes.write",
+                "indexes.read",
+                "indexes.write",
+                "documents.read",
+                "documents.write"
+            ]
+        }
+    ]
 }
