@@ -170,74 +170,56 @@ const createMeetingsCollection = async () => {
     )
   }
 
-  // Create attributes (check if they exist first)
-  if (!(await attributeExists(config.collections.meetings, 'meetingId'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.meetings,
-      'meetingId',
-      50,
-      true
-    )
-  }
+  // Enhanced Meetings attributes - synced with server database-setup.js
+  const meetingAttributes: Array<{key: string, type: string, size?: number, required: boolean}> = [
+    // Core identifiers
+    { key: 'meetingId', type: 'string', size: 50, required: true },
+    { key: 'meetingName', type: 'string', size: 255, required: true },
+    
+    // Location and categorization
+    { key: 'country', type: 'string', size: 10, required: true },
+    { key: 'state', type: 'string', size: 10, required: false },
+    { key: 'raceType', type: 'string', size: 50, required: true },
+    { key: 'category', type: 'string', size: 10, required: false }, // T, H, G
+    { key: 'categoryName', type: 'string', size: 100, required: false }, // Full category name
+    
+    // Meeting details
+    { key: 'date', type: 'datetime', required: true },
+    { key: 'trackCondition', type: 'string', size: 50, required: false },
+    { key: 'status', type: 'string', size: 50, required: true },
+    
+    // Additional meeting metadata for future functionality
+    { key: 'trackDirection', type: 'string', size: 20, required: false }, // Left/Right
+    { key: 'trackSurface', type: 'string', size: 50, required: false }, // All Weather, Turf, etc
+    { key: 'railPosition', type: 'string', size: 100, required: false },
+    { key: 'weather', type: 'string', size: 50, required: false },
+    
+    // Import metadata
+    { key: 'lastUpdated', type: 'datetime', required: false },
+    { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
+    { key: 'apiGeneratedTime', type: 'datetime', required: false },
+  ]
 
-  if (!(await attributeExists(config.collections.meetings, 'meetingName'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.meetings,
-      'meetingName',
-      255,
-      true
-    )
-  }
-
-  if (!(await attributeExists(config.collections.meetings, 'country'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.meetings,
-      'country',
-      10,
-      true
-    )
-  }
-
-  if (!(await attributeExists(config.collections.meetings, 'raceType'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.meetings,
-      'raceType',
-      50,
-      true
-    )
-  }
-
-  if (!(await attributeExists(config.collections.meetings, 'date'))) {
-    await databases.createDatetimeAttribute(
-      config.databaseId,
-      config.collections.meetings,
-      'date',
-      true
-    )
-  }
-
-  if (!(await attributeExists(config.collections.meetings, 'trackCondition'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.meetings,
-      'trackCondition',
-      50,
-      false
-    )
-  }
-
-  if (!(await attributeExists(config.collections.meetings, 'status'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.meetings,
-      'status',
-      50,
-      true
-    )
+  for (const attr of meetingAttributes) {
+    if (!(await attributeExists(config.collections.meetings, attr.key))) {
+      log(`Creating meetings attribute: ${attr.key}`)
+      if (attr.type === 'string') {
+        await databases.createStringAttribute(
+          config.databaseId,
+          config.collections.meetings,
+          attr.key,
+          attr.size!,
+          attr.required
+        )
+      } else if (attr.type === 'datetime') {
+        await databases.createDatetimeAttribute(
+          config.databaseId,
+          config.collections.meetings,
+          attr.key,
+          attr.required
+        )
+      }
+    }
   }
 
   // Create indexes (check if they exist first)
@@ -395,101 +377,111 @@ const createRacesCollection = async () => {
     )
   }
 
-  // Create attributes (check if they exist first)
-  if (!(await attributeExists(config.collections.races, 'raceId'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.races,
-      'raceId',
-      50,
-      true
-    )
-  }
+  // Enhanced Races attributes - synced with server database-setup.js
+  const raceAttributes: Array<{key: string, type: string, size?: number, required: boolean}> = [
+    // Core identifiers
+    { key: 'raceId', type: 'string', size: 50, required: true },
+    { key: 'name', type: 'string', size: 255, required: true },
+    { key: 'raceNumber', type: 'integer', required: true },
+    
+    // Timing information
+    { key: 'startTime', type: 'datetime', required: true }, // advertised_start
+    { key: 'actualStart', type: 'datetime', required: false }, // actual_start
+    { key: 'toteStartTime', type: 'string', size: 20, required: false }, // tote_start_time
+    { key: 'startTimeNz', type: 'string', size: 30, required: false }, // start_time_nz
+    { key: 'raceDateNz', type: 'string', size: 15, required: false }, // race_date_nz
+    
+    // Race details
+    { key: 'distance', type: 'integer', required: false },
+    { key: 'trackCondition', type: 'string', size: 100, required: false },
+    { key: 'weather', type: 'string', size: 50, required: false },
+    { key: 'status', type: 'string', size: 50, required: true },
+    
+    // Track information
+    { key: 'trackDirection', type: 'string', size: 20, required: false }, // track_direction
+    { key: 'trackSurface', type: 'string', size: 50, required: false }, // track_surface
+    { key: 'railPosition', type: 'string', size: 100, required: false }, // rail_position
+    { key: 'trackHomeStraight', type: 'integer', required: false }, // track_home_straight
+    
+    // Race classification
+    { key: 'type', type: 'string', size: 10, required: false }, // race type (T, H, G)
+    { key: 'startType', type: 'string', size: 50, required: false }, // start_type
+    { key: 'group', type: 'string', size: 50, required: false }, // Grade, Listed, etc
+    { key: 'class', type: 'string', size: 20, required: false }, // C1, C2, etc
+    { key: 'gait', type: 'string', size: 20, required: false }, // for harness racing
+    
+    // Prize and field information
+    { key: 'totalPrizeMoney', type: 'integer', required: false }, // prize_monies.total_value
+    { key: 'entrantCount', type: 'integer', required: false }, // entrant_count
+    { key: 'fieldSize', type: 'integer', required: false }, // field_size
+    { key: 'positionsPaid', type: 'integer', required: false }, // positions_paid
+    
+    // Race conditions and restrictions
+    { key: 'genderConditions', type: 'string', size: 100, required: false },
+    { key: 'ageConditions', type: 'string', size: 100, required: false },
+    { key: 'weightConditions', type: 'string', size: 200, required: false },
+    { key: 'allowanceConditions', type: 'boolean', required: false },
+    { key: 'specialConditions', type: 'string', size: 500, required: false },
+    { key: 'jockeyConditions', type: 'string', size: 200, required: false },
+    
+    // Form and commentary
+    { key: 'formGuide', type: 'string', size: 2000, required: false },
+    { key: 'comment', type: 'string', size: 2000, required: false },
+    { key: 'description', type: 'string', size: 255, required: false },
+    
+    // Visual and media
+    { key: 'silkUrl', type: 'string', size: 500, required: false },
+    { key: 'silkBaseUrl', type: 'string', size: 200, required: false },
+    { key: 'videoChannels', type: 'string', size: 500, required: false }, // JSON array as string
+    
+    // Betting options
+    { key: 'ffwinOptionNumber', type: 'integer', required: false },
+    { key: 'fftop3OptionNumber', type: 'integer', required: false },
+    
+    // Rate information for harness/trots
+    { key: 'mileRate400', type: 'string', size: 20, required: false },
+    { key: 'mileRate800', type: 'string', size: 20, required: false },
+    
+    // Import metadata
+    { key: 'lastUpdated', type: 'datetime', required: false },
+    { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
+    { key: 'importedAt', type: 'datetime', required: false },
+  ]
 
-  if (!(await attributeExists(config.collections.races, 'name'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.races,
-      'name',
-      255,
-      true
-    )
-  }
-
-  if (!(await attributeExists(config.collections.races, 'raceNumber'))) {
-    await databases.createIntegerAttribute(
-      config.databaseId,
-      config.collections.races,
-      'raceNumber',
-      true
-    )
-  }
-
-  if (!(await attributeExists(config.collections.races, 'startTime'))) {
-    await databases.createDatetimeAttribute(
-      config.databaseId,
-      config.collections.races,
-      'startTime',
-      true
-    )
-  }
-
-  if (!(await attributeExists(config.collections.races, 'distance'))) {
-    await databases.createIntegerAttribute(
-      config.databaseId,
-      config.collections.races,
-      'distance',
-      false
-    )
-  }
-
-  if (!(await attributeExists(config.collections.races, 'trackCondition'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.races,
-      'trackCondition',
-      100,
-      false
-    )
-  }
-
-  if (!(await attributeExists(config.collections.races, 'weather'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.races,
-      'weather',
-      50,
-      false
-    )
-  }
-
-  if (!(await attributeExists(config.collections.races, 'status'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.races,
-      'status',
-      50,
-      true
-    )
-  }
-
-  if (!(await attributeExists(config.collections.races, 'actualStart'))) {
-    await databases.createDatetimeAttribute(
-      config.databaseId,
-      config.collections.races,
-      'actualStart',
-      false
-    )
-  }
-
-  if (!(await attributeExists(config.collections.races, 'silkUrl'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.races,
-      'silkUrl',
-      500,
-      false
-    )
+  for (const attr of raceAttributes) {
+    if (!(await attributeExists(config.collections.races, attr.key))) {
+      log(`Creating races attribute: ${attr.key}`)
+      if (attr.type === 'string') {
+        await databases.createStringAttribute(
+          config.databaseId,
+          config.collections.races,
+          attr.key,
+          attr.size!,
+          attr.required
+        )
+      } else if (attr.type === 'datetime') {
+        await databases.createDatetimeAttribute(
+          config.databaseId,
+          config.collections.races,
+          attr.key,
+          attr.required
+        )
+      } else if (attr.type === 'integer') {
+        await databases.createIntegerAttribute(
+          config.databaseId,
+          config.collections.races,
+          attr.key,
+          attr.required
+        )
+      } else if (attr.type === 'boolean') {
+        await databases.createBooleanAttribute(
+          config.databaseId,
+          config.collections.races,
+          attr.key,
+          attr.required
+        )
+      }
+    }
   }
 
   // Relationship to meetings (check if it exists first)
@@ -628,111 +620,230 @@ const createEntrantsCollection = async () => {
     )
   }
 
-  // Create attributes (check if they exist first)
-  if (!(await attributeExists(config.collections.entrants, 'entrantId'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.entrants,
-      'entrantId',
-      50,
-      true
-    )
+  // Enhanced Entrants attributes - synced with server database-setup.js
+  // NOTE: This is a comprehensive schema with 80+ fields for maximum data capture
+  const entrantAttributes: Array<{key: string, type: string, size?: number, required: boolean, default?: boolean}> = [
+    // Core identifiers
+    { key: 'entrantId', type: 'string', size: 50, required: true },
+    { key: 'name', type: 'string', size: 255, required: true },
+    { key: 'runnerNumber', type: 'integer', required: true },
+    { key: 'barrier', type: 'integer', required: false },
+    
+    // Status information
+    { key: 'isScratched', type: 'boolean', required: false, default: false },
+    { key: 'isLateScratched', type: 'boolean', required: false, default: false },
+    { key: 'isEmergency', type: 'boolean', required: false, default: false },
+    { key: 'scratchTime', type: 'integer', required: false }, // Unix timestamp
+    { key: 'emergencyPosition', type: 'string', size: 20, required: false },
+    { key: 'runnerChange', type: 'string', size: 500, required: false },
+    
+    // Horse/Animal details
+    { key: 'age', type: 'integer', required: false },
+    { key: 'sex', type: 'string', size: 10, required: false }, // B, F, M, C, G
+    { key: 'colour', type: 'string', size: 20, required: false }, // BK, BR, CH, etc
+    { key: 'country', type: 'string', size: 10, required: false },
+    { key: 'foalingDate', type: 'string', size: 20, required: false },
+    { key: 'firstStartIndicator', type: 'boolean', required: false, default: false },
+    
+    // Breeding information
+    { key: 'sire', type: 'string', size: 255, required: false },
+    { key: 'dam', type: 'string', size: 255, required: false },
+    { key: 'breeding', type: 'string', size: 500, required: false },
+    { key: 'horseId', type: 'integer', required: false },
+    
+    // Connections
+    { key: 'jockey', type: 'string', size: 255, required: false },
+    { key: 'apprenticeIndicator', type: 'string', size: 50, required: false },
+    { key: 'trainerName', type: 'string', size: 255, required: false },
+    { key: 'trainerLocation', type: 'string', size: 255, required: false },
+    { key: 'owners', type: 'string', size: 500, required: false },
+    
+    // Weight and gear
+    { key: 'weight', type: 'string', size: 50, required: false },
+    { key: 'allocatedWeight', type: 'string', size: 20, required: false },
+    { key: 'totalWeight', type: 'string', size: 20, required: false },
+    { key: 'allowanceWeight', type: 'string', size: 20, required: false },
+    { key: 'gear', type: 'string', size: 200, required: false },
+    
+    // Current odds - enhanced with all types
+    { key: 'fixedWinOdds', type: 'float', required: false },
+    { key: 'fixedPlaceOdds', type: 'float', required: false },
+    { key: 'poolWinOdds', type: 'float', required: false },
+    { key: 'poolPlaceOdds', type: 'float', required: false },
+    
+    // Betting indicators
+    { key: 'favourite', type: 'boolean', required: false, default: false },
+    { key: 'mover', type: 'boolean', required: false, default: false },
+    
+    // Prize money and statistics
+    { key: 'prizeMoney', type: 'string', size: 50, required: false },
+    { key: 'rating', type: 'string', size: 20, required: false },
+    { key: 'handicapRating', type: 'string', size: 20, required: false },
+    { key: 'classLevel', type: 'string', size: 50, required: false },
+    
+    // Form and performance
+    { key: 'lastTwentyStarts', type: 'string', size: 20, required: false }, // e.g., "21331"
+    { key: 'bestTime', type: 'string', size: 20, required: false },
+    { key: 'formComment', type: 'string', size: 2000, required: false },
+    
+    // Performance statistics - overall
+    { key: 'overallStarts', type: 'integer', required: false },
+    { key: 'overallWins', type: 'integer', required: false },
+    { key: 'overallSeconds', type: 'integer', required: false },
+    { key: 'overallThirds', type: 'integer', required: false },
+    { key: 'overallPlacings', type: 'integer', required: false },
+    { key: 'winPercentage', type: 'string', size: 10, required: false }, // "40%"
+    { key: 'placePercentage', type: 'string', size: 10, required: false }, // "100%"
+  ]
+
+  const entrantAttributesPart2: Array<{key: string, type: string, size?: number, required: boolean, default?: boolean}> = [
+    // Track/distance/condition specific stats
+    { key: 'trackStarts', type: 'integer', required: false },
+    { key: 'trackWins', type: 'integer', required: false },
+    { key: 'trackSeconds', type: 'integer', required: false },
+    { key: 'trackThirds', type: 'integer', required: false },
+    { key: 'distanceStarts', type: 'integer', required: false },
+    { key: 'distanceWins', type: 'integer', required: false },
+    { key: 'distanceSeconds', type: 'integer', required: false },
+    { key: 'distanceThirds', type: 'integer', required: false },
+    
+    // Barrier/box statistics
+    { key: 'barrierStarts', type: 'integer', required: false },
+    { key: 'barrierWins', type: 'integer', required: false },
+    { key: 'barrierSeconds', type: 'integer', required: false },
+    { key: 'barrierThirds', type: 'integer', required: false },
+    
+    // Recent form (last 12 months)
+    { key: 'last12Starts', type: 'integer', required: false },
+    { key: 'last12Wins', type: 'integer', required: false },
+    { key: 'last12Seconds', type: 'integer', required: false },
+    { key: 'last12Thirds', type: 'integer', required: false },
+    { key: 'last12WinPercentage', type: 'string', size: 10, required: false },
+    { key: 'last12PlacePercentage', type: 'string', size: 10, required: false },
+    
+    // Speed and prediction data
+    { key: 'spr', type: 'integer', required: false }, // Speed Rating
+    { key: 'settlingLengths', type: 'integer', required: false }, // speedmap data
+    { key: 'averageTime', type: 'float', required: false },
+    { key: 'averageKms', type: 'float', required: false },
+    { key: 'bestTimeFloat', type: 'float', required: false },
+    { key: 'bestKms', type: 'float', required: false },
+    { key: 'bestDate', type: 'string', size: 20, required: false },
+    { key: 'winPrediction', type: 'float', required: false },
+    { key: 'placePrediction', type: 'float', required: false },
+    
+    // Visual and display
+    { key: 'silkColours', type: 'string', size: 200, required: false },
+    { key: 'silkUrl', type: 'string', size: 500, required: false },
+    { key: 'silkUrl64x64', type: 'string', size: 500, required: false },
+    { key: 'silkUrl128x128', type: 'string', size: 500, required: false },
+    
+    // Complex data stored as JSON strings for flexible future use
+    { key: 'formIndicators', type: 'string', size: 2000, required: false }, // JSON array
+    { key: 'lastStarts', type: 'string', size: 5000, required: false }, // JSON array of recent runs
+    { key: 'allBoxHistory', type: 'string', size: 2000, required: false }, // JSON array
+    { key: 'pastPerformances', type: 'string', size: 5000, required: false }, // JSON array
+    { key: 'runnerWinHistory', type: 'string', size: 2000, required: false }, // JSON array
+    { key: 'videoChannelsMeta', type: 'string', size: 2000, required: false }, // JSON object
+    
+    // Import and update metadata
+    { key: 'lastUpdated', type: 'datetime', required: false },
+    { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
+    { key: 'marketName', type: 'string', size: 100, required: false }, // Final Field, etc
+    { key: 'primaryMarket', type: 'boolean', required: false, default: true },
+    { key: 'importedAt', type: 'datetime', required: false },
+  ]
+
+  // Process first batch of entrant attributes
+  log('Creating comprehensive entrants attributes (Part 1/2)...')
+  for (const attr of entrantAttributes) {
+    if (!(await attributeExists(config.collections.entrants, attr.key))) {
+      log(`Creating entrants attribute: ${attr.key}`)
+      if (attr.type === 'string') {
+        await databases.createStringAttribute(
+          config.databaseId,
+          config.collections.entrants,
+          attr.key,
+          attr.size!,
+          attr.required
+        )
+      } else if (attr.type === 'integer') {
+        await databases.createIntegerAttribute(
+          config.databaseId,
+          config.collections.entrants,
+          attr.key,
+          attr.required
+        )
+      } else if (attr.type === 'float') {
+        await databases.createFloatAttribute(
+          config.databaseId,
+          config.collections.entrants,
+          attr.key,
+          attr.required
+        )
+      } else if (attr.type === 'boolean') {
+        await databases.createBooleanAttribute(
+          config.databaseId,
+          config.collections.entrants,
+          attr.key,
+          attr.required,
+          attr.default
+        )
+      } else if (attr.type === 'datetime') {
+        await databases.createDatetimeAttribute(
+          config.databaseId,
+          config.collections.entrants,
+          attr.key,
+          attr.required
+        )
+      }
+    }
   }
 
-  if (!(await attributeExists(config.collections.entrants, 'name'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.entrants,
-      'name',
-      255,
-      true
-    )
-  }
-
-  if (!(await attributeExists(config.collections.entrants, 'runnerNumber'))) {
-    await databases.createIntegerAttribute(
-      config.databaseId,
-      config.collections.entrants,
-      'runnerNumber',
-      true
-    )
-  }
-
-  if (!(await attributeExists(config.collections.entrants, 'jockey'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.entrants,
-      'jockey',
-      255,
-      false
-    )
-  }
-
-  if (!(await attributeExists(config.collections.entrants, 'trainerName'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.entrants,
-      'trainerName',
-      255,
-      false
-    )
-  }
-
-  if (!(await attributeExists(config.collections.entrants, 'weight'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.entrants,
-      'weight',
-      50,
-      false
-    )
-  }
-
-  if (!(await attributeExists(config.collections.entrants, 'winOdds'))) {
-    await databases.createFloatAttribute(
-      config.databaseId,
-      config.collections.entrants,
-      'winOdds',
-      false
-    )
-  }
-
-  if (!(await attributeExists(config.collections.entrants, 'placeOdds'))) {
-    await databases.createFloatAttribute(
-      config.databaseId,
-      config.collections.entrants,
-      'placeOdds',
-      false
-    )
-  }
-
-  if (!(await attributeExists(config.collections.entrants, 'holdPercentage'))) {
-    await databases.createFloatAttribute(
-      config.databaseId,
-      config.collections.entrants,
-      'holdPercentage',
-      false
-    )
-  }
-
-  if (!(await attributeExists(config.collections.entrants, 'isScratched'))) {
-    await databases.createBooleanAttribute(
-      config.databaseId,
-      config.collections.entrants,
-      'isScratched',
-      false,
-      false
-    )
-  }
-
-  if (!(await attributeExists(config.collections.entrants, 'silkUrl'))) {
-    await databases.createStringAttribute(
-      config.databaseId,
-      config.collections.entrants,
-      'silkUrl',
-      500,
-      false
-    )
+  // Process second batch of entrant attributes  
+  log('Creating comprehensive entrants attributes (Part 2/2)...')
+  for (const attr of entrantAttributesPart2) {
+    if (!(await attributeExists(config.collections.entrants, attr.key))) {
+      log(`Creating entrants attribute: ${attr.key}`)
+      if (attr.type === 'string') {
+        await databases.createStringAttribute(
+          config.databaseId,
+          config.collections.entrants,
+          attr.key,
+          attr.size!,
+          attr.required
+        )
+      } else if (attr.type === 'integer') {
+        await databases.createIntegerAttribute(
+          config.databaseId,
+          config.collections.entrants,
+          attr.key,
+          attr.required
+        )
+      } else if (attr.type === 'float') {
+        await databases.createFloatAttribute(
+          config.databaseId,
+          config.collections.entrants,
+          attr.key,
+          attr.required
+        )
+      } else if (attr.type === 'boolean') {
+        await databases.createBooleanAttribute(
+          config.databaseId,
+          config.collections.entrants,
+          attr.key,
+          attr.required,
+          attr.default
+        )
+      } else if (attr.type === 'datetime') {
+        await databases.createDatetimeAttribute(
+          config.databaseId,
+          config.collections.entrants,
+          attr.key,
+          attr.required
+        )
+      }
+    }
   }
 
   // Relationship to races (check if it exists first)

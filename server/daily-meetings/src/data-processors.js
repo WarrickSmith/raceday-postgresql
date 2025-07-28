@@ -10,7 +10,7 @@
  */
 export function filterMeetings(meetings, context) {
     const allowedCountries = ['AUS', 'NZ'];
-    const allowedCategories = ['Thoroughbred Horse Racing', 'Harness Horse Racing'];
+    const allowedCategories = ['Thoroughbred Horse Racing', 'Harness'];
     const countriesFound = [...new Set(meetings.map(meeting => meeting.country))];
     const categoriesFound = [...new Set(meetings.map(meeting => meeting.category_name))];
     

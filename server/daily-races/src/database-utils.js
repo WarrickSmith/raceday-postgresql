@@ -199,3 +199,109 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
     
     return entrantsProcessed;
 }
+
+/**
+ * Process races with detailed data from events API
+ * @param {Object} databases - Appwrite Databases instance
+ * @param {string} databaseId - Database ID
+ * @param {Array} detailedRaces - Array of objects with basicRace and detailedData
+ * @param {Object} context - Appwrite function context for logging
+ * @returns {number} Number of races processed
+ */
+export async function processDetailedRaces(databases, databaseId, detailedRaces, context) {
+    let racesProcessed = 0;
+    
+    // Process each race with detailed data
+    for (const { basicRace, detailedData } of detailedRaces) {
+        try {
+            const enhancedRaceDoc = {
+                // Core identifiers (keep existing)
+                raceId: basicRace.raceId,
+                name: detailedData.description || basicRace.name,
+                raceNumber: basicRace.raceNumber,
+                
+                // Enhanced timing information
+                startTime: basicRace.startTime,
+                ...(detailedData.actual_start && { actualStart: new Date(detailedData.actual_start * 1000).toISOString() }),
+                ...(detailedData.start_time_nz && { startTimeNz: detailedData.start_time_nz }),
+                ...(detailedData.race_date_nz && { raceDateNz: detailedData.race_date_nz }),
+                
+                // Race details (merge basic with detailed)
+                ...(detailedData.distance && { distance: detailedData.distance }),
+                ...(detailedData.track_condition && { trackCondition: detailedData.track_condition }),
+                ...(detailedData.weather && { weather: detailedData.weather }),
+                status: detailedData.status || basicRace.status,
+                
+                // Track information
+                ...(detailedData.track_direction && { trackDirection: detailedData.track_direction }),
+                ...(detailedData.track_surface && { trackSurface: detailedData.track_surface }),
+                ...(detailedData.rail_position && { railPosition: detailedData.rail_position }),
+                ...(detailedData.track_home_straight && { trackHomeStraight: detailedData.track_home_straight }),
+                
+                // Race classification
+                ...(detailedData.type && { type: detailedData.type }),
+                ...(detailedData.start_type && { startType: detailedData.start_type }),
+                ...(detailedData.group && { group: detailedData.group }),
+                ...(detailedData.class && { class: detailedData.class }),
+                ...(detailedData.gait && { gait: detailedData.gait }),
+                
+                // Prize and field information
+                ...(detailedData.prize_monies?.total_value && { totalPrizeMoney: detailedData.prize_monies.total_value }),
+                ...(detailedData.entrant_count && { entrantCount: detailedData.entrant_count }),
+                ...(detailedData.field_size && { fieldSize: detailedData.field_size }),
+                ...(detailedData.positions_paid && { positionsPaid: detailedData.positions_paid }),
+                
+                // Race conditions
+                ...(detailedData.gender_conditions && { genderConditions: detailedData.gender_conditions }),
+                ...(detailedData.age_conditions && { ageConditions: detailedData.age_conditions }),
+                ...(detailedData.weight_and_handicap_conditions && { weightConditions: detailedData.weight_and_handicap_conditions }),
+                ...(detailedData.allowance_conditions !== undefined && { allowanceConditions: detailedData.allowance_conditions }),
+                ...(detailedData.special_conditions && { specialConditions: detailedData.special_conditions }),
+                ...(detailedData.jockey_conditions && { jockeyConditions: detailedData.jockey_conditions }),
+                
+                // Form and commentary
+                ...(detailedData.form_guide && { formGuide: detailedData.form_guide }),
+                ...(detailedData.comment && { comment: detailedData.comment }),
+                ...(detailedData.description && { description: detailedData.description }),
+                
+                // Visual and media
+                ...(detailedData.silk_url && { silkUrl: detailedData.silk_url }),
+                ...(detailedData.silk_base_url && { silkBaseUrl: detailedData.silk_base_url }),
+                ...(detailedData.video_channels && { videoChannels: JSON.stringify(detailedData.video_channels) }),
+                
+                // Betting options
+                ...(detailedData.ffwin_option_number && { ffwinOptionNumber: detailedData.ffwin_option_number }),
+                ...(detailedData.fftop3_option_number && { fftop3OptionNumber: detailedData.fftop3_option_number }),
+                
+                // Rate information
+                ...(detailedData.mile_rate_400 && { mileRate400: detailedData.mile_rate_400 }),
+                ...(detailedData.mile_rate_800 && { mileRate800: detailedData.mile_rate_800 }),
+                
+                // Import metadata
+                lastUpdated: new Date().toISOString(),
+                dataSource: 'NZTAB',
+                importedAt: new Date().toISOString(),
+                meeting: basicRace.meeting
+            };
+
+            const success = await performantUpsert(databases, databaseId, 'races', basicRace.raceId, enhancedRaceDoc, context);
+            if (success) {
+                racesProcessed++;
+                context.log('Enhanced race with detailed data', { 
+                    raceId: basicRace.raceId, 
+                    name: enhancedRaceDoc.name,
+                    entrantCount: enhancedRaceDoc.entrantCount,
+                    fieldSize: enhancedRaceDoc.fieldSize
+                });
+            }
+        } catch (error) {
+            context.error('Failed to process detailed race data', {
+                raceId: basicRace.raceId,
+                raceName: basicRace.name,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            });
+        }
+    }
+    
+    return racesProcessed;
+}
