@@ -35,7 +35,7 @@
             "$id": "daily-races",
             "name": "Daily Races Import",
             "runtime": "node-22",
-            "specification": "s-1vcpu-512mb",
+            "specification": "s-1vcpu-1gb",
             "path": "daily-races",
             "execute": [
                 "any"
