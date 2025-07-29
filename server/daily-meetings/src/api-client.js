@@ -64,9 +64,12 @@ export async function fetchRacingData(baseUrl, context) {
  */
 export async function fetchRaceEventData(baseUrl, raceId, context) {
     try {
-        // Add parameters to get more complete race data including entrants
+        // Add parameters to get comprehensive race data including entrants, form, and betting data
         const params = new URLSearchParams({
-            'with_tote_trends_data': 'true'
+            'with_tote_trends_data': 'true',
+            'with_biggest_bet': 'true',
+            'with_money_tracker': 'true',
+            'will_pays': 'true'
         });
         const apiUrl = `${baseUrl}/affiliates/v1/racing/events/${raceId}?${params.toString()}`;
         

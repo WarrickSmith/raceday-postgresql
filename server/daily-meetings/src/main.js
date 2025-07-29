@@ -2,7 +2,7 @@ import { Client, Databases } from 'node-appwrite';
 import { ensureDatabaseSetup } from './database-setup.js';
 import { fetchRacingData } from './api-client.js';
 import { filterMeetings } from './data-processors.js';
-import { processMeetings } from './database-utils.js';
+import { processMeetings, processRaces } from './database-utils.js';
 import { validateEnvironmentVariables, executeWithDatabaseSetupTimeout, handleError } from './error-handlers.js';
 
 export default async function main(context) {
@@ -49,20 +49,29 @@ export default async function main(context) {
         // Process meetings into database
         const { meetingsProcessed } = await processMeetings(databases, databaseId, filteredMeetings, context);
         
+        // Process races from the meetings data
+        context.log('Processing races from meetings data...');
+        const { racesProcessed, raceIds } = await processRaces(databases, databaseId, filteredMeetings, context);
+        context.log(`Processed ${racesProcessed} races from ${filteredMeetings.length} meetings`);
+        
         context.log('Daily meetings function completed successfully', {
             timestamp: new Date().toISOString(),
             meetingsProcessed,
+            racesProcessed,
             totalMeetingsFetched: meetings.length,
-            filteredMeetings: filteredMeetings.length
+            filteredMeetings: filteredMeetings.length,
+            totalRaceIds: raceIds.length
         });
         
         return {
             success: true,
-            message: `Successfully imported ${meetingsProcessed} meetings`,
+            message: `Successfully imported ${meetingsProcessed} meetings and ${racesProcessed} races`,
             statistics: {
                 meetingsProcessed,
+                racesProcessed,
                 totalMeetingsFetched: meetings.length,
-                filteredMeetings: filteredMeetings.length
+                filteredMeetings: filteredMeetings.length,
+                raceIds: raceIds.length
             }
         };
     }

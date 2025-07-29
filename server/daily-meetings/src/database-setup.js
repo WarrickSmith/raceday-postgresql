@@ -113,13 +113,32 @@ async function ensureMeetingsCollection(databases, config, context) {
         ]);
     }
     const requiredAttributes = [
+        // Core identifiers
         { key: 'meetingId', type: 'string', size: 50, required: true },
         { key: 'meetingName', type: 'string', size: 255, required: true },
+        
+        // Location and categorization
         { key: 'country', type: 'string', size: 10, required: true },
+        { key: 'state', type: 'string', size: 10, required: false },
         { key: 'raceType', type: 'string', size: 50, required: true },
+        { key: 'category', type: 'string', size: 10, required: false }, // T, H, G
+        { key: 'categoryName', type: 'string', size: 100, required: false }, // Full category name
+        
+        // Meeting details
         { key: 'date', type: 'datetime', required: true },
         { key: 'trackCondition', type: 'string', size: 50, required: false },
         { key: 'status', type: 'string', size: 50, required: true },
+        
+        // Additional meeting metadata for future functionality
+        { key: 'trackDirection', type: 'string', size: 20, required: false }, // Left/Right
+        { key: 'trackSurface', type: 'string', size: 50, required: false }, // All Weather, Turf, etc
+        { key: 'railPosition', type: 'string', size: 100, required: false },
+        { key: 'weather', type: 'string', size: 50, required: false },
+        
+        // Import metadata
+        { key: 'lastUpdated', type: 'datetime', required: false },
+        { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
+        { key: 'apiGeneratedTime', type: 'datetime', required: false },
     ];
     for (const attr of requiredAttributes) {
         if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
@@ -208,16 +227,73 @@ async function ensureRacesCollection(databases, config, context) {
         ]);
     }
     const requiredAttributes = [
+        // Core identifiers
         { key: 'raceId', type: 'string', size: 50, required: true },
         { key: 'name', type: 'string', size: 255, required: true },
         { key: 'raceNumber', type: 'integer', required: true },
-        { key: 'startTime', type: 'datetime', required: true },
+        
+        // Timing information
+        { key: 'startTime', type: 'datetime', required: true }, // advertised_start
+        { key: 'actualStart', type: 'datetime', required: false }, // actual_start
+        { key: 'toteStartTime', type: 'string', size: 20, required: false }, // tote_start_time
+        { key: 'startTimeNz', type: 'string', size: 30, required: false }, // start_time_nz
+        { key: 'raceDateNz', type: 'string', size: 15, required: false }, // race_date_nz
+        
+        // Race details
         { key: 'distance', type: 'integer', required: false },
         { key: 'trackCondition', type: 'string', size: 100, required: false },
         { key: 'weather', type: 'string', size: 50, required: false },
         { key: 'status', type: 'string', size: 50, required: true },
-        { key: 'actualStart', type: 'datetime', required: false },
+        
+        // Track information
+        { key: 'trackDirection', type: 'string', size: 20, required: false }, // track_direction
+        { key: 'trackSurface', type: 'string', size: 50, required: false }, // track_surface
+        { key: 'railPosition', type: 'string', size: 100, required: false }, // rail_position
+        { key: 'trackHomeStraight', type: 'integer', required: false }, // track_home_straight
+        
+        // Race classification
+        { key: 'type', type: 'string', size: 10, required: false }, // race type (T, H, G)
+        { key: 'startType', type: 'string', size: 50, required: false }, // start_type
+        { key: 'group', type: 'string', size: 50, required: false }, // Grade, Listed, etc
+        { key: 'class', type: 'string', size: 20, required: false }, // C1, C2, etc
+        { key: 'gait', type: 'string', size: 20, required: false }, // for harness racing
+        
+        // Prize and field information
+        { key: 'totalPrizeMoney', type: 'integer', required: false }, // prize_monies.total_value
+        { key: 'entrantCount', type: 'integer', required: false }, // entrant_count
+        { key: 'fieldSize', type: 'integer', required: false }, // field_size
+        { key: 'positionsPaid', type: 'integer', required: false }, // positions_paid
+        
+        // Race conditions and restrictions
+        { key: 'genderConditions', type: 'string', size: 100, required: false },
+        { key: 'ageConditions', type: 'string', size: 100, required: false },
+        { key: 'weightConditions', type: 'string', size: 200, required: false },
+        { key: 'allowanceConditions', type: 'boolean', required: false },
+        { key: 'specialConditions', type: 'string', size: 500, required: false },
+        { key: 'jockeyConditions', type: 'string', size: 200, required: false },
+        
+        // Form and commentary
+        { key: 'formGuide', type: 'string', size: 2000, required: false },
+        { key: 'comment', type: 'string', size: 2000, required: false },
+        { key: 'description', type: 'string', size: 255, required: false },
+        
+        // Visual and media
         { key: 'silkUrl', type: 'string', size: 500, required: false },
+        { key: 'silkBaseUrl', type: 'string', size: 200, required: false },
+        { key: 'videoChannels', type: 'string', size: 500, required: false }, // JSON array as string
+        
+        // Betting options
+        { key: 'ffwinOptionNumber', type: 'integer', required: false },
+        { key: 'fftop3OptionNumber', type: 'integer', required: false },
+        
+        // Rate information for harness/trots
+        { key: 'mileRate400', type: 'string', size: 20, required: false },
+        { key: 'mileRate800', type: 'string', size: 20, required: false },
+        
+        // Import metadata
+        { key: 'lastUpdated', type: 'datetime', required: false },
+        { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
+        { key: 'importedAt', type: 'datetime', required: false },
     ];
     for (const attr of requiredAttributes) {
         if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
@@ -296,18 +372,54 @@ async function ensureEntrantsCollection(databases, config, context) {
             Permission.delete(Role.users()),
         ]);
     }
+    // Daily Entrants collection - for frequently updated data (odds, status, betting)
     const requiredAttributes = [
+        // Core identifiers
         { key: 'entrantId', type: 'string', size: 50, required: true },
         { key: 'name', type: 'string', size: 255, required: true },
         { key: 'runnerNumber', type: 'integer', required: true },
-        { key: 'jockey', type: 'string', size: 255, required: false },
-        { key: 'trainerName', type: 'string', size: 255, required: false },
-        { key: 'weight', type: 'string', size: 50, required: false },
-        { key: 'winOdds', type: 'float', required: false },
-        { key: 'placeOdds', type: 'float', required: false },
-        { key: 'holdPercentage', type: 'float', required: false },
+        { key: 'barrier', type: 'integer', required: false },
+        
+        // Current status information (updated frequently during race day)
         { key: 'isScratched', type: 'boolean', required: false, default: false },
-        { key: 'silkUrl', type: 'string', size: 500, required: false },
+        { key: 'isLateScratched', type: 'boolean', required: false, default: false },
+        { key: 'isEmergency', type: 'boolean', required: false, default: false },
+        { key: 'scratchTime', type: 'integer', required: false }, // Unix timestamp
+        { key: 'emergencyPosition', type: 'string', size: 20, required: false },
+        { key: 'runnerChange', type: 'string', size: 500, required: false },
+        
+        // Current odds (updated frequently during betting)
+        { key: 'fixedWinOdds', type: 'float', required: false },
+        { key: 'fixedPlaceOdds', type: 'float', required: false },
+        { key: 'poolWinOdds', type: 'float', required: false },
+        { key: 'poolPlaceOdds', type: 'float', required: false },
+        
+        // Betting status indicators (updated frequently)
+        { key: 'favourite', type: 'boolean', required: false, default: false },
+        { key: 'mover', type: 'boolean', required: false, default: false },
+        
+        // Current race connections (may change on race day)
+        { key: 'jockey', type: 'string', size: 255, required: false },
+        { key: 'apprenticeIndicator', type: 'string', size: 50, required: false },
+        { key: 'gear', type: 'string', size: 200, required: false },
+        
+        // Weight information (finalized on race day)
+        { key: 'weight', type: 'string', size: 50, required: false },
+        { key: 'allocatedWeight', type: 'string', size: 20, required: false },
+        { key: 'totalWeight', type: 'string', size: 20, required: false },
+        { key: 'allowanceWeight', type: 'string', size: 20, required: false },
+        
+        // Current market information
+        { key: 'marketName', type: 'string', size: 100, required: false }, // Final Field, etc
+        { key: 'primaryMarket', type: 'boolean', required: false, default: true },
+        
+        // Speedmap positioning for live race strategy
+        { key: 'settlingLengths', type: 'integer', required: false },
+        
+        // Import and update metadata
+        { key: 'lastUpdated', type: 'datetime', required: false },
+        { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
+        { key: 'importedAt', type: 'datetime', required: false },
     ];
     for (const attr of requiredAttributes) {
         if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
@@ -362,6 +474,7 @@ async function ensureEntrantsCollection(databases, config, context) {
         }
     }
 }
+
 async function ensureOddsHistoryCollection(databases, config, context) {
     const collectionId = collections.oddsHistory;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
