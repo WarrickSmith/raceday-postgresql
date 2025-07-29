@@ -33,7 +33,8 @@ export default async function main(context) {
         context.log('Fetching races from database...');
         const racesResult = await databases.listDocuments(databaseId, 'races', [
             Query.greaterThanEqual('startTime', todayISO),
-            Query.orderAsc('startTime')
+            Query.orderAsc('startTime'),
+            Query.limit(999) // Override default 25 limit to get all races
         ]);
         
         context.log(`Found ${racesResult.documents.length} races for today`);
@@ -50,20 +51,29 @@ export default async function main(context) {
             };
         }
         
-        // Limit to 20 races to prevent timeout
-        const maxRaces = Math.min(racesResult.documents.length, 20);
-        const racesToProcess = racesResult.documents.slice(0, maxRaces);
+        // Process all races in chunks to prevent timeout, rather than limiting total races
+        const totalRaces = racesResult.documents.length;
+        const chunkSize = 8; // Smaller chunks for entrants processing (more API intensive)
+        const totalChunks = Math.ceil(totalRaces / chunkSize);
         
-        context.log(`Processing ${maxRaces} of ${racesResult.documents.length} races to avoid timeout`);
+        context.log(`Processing ALL ${totalRaces} races in ${totalChunks} chunks of ${chunkSize} races each`);
         
         let entrantsProcessed = 0;
         
-        // Process races sequentially (not in parallel) to avoid overwhelming the API
-        for (let i = 0; i < racesToProcess.length; i++) {
-            const race = racesToProcess[i];
+        // Process races in chunks sequentially to avoid overwhelming the API
+        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+            const startIndex = chunkIndex * chunkSize;
+            const endIndex = Math.min(startIndex + chunkSize, totalRaces);
+            const currentChunk = racesResult.documents.slice(startIndex, endIndex);
             
-            try {
-                context.log(`Processing entrants for race ${race.raceId} (${i + 1}/${maxRaces})`);
+            context.log(`Processing chunk ${chunkIndex + 1}/${totalChunks} (races ${startIndex + 1}-${endIndex})`);
+            
+            // Process each race in the current chunk
+            for (let i = 0; i < currentChunk.length; i++) {
+                const race = currentChunk[i];
+                
+                try {
+                    context.log(`Processing entrants for race ${race.raceId} (${startIndex + i + 1}/${totalRaces})`);
                 
                 // Fetch race event data with timeout protection
                 const raceEventData = await executeApiCallWithTimeout(
@@ -74,50 +84,56 @@ export default async function main(context) {
                     0 // No retries for now
                 );
                 
-                if (!raceEventData || !raceEventData.entrants || raceEventData.entrants.length === 0) {
-                    context.log(`No entrants data found for race ${race.raceId}`);
+                if (!raceEventData || !raceEventData.runners || raceEventData.runners.length === 0) {
+                    context.log(`No runners data found for race ${race.raceId}`);
                     continue; // Skip to next race
                 }
                 
-                // Process entrants for this race
+                // Process entrants for this race (runners array contains the entrant data)
                 const raceEntrantsProcessed = await processEntrants(
                     databases,
                     databaseId,
                     race.raceId,
-                    raceEventData.entrants,
+                    raceEventData.runners,
                     context
                 );
                 
                 entrantsProcessed += raceEntrantsProcessed;
                 context.log(`Completed race ${race.raceId}: ${raceEntrantsProcessed} entrants processed`);
                 
-                // Rate limiting delay between races
-                if (i < racesToProcess.length - 1) {
-                    await rateLimit(1000, context, 'Between race processing');
+                    // Rate limiting delay between races (within chunk)
+                    if (i < currentChunk.length - 1) {
+                        await rateLimit(1000, context, 'Between race processing');
+                    }
+                    
+                } catch (error) {
+                    handleError(error, `Processing entrants for race ${race.raceId}`, context, {
+                        raceId: race.raceId,
+                        raceIndex: startIndex + i + 1
+                    });
+                    // Continue with next race instead of failing completely
                 }
-                
-            } catch (error) {
-                handleError(error, `Processing entrants for race ${race.raceId}`, context, {
-                    raceId: race.raceId,
-                    raceIndex: i + 1
-                });
-                // Continue with next race instead of failing completely
+            }
+            
+            // Rate limiting delay between chunks
+            if (chunkIndex < totalChunks - 1) {
+                await rateLimit(3000, context, 'Between chunk processing');
             }
         }
         
         context.log('Daily entrants function completed', {
             timestamp: new Date().toISOString(),
             racesFound: racesResult.documents.length,
-            racesProcessed: racesToProcess.length,
+            racesProcessed: totalRaces,
             entrantsProcessed
         });
         
         return {
             success: true,
-            message: `Successfully processed ${entrantsProcessed} entrants from ${racesToProcess.length} races`,
+            message: `Successfully processed ${entrantsProcessed} entrants from ${totalRaces} races`,
             statistics: {
                 racesFound: racesResult.documents.length,
-                racesProcessed: racesToProcess.length,
+                racesProcessed: totalRaces,
                 entrantsProcessed
             }
         };

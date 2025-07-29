@@ -153,7 +153,7 @@ export async function processRaces(databases, databaseId, meetings, context) {
 }
 
 /**
- * Process entrants for a specific race
+ * Process entrants using the new dual-collection approach to avoid MariaDB limitations
  * @param {Object} databases - Appwrite Databases instance
  * @param {string} databaseId - Database ID
  * @param {string} raceId - Race ID
@@ -164,35 +164,186 @@ export async function processRaces(databases, databaseId, meetings, context) {
 export async function processEntrants(databases, databaseId, raceId, entrants, context) {
     let entrantsProcessed = 0;
     
-    // Process each entrant
+    // Process each entrant with dual-collection approach
     for (const entrant of entrants) {
-        const entrantDoc = {
-            entrantId: entrant.entrant_id,
-            name: entrant.name,
-            runnerNumber: entrant.runner_number,
-            isScratched: entrant.is_scratched || false,
-            race: raceId
-        };
-
-        // Add optional fields if present
-        if (entrant.jockey) entrantDoc.jockey = entrant.jockey;
-        if (entrant.trainer_name) entrantDoc.trainerName = entrant.trainer_name;
-        if (entrant.weight) entrantDoc.weight = entrant.weight;
-        if (entrant.silk_url) entrantDoc.silkUrl = entrant.silk_url;
-
-        // Handle odds data if present
-        if (entrant.odds) {
-            if (entrant.odds.fixed_win !== undefined) entrantDoc.winOdds = entrant.odds.fixed_win;
-            if (entrant.odds.fixed_place !== undefined) entrantDoc.placeOdds = entrant.odds.fixed_place;
-        }
-
-        const success = await performantUpsert(databases, databaseId, 'entrants', entrant.entrant_id, entrantDoc, context);
-        if (success) {
-            entrantsProcessed++;
-            context.log('Upserted entrant', { 
-                entrantId: entrant.entrant_id, 
+        try {
+            // Daily entrants document (frequently updated data)
+            const dailyEntrantDoc = {
+                // Core identifiers
+                entrantId: entrant.entrant_id,
                 name: entrant.name,
-                raceId: raceId
+                runnerNumber: entrant.runner_number,
+                ...(entrant.barrier && { barrier: entrant.barrier }),
+                
+                // Current status information (updated frequently during race day)
+                isScratched: entrant.is_scratched || false,
+                ...(entrant.is_late_scratched !== undefined && { isLateScratched: entrant.is_late_scratched }),
+                ...(entrant.is_emergency !== undefined && { isEmergency: entrant.is_emergency }),
+                ...(entrant.scratch_time && { scratchTime: entrant.scratch_time }),
+                ...(entrant.emergency_position && { emergencyPosition: entrant.emergency_position }),
+                ...(entrant.runner_change && { runnerChange: entrant.runner_change }),
+                
+                // Betting status indicators (updated frequently)
+                ...(entrant.favourite !== undefined && { favourite: entrant.favourite }),
+                ...(entrant.mover !== undefined && { mover: entrant.mover }),
+                
+                // Current race connections (may change on race day)
+                ...(entrant.jockey && { jockey: entrant.jockey }),
+                ...(entrant.apprentice_indicator && { apprenticeIndicator: entrant.apprentice_indicator }),
+                ...(entrant.gear && { gear: entrant.gear }),
+                
+                // Weight information (finalized on race day)
+                ...(entrant.weight?.total && { weight: entrant.weight.total }),
+                ...(entrant.weight?.allocated && { allocatedWeight: entrant.weight.allocated }),
+                ...(entrant.allowance_weight && { allowanceWeight: entrant.allowance_weight }),
+                
+                // Current market information
+                ...(entrant.market_name && { marketName: entrant.market_name }),
+                ...(entrant.primary_market !== undefined && { primaryMarket: entrant.primary_market }),
+                
+                // Speedmap positioning for live race strategy
+                ...(entrant.speedmap?.settling_lengths && { settlingLengths: entrant.speedmap.settling_lengths }),
+                
+                // Import and update metadata
+                lastUpdated: new Date().toISOString(),
+                dataSource: 'NZTAB',
+                importedAt: new Date().toISOString(),
+                race: raceId
+            };
+
+            // Handle odds data
+            if (entrant.odds) {
+                if (entrant.odds.fixed_win !== undefined) dailyEntrantDoc.fixedWinOdds = entrant.odds.fixed_win;
+                if (entrant.odds.fixed_place !== undefined) dailyEntrantDoc.fixedPlaceOdds = entrant.odds.fixed_place;
+                if (entrant.odds.pool_win !== undefined) dailyEntrantDoc.poolWinOdds = entrant.odds.pool_win;
+                if (entrant.odds.pool_place !== undefined) dailyEntrantDoc.poolPlaceOdds = entrant.odds.pool_place;
+            }
+
+            // Entrants history document (static/historical data)
+            const entrantHistoryDoc = {
+                // Core identifier to link with daily entrants
+                entrantId: entrant.entrant_id,
+                ...(entrant.horse_id && { horseId: entrant.horse_id }),
+                
+                // Animal details (relatively static)
+                ...(entrant.age && { age: entrant.age }),
+                ...(entrant.sex && { sex: entrant.sex }),
+                ...(entrant.colour && { colour: entrant.colour }),
+                ...(entrant.country && { country: entrant.country }),
+                ...(entrant.foaling_date && { foalingDate: entrant.foaling_date }),
+                ...(entrant.first_start_indicator !== undefined && { firstStartIndicator: entrant.first_start_indicator }),
+                
+                // Breeding information (static)
+                ...(entrant.sire && { sire: entrant.sire }),
+                ...(entrant.dam && { dam: entrant.dam }),
+                ...(entrant.breeding && { breeding: entrant.breeding }),
+                
+                // Stable connections (relatively static)
+                ...(entrant.trainer_name && { trainerName: entrant.trainer_name }),
+                ...(entrant.trainer_location && { trainerLocation: entrant.trainer_location }),
+                ...(entrant.owners && { owners: entrant.owners }),
+                
+                // Rating and classification (updated periodically, not daily)
+                ...(entrant.rating && { rating: entrant.rating }),
+                ...(entrant.handicap_rating && { handicapRating: entrant.handicap_rating }),
+                ...(entrant.class_level && { classLevel: entrant.class_level }),
+                ...(entrant.prize_money && { prizeMoney: entrant.prize_money }),
+                
+                // Form and performance summary
+                ...(entrant.last_twenty_starts && { lastTwentyStarts: entrant.last_twenty_starts }),
+                ...(entrant.best_time && { bestTime: entrant.best_time }),
+                ...(entrant.form_comment && { formComment: entrant.form_comment }),
+                
+                // Overall performance statistics
+                ...(entrant.overall?.number_of_starts && { overallStarts: entrant.overall.number_of_starts }),
+                ...(entrant.overall?.number_of_wins && { overallWins: entrant.overall.number_of_wins }),
+                ...(entrant.overall?.number_of_seconds && { overallSeconds: entrant.overall.number_of_seconds }),
+                ...(entrant.overall?.number_of_thirds && { overallThirds: entrant.overall.number_of_thirds }),
+                ...(entrant.overall?.number_of_placings && { overallPlacings: entrant.overall.number_of_placings }),
+                ...(entrant.win_p && { winPercentage: entrant.win_p }),
+                ...(entrant.place_p && { placePercentage: entrant.place_p }),
+                
+                // Track/distance/condition specific stats
+                ...(entrant.track?.number_of_starts && { trackStarts: entrant.track.number_of_starts }),
+                ...(entrant.track?.number_of_wins && { trackWins: entrant.track.number_of_wins }),
+                ...(entrant.track?.number_of_seconds && { trackSeconds: entrant.track.number_of_seconds }),
+                ...(entrant.track?.number_of_thirds && { trackThirds: entrant.track.number_of_thirds }),
+                
+                ...(entrant.distance?.number_of_starts && { distanceStarts: entrant.distance.number_of_starts }),
+                ...(entrant.distance?.number_of_wins && { distanceWins: entrant.distance.number_of_wins }),
+                ...(entrant.distance?.number_of_seconds && { distanceSeconds: entrant.distance.number_of_seconds }),
+                ...(entrant.distance?.number_of_thirds && { distanceThirds: entrant.distance.number_of_thirds }),
+                
+                // Barrier/box statistics
+                ...(entrant.box_history?.number_of_starts && { barrierStarts: entrant.box_history.number_of_starts }),
+                ...(entrant.box_history?.number_of_wins && { barrierWins: entrant.box_history.number_of_wins }),
+                ...(entrant.box_history?.number_of_seconds && { barrierSeconds: entrant.box_history.number_of_seconds }),
+                ...(entrant.box_history?.number_of_thirds && { barrierThirds: entrant.box_history.number_of_thirds }),
+                
+                // Recent form (last 12 months)
+                ...(entrant.last_12_months?.number_of_starts && { last12Starts: entrant.last_12_months.number_of_starts }),
+                ...(entrant.last_12_months?.number_of_wins && { last12Wins: entrant.last_12_months.number_of_wins }),
+                ...(entrant.last_12_months?.number_of_seconds && { last12Seconds: entrant.last_12_months.number_of_seconds }),
+                ...(entrant.last_12_months?.number_of_thirds && { last12Thirds: entrant.last_12_months.number_of_thirds }),
+                ...(entrant.last_12_w && { last12WinPercentage: entrant.last_12_w }),
+                ...(entrant.last_12_p && { last12PlacePercentage: entrant.last_12_p }),
+                
+                // Speed and prediction data
+                ...(entrant.spr && { spr: entrant.spr }),
+                ...(entrant.predictors?.[0]?.average_time && { averageTime: entrant.predictors[0].average_time }),
+                ...(entrant.predictors?.[0]?.average_kms && { averageKms: entrant.predictors[0].average_kms }),
+                ...(entrant.predictors?.[0]?.best_time && { bestTimeFloat: entrant.predictors[0].best_time }),
+                ...(entrant.predictors?.[0]?.best_kms && { bestKms: entrant.predictors[0].best_kms }),
+                ...(entrant.predictors?.[0]?.best_date && { bestDate: entrant.predictors[0].best_date }),
+                ...(entrant.predictors?.[0]?.win && { winPrediction: entrant.predictors[0].win }),
+                ...(entrant.predictors?.[0]?.place && { placePrediction: entrant.predictors[0].place }),
+                
+                // Visual and display (relatively static)
+                ...(entrant.silk_colours && { silkColours: entrant.silk_colours }),
+                ...(entrant.silk_url && { silkUrl: entrant.silk_url }),
+                ...(entrant.silk_url_64x64 && { silkUrl64x64: entrant.silk_url_64x64 }),
+                ...(entrant.silk_url_128x128 && { silkUrl128x128: entrant.silk_url_128x128 }),
+                
+                // Complex historical data stored as JSON strings
+                ...(entrant.form_indicators && { formIndicators: JSON.stringify(entrant.form_indicators) }),
+                ...(entrant.last_starts && { lastStarts: JSON.stringify(entrant.last_starts) }),
+                ...(entrant.all_box_history && { allBoxHistory: JSON.stringify(entrant.all_box_history) }),
+                ...(entrant.past_performances && { pastPerformances: JSON.stringify(entrant.past_performances) }),
+                ...(entrant.runner_win_history && { runnerWinHistory: JSON.stringify(entrant.runner_win_history) }),
+                ...(entrant.video_channels_meta && { videoChannelsMeta: JSON.stringify(entrant.video_channels_meta) }),
+                
+                // Import and update metadata
+                lastUpdated: new Date().toISOString(),
+                dataSource: 'NZTAB',
+                importedAt: new Date().toISOString()
+            };
+
+            // Upsert both documents
+            const dailySuccess = await performantUpsert(databases, databaseId, 'entrants', entrant.entrant_id, dailyEntrantDoc, context);
+            const historySuccess = await performantUpsert(databases, databaseId, 'entrants-history', entrant.entrant_id, entrantHistoryDoc, context);
+
+            if (dailySuccess && historySuccess) {
+                entrantsProcessed++;
+                context.log('Upserted entrant (daily + history)', { 
+                    entrantId: entrant.entrant_id, 
+                    name: entrant.name,
+                    raceId: raceId
+                });
+            } else if (dailySuccess) {
+                entrantsProcessed++;
+                context.log('Upserted entrant (daily only)', { 
+                    entrantId: entrant.entrant_id, 
+                    name: entrant.name,
+                    raceId: raceId,
+                    warning: 'History upsert failed'
+                });
+            }
+        } catch (error) {
+            context.error('Failed to process entrant', {
+                entrantId: entrant.entrant_id,
+                entrantName: entrant.name,
+                raceId: raceId,
+                error: error instanceof Error ? error.message : 'Unknown error'
             });
         }
     }

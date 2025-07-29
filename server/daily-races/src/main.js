@@ -35,7 +35,8 @@ export default async function main(context) {
         context.log('Fetching basic races from database for detailed enhancement...');
         const racesResult = await databases.listDocuments(databaseId, 'races', [
             Query.greaterThanEqual('startTime', nzDate),
-            Query.orderAsc('startTime')
+            Query.orderAsc('startTime'),
+            Query.limit(999) // Override default 25 limit to get all races
         ]);
         
         context.log(`Found ${racesResult.documents.length} races for detailed processing`);
@@ -52,21 +53,30 @@ export default async function main(context) {
             };
         }
         
-        // Limit processing to prevent timeout - process in chunks
-        const maxRaces = Math.min(racesResult.documents.length, 25);
-        const racesToProcess = racesResult.documents.slice(0, maxRaces);
+        // Process all races in chunks to prevent timeout, rather than limiting total races
+        const totalRaces = racesResult.documents.length;
+        const chunkSize = 10; // Smaller chunks for better reliability
+        const totalChunks = Math.ceil(totalRaces / chunkSize);
         
-        context.log(`Processing ${maxRaces} of ${racesResult.documents.length} races for detailed enhancement`);
+        context.log(`Processing ALL ${totalRaces} races in ${totalChunks} chunks of ${chunkSize} races each`);
         
         let racesProcessed = 0;
         const detailedRaces = [];
         
-        // Process races sequentially to avoid overwhelming the API
-        for (let i = 0; i < racesToProcess.length; i++) {
-            const basicRace = racesToProcess[i];
+        // Process races in chunks sequentially to avoid overwhelming the API
+        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+            const startIndex = chunkIndex * chunkSize;
+            const endIndex = Math.min(startIndex + chunkSize, totalRaces);
+            const currentChunk = racesResult.documents.slice(startIndex, endIndex);
             
-            try {
-                context.log(`Fetching detailed data for race ${basicRace.raceId} (${i + 1}/${maxRaces})`);
+            context.log(`Processing chunk ${chunkIndex + 1}/${totalChunks} (races ${startIndex + 1}-${endIndex})`);
+            
+            // Process each race in the current chunk
+            for (let i = 0; i < currentChunk.length; i++) {
+                const basicRace = currentChunk[i];
+                
+                try {
+                    context.log(`Fetching detailed data for race ${basicRace.raceId} (${startIndex + i + 1}/${totalRaces})`);
                 
                 // Fetch detailed race event data with timeout protection
                 const raceEventData = await executeApiCallWithTimeout(
@@ -90,17 +100,23 @@ export default async function main(context) {
                 
                 context.log(`Successfully fetched detailed data for race ${basicRace.raceId}`);
                 
-                // Rate limiting delay between races
-                if (i < racesToProcess.length - 1) {
-                    await rateLimit(1000, context, 'Between race processing');
+                    // Rate limiting delay between races (within chunk)
+                    if (i < currentChunk.length - 1) {
+                        await rateLimit(1000, context, 'Between race processing');
+                    }
+                    
+                } catch (error) {
+                    handleError(error, `Fetching detailed data for race ${basicRace.raceId}`, context, {
+                        raceId: basicRace.raceId,
+                        raceIndex: startIndex + i + 1
+                    });
+                    // Continue with next race instead of failing completely
                 }
-                
-            } catch (error) {
-                handleError(error, `Fetching detailed data for race ${basicRace.raceId}`, context, {
-                    raceId: basicRace.raceId,
-                    raceIndex: i + 1
-                });
-                // Continue with next race instead of failing completely
+            }
+            
+            // Rate limiting delay between chunks
+            if (chunkIndex < totalChunks - 1) {
+                await rateLimit(2000, context, 'Between chunk processing');
             }
         }
         

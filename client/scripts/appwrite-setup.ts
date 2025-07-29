@@ -23,6 +23,7 @@ const config = {
     meetings: 'meetings',
     races: 'races',
     entrants: 'entrants',
+    entrantsHistory: 'entrants-history',
     oddsHistory: 'odds-history',
     moneyFlowHistory: 'money-flow-history',
     userAlertConfigs: 'user-alert-configs',
@@ -620,8 +621,8 @@ const createEntrantsCollection = async () => {
     )
   }
 
-  // Enhanced Entrants attributes - synced with server database-setup.js
-  // NOTE: This is a comprehensive schema with 80+ fields for maximum data capture
+  // Daily Entrants attributes - for frequently updated data (odds, status, betting)
+  // This matches the simplified schema from server database-setup.js
   const entrantAttributes: Array<{key: string, type: string, size?: number, required: boolean, default?: boolean}> = [
     // Core identifiers
     { key: 'entrantId', type: 'string', size: 50, required: true },
@@ -629,7 +630,7 @@ const createEntrantsCollection = async () => {
     { key: 'runnerNumber', type: 'integer', required: true },
     { key: 'barrier', type: 'integer', required: false },
     
-    // Status information
+    // Current status information (updated frequently during race day)
     { key: 'isScratched', type: 'boolean', required: false, default: false },
     { key: 'isLateScratched', type: 'boolean', required: false, default: false },
     { key: 'isEmergency', type: 'boolean', required: false, default: false },
@@ -637,172 +638,43 @@ const createEntrantsCollection = async () => {
     { key: 'emergencyPosition', type: 'string', size: 20, required: false },
     { key: 'runnerChange', type: 'string', size: 500, required: false },
     
-    // Horse/Animal details
-    { key: 'age', type: 'integer', required: false },
-    { key: 'sex', type: 'string', size: 10, required: false }, // B, F, M, C, G
-    { key: 'colour', type: 'string', size: 20, required: false }, // BK, BR, CH, etc
-    { key: 'country', type: 'string', size: 10, required: false },
-    { key: 'foalingDate', type: 'string', size: 20, required: false },
-    { key: 'firstStartIndicator', type: 'boolean', required: false, default: false },
-    
-    // Breeding information
-    { key: 'sire', type: 'string', size: 255, required: false },
-    { key: 'dam', type: 'string', size: 255, required: false },
-    { key: 'breeding', type: 'string', size: 500, required: false },
-    { key: 'horseId', type: 'integer', required: false },
-    
-    // Connections
-    { key: 'jockey', type: 'string', size: 255, required: false },
-    { key: 'apprenticeIndicator', type: 'string', size: 50, required: false },
-    { key: 'trainerName', type: 'string', size: 255, required: false },
-    { key: 'trainerLocation', type: 'string', size: 255, required: false },
-    { key: 'owners', type: 'string', size: 500, required: false },
-    
-    // Weight and gear
-    { key: 'weight', type: 'string', size: 50, required: false },
-    { key: 'allocatedWeight', type: 'string', size: 20, required: false },
-    { key: 'totalWeight', type: 'string', size: 20, required: false },
-    { key: 'allowanceWeight', type: 'string', size: 20, required: false },
-    { key: 'gear', type: 'string', size: 200, required: false },
-    
-    // Current odds - enhanced with all types
+    // Current odds (updated frequently during betting)
     { key: 'fixedWinOdds', type: 'float', required: false },
     { key: 'fixedPlaceOdds', type: 'float', required: false },
     { key: 'poolWinOdds', type: 'float', required: false },
     { key: 'poolPlaceOdds', type: 'float', required: false },
     
-    // Betting indicators
+    // Betting status indicators (updated frequently)
     { key: 'favourite', type: 'boolean', required: false, default: false },
     { key: 'mover', type: 'boolean', required: false, default: false },
     
-    // Prize money and statistics
-    { key: 'prizeMoney', type: 'string', size: 50, required: false },
-    { key: 'rating', type: 'string', size: 20, required: false },
-    { key: 'handicapRating', type: 'string', size: 20, required: false },
-    { key: 'classLevel', type: 'string', size: 50, required: false },
+    // Current race connections (may change on race day)
+    { key: 'jockey', type: 'string', size: 255, required: false },
+    { key: 'apprenticeIndicator', type: 'string', size: 50, required: false },
+    { key: 'gear', type: 'string', size: 200, required: false },
     
-    // Form and performance
-    { key: 'lastTwentyStarts', type: 'string', size: 20, required: false }, // e.g., "21331"
-    { key: 'bestTime', type: 'string', size: 20, required: false },
-    { key: 'formComment', type: 'string', size: 2000, required: false },
+    // Weight information (finalized on race day)
+    { key: 'weight', type: 'string', size: 50, required: false },
+    { key: 'allocatedWeight', type: 'string', size: 20, required: false },
+    { key: 'totalWeight', type: 'string', size: 20, required: false },
+    { key: 'allowanceWeight', type: 'string', size: 20, required: false },
     
-    // Performance statistics - overall
-    { key: 'overallStarts', type: 'integer', required: false },
-    { key: 'overallWins', type: 'integer', required: false },
-    { key: 'overallSeconds', type: 'integer', required: false },
-    { key: 'overallThirds', type: 'integer', required: false },
-    { key: 'overallPlacings', type: 'integer', required: false },
-    { key: 'winPercentage', type: 'string', size: 10, required: false }, // "40%"
-    { key: 'placePercentage', type: 'string', size: 10, required: false }, // "100%"
-  ]
-
-  const entrantAttributesPart2: Array<{key: string, type: string, size?: number, required: boolean, default?: boolean}> = [
-    // Track/distance/condition specific stats
-    { key: 'trackStarts', type: 'integer', required: false },
-    { key: 'trackWins', type: 'integer', required: false },
-    { key: 'trackSeconds', type: 'integer', required: false },
-    { key: 'trackThirds', type: 'integer', required: false },
-    { key: 'distanceStarts', type: 'integer', required: false },
-    { key: 'distanceWins', type: 'integer', required: false },
-    { key: 'distanceSeconds', type: 'integer', required: false },
-    { key: 'distanceThirds', type: 'integer', required: false },
+    // Current market information
+    { key: 'marketName', type: 'string', size: 100, required: false }, // Final Field, etc
+    { key: 'primaryMarket', type: 'boolean', required: false, default: true },
     
-    // Barrier/box statistics
-    { key: 'barrierStarts', type: 'integer', required: false },
-    { key: 'barrierWins', type: 'integer', required: false },
-    { key: 'barrierSeconds', type: 'integer', required: false },
-    { key: 'barrierThirds', type: 'integer', required: false },
-    
-    // Recent form (last 12 months)
-    { key: 'last12Starts', type: 'integer', required: false },
-    { key: 'last12Wins', type: 'integer', required: false },
-    { key: 'last12Seconds', type: 'integer', required: false },
-    { key: 'last12Thirds', type: 'integer', required: false },
-    { key: 'last12WinPercentage', type: 'string', size: 10, required: false },
-    { key: 'last12PlacePercentage', type: 'string', size: 10, required: false },
-    
-    // Speed and prediction data
-    { key: 'spr', type: 'integer', required: false }, // Speed Rating
-    { key: 'settlingLengths', type: 'integer', required: false }, // speedmap data
-    { key: 'averageTime', type: 'float', required: false },
-    { key: 'averageKms', type: 'float', required: false },
-    { key: 'bestTimeFloat', type: 'float', required: false },
-    { key: 'bestKms', type: 'float', required: false },
-    { key: 'bestDate', type: 'string', size: 20, required: false },
-    { key: 'winPrediction', type: 'float', required: false },
-    { key: 'placePrediction', type: 'float', required: false },
-    
-    // Visual and display
-    { key: 'silkColours', type: 'string', size: 200, required: false },
-    { key: 'silkUrl', type: 'string', size: 500, required: false },
-    { key: 'silkUrl64x64', type: 'string', size: 500, required: false },
-    { key: 'silkUrl128x128', type: 'string', size: 500, required: false },
-    
-    // Complex data stored as JSON strings for flexible future use
-    { key: 'formIndicators', type: 'string', size: 2000, required: false }, // JSON array
-    { key: 'lastStarts', type: 'string', size: 5000, required: false }, // JSON array of recent runs
-    { key: 'allBoxHistory', type: 'string', size: 2000, required: false }, // JSON array
-    { key: 'pastPerformances', type: 'string', size: 5000, required: false }, // JSON array
-    { key: 'runnerWinHistory', type: 'string', size: 2000, required: false }, // JSON array
-    { key: 'videoChannelsMeta', type: 'string', size: 2000, required: false }, // JSON object
+    // Speedmap positioning for live race strategy
+    { key: 'settlingLengths', type: 'integer', required: false },
     
     // Import and update metadata
     { key: 'lastUpdated', type: 'datetime', required: false },
     { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
-    { key: 'marketName', type: 'string', size: 100, required: false }, // Final Field, etc
-    { key: 'primaryMarket', type: 'boolean', required: false, default: true },
     { key: 'importedAt', type: 'datetime', required: false },
   ]
 
-  // Process first batch of entrant attributes
-  log('Creating comprehensive entrants attributes (Part 1/2)...')
+  // Process entrant attributes
+  log('Creating daily entrants attributes (optimized for frequent updates)...')
   for (const attr of entrantAttributes) {
-    if (!(await attributeExists(config.collections.entrants, attr.key))) {
-      log(`Creating entrants attribute: ${attr.key}`)
-      if (attr.type === 'string') {
-        await databases.createStringAttribute(
-          config.databaseId,
-          config.collections.entrants,
-          attr.key,
-          attr.size!,
-          attr.required
-        )
-      } else if (attr.type === 'integer') {
-        await databases.createIntegerAttribute(
-          config.databaseId,
-          config.collections.entrants,
-          attr.key,
-          attr.required
-        )
-      } else if (attr.type === 'float') {
-        await databases.createFloatAttribute(
-          config.databaseId,
-          config.collections.entrants,
-          attr.key,
-          attr.required
-        )
-      } else if (attr.type === 'boolean') {
-        await databases.createBooleanAttribute(
-          config.databaseId,
-          config.collections.entrants,
-          attr.key,
-          attr.required,
-          attr.default
-        )
-      } else if (attr.type === 'datetime') {
-        await databases.createDatetimeAttribute(
-          config.databaseId,
-          config.collections.entrants,
-          attr.key,
-          attr.required
-        )
-      }
-    }
-  }
-
-  // Process second batch of entrant attributes  
-  log('Creating comprehensive entrants attributes (Part 2/2)...')
-  for (const attr of entrantAttributesPart2) {
     if (!(await attributeExists(config.collections.entrants, attr.key))) {
       log(`Creating entrants attribute: ${attr.key}`)
       if (attr.type === 'string') {
@@ -924,6 +796,242 @@ const createEntrantsCollection = async () => {
   }
 
   log('Entrants collection created successfully', 'success')
+}
+
+// Create EntrantsHistory collection
+const createEntrantsHistoryCollection = async () => {
+  log('Creating EntrantsHistory collection...')
+
+  const exists = await resourceExists(() =>
+    databases.getCollection(config.databaseId, config.collections.entrantsHistory)
+  )
+
+  if (exists) {
+    log('EntrantsHistory collection already exists, skipping creation', 'info')
+  } else {
+    await databases.createCollection(
+      config.databaseId,
+      config.collections.entrantsHistory,
+      'EntrantsHistory',
+      [
+        Permission.read(Role.any()),
+        Permission.create(Role.users()),
+        Permission.update(Role.users()),
+        Permission.delete(Role.users()),
+      ]
+    )
+  }
+
+  // Entrants History attributes - for static/historical data (breeding, form, performance stats)
+  // This matches the comprehensive schema from server database-setup.js
+  const entrantsHistoryAttributes: Array<{key: string, type: string, size?: number, required: boolean, default?: boolean}> = [
+    // Core identifier to link with daily entrants
+    { key: 'entrantId', type: 'string', size: 50, required: true },
+    { key: 'horseId', type: 'integer', required: false }, // Unique horse identifier across races
+    
+    // Animal details (relatively static)
+    { key: 'age', type: 'integer', required: false },
+    { key: 'sex', type: 'string', size: 10, required: false }, // B, F, M, C, G
+    { key: 'colour', type: 'string', size: 20, required: false }, // BK, BR, CH, etc
+    { key: 'country', type: 'string', size: 10, required: false },
+    { key: 'foalingDate', type: 'string', size: 20, required: false },
+    { key: 'firstStartIndicator', type: 'boolean', required: false, default: false },
+    
+    // Breeding information (static)
+    { key: 'sire', type: 'string', size: 255, required: false },
+    { key: 'dam', type: 'string', size: 255, required: false },
+    { key: 'breeding', type: 'string', size: 500, required: false },
+    
+    // Stable connections (relatively static)
+    { key: 'trainerName', type: 'string', size: 255, required: false },
+    { key: 'trainerLocation', type: 'string', size: 255, required: false },
+    { key: 'owners', type: 'string', size: 500, required: false },
+    
+    // Rating and classification (updated periodically, not daily)
+    { key: 'rating', type: 'string', size: 20, required: false },
+    { key: 'handicapRating', type: 'string', size: 20, required: false },
+    { key: 'classLevel', type: 'string', size: 50, required: false },
+    { key: 'prizeMoney', type: 'string', size: 50, required: false },
+    
+    // Form and performance summary
+    { key: 'lastTwentyStarts', type: 'string', size: 20, required: false }, // e.g., "21331"
+    { key: 'bestTime', type: 'string', size: 20, required: false },
+    { key: 'formComment', type: 'string', size: 2000, required: false },
+    
+    // Overall performance statistics
+    { key: 'overallStarts', type: 'integer', required: false },
+    { key: 'overallWins', type: 'integer', required: false },
+    { key: 'overallSeconds', type: 'integer', required: false },
+    { key: 'overallThirds', type: 'integer', required: false },
+    { key: 'overallPlacings', type: 'integer', required: false },
+    { key: 'winPercentage', type: 'string', size: 10, required: false }, // "40%"
+    { key: 'placePercentage', type: 'string', size: 10, required: false }, // "100%"
+    
+    // Track/distance/condition specific stats
+    { key: 'trackStarts', type: 'integer', required: false },
+    { key: 'trackWins', type: 'integer', required: false },
+    { key: 'trackSeconds', type: 'integer', required: false },
+    { key: 'trackThirds', type: 'integer', required: false },
+    { key: 'distanceStarts', type: 'integer', required: false },
+    { key: 'distanceWins', type: 'integer', required: false },
+    { key: 'distanceSeconds', type: 'integer', required: false },
+    { key: 'distanceThirds', type: 'integer', required: false },
+    
+    // Barrier/box statistics
+    { key: 'barrierStarts', type: 'integer', required: false },
+    { key: 'barrierWins', type: 'integer', required: false },
+    { key: 'barrierSeconds', type: 'integer', required: false },
+    { key: 'barrierThirds', type: 'integer', required: false },
+    
+    // Recent form (last 12 months)
+    { key: 'last12Starts', type: 'integer', required: false },
+    { key: 'last12Wins', type: 'integer', required: false },
+    { key: 'last12Seconds', type: 'integer', required: false },
+    { key: 'last12Thirds', type: 'integer', required: false },
+    { key: 'last12WinPercentage', type: 'string', size: 10, required: false },
+    { key: 'last12PlacePercentage', type: 'string', size: 10, required: false },
+    
+    // Speed and prediction data
+    { key: 'spr', type: 'integer', required: false }, // Speed Rating
+    { key: 'averageTime', type: 'float', required: false },
+    { key: 'averageKms', type: 'float', required: false },
+    { key: 'bestTimeFloat', type: 'float', required: false },
+    { key: 'bestKms', type: 'float', required: false },
+    { key: 'bestDate', type: 'string', size: 20, required: false },
+    { key: 'winPrediction', type: 'float', required: false },
+    { key: 'placePrediction', type: 'float', required: false },
+    
+    // Visual and display (relatively static)
+    { key: 'silkColours', type: 'string', size: 200, required: false },
+    { key: 'silkUrl', type: 'string', size: 500, required: false },
+    { key: 'silkUrl64x64', type: 'string', size: 500, required: false },
+    { key: 'silkUrl128x128', type: 'string', size: 500, required: false },
+    
+    // Complex historical data stored as JSON strings
+    { key: 'formIndicators', type: 'string', size: 2000, required: false }, // JSON array
+    { key: 'lastStarts', type: 'string', size: 5000, required: false }, // JSON array of recent runs
+    { key: 'allBoxHistory', type: 'string', size: 2000, required: false }, // JSON array
+    { key: 'pastPerformances', type: 'string', size: 5000, required: false }, // JSON array
+    { key: 'runnerWinHistory', type: 'string', size: 2000, required: false }, // JSON array
+    { key: 'videoChannelsMeta', type: 'string', size: 2000, required: false }, // JSON object
+    
+    // Import and update metadata
+    { key: 'lastUpdated', type: 'datetime', required: false },
+    { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
+    { key: 'importedAt', type: 'datetime', required: false },
+  ]
+
+  // Process entrants history attributes
+  log('Creating comprehensive entrants history attributes...')
+  for (const attr of entrantsHistoryAttributes) {
+    if (!(await attributeExists(config.collections.entrantsHistory, attr.key))) {
+      log(`Creating entrants history attribute: ${attr.key}`)
+      if (attr.type === 'string') {
+        await databases.createStringAttribute(
+          config.databaseId,
+          config.collections.entrantsHistory,
+          attr.key,
+          attr.size!,
+          attr.required
+        )
+      } else if (attr.type === 'integer') {
+        await databases.createIntegerAttribute(
+          config.databaseId,
+          config.collections.entrantsHistory,
+          attr.key,
+          attr.required
+        )
+      } else if (attr.type === 'float') {
+        await databases.createFloatAttribute(
+          config.databaseId,
+          config.collections.entrantsHistory,
+          attr.key,
+          attr.required
+        )
+      } else if (attr.type === 'boolean') {
+        await databases.createBooleanAttribute(
+          config.databaseId,
+          config.collections.entrantsHistory,
+          attr.key,
+          attr.required,
+          attr.default
+        )
+      } else if (attr.type === 'datetime') {
+        await databases.createDatetimeAttribute(
+          config.databaseId,
+          config.collections.entrantsHistory,
+          attr.key,
+          attr.required
+        )
+      }
+    }
+  }
+
+  // Create indexes (check if they exist first)
+  const collection = await databases.getCollection(
+    config.databaseId,
+    config.collections.entrantsHistory
+  )
+
+  if (
+    !collection.indexes.some(
+      (idx: { key: string }) => idx.key === 'idx_entrant_id_history'
+    )
+  ) {
+    const isAvailable = await waitForAttributeAvailable(
+      config.collections.entrantsHistory,
+      'entrantId'
+    )
+    if (isAvailable) {
+      try {
+        await databases.createIndex(
+          config.databaseId,
+          config.collections.entrantsHistory,
+          'idx_entrant_id_history',
+          IndexType.Unique,
+          ['entrantId']
+        )
+        log('idx_entrant_id_history index created successfully')
+      } catch (error) {
+        log(`Failed to create idx_entrant_id_history index: ${error}`, 'error')
+      }
+    } else {
+      log(
+        'entrantId attribute is not available for index creation, skipping idx_entrant_id_history index',
+        'error'
+      )
+    }
+  }
+
+  if (
+    !collection.indexes.some((idx: { key: string }) => idx.key === 'idx_horse_id')
+  ) {
+    const isAvailable = await waitForAttributeAvailable(
+      config.collections.entrantsHistory,
+      'horseId'
+    )
+    if (isAvailable) {
+      try {
+        await databases.createIndex(
+          config.databaseId,
+          config.collections.entrantsHistory,
+          'idx_horse_id',
+          IndexType.Key,
+          ['horseId']
+        )
+        log('idx_horse_id index created successfully')
+      } catch (error) {
+        log(`Failed to create idx_horse_id index: ${error}`, 'error')
+      }
+    } else {
+      log(
+        'horseId attribute is not available for index creation, skipping idx_horse_id index',
+        'error'
+      )
+    }
+  }
+
+  log('EntrantsHistory collection created successfully', 'success')
 }
 
 // Create OddsHistory collection
@@ -1503,6 +1611,7 @@ const setupAppwrite = async () => {
     await createMeetingsCollection()
     await createRacesCollection()
     await createEntrantsCollection()
+    await createEntrantsHistoryCollection()
     await createOddsHistoryCollection()
     await createMoneyFlowHistoryCollection()
     await createUserAlertConfigsCollection()
