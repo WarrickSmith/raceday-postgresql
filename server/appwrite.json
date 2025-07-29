@@ -61,35 +61,6 @@
             ]
         },
         {
-            "$id": "daily-entrants",
-            "name": "Daily Entrants Import",
-            "runtime": "node-22",
-            "specification": "s-1vcpu-1gb",
-            "path": "daily-entrants",
-            "execute": [
-                "any"
-            ],
-            "events": [],
-            "schedule": "20 17 * * *",
-            "timeout": 300,
-            "enabled": true,
-            "logging": true,
-            "entrypoint": "src/main.js",
-            "commands": "npm install",
-            "scopes": [
-                "databases.read",
-                "databases.write",
-                "collections.read",
-                "collections.write",
-                "attributes.read",
-                "attributes.write",
-                "indexes.read",
-                "indexes.write",
-                "documents.read",
-                "documents.write"
-            ]
-        },
-        {
             "$id": "race-data-poller",
             "name": "Race Data Poller",
             "runtime": "node-22",
