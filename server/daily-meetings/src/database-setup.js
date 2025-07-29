@@ -3,7 +3,6 @@ const collections = {
     meetings: 'meetings',
     races: 'races',
     entrants: 'entrants',
-    entrantsHistory: 'entrants-history',
     oddsHistory: 'odds-history',
     moneyFlowHistory: 'money-flow-history',
     userAlertConfigs: 'user-alert-configs',
@@ -88,7 +87,6 @@ export async function ensureDatabaseSetup(config, context) {
         await ensureMeetingsCollection(databases, config, context);
         await ensureRacesCollection(databases, config, context);
         await ensureEntrantsCollection(databases, config, context);
-        await ensureEntrantsHistoryCollection(databases, config, context);
         await ensureOddsHistoryCollection(databases, config, context);
         await ensureMoneyFlowHistoryCollection(databases, config, context);
         await ensureUserAlertConfigsCollection(databases, config, context);
@@ -473,173 +471,6 @@ async function ensureEntrantsCollection(databases, config, context) {
         }
         else {
             context.log('runnerNumber attribute is not available for index creation, skipping idx_runner_number index');
-        }
-    }
-}
-
-async function ensureEntrantsHistoryCollection(databases, config, context) {
-    const collectionId = collections.entrantsHistory;
-    const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
-    if (!exists) {
-        context.log('Creating entrants history collection...');
-        await databases.createCollection(config.databaseId, collectionId, 'EntrantsHistory', [
-            Permission.read(Role.any()),
-            Permission.create(Role.users()),
-            Permission.update(Role.users()),
-            Permission.delete(Role.users()),
-        ]);
-    }
-    
-    // Entrants History collection - for static/historical data (breeding, form, performance stats)
-    const requiredAttributes = [
-        // Core identifier to link with daily entrants
-        { key: 'entrantId', type: 'string', size: 50, required: true },
-        { key: 'horseId', type: 'integer', required: false }, // Unique horse identifier across races
-        
-        // Animal details (relatively static)
-        { key: 'age', type: 'integer', required: false },
-        { key: 'sex', type: 'string', size: 10, required: false }, // B, F, M, C, G
-        { key: 'colour', type: 'string', size: 20, required: false }, // BK, BR, CH, etc
-        { key: 'country', type: 'string', size: 10, required: false },
-        { key: 'foalingDate', type: 'string', size: 20, required: false },
-        { key: 'firstStartIndicator', type: 'boolean', required: false, default: false },
-        
-        // Breeding information (static)
-        { key: 'sire', type: 'string', size: 255, required: false },
-        { key: 'dam', type: 'string', size: 255, required: false },
-        { key: 'breeding', type: 'string', size: 500, required: false },
-        
-        // Stable connections (relatively static)
-        { key: 'trainerName', type: 'string', size: 255, required: false },
-        { key: 'trainerLocation', type: 'string', size: 255, required: false },
-        { key: 'owners', type: 'string', size: 500, required: false },
-        
-        // Rating and classification (updated periodically, not daily)
-        { key: 'rating', type: 'string', size: 20, required: false },
-        { key: 'handicapRating', type: 'string', size: 20, required: false },
-        { key: 'classLevel', type: 'string', size: 50, required: false },
-        { key: 'prizeMoney', type: 'string', size: 50, required: false },
-        
-        // Form and performance summary
-        { key: 'lastTwentyStarts', type: 'string', size: 20, required: false }, // e.g., "21331"
-        { key: 'bestTime', type: 'string', size: 20, required: false },
-        { key: 'formComment', type: 'string', size: 2000, required: false },
-        
-        // Overall performance statistics
-        { key: 'overallStarts', type: 'integer', required: false },
-        { key: 'overallWins', type: 'integer', required: false },
-        { key: 'overallSeconds', type: 'integer', required: false },
-        { key: 'overallThirds', type: 'integer', required: false },
-        { key: 'overallPlacings', type: 'integer', required: false },
-        { key: 'winPercentage', type: 'string', size: 10, required: false }, // "40%"
-        { key: 'placePercentage', type: 'string', size: 10, required: false }, // "100%"
-        
-        // Track/distance/condition specific stats
-        { key: 'trackStarts', type: 'integer', required: false },
-        { key: 'trackWins', type: 'integer', required: false },
-        { key: 'trackSeconds', type: 'integer', required: false },
-        { key: 'trackThirds', type: 'integer', required: false },
-        { key: 'distanceStarts', type: 'integer', required: false },
-        { key: 'distanceWins', type: 'integer', required: false },
-        { key: 'distanceSeconds', type: 'integer', required: false },
-        { key: 'distanceThirds', type: 'integer', required: false },
-        
-        // Barrier/box statistics
-        { key: 'barrierStarts', type: 'integer', required: false },
-        { key: 'barrierWins', type: 'integer', required: false },
-        { key: 'barrierSeconds', type: 'integer', required: false },
-        { key: 'barrierThirds', type: 'integer', required: false },
-        
-        // Recent form (last 12 months)
-        { key: 'last12Starts', type: 'integer', required: false },
-        { key: 'last12Wins', type: 'integer', required: false },
-        { key: 'last12Seconds', type: 'integer', required: false },
-        { key: 'last12Thirds', type: 'integer', required: false },
-        { key: 'last12WinPercentage', type: 'string', size: 10, required: false },
-        { key: 'last12PlacePercentage', type: 'string', size: 10, required: false },
-        
-        // Speed and prediction data
-        { key: 'spr', type: 'integer', required: false }, // Speed Rating
-        { key: 'averageTime', type: 'float', required: false },
-        { key: 'averageKms', type: 'float', required: false },
-        { key: 'bestTimeFloat', type: 'float', required: false },
-        { key: 'bestKms', type: 'float', required: false },
-        { key: 'bestDate', type: 'string', size: 20, required: false },
-        { key: 'winPrediction', type: 'float', required: false },
-        { key: 'placePrediction', type: 'float', required: false },
-        
-        // Visual and display (relatively static)
-        { key: 'silkColours', type: 'string', size: 200, required: false },
-        { key: 'silkUrl', type: 'string', size: 500, required: false },
-        { key: 'silkUrl64x64', type: 'string', size: 500, required: false },
-        { key: 'silkUrl128x128', type: 'string', size: 500, required: false },
-        
-        // Complex historical data stored as JSON strings
-        { key: 'formIndicators', type: 'string', size: 2000, required: false }, // JSON array
-        { key: 'lastStarts', type: 'string', size: 5000, required: false }, // JSON array of recent runs
-        { key: 'allBoxHistory', type: 'string', size: 2000, required: false }, // JSON array
-        { key: 'pastPerformances', type: 'string', size: 5000, required: false }, // JSON array
-        { key: 'runnerWinHistory', type: 'string', size: 2000, required: false }, // JSON array
-        { key: 'videoChannelsMeta', type: 'string', size: 2000, required: false }, // JSON object
-        
-        // Import and update metadata
-        { key: 'lastUpdated', type: 'datetime', required: false },
-        { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
-        { key: 'importedAt', type: 'datetime', required: false },
-    ];
-    
-    for (const attr of requiredAttributes) {
-        if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
-            context.log(`Creating entrants history attribute: ${attr.key}`);
-            if (attr.type === 'string') {
-                await databases.createStringAttribute(config.databaseId, collectionId, attr.key, attr.size, attr.required);
-            }
-            else if (attr.type === 'integer') {
-                await databases.createIntegerAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-            else if (attr.type === 'float') {
-                await databases.createFloatAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-            else if (attr.type === 'boolean') {
-                await databases.createBooleanAttribute(config.databaseId, collectionId, attr.key, attr.required, attr.default);
-            }
-            else if (attr.type === 'datetime') {
-                await databases.createDatetimeAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-        }
-    }
-    
-    // Create indexes
-    const entrantsHistoryCollection = await databases.getCollection(config.databaseId, collectionId);
-    if (!entrantsHistoryCollection.indexes.some((idx) => idx.key === 'idx_entrant_id_history')) {
-        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'entrantId', context);
-        if (isAvailable) {
-            try {
-                await databases.createIndex(config.databaseId, collectionId, 'idx_entrant_id_history', IndexType.Unique, ['entrantId']);
-                context.log('idx_entrant_id_history index created successfully');
-            }
-            catch (error) {
-                context.error(`Failed to create idx_entrant_id_history index: ${error}`);
-            }
-        }
-        else {
-            context.log('entrantId attribute is not available for index creation, skipping idx_entrant_id_history index');
-        }
-    }
-    
-    if (!entrantsHistoryCollection.indexes.some((idx) => idx.key === 'idx_horse_id')) {
-        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'horseId', context);
-        if (isAvailable) {
-            try {
-                await databases.createIndex(config.databaseId, collectionId, 'idx_horse_id', IndexType.Key, ['horseId']);
-                context.log('idx_horse_id index created successfully');
-            }
-            catch (error) {
-                context.error(`Failed to create idx_horse_id index: ${error}`);
-            }
-        }
-        else {
-            context.log('horseId attribute is not available for index creation, skipping idx_horse_id index');
         }
     }
 }
