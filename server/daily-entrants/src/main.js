@@ -84,10 +84,25 @@ export default async function main(context) {
                     0 // No retries for now
                 );
                 
-                if (!raceEventData || !raceEventData.runners || raceEventData.runners.length === 0) {
-                    context.log(`No runners data found for race ${race.raceId}`);
+                if (!raceEventData) {
+                    context.log(`No race event data returned for race ${race.raceId}`);
                     continue; // Skip to next race
                 }
+                
+                if (!raceEventData.runners) {
+                    context.log(`No runners property found for race ${race.raceId}`, {
+                        dataKeys: Object.keys(raceEventData),
+                        hasRace: !!raceEventData.race
+                    });
+                    continue; // Skip to next race
+                }
+                
+                if (raceEventData.runners.length === 0) {
+                    context.log(`Empty runners array for race ${race.raceId}`);
+                    continue; // Skip to next race
+                }
+                
+                context.log(`Found ${raceEventData.runners.length} runners for race ${race.raceId}`);
                 
                 // Process entrants for this race (runners array contains the entrant data)
                 const raceEntrantsProcessed = await processEntrants(
@@ -99,7 +114,11 @@ export default async function main(context) {
                 );
                 
                 entrantsProcessed += raceEntrantsProcessed;
-                context.log(`Completed race ${race.raceId}: ${raceEntrantsProcessed} entrants processed`);
+                context.log(`Completed race ${race.raceId}: ${raceEntrantsProcessed} entrants processed`, {
+                    runnersFound: raceEventData.runners.length,
+                    entrantsProcessed: raceEntrantsProcessed,
+                    totalEntrantsProcessed: entrantsProcessed
+                });
                 
                     // Rate limiting delay between races (within chunk)
                     if (i < currentChunk.length - 1) {

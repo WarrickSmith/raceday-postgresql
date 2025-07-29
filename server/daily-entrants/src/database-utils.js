@@ -164,6 +164,8 @@ export async function processRaces(databases, databaseId, meetings, context) {
 export async function processEntrants(databases, databaseId, raceId, entrants, context) {
     let entrantsProcessed = 0;
     
+    context.log(`Processing ${entrants.length} entrants for race ${raceId}`);
+    
     // Process each entrant with dual-collection approach
     for (const entrant of entrants) {
         try {
@@ -348,5 +350,6 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
         }
     }
     
+    context.log(`Finished processing entrants for race ${raceId}: ${entrantsProcessed}/${entrants.length} successful`);
     return entrantsProcessed;
 }

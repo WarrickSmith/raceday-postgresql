@@ -98,41 +98,23 @@ export async function fetchRaceEventData(baseUrl, raceId, context) {
 
         const data = await response.json();
 
-        if (!data.data || !data.data.entrants) {
-            context.log(`No entrants data in API response for race ${raceId}`, {
+        if (!data.data || !data.data.runners) {
+            context.log(`No runners data in API response for race ${raceId}`, {
                 hasData: !!data.data,
-                hasEntrants: !!(data.data && data.data.entrants),
-                dataKeys: data.data ? Object.keys(data.data) : [],
-                fullResponse: JSON.stringify(data, null, 2)
+                hasRunners: !!(data.data && data.data.runners),
+                dataKeys: data.data ? Object.keys(data.data) : []
             });
             return null;
         }
 
-        // Log response structure for debugging entrants issue
-        const entrantsCount = data.data.entrants ? data.data.entrants.length : 0;
-        const runnersCount = data.data.runners ? data.data.runners.length : 0;
-        
         context.log('Successfully fetched race event data from NZTAB API', {
             raceId,
-            entrantsCount,
-            runnersCount,
+            runnersCount: data.data.runners.length,
             raceStatus: data.data.race ? data.data.race.status : 'unknown',
-            dataKeys: Object.keys(data.data),
-            // Log response structure if no entrants
-            responseStructure: entrantsCount === 0 ? {
-                hasEntrants: !!data.data.entrants,
-                hasRunners: !!data.data.runners,
-                hasRace: !!data.data.race,
-                entrantsType: typeof data.data.entrants,
-                runnersType: typeof data.data.runners
-            } : null
+            entrantCount: data.data.race ? data.data.race.entrant_count : 0,
+            fieldSize: data.data.race ? data.data.race.field_size : 0,
+            dataKeys: Object.keys(data.data)
         });
-
-        // If no entrants but has runners, use runners as entrants
-        if (entrantsCount === 0 && runnersCount > 0) {
-            context.log(`Converting ${runnersCount} runners to entrants format`, { raceId });
-            data.data.entrants = data.data.runners;
-        }
 
         return data.data;
 
