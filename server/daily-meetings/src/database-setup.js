@@ -400,6 +400,7 @@ async function ensureEntrantsCollection(databases, config, context) {
         
         // Current race connections (may change on race day)
         { key: 'jockey', type: 'string', size: 255, required: false },
+        { key: 'trainerName', type: 'string', size: 255, required: false },
         { key: 'apprenticeIndicator', type: 'string', size: 50, required: false },
         { key: 'gear', type: 'string', size: 200, required: false },
         
@@ -415,6 +416,37 @@ async function ensureEntrantsCollection(databases, config, context) {
         
         // Speedmap positioning for live race strategy
         { key: 'settlingLengths', type: 'integer', required: false },
+        
+        // Static entrant information (rarely changes)
+        { key: 'age', type: 'integer', required: false },
+        { key: 'sex', type: 'string', size: 10, required: false }, // M, F, G, etc
+        { key: 'colour', type: 'string', size: 20, required: false }, // B, BR, CH, etc
+        { key: 'foalingDate', type: 'string', size: 20, required: false }, // "Dec 23" format
+        { key: 'sire', type: 'string', size: 100, required: false },
+        { key: 'dam', type: 'string', size: 100, required: false },
+        { key: 'breeding', type: 'string', size: 200, required: false },
+        { key: 'owners', type: 'string', size: 255, required: false },
+        { key: 'trainerLocation', type: 'string', size: 100, required: false },
+        { key: 'country', type: 'string', size: 10, required: false }, // NZL, AUS
+        
+        // Performance and form data
+        { key: 'prizeMoney', type: 'string', size: 20, required: false }, // "4800" format
+        { key: 'bestTime', type: 'string', size: 20, required: false }, // "17.37" format
+        { key: 'lastTwentyStarts', type: 'string', size: 30, required: false }, // "21331" format
+        { key: 'winPercentage', type: 'string', size: 10, required: false }, // "40%" format
+        { key: 'placePercentage', type: 'string', size: 10, required: false }, // "100%" format
+        { key: 'rating', type: 'string', size: 20, required: false },
+        { key: 'handicapRating', type: 'string', size: 20, required: false },
+        { key: 'classLevel', type: 'string', size: 20, required: false },
+        
+        // Current race day specific information
+        { key: 'firstStartIndicator', type: 'boolean', required: false, default: false },
+        { key: 'formComment', type: 'string', size: 500, required: false },
+        
+        // Silk and visual information
+        { key: 'silkColours', type: 'string', size: 100, required: false },
+        { key: 'silkUrl64', type: 'string', size: 500, required: false },
+        { key: 'silkUrl128', type: 'string', size: 500, required: false },
         
         // Import and update metadata
         { key: 'lastUpdated', type: 'datetime', required: false },
@@ -435,6 +467,9 @@ async function ensureEntrantsCollection(databases, config, context) {
             }
             else if (attr.type === 'boolean') {
                 await databases.createBooleanAttribute(config.databaseId, collectionId, attr.key, attr.required, attr.default);
+            }
+            else if (attr.type === 'datetime') {
+                await databases.createDatetimeAttribute(config.databaseId, collectionId, attr.key, attr.required);
             }
         }
     }
