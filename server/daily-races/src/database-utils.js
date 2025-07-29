@@ -153,7 +153,7 @@ export async function processRaces(databases, databaseId, meetings, context) {
 }
 
 /**
- * Process entrants for a specific race
+ * Process entrants for a specific race using existing database schema
  * @param {Object} databases - Appwrite Databases instance
  * @param {string} databaseId - Database ID
  * @param {string} raceId - Race ID
@@ -164,39 +164,40 @@ export async function processRaces(databases, databaseId, meetings, context) {
 export async function processEntrants(databases, databaseId, raceId, entrants, context) {
     let entrantsProcessed = 0;
     
-    // Process each entrant
+    context.log(`Processing ${entrants.length} entrants for race ${raceId}`);
+    
+    // Process each entrant using simple schema that matches existing database
     for (const entrant of entrants) {
-        const entrantDoc = {
-            entrantId: entrant.entrant_id,
-            name: entrant.name,
-            runnerNumber: entrant.runner_number,
-            isScratched: entrant.is_scratched || false,
-            race: raceId
-        };
-
-        // Add optional fields if present
-        if (entrant.jockey) entrantDoc.jockey = entrant.jockey;
-        if (entrant.trainer_name) entrantDoc.trainerName = entrant.trainer_name;
-        if (entrant.weight) entrantDoc.weight = entrant.weight;
-        if (entrant.silk_url) entrantDoc.silkUrl = entrant.silk_url;
-
-        // Handle odds data if present
-        if (entrant.odds) {
-            if (entrant.odds.fixed_win !== undefined) entrantDoc.winOdds = entrant.odds.fixed_win;
-            if (entrant.odds.fixed_place !== undefined) entrantDoc.placeOdds = entrant.odds.fixed_place;
-        }
-
-        const success = await performantUpsert(databases, databaseId, 'entrants', entrant.entrant_id, entrantDoc, context);
-        if (success) {
-            entrantsProcessed++;
-            context.log('Upserted entrant', { 
-                entrantId: entrant.entrant_id, 
+        try {
+            // Use minimal schema - only fields that definitely exist
+            const entrantDoc = {
+                entrantId: entrant.entrant_id,
                 name: entrant.name,
-                raceId: raceId
+                runnerNumber: entrant.runner_number,
+                isScratched: entrant.is_scratched || false,
+                race: raceId
+            };
+
+            const success = await performantUpsert(databases, databaseId, 'entrants', entrant.entrant_id, entrantDoc, context);
+            if (success) {
+                entrantsProcessed++;
+                context.log('Upserted entrant', { 
+                    entrantId: entrant.entrant_id, 
+                    name: entrant.name,
+                    raceId: raceId
+                });
+            }
+        } catch (error) {
+            context.error('Failed to process entrant', {
+                entrantId: entrant.entrant_id,
+                entrantName: entrant.name,
+                raceId: raceId,
+                error: error instanceof Error ? error.message : 'Unknown error'
             });
         }
     }
     
+    context.log(`Finished processing entrants for race ${raceId}: ${entrantsProcessed}/${entrants.length} successful`);
     return entrantsProcessed;
 }
 
