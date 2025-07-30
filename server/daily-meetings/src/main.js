@@ -28,14 +28,14 @@ export default async function main(context) {
         const databases = new Databases(client);
         const databaseId = 'raceday-db';
         
-        // Database setup (with timeout protection)
+        // Database setup (with timeout protection) - increased timeout for comprehensive schema
         context.log('Starting database setup verification...');
         await executeWithDatabaseSetupTimeout(ensureDatabaseSetup, {
             endpoint,
             projectId,
             apiKey,
             databaseId
-        }, context, 60000);
+        }, context, 180000); // 3 minutes for comprehensive entrant attributes
         
         // Fetch meetings data from NZ TAB API
         context.log('Fetching meetings data from NZ TAB API...');

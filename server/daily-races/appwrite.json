@@ -11,7 +11,7 @@
       "execute": ["any"],
       "events": [],
       "schedule": "10 17 * * *",
-      "timeout": 300,
+      "timeout": 360,
       "enabled": true,
       "logging": true,
       "entrypoint": "src/main.js",

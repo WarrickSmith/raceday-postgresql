@@ -4,6 +4,29 @@
  */
 
 /**
+ * Safely convert and truncate a field to string with max length
+ * @param {any} value - The value to process
+ * @param {number} maxLength - Maximum allowed length
+ * @returns {string|undefined} Processed string or undefined if no value
+ */
+function safeStringField(value, maxLength) {
+    if (value === null || value === undefined) {
+        return undefined;
+    }
+    
+    let stringValue;
+    if (typeof value === 'string') {
+        stringValue = value;
+    } else if (typeof value === 'object') {
+        stringValue = JSON.stringify(value);
+    } else {
+        stringValue = String(value);
+    }
+    
+    return stringValue.length > maxLength ? stringValue.substring(0, maxLength) : stringValue;
+}
+
+/**
  * Performant upsert operation: try update first, create on 404
  * @param {Object} databases - Appwrite Databases instance
  * @param {string} databaseId - Database ID
@@ -19,6 +42,15 @@ export async function performantUpsert(databases, databaseId, collectionId, docu
         return true;
     }
     catch (error) {
+        // Log the update error for debugging
+        if (error && typeof error === 'object' && 'code' in error && error.code !== 404) {
+            context.error(`Update failed for ${collectionId} document (non-404 error)`, {
+                documentId,
+                updateError: error instanceof Error ? error.message : 'Unknown error',
+                errorCode: error.code
+            });
+        }
+        
         try {
             await databases.createDocument(databaseId, collectionId, documentId, data);
             return true;
@@ -183,7 +215,8 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
             // Current race day status
             if (entrant.scratch_time) entrantDoc.scratchTime = entrant.scratch_time;
             if (entrant.emergency_position) entrantDoc.emergencyPosition = entrant.emergency_position;
-            if (entrant.runner_change) entrantDoc.runnerChange = entrant.runner_change;
+            const runnerChange = safeStringField(entrant.runner_change, 500);
+            if (runnerChange) entrantDoc.runnerChange = runnerChange;
             if (entrant.first_start_indicator) entrantDoc.firstStartIndicator = entrant.first_start_indicator;
             
             // Current race connections
@@ -223,7 +256,8 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
             if (entrant.sire) entrantDoc.sire = entrant.sire;
             if (entrant.dam) entrantDoc.dam = entrant.dam;
             if (entrant.breeding) entrantDoc.breeding = entrant.breeding;
-            if (entrant.owners) entrantDoc.owners = entrant.owners;
+            const owners = safeStringField(entrant.owners, 255);
+            if (owners) entrantDoc.owners = owners;
             if (entrant.country) entrantDoc.country = entrant.country;
             
             // Performance and form data (summarized for storage)
@@ -238,7 +272,8 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
             if (entrant.form_comment) entrantDoc.formComment = entrant.form_comment;
             
             // Silk and visual information
-            if (entrant.silk_colours) entrantDoc.silkColours = entrant.silk_colours;
+            const silkColours = safeStringField(entrant.silk_colours, 100);
+            if (silkColours) entrantDoc.silkColours = silkColours;
             if (entrant.silk_url_64x64) entrantDoc.silkUrl64 = entrant.silk_url_64x64;
             if (entrant.silk_url_128x128) entrantDoc.silkUrl128 = entrant.silk_url_128x128;
             

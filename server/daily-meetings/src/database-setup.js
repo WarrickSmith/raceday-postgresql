@@ -43,7 +43,7 @@ const isAttributeAvailable = async (databases, databaseId, collectionId, attribu
         return false;
     }
 };
-const waitForAttributeAvailable = async (databases, databaseId, collectionId, attributeKey, context, maxRetries = 5, delayMs = 2000) => {
+const waitForAttributeAvailable = async (databases, databaseId, collectionId, attributeKey, context, maxRetries = 3, delayMs = 1000) => {
     context.log(`Starting to wait for attribute ${attributeKey} to become available...`);
     
     for (let i = 0; i < maxRetries; i++) {
@@ -71,6 +71,7 @@ const waitForAttributeAvailable = async (databases, databaseId, collectionId, at
     return false;
 };
 export async function ensureDatabaseSetup(config, context) {
+    const setupStartTime = Date.now();
     const client = new Client()
         .setEndpoint(config.endpoint)
         .setProject(config.projectId)
@@ -84,18 +85,30 @@ export async function ensureDatabaseSetup(config, context) {
             await databases.create(config.databaseId, 'RaceDay Database');
             context.log('Database created successfully');
         }
+        
+        const collectionsStart = Date.now();
         await ensureMeetingsCollection(databases, config, context);
         await ensureRacesCollection(databases, config, context);
+        
+        // Entrants collection is the most complex - track it separately
+        const entrantsStart = Date.now();
         await ensureEntrantsCollection(databases, config, context);
+        const entrantsDuration = Date.now() - entrantsStart;
+        context.log(`Entrants collection setup completed in ${entrantsDuration}ms`);
+        
         await ensureOddsHistoryCollection(databases, config, context);
         await ensureMoneyFlowHistoryCollection(databases, config, context);
         await ensureUserAlertConfigsCollection(databases, config, context);
         await ensureNotificationsCollection(databases, config, context);
-        context.log('Database setup verification completed');
+        
+        const totalDuration = Date.now() - setupStartTime;
+        context.log(`Database setup verification completed in ${totalDuration}ms`);
     }
     catch (error) {
+        const totalDuration = Date.now() - setupStartTime;
         context.error('Database setup failed', {
-            error: error instanceof Error ? error.message : 'Unknown error'
+            error: error instanceof Error ? error.message : 'Unknown error',
+            duration: totalDuration
         });
         throw error;
     }
@@ -107,8 +120,8 @@ async function ensureMeetingsCollection(databases, config, context) {
         context.log('Creating meetings collection...');
         await databases.createCollection(config.databaseId, collectionId, 'Meetings', [
             Permission.read(Role.any()),
-            Permission.create(Role.users()),
-            Permission.update(Role.users()),
+            Permission.create(Role.any()),
+            Permission.update(Role.any()),
             Permission.delete(Role.users()),
         ]);
     }
@@ -221,8 +234,8 @@ async function ensureRacesCollection(databases, config, context) {
         context.log('Creating races collection...');
         await databases.createCollection(config.databaseId, collectionId, 'Races', [
             Permission.read(Role.any()),
-            Permission.create(Role.users()),
-            Permission.update(Role.users()),
+            Permission.create(Role.any()),
+            Permission.update(Role.any()),
             Permission.delete(Role.users()),
         ]);
     }
@@ -367,8 +380,8 @@ async function ensureEntrantsCollection(databases, config, context) {
         context.log('Creating entrants collection...');
         await databases.createCollection(config.databaseId, collectionId, 'Entrants', [
             Permission.read(Role.any()),
-            Permission.create(Role.users()),
-            Permission.update(Role.users()),
+            Permission.create(Role.any()),
+            Permission.update(Role.any()),
             Permission.delete(Role.users()),
         ]);
     }
@@ -453,25 +466,47 @@ async function ensureEntrantsCollection(databases, config, context) {
         { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
         { key: 'importedAt', type: 'datetime', required: false },
     ];
+    // Create attributes with progress tracking
+    let attributesCreated = 0;
+    const totalNewAttributes = requiredAttributes.length;
+    
     for (const attr of requiredAttributes) {
         if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
-            context.log(`Creating entrants attribute: ${attr.key}`);
-            if (attr.type === 'string') {
-                await databases.createStringAttribute(config.databaseId, collectionId, attr.key, attr.size, attr.required);
-            }
-            else if (attr.type === 'integer') {
-                await databases.createIntegerAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-            else if (attr.type === 'float') {
-                await databases.createFloatAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-            else if (attr.type === 'boolean') {
-                await databases.createBooleanAttribute(config.databaseId, collectionId, attr.key, attr.required, attr.default);
-            }
-            else if (attr.type === 'datetime') {
-                await databases.createDatetimeAttribute(config.databaseId, collectionId, attr.key, attr.required);
+            context.log(`Creating entrants attribute (${attributesCreated + 1}/${totalNewAttributes}): ${attr.key}`);
+            const startTime = Date.now();
+            
+            try {
+                if (attr.type === 'string') {
+                    await databases.createStringAttribute(config.databaseId, collectionId, attr.key, attr.size, attr.required);
+                }
+                else if (attr.type === 'integer') {
+                    await databases.createIntegerAttribute(config.databaseId, collectionId, attr.key, attr.required);
+                }
+                else if (attr.type === 'float') {
+                    await databases.createFloatAttribute(config.databaseId, collectionId, attr.key, attr.required);
+                }
+                else if (attr.type === 'boolean') {
+                    await databases.createBooleanAttribute(config.databaseId, collectionId, attr.key, attr.required, attr.default);
+                }
+                else if (attr.type === 'datetime') {
+                    await databases.createDatetimeAttribute(config.databaseId, collectionId, attr.key, attr.required);
+                }
+                
+                const duration = Date.now() - startTime;
+                context.log(`Created attribute ${attr.key} in ${duration}ms`);
+                attributesCreated++;
+            } catch (error) {
+                context.error(`Failed to create attribute ${attr.key}`, {
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    type: attr.type,
+                    duration: Date.now() - startTime
+                });
             }
         }
+    }
+    
+    if (attributesCreated > 0) {
+        context.log(`Created ${attributesCreated} new entrant attributes`);
     }
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'race'))) {
         context.log('Creating entrants->races relationship...');

@@ -4,6 +4,29 @@
  */
 
 /**
+ * Safely convert and truncate a field to string with max length
+ * @param {any} value - The value to process
+ * @param {number} maxLength - Maximum allowed length
+ * @returns {string|undefined} Processed string or undefined if no value
+ */
+function safeStringField(value, maxLength) {
+    if (value === null || value === undefined) {
+        return undefined;
+    }
+    
+    let stringValue;
+    if (typeof value === 'string') {
+        stringValue = value;
+    } else if (typeof value === 'object') {
+        stringValue = JSON.stringify(value);
+    } else {
+        stringValue = String(value);
+    }
+    
+    return stringValue.length > maxLength ? stringValue.substring(0, maxLength) : stringValue;
+}
+
+/**
  * Performant upsert operation: try update first, create on 404
  * @param {Object} databases - Appwrite Databases instance
  * @param {string} databaseId - Database ID
@@ -254,7 +277,7 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
                 ...(entrant.is_emergency !== undefined && { isEmergency: entrant.is_emergency }),
                 ...(entrant.scratch_time && { scratchTime: entrant.scratch_time }),
                 ...(entrant.emergency_position && { emergencyPosition: entrant.emergency_position }),
-                ...(entrant.runner_change && { runnerChange: entrant.runner_change }),
+                ...(entrant.runner_change && { runnerChange: safeStringField(entrant.runner_change, 500) }),
                 
                 // Betting status indicators (updated frequently)
                 ...(entrant.favourite !== undefined && { favourite: entrant.favourite }),
@@ -314,7 +337,7 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
                 // Stable connections (relatively static)
                 ...(entrant.trainer_name && { trainerName: entrant.trainer_name }),
                 ...(entrant.trainer_location && { trainerLocation: entrant.trainer_location }),
-                ...(entrant.owners && { owners: entrant.owners }),
+                ...(entrant.owners && { owners: safeStringField(entrant.owners, 255) }),
                 
                 // Rating and classification (updated periodically, not daily)
                 ...(entrant.rating && { rating: entrant.rating }),
@@ -372,7 +395,7 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
                 ...(entrant.predictors?.[0]?.place && { placePrediction: entrant.predictors[0].place }),
                 
                 // Visual and display (relatively static)
-                ...(entrant.silk_colours && { silkColours: entrant.silk_colours }),
+                ...(entrant.silk_colours && { silkColours: safeStringField(entrant.silk_colours, 100) }),
                 ...(entrant.silk_url && { silkUrl: entrant.silk_url }),
                 ...(entrant.silk_url_64x64 && { silkUrl64x64: entrant.silk_url_64x64 }),
                 ...(entrant.silk_url_128x128 && { silkUrl128x128: entrant.silk_url_128x128 }),
