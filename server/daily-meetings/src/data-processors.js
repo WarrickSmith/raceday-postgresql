@@ -169,7 +169,7 @@ export function transformRaceData(race, meetingId) {
     if (race.gender_conditions) raceDoc.genderConditions = race.gender_conditions;
     if (race.age_conditions) raceDoc.ageConditions = race.age_conditions;
     if (race.weight_and_handicap_conditions) raceDoc.weightConditions = race.weight_and_handicap_conditions;
-    if (race.allowance_conditions !== undefined) raceDoc.allowanceConditions = race.allowance_conditions;
+    if (race.allowance_conditions !== undefined) raceDoc.allowanceConditions = Boolean(race.allowance_conditions);
     if (race.special_conditions) raceDoc.specialConditions = race.special_conditions;
     if (race.jockey_conditions) raceDoc.jockeyConditions = race.jockey_conditions;
     

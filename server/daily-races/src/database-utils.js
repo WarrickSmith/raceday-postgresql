@@ -363,7 +363,7 @@ export async function processDetailedRaces(databases, databaseId, detailedRaces,
                 ...(detailedData.gender_conditions && { genderConditions: detailedData.gender_conditions }),
                 ...(detailedData.age_conditions && { ageConditions: detailedData.age_conditions }),
                 ...(detailedData.weight_and_handicap_conditions && { weightConditions: detailedData.weight_and_handicap_conditions }),
-                ...(detailedData.allowance_conditions !== undefined && { allowanceConditions: detailedData.allowance_conditions }),
+                ...(detailedData.allowance_conditions !== undefined && { allowanceConditions: Boolean(detailedData.allowance_conditions) }),
                 ...(detailedData.special_conditions && { specialConditions: detailedData.special_conditions }),
                 ...(detailedData.jockey_conditions && { jockeyConditions: detailedData.jockey_conditions }),
                 

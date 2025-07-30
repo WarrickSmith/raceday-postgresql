@@ -320,6 +320,9 @@ async function ensureRacesCollection(databases, config, context) {
             else if (attr.type === 'integer') {
                 await databases.createIntegerAttribute(config.databaseId, collectionId, attr.key, attr.required);
             }
+            else if (attr.type === 'boolean') {
+                await databases.createBooleanAttribute(config.databaseId, collectionId, attr.key, attr.required);
+            }
         }
     }
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'meeting'))) {
