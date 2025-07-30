@@ -3,22 +3,22 @@
  */
 
 /**
- * Filter meetings for AU/NZ Horse/Harness racing only
+ * Filter meetings for AU/NZ Thoroughbred (T) and Harness (H) racing only
  * @param {Array} meetings - Array of meeting objects
  * @param {Object} context - Appwrite function context for logging
  * @returns {Array} Filtered meetings array
  */
 export function filterMeetings(meetings, context) {
     const allowedCountries = ['AUS', 'NZ'];
-    const allowedCategories = ['Thoroughbred Horse Racing', 'Harness'];
+    const allowedCategories = ['T', 'H']; // T = Thoroughbred, H = Harness
     const countriesFound = [...new Set(meetings.map(meeting => meeting.country))];
-    const categoriesFound = [...new Set(meetings.map(meeting => meeting.category_name))];
+    const categoriesFound = [...new Set(meetings.map(meeting => meeting.category))];
     
     const filtered = meetings.filter(meeting => {
         if (!allowedCountries.includes(meeting.country)) {
             return false;
         }
-        if (!allowedCategories.includes(meeting.category_name)) {
+        if (!allowedCategories.includes(meeting.category)) {
             return false;
         }
         return true;
@@ -31,9 +31,7 @@ export function filterMeetings(meetings, context) {
         allowedCategories,
         countriesFound,
         categoriesFound,
-        countriesFiltered: meetings.length - filtered.length > 0 ?
-            `Filtered out: ${meetings.length - filtered.length} meetings` :
-            'No filtering needed'
+        filteredOut: meetings.length - filtered.length
     });
     
     return filtered;

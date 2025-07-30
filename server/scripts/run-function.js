@@ -50,6 +50,12 @@ async function runFunction() {
     const result = await main(mockContext);
     console.log('✅ Function completed successfully!');
     console.log('📊 Result:', JSON.stringify(result, null, 2));
+    
+    // Graceful exit: Allow 3 seconds for any remaining async operations to complete
+    setTimeout(() => {
+      console.log('🔄 Gracefully exiting process...');
+      process.exit(0);
+    }, 3000);
   } catch (error) {
     console.error('❌ Function execution failed:', error.message);
     if (error.stack) console.error('Stack:', error.stack);
