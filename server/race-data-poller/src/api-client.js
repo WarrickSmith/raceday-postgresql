@@ -64,9 +64,13 @@ export async function fetchRacingData(baseUrl, context) {
  */
 export async function fetchRaceEventData(baseUrl, raceId, context) {
     try {
-        // Add parameters to get more complete race data including entrants
+        // Add parameters to get comprehensive betting and market data
         const params = new URLSearchParams({
-            'with_tote_trends_data': 'true'
+            'with_tote_trends_data': 'true',
+            'with_big_bets': 'true',
+            'with_live_bets': 'true',
+            'with_money_tracker': 'true',
+            'with_will_pays': 'true'
         });
         const apiUrl = `${baseUrl}/affiliates/v1/racing/events/${raceId}?${params.toString()}`;
         
@@ -98,13 +102,8 @@ export async function fetchRaceEventData(baseUrl, raceId, context) {
 
         const data = await response.json();
 
-        if (!data.data || !data.data.entrants) {
-            context.log(`No entrants data in API response for race ${raceId}`, {
-                hasData: !!data.data,
-                hasEntrants: !!(data.data && data.data.entrants),
-                dataKeys: data.data ? Object.keys(data.data) : [],
-                fullResponse: JSON.stringify(data, null, 2)
-            });
+        if (!data.data) {
+            context.log(`No data in API response for race ${raceId}`);
             return null;
         }
 
@@ -128,10 +127,18 @@ export async function fetchRaceEventData(baseUrl, raceId, context) {
             } : null
         });
 
-        // If no entrants but has runners, use runners as entrants
-        if (entrantsCount === 0 && runnersCount > 0) {
+        // Always ensure we have entrants data - convert runners if needed
+        if (!data.data.entrants && data.data.runners && data.data.runners.length > 0) {
             context.log(`Converting ${runnersCount} runners to entrants format`, { raceId });
             data.data.entrants = data.data.runners;
+        } else if (!data.data.entrants || data.data.entrants.length === 0) {
+            context.log(`No entrants or runners data available for race ${raceId}`, {
+                hasEntrants: !!data.data.entrants,
+                hasRunners: !!data.data.runners,
+                entrantsCount,
+                runnersCount
+            });
+            return null;
         }
 
         return data.data;
