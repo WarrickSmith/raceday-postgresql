@@ -220,11 +220,15 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
             if (entrant.first_start_indicator) entrantDoc.firstStartIndicator = entrant.first_start_indicator;
             
             // Current race connections
-            if (entrant.jockey) entrantDoc.jockey = entrant.jockey;
-            if (entrant.trainer_name) entrantDoc.trainerName = entrant.trainer_name;
-            if (entrant.trainer_location) entrantDoc.trainerLocation = entrant.trainer_location;
+            const jockey = safeStringField(entrant.jockey, 255);
+            if (jockey) entrantDoc.jockey = jockey;
+            const trainerName = safeStringField(entrant.trainer_name, 255);
+            if (trainerName) entrantDoc.trainerName = trainerName;
+            const trainerLocation = safeStringField(entrant.trainer_location, 255);
+            if (trainerLocation) entrantDoc.trainerLocation = trainerLocation;
             if (entrant.apprentice_indicator) entrantDoc.apprenticeIndicator = entrant.apprentice_indicator;
-            if (entrant.gear) entrantDoc.gear = entrant.gear;
+            const gear = safeStringField(entrant.gear, 200);
+            if (gear) entrantDoc.gear = gear;
             
             // Weight information
             if (entrant.weight?.allocated) entrantDoc.allocatedWeight = entrant.weight.allocated;
@@ -269,7 +273,8 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
             if (entrant.rating) entrantDoc.rating = entrant.rating;
             if (entrant.handicap_rating) entrantDoc.handicapRating = entrant.handicap_rating;
             if (entrant.class_level) entrantDoc.classLevel = entrant.class_level;
-            if (entrant.form_comment) entrantDoc.formComment = entrant.form_comment;
+            const formComment = safeStringField(entrant.form_comment, 500);
+            if (formComment) entrantDoc.formComment = formComment;
             
             // Silk and visual information
             const silkColours = safeStringField(entrant.silk_colours, 100);
@@ -350,7 +355,7 @@ export async function processDetailedRaces(databases, databaseId, detailedRaces,
                 ...(detailedData.type && { type: detailedData.type }),
                 ...(detailedData.start_type && { startType: detailedData.start_type }),
                 ...(detailedData.group && { group: detailedData.group }),
-                ...(detailedData.class && { class: detailedData.class }),
+                ...(detailedData.class && { class: safeStringField(detailedData.class, 20) }),
                 ...(detailedData.gait && { gait: detailedData.gait }),
                 
                 // Prize and field information
