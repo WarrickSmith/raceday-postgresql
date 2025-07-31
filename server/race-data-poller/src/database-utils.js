@@ -3,6 +3,8 @@
  * Provides performant upsert patterns and error handling
  */
 
+import { ID } from 'node-appwrite';
+
 /**
  * Safely convert and truncate a field to string with max length
  * @param {any} value - The value to process
@@ -24,6 +26,234 @@ function safeStringField(value, maxLength) {
     }
     
     return stringValue.length > maxLength ? stringValue.substring(0, maxLength) : stringValue;
+}
+
+/**
+ * Get current entrant data before updating for historical comparison
+ * @param {Object} databases - Appwrite Databases instance
+ * @param {string} databaseId - Database ID
+ * @param {string} entrantId - Entrant ID
+ * @param {Object} context - Appwrite function context for logging
+ * @returns {Object|null} Current entrant data or null if not found
+ */
+async function getCurrentEntrantData(databases, databaseId, entrantId, context) {
+    try {
+        const document = await databases.getDocument(databaseId, 'entrants', entrantId);
+        return document;
+    } catch (error) {
+        // Document doesn't exist yet - this is normal for new entrants
+        if (error.code === 404) {
+            return null;
+        }
+        context.error('Failed to get current entrant data', {
+            entrantId,
+            error: error instanceof Error ? error.message : 'Unknown error'
+        });
+        return null;
+    }
+}
+
+/**
+ * Save odds history when odds change
+ * @param {Object} databases - Appwrite Databases instance
+ * @param {string} databaseId - Database ID
+ * @param {string} entrantId - Entrant ID
+ * @param {Object} newOdds - New odds data from API
+ * @param {Object} currentData - Current entrant data (if exists)
+ * @param {Object} context - Appwrite function context for logging
+ * @returns {number} Number of history records created
+ */
+async function saveOddsHistory(databases, databaseId, entrantId, newOdds, currentData, context) {
+    const timestamp = new Date().toISOString();
+    let recordsCreated = 0;
+
+    try {
+        // Save fixed win odds history if changed
+        if (newOdds.fixed_win !== undefined && 
+            (!currentData || currentData.fixedWinOdds !== newOdds.fixed_win)) {
+            
+            await databases.createDocument(databaseId, 'odds-history', ID.unique(), {
+                entrant: entrantId,
+                odds: newOdds.fixed_win,
+                type: 'fixed_win',
+                eventTimestamp: timestamp
+            });
+            recordsCreated++;
+            context.log('Saved fixed win odds history', { 
+                entrantId, 
+                newOdds: newOdds.fixed_win,
+                previousOdds: currentData?.fixedWinOdds || 'none'
+            });
+        }
+
+        // Save fixed place odds history if changed
+        if (newOdds.fixed_place !== undefined && 
+            (!currentData || currentData.fixedPlaceOdds !== newOdds.fixed_place)) {
+            
+            await databases.createDocument(databaseId, 'odds-history', ID.unique(), {
+                entrant: entrantId,
+                odds: newOdds.fixed_place,
+                type: 'fixed_place',
+                eventTimestamp: timestamp
+            });
+            recordsCreated++;
+            context.log('Saved fixed place odds history', { 
+                entrantId, 
+                newOdds: newOdds.fixed_place,
+                previousOdds: currentData?.fixedPlaceOdds || 'none'
+            });
+        }
+
+        // Save pool win odds history if changed
+        if (newOdds.pool_win !== undefined && 
+            (!currentData || currentData.poolWinOdds !== newOdds.pool_win)) {
+            
+            await databases.createDocument(databaseId, 'odds-history', ID.unique(), {
+                entrant: entrantId,
+                odds: newOdds.pool_win,
+                type: 'pool_win',
+                eventTimestamp: timestamp
+            });
+            recordsCreated++;
+            context.log('Saved pool win odds history', { 
+                entrantId, 
+                newOdds: newOdds.pool_win,
+                previousOdds: currentData?.poolWinOdds || 'none'
+            });
+        }
+
+        // Save pool place odds history if changed  
+        if (newOdds.pool_place !== undefined && 
+            (!currentData || currentData.poolPlaceOdds !== newOdds.pool_place)) {
+            
+            await databases.createDocument(databaseId, 'odds-history', ID.unique(), {
+                entrant: entrantId,
+                odds: newOdds.pool_place,
+                type: 'pool_place',
+                eventTimestamp: timestamp
+            });
+            recordsCreated++;
+            context.log('Saved pool place odds history', { 
+                entrantId, 
+                newOdds: newOdds.pool_place,
+                previousOdds: currentData?.poolPlaceOdds || 'none'
+            });
+        }
+
+    } catch (error) {
+        context.error('Failed to save odds history', {
+            entrantId,
+            error: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+
+    return recordsCreated;
+}
+
+/**
+ * Save money flow history data from money_tracker API response
+ * @param {Object} databases - Appwrite Databases instance
+ * @param {string} databaseId - Database ID  
+ * @param {string} entrantId - Entrant ID
+ * @param {Object} moneyData - Money tracker data from API (hold_percentage, bet_percentage)
+ * @param {Object} context - Appwrite function context for logging
+ * @returns {boolean} Success status
+ */
+async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData, context) {
+    if (!moneyData || (typeof moneyData.hold_percentage === 'undefined' && typeof moneyData.bet_percentage === 'undefined')) {
+        return false;
+    }
+
+    try {
+        const timestamp = new Date().toISOString();
+        
+        // Store both hold_percentage and bet_percentage as separate records for comprehensive tracking
+        let recordsCreated = 0;
+        
+        // Save hold percentage (money held on this entrant)
+        if (typeof moneyData.hold_percentage !== 'undefined') {
+            await databases.createDocument(databaseId, 'money-flow-history', ID.unique(), {
+                entrant: entrantId,
+                holdPercentage: moneyData.hold_percentage,
+                type: 'hold_percentage',
+                eventTimestamp: timestamp
+            });
+            recordsCreated++;
+        }
+        
+        // Save bet percentage (percentage of total bets on this entrant) 
+        if (typeof moneyData.bet_percentage !== 'undefined') {
+            await databases.createDocument(databaseId, 'money-flow-history', ID.unique(), {
+                entrant: entrantId,
+                holdPercentage: moneyData.bet_percentage, // Using same field name for consistency
+                type: 'bet_percentage',
+                eventTimestamp: timestamp
+            });
+            recordsCreated++;
+        }
+
+        context.log('Saved money flow history', { 
+            entrantId, 
+            holdPercentage: moneyData.hold_percentage,
+            betPercentage: moneyData.bet_percentage,
+            recordsCreated
+        });
+        return recordsCreated > 0;
+    } catch (error) {
+        context.error('Failed to save money flow history', {
+            entrantId,
+            holdPercentage: moneyData.hold_percentage,
+            betPercentage: moneyData.bet_percentage,
+            error: error instanceof Error ? error.message : 'Unknown error'
+        });
+        return false;
+    }
+}
+
+/**
+ * Process money tracker data from API response
+ * @param {Object} databases - Appwrite Databases instance
+ * @param {string} databaseId - Database ID
+ * @param {Object} moneyTrackerData - Money tracker data from API response
+ * @param {Object} context - Appwrite function context for logging
+ * @returns {number} Number of entrants processed for money flow
+ */
+export async function processMoneyTrackerData(databases, databaseId, moneyTrackerData, context) {
+    if (!moneyTrackerData || !moneyTrackerData.entrants || !Array.isArray(moneyTrackerData.entrants)) {
+        context.log('No money tracker entrants data available');
+        return 0;
+    }
+
+    let entrantsProcessed = 0;
+    
+    // Group money tracker entries by entrant_id to get the latest data for each
+    const entrantMoneyData = {};
+    
+    for (const entry of moneyTrackerData.entrants) {
+        if (entry.entrant_id) {
+            // Keep the latest entry for each entrant (assuming they're in chronological order)
+            entrantMoneyData[entry.entrant_id] = {
+                hold_percentage: entry.hold_percentage,
+                bet_percentage: entry.bet_percentage
+            };
+        }
+    }
+    
+    // Save money flow history for each entrant
+    for (const [entrantId, moneyData] of Object.entries(entrantMoneyData)) {
+        const success = await saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData, context);
+        if (success) {
+            entrantsProcessed++;
+        }
+    }
+    
+    context.log('Processed money tracker data', {
+        totalEntries: moneyTrackerData.entrants.length,
+        uniqueEntrants: Object.keys(entrantMoneyData).length,
+        entrantsProcessed
+    });
+    
+    return entrantsProcessed;
 }
 
 /**
@@ -266,6 +496,27 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
             // Import metadata
             entrantDoc.lastUpdated = new Date().toISOString();
             entrantDoc.dataSource = 'NZTAB';
+            
+            // 🔥 HISTORICAL DATA STORAGE - Get current data before updating
+            const currentData = await getCurrentEntrantData(databases, databaseId, entrant.entrant_id, context);
+            
+            // 🔥 Save odds history if odds changed
+            if (entrant.odds) {
+                const historyRecords = await saveOddsHistory(databases, databaseId, entrant.entrant_id, entrant.odds, currentData, context);
+                if (historyRecords > 0) {
+                    context.log('Created odds history records', { 
+                        entrantId: entrant.entrant_id, 
+                        recordsCreated: historyRecords 
+                    });
+                }
+            }
+            
+            // 🔥 Save money flow history if available
+            // Note: Need to check if money tracker data is available in the API response
+            // This will be implemented when money tracker data structure is confirmed
+            // if (entrant.money_tracker) {
+            //     await saveMoneyFlowHistory(databases, databaseId, entrant.entrant_id, entrant.money_tracker, context);
+            // }
             
             const success = await performantUpsert(databases, databaseId, 'entrants', entrant.entrant_id, entrantDoc, context);
             if (success) {

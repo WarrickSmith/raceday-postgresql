@@ -64,7 +64,7 @@
       "path": "race-data-poller",
       "execute": ["any"],
       "events": [],
-      "schedule": "*/1 * * * *",
+      "schedule": "*/5 * * * *",
       "timeout": 840,
       "enabled": true,
       "logging": true,

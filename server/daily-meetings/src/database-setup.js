@@ -599,6 +599,9 @@ async function ensureOddsHistoryCollection(databases, config, context) {
             context.log('eventTimestamp attribute is not available for index creation, skipping idx_timestamp index');
         }
     }
+    // Note: Cannot create compound indexes with relationship attributes in Appwrite
+    // The existing idx_timestamp index on eventTimestamp is sufficient for time-based queries
+    // Cross-entrant queries can use the entrant relationship field directly
 }
 async function ensureMoneyFlowHistoryCollection(databases, config, context) {
     const collectionId = collections.moneyFlowHistory;
@@ -615,11 +618,15 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
     const requiredAttributes = [
         { key: 'holdPercentage', type: 'float', required: true },
         { key: 'eventTimestamp', type: 'datetime', required: true },
+        { key: 'type', type: 'string', size: 20, required: true },
     ];
     for (const attr of requiredAttributes) {
         if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
             context.log(`Creating money flow history attribute: ${attr.key}`);
-            if (attr.type === 'datetime') {
+            if (attr.type === 'string') {
+                await databases.createStringAttribute(config.databaseId, collectionId, attr.key, attr.size, attr.required);
+            }
+            else if (attr.type === 'datetime') {
                 await databases.createDatetimeAttribute(config.databaseId, collectionId, attr.key, attr.required);
             }
             else if (attr.type === 'float') {
@@ -647,6 +654,9 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
             context.log('eventTimestamp attribute is not available for index creation, skipping idx_timestamp index');
         }
     }
+    // Note: Cannot create compound indexes with relationship attributes in Appwrite
+    // The existing idx_timestamp index on eventTimestamp is sufficient for time-based queries
+    // Cross-entrant queries can use the entrant relationship field directly
 }
 async function ensureUserAlertConfigsCollection(databases, config, context) {
     const collectionId = collections.userAlertConfigs;

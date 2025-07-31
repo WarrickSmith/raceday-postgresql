@@ -1,6 +1,6 @@
 import { Client, Databases, Query } from 'node-appwrite'
 import { fetchRaceEventData } from './api-client.js'
-import { processEntrants } from './database-utils.js'
+import { processEntrants, processMoneyTrackerData } from './database-utils.js'
 import {
   validateEnvironmentVariables,
   executeApiCallWithTimeout,
@@ -37,7 +37,7 @@ export default async function main(context) {
 
     const now = new Date()
     const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000)
-    const oneHourFromNow = new Date(now.getTime() + 4 * 60 * 60 * 1000)
+    const oneHourFromNow = new Date(now.getTime() + 1 * 60 * 60 * 1000)
 
     // Query races needing polling (within time window, not Final)
     context.log('Fetching active races for polling...')
@@ -97,6 +97,19 @@ export default async function main(context) {
             context
           )
           updatesProcessed += entrantsUpdated
+        }
+
+        // Process money tracker data if available
+        if (raceEventData.money_tracker) {
+          const moneyFlowProcessed = await processMoneyTrackerData(
+            databases,
+            databaseId,
+            raceEventData.money_tracker,
+            context
+          )
+          context.log(`Processed money tracker data for race ${race.raceId}`, {
+            entrantsProcessed: moneyFlowProcessed,
+          })
         }
 
         racesPolled++
