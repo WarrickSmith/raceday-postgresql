@@ -8,6 +8,7 @@ import {
   rateLimit,
 } from './error-handlers.js'
 
+
 export default async function main(context) {
   try {
     // Validate environment variables
@@ -36,27 +37,25 @@ export default async function main(context) {
     const databaseId = 'raceday-db'
 
     const now = new Date()
-    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000)
+    const oneHourAgo = new Date(now.getTime() - 1 * 60 * 60 * 1000)
     const oneHourFromNow = new Date(now.getTime() + 1 * 60 * 60 * 1000)
 
-    // Query races needing polling (within time window, not Final)
-    context.log('Fetching active races for polling...')
+    // Query races within 1-hour window for baseline polling
+    context.log('Fetching races for baseline polling (1-hour window)...')
     const racesResult = await databases.listDocuments(databaseId, 'races', [
-      Query.greaterThanEqual('startTime', twoHoursAgo.toISOString()),
+      Query.greaterThanEqual('startTime', oneHourAgo.toISOString()),
       Query.lessThanEqual('startTime', oneHourFromNow.toISOString()),
       Query.notEqual('status', 'Final'),
       Query.orderAsc('startTime'),
     ])
 
-    context.log(
-      `Found ${racesResult.documents.length} active races for polling`
-    )
+    context.log(`Found ${racesResult.documents.length} races for baseline polling`)
 
     if (racesResult.documents.length === 0) {
-      context.log('No active races found for polling')
+      context.log('No races found within 1-hour window')
       return {
         success: true,
-        message: 'No active races found for polling',
+        message: 'No races found for baseline polling',
         statistics: {
           racesFound: 0,
           racesPolled: 0,
@@ -68,10 +67,10 @@ export default async function main(context) {
     let racesPolled = 0
     let updatesProcessed = 0
 
-    // Process each race (simplified polling logic for refactor)
+    // Process each race for baseline data updates
     for (const race of racesResult.documents) {
       try {
-        context.log(`Polling race ${race.raceId}`)
+        context.log(`Baseline polling race ${race.raceId}`)
 
         // Fetch latest race data with timeout protection
         const raceEventData = await executeApiCallWithTimeout(
@@ -125,7 +124,7 @@ export default async function main(context) {
       }
     }
 
-    context.log('Race data poller function completed', {
+    context.log('Baseline race data polling completed', {
       timestamp: new Date().toISOString(),
       racesFound: racesResult.documents.length,
       racesPolled,
@@ -134,7 +133,7 @@ export default async function main(context) {
 
     return {
       success: true,
-      message: `Successfully polled ${racesPolled} races with ${updatesProcessed} updates`,
+      message: `Baseline polling completed: ${racesPolled}/${racesResult.documents.length} races processed with ${updatesProcessed} updates`,
       statistics: {
         racesFound: racesResult.documents.length,
         racesPolled,

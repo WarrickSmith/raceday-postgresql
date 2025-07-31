@@ -65,6 +65,20 @@ This document outlines how the RaceDay client application integrates with the Ap
 }
 ```
 
+## Real-Time Data Architecture
+
+### Two-Function Polling Strategy
+
+**Baseline Polling (race-data-poller)**:
+- Scheduled every 5 minutes
+- Maintains 1-hour window of race data
+- Sustainable background data maintenance
+
+**Dynamic Polling (single-race-poller)**:
+- HTTP-triggered by client applications
+- On-demand polling for specific races
+- Enables true 15-second intervals when needed
+
 ## Real-Time Subscription Implementation
 
 ### Primary Subscription Strategy

@@ -11,7 +11,12 @@ config({ path: join(__dirname, '../.env') });
 
 const functionName = process.argv[2];
 if (!functionName) {
-  console.error('❌ Please specify a function name: npm run daily OR npm run poller');
+  console.error('❌ Please specify a function name');
+  console.error('Examples:');
+  console.error('  npm run meetings');
+  console.error('  npm run races'); 
+  console.error('  npm run poller');
+  console.error('  npm run single-race \'{"raceId":"race-uuid"}\'');
   process.exit(1);
 }
 
@@ -30,6 +35,19 @@ const mockContext = {
     if (Object.keys(data).length > 0) {
       console.error('  Data:', JSON.stringify(data, null, 2));
     }
+  },
+  // Mock HTTP request/response for HTTP-triggered functions
+  req: {
+    body: process.argv[3] || '{}', // Allow passing JSON payload as 3rd argument
+    bodyJson: {},
+    headers: {},
+    method: 'POST'
+  },
+  res: {
+    json: (data, statusCode = 200) => {
+      console.log(`📤 HTTP Response (${statusCode}):`, JSON.stringify(data, null, 2));
+      return data;
+    }
   }
 };
 
@@ -43,6 +61,17 @@ if (missingVars.length > 0) {
 }
 
 console.log(`🚀 Starting ${functionName} locally (non-Docker)...`);
+
+// Parse JSON payload if provided for HTTP functions
+if (process.argv[3]) {
+  try {
+    mockContext.req.bodyJson = JSON.parse(process.argv[3]);
+    console.log('📥 HTTP Payload:', JSON.stringify(mockContext.req.bodyJson, null, 2));
+  } catch (error) {
+    console.error('❌ Invalid JSON payload provided:', process.argv[3]);
+    process.exit(1);
+  }
+}
 
 async function runFunction() {
   try {

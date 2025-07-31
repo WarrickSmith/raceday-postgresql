@@ -82,6 +82,33 @@
         "documents.read",
         "documents.write"
       ]
+    },
+    {
+      "$id": "single-race-poller",
+      "name": "Single Race Poller",
+      "runtime": "node-22",
+      "specification": "s-1vcpu-1gb",
+      "path": "single-race-poller",
+      "execute": ["any"],
+      "events": [],
+      "schedule": "",
+      "timeout": 300,
+      "enabled": true,
+      "logging": true,
+      "entrypoint": "src/main.js",
+      "commands": "npm install",
+      "scopes": [
+        "databases.read",
+        "databases.write",
+        "collections.read",
+        "collections.write",
+        "attributes.read",
+        "attributes.write",
+        "indexes.read",
+        "indexes.write",
+        "documents.read",
+        "documents.write"
+      ]
     }
   ]
 }

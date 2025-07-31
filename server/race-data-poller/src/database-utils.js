@@ -511,12 +511,7 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
                 }
             }
             
-            // 🔥 Save money flow history if available
-            // Note: Need to check if money tracker data is available in the API response
-            // This will be implemented when money tracker data structure is confirmed
-            // if (entrant.money_tracker) {
-            //     await saveMoneyFlowHistory(databases, databaseId, entrant.entrant_id, entrant.money_tracker, context);
-            // }
+            // Money flow data is processed separately via processMoneyTrackerData() in main.js
             
             const success = await performantUpsert(databases, databaseId, 'entrants', entrant.entrant_id, entrantDoc, context);
             if (success) {
