@@ -1,3 +1,10 @@
+/**
+ * Database Setup for Raceday Application
+ * 
+ * Performance Optimization: Attribute creation operations use Promise.all for parallel execution
+ * instead of sequential loops, significantly improving setup performance when creating multiple
+ * attributes per collection.
+ */
 import { Client, Databases, Permission, Role, RelationshipType, IndexType } from 'node-appwrite';
 const collections = {
     meetings: 'meetings',
@@ -43,6 +50,80 @@ const isAttributeAvailable = async (databases, databaseId, collectionId, attribu
         return false;
     }
 };
+/**
+ * Create multiple attributes in parallel using Promise.all for improved performance
+ * @param {Object} databases - Appwrite Databases instance
+ * @param {string} databaseId - Database ID
+ * @param {string} collectionId - Collection ID
+ * @param {Array} attributes - Array of attribute objects to create
+ * @param {Object} context - Appwrite function context for logging
+ * @returns {Promise<number>} Number of attributes created
+ */
+const createAttributesInParallel = async (databases, databaseId, collectionId, attributes, context) => {
+    // Filter out attributes that already exist
+    const attributesToCreate = [];
+    for (const attr of attributes) {
+        if (!(await attributeExists(databases, databaseId, collectionId, attr.key))) {
+            attributesToCreate.push(attr);
+        }
+    }
+
+    if (attributesToCreate.length === 0) {
+        context.log('All attributes already exist, skipping creation');
+        return 0;
+    }
+
+    context.log(`Creating ${attributesToCreate.length} attributes in parallel for collection ${collectionId}`);
+    const startTime = Date.now();
+    
+    // Create all attributes in parallel using Promise.all
+    const createPromises = attributesToCreate.map(async (attr) => {
+        try {
+            context.log(`Starting creation of attribute: ${attr.key} (${attr.type})`);
+            
+            if (attr.type === 'string') {
+                await databases.createStringAttribute(databaseId, collectionId, attr.key, attr.size, attr.required, attr.default);
+            } else if (attr.type === 'datetime') {
+                await databases.createDatetimeAttribute(databaseId, collectionId, attr.key, attr.required, attr.default);
+            } else if (attr.type === 'float') {
+                await databases.createFloatAttribute(databaseId, collectionId, attr.key, attr.required, null, null, attr.default);
+            } else if (attr.type === 'integer') {
+                await databases.createIntegerAttribute(databaseId, collectionId, attr.key, attr.required, null, null, attr.default);
+            } else if (attr.type === 'boolean') {
+                await databases.createBooleanAttribute(databaseId, collectionId, attr.key, attr.required, attr.default);
+            } else {
+                throw new Error(`Unsupported attribute type: ${attr.type}`);
+            }
+            
+            context.log(`✓ Successfully created attribute: ${attr.key}`);
+            return attr.key;
+        } catch (error) {
+            context.error(`✗ Failed to create attribute ${attr.key}: ${error.message}`);
+            // Don't throw here - let other attributes continue
+            return null;
+        }
+    });
+
+    // Execute all attribute creations in parallel with error handling
+    try {
+        const results = await Promise.all(createPromises);
+        const successCount = results.filter(result => result !== null).length;
+        const failureCount = results.length - successCount;
+        const duration = Date.now() - startTime;
+        
+        context.log(`Parallel attribute creation completed in ${duration}ms: ${successCount} succeeded, ${failureCount} failed`);
+        
+        if (failureCount > 0) {
+            context.error(`Some attributes failed to create. This may be due to rate limiting or concurrent access.`);
+        }
+        
+        return successCount;
+    } catch (error) {
+        context.error(`Parallel attribute creation failed: ${error.message}`);
+        return 0;
+    }
+};
+
 const waitForAttributeAvailable = async (databases, databaseId, collectionId, attributeKey, context, maxRetries = 3, delayMs = 1000) => {
     context.log(`Starting to wait for attribute ${attributeKey} to become available...`);
     
@@ -153,17 +234,9 @@ async function ensureMeetingsCollection(databases, config, context) {
         { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
         { key: 'apiGeneratedTime', type: 'datetime', required: false },
     ];
-    for (const attr of requiredAttributes) {
-        if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
-            context.log(`Creating meetings attribute: ${attr.key}`);
-            if (attr.type === 'string') {
-                await databases.createStringAttribute(config.databaseId, collectionId, attr.key, attr.size, attr.required);
-            }
-            else if (attr.type === 'datetime') {
-                await databases.createDatetimeAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-        }
-    }
+    
+    // Create attributes in parallel for improved performance
+    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
     const collection = await databases.getCollection(config.databaseId, collectionId);
     if (!collection.indexes.some((idx) => idx.key === 'idx_date')) {
         context.log('Creating idx_date index on date...');
@@ -308,23 +381,8 @@ async function ensureRacesCollection(databases, config, context) {
         { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
         { key: 'importedAt', type: 'datetime', required: false },
     ];
-    for (const attr of requiredAttributes) {
-        if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
-            context.log(`Creating races attribute: ${attr.key}`);
-            if (attr.type === 'string') {
-                await databases.createStringAttribute(config.databaseId, collectionId, attr.key, attr.size, attr.required);
-            }
-            else if (attr.type === 'datetime') {
-                await databases.createDatetimeAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-            else if (attr.type === 'integer') {
-                await databases.createIntegerAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-            else if (attr.type === 'boolean') {
-                await databases.createBooleanAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-        }
-    }
+    // Create attributes in parallel for improved performance
+    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'meeting'))) {
         context.log('Creating races->meetings relationship...');
         await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.meetings, RelationshipType.ManyToOne, false, 'meeting', 'races');
@@ -469,47 +527,11 @@ async function ensureEntrantsCollection(databases, config, context) {
         { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
         { key: 'importedAt', type: 'datetime', required: false },
     ];
-    // Create attributes with progress tracking
-    let attributesCreated = 0;
-    const totalNewAttributes = requiredAttributes.length;
-    
-    for (const attr of requiredAttributes) {
-        if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
-            context.log(`Creating entrants attribute (${attributesCreated + 1}/${totalNewAttributes}): ${attr.key}`);
-            const startTime = Date.now();
-            
-            try {
-                if (attr.type === 'string') {
-                    await databases.createStringAttribute(config.databaseId, collectionId, attr.key, attr.size, attr.required);
-                }
-                else if (attr.type === 'integer') {
-                    await databases.createIntegerAttribute(config.databaseId, collectionId, attr.key, attr.required);
-                }
-                else if (attr.type === 'float') {
-                    await databases.createFloatAttribute(config.databaseId, collectionId, attr.key, attr.required);
-                }
-                else if (attr.type === 'boolean') {
-                    await databases.createBooleanAttribute(config.databaseId, collectionId, attr.key, attr.required, attr.default);
-                }
-                else if (attr.type === 'datetime') {
-                    await databases.createDatetimeAttribute(config.databaseId, collectionId, attr.key, attr.required);
-                }
-                
-                const duration = Date.now() - startTime;
-                context.log(`Created attribute ${attr.key} in ${duration}ms`);
-                attributesCreated++;
-            } catch (error) {
-                context.error(`Failed to create attribute ${attr.key}`, {
-                    error: error instanceof Error ? error.message : 'Unknown error',
-                    type: attr.type,
-                    duration: Date.now() - startTime
-                });
-            }
-        }
-    }
+    // Create attributes in parallel for improved performance
+    const attributesCreated = await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
     
     if (attributesCreated > 0) {
-        context.log(`Created ${attributesCreated} new entrant attributes`);
+        context.log(`Entrants collection: ${attributesCreated} new attributes created in parallel`);
     }
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'race'))) {
         context.log('Creating entrants->races relationship...');
@@ -565,20 +587,8 @@ async function ensureOddsHistoryCollection(databases, config, context) {
         { key: 'eventTimestamp', type: 'datetime', required: true },
         { key: 'type', type: 'string', size: 20, required: true },
     ];
-    for (const attr of requiredAttributes) {
-        if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
-            context.log(`Creating odds history attribute: ${attr.key}`);
-            if (attr.type === 'string') {
-                await databases.createStringAttribute(config.databaseId, collectionId, attr.key, attr.size, attr.required);
-            }
-            else if (attr.type === 'datetime') {
-                await databases.createDatetimeAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-            else if (attr.type === 'float') {
-                await databases.createFloatAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-        }
-    }
+    // Create attributes in parallel for improved performance
+    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'entrant'))) {
         context.log('Creating odds history->entrants relationship...');
         await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.entrants, RelationshipType.ManyToOne, false, 'entrant', 'oddsHistory');
@@ -628,20 +638,8 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
         { key: 'eventTimestamp', type: 'datetime', required: true },
         { key: 'type', type: 'string', size: 20, required: true }, // Enum: 'hold_percentage' or 'bet_percentage'
     ];
-    for (const attr of requiredAttributes) {
-        if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
-            context.log(`Creating money flow history attribute: ${attr.key}`);
-            if (attr.type === 'string') {
-                await databases.createStringAttribute(config.databaseId, collectionId, attr.key, attr.size, attr.required);
-            }
-            else if (attr.type === 'datetime') {
-                await databases.createDatetimeAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-            else if (attr.type === 'float') {
-                await databases.createFloatAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-        }
-    }
+    // Create attributes in parallel for improved performance
+    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'entrant'))) {
         context.log('Creating money flow history->entrants relationship...');
         await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.entrants, RelationshipType.ManyToOne, false, 'entrant', 'moneyFlowHistory');
@@ -692,23 +690,8 @@ async function ensureUserAlertConfigsCollection(databases, config, context) {
         { key: 'timeWindowSeconds', type: 'integer', required: false },
         { key: 'enabled', type: 'boolean', required: true },
     ];
-    for (const attr of requiredAttributes) {
-        if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
-            context.log(`Creating user alert configs attribute: ${attr.key}`);
-            if (attr.type === 'string') {
-                await databases.createStringAttribute(config.databaseId, collectionId, attr.key, attr.size, attr.required);
-            }
-            else if (attr.type === 'integer') {
-                await databases.createIntegerAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-            else if (attr.type === 'float') {
-                await databases.createFloatAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-            else if (attr.type === 'boolean') {
-                await databases.createBooleanAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-        }
-    }
+    // Create attributes in parallel for improved performance
+    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'entrant'))) {
         context.log('Creating user alert configs->entrants relationship...');
         await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.entrants, RelationshipType.ManyToOne, false, 'entrant', 'alertConfigs');
@@ -766,17 +749,8 @@ async function ensureNotificationsCollection(databases, config, context) {
         { key: 'raceId', type: 'string', size: 50, required: false },
         { key: 'entrantId', type: 'string', size: 50, required: false },
     ];
-    for (const attr of requiredAttributes) {
-        if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
-            context.log(`Creating notifications attribute: ${attr.key}`);
-            if (attr.type === 'string') {
-                await databases.createStringAttribute(config.databaseId, collectionId, attr.key, attr.size, attr.required);
-            }
-            else if (attr.type === 'boolean') {
-                await databases.createBooleanAttribute(config.databaseId, collectionId, attr.key, attr.required, attr.default);
-            }
-        }
-    }
+    // Create attributes in parallel for improved performance
+    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
     const notificationsCollection = await databases.getCollection(config.databaseId, collectionId);
     if (!notificationsCollection.indexes.some((idx) => idx.key === 'idx_user_id')) {
         const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'userId', context);
