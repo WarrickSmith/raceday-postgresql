@@ -8,6 +8,8 @@ import {
   rateLimit,
 } from './error-handlers.js'
 
+const HOUR_IN_MS = 60 * 60 * 1000 // 1 hour in milliseconds
+
 
 export default async function main(context) {
   try {
