@@ -37,8 +37,8 @@ export default async function main(context) {
     const databaseId = 'raceday-db'
 
     const now = new Date()
-    const oneHourAgo = new Date(now.getTime() - 1 * 60 * 60 * 1000)
-    const oneHourFromNow = new Date(now.getTime() + 1 * 60 * 60 * 1000)
+    const oneHourAgo = new Date(now.getTime() - HOUR_IN_MS)
+    const oneHourFromNow = new Date(now.getTime() + HOUR_IN_MS)
 
     // Query races within 1-hour window for baseline polling
     context.log('Fetching races for baseline polling (1-hour window)...')
