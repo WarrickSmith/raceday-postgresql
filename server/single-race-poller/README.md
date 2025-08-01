@@ -106,7 +106,10 @@ class RaceDynamicPoller {
           'Content-Type': 'application/json',
           'X-Appwrite-Project': this.projectId
         },
-        body: JSON.stringify({ raceId })
+        body: JSON.stringify({
+          body: JSON.stringify({ raceId }),
+          async: true  // Prevents 30-second timeout
+        })
       })
 
       const result = await response.json()
