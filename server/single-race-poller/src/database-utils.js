@@ -175,6 +175,7 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
             await databases.createDocument(databaseId, 'money-flow-history', ID.unique(), {
                 entrant: entrantId,
                 holdPercentage: moneyData.hold_percentage,
+                betPercentage: null, // Explicitly null for hold_percentage records
                 type: 'hold_percentage',
                 eventTimestamp: timestamp
             });
@@ -185,7 +186,8 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
         if (typeof moneyData.bet_percentage !== 'undefined') {
             await databases.createDocument(databaseId, 'money-flow-history', ID.unique(), {
                 entrant: entrantId,
-                holdPercentage: moneyData.bet_percentage, // Using same field name for consistency
+                holdPercentage: null, // Explicitly null for bet_percentage records
+                betPercentage: moneyData.bet_percentage,
                 type: 'bet_percentage',
                 eventTimestamp: timestamp
             });
@@ -194,16 +196,16 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
 
         context.log('Saved money flow history', { 
             entrantId, 
-            holdPercentage: moneyData.hold_percentage,
-            betPercentage: moneyData.bet_percentage,
+            holdPercentageValue: moneyData.hold_percentage,
+            betPercentageValue: moneyData.bet_percentage,
             recordsCreated
         });
         return recordsCreated > 0;
     } catch (error) {
         context.error('Failed to save money flow history', {
             entrantId,
-            holdPercentage: moneyData.hold_percentage,
-            betPercentage: moneyData.bet_percentage,
+            holdPercentageValue: moneyData.hold_percentage,
+            betPercentageValue: moneyData.bet_percentage,
             error: error instanceof Error ? error.message : 'Unknown error'
         });
         return false;

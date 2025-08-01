@@ -599,9 +599,16 @@ async function ensureOddsHistoryCollection(databases, config, context) {
             context.log('eventTimestamp attribute is not available for index creation, skipping idx_timestamp index');
         }
     }
-    // Note: Cannot create compound indexes with relationship attributes in Appwrite
-    // The existing idx_timestamp index on eventTimestamp is sufficient for time-based queries
-    // Cross-entrant queries can use the entrant relationship field directly
+    // Note: Appwrite does not support creating compound indexes that include relationship attributes.
+    // This limitation means that queries requiring both eventTimestamp and entrant fields cannot leverage
+    // a single compound index for optimized performance. Instead, such queries may require scanning
+    // multiple records, which could impact performance for large datasets.
+    // 
+    // Workarounds:
+    // 1. Use the existing idx_timestamp index on eventTimestamp for time-based queries.
+    // 2. For cross-entrant queries, use the entrant relationship field directly and filter results in code.
+    // 3. If performance becomes an issue, consider denormalizing data or creating additional collections
+    //    to store pre-aggregated or indexed data for specific query patterns.
 }
 async function ensureMoneyFlowHistoryCollection(databases, config, context) {
     const collectionId = collections.moneyFlowHistory;
@@ -616,9 +623,10 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
         ]);
     }
     const requiredAttributes = [
-        { key: 'holdPercentage', type: 'float', required: true },
+        { key: 'holdPercentage', type: 'float', required: false }, // Optional - used for hold_percentage data
+        { key: 'betPercentage', type: 'float', required: false },  // Optional - used for bet_percentage data
         { key: 'eventTimestamp', type: 'datetime', required: true },
-        { key: 'type', type: 'string', size: 20, required: true },
+        { key: 'type', type: 'string', size: 20, required: true }, // Enum: 'hold_percentage' or 'bet_percentage'
     ];
     for (const attr of requiredAttributes) {
         if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
@@ -654,9 +662,16 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
             context.log('eventTimestamp attribute is not available for index creation, skipping idx_timestamp index');
         }
     }
-    // Note: Cannot create compound indexes with relationship attributes in Appwrite
-    // The existing idx_timestamp index on eventTimestamp is sufficient for time-based queries
-    // Cross-entrant queries can use the entrant relationship field directly
+    // Note: Appwrite does not support creating compound indexes that include relationship attributes.
+    // This limitation means that queries requiring both eventTimestamp and entrant fields cannot leverage
+    // a single compound index for optimized performance. Instead, such queries may require scanning
+    // multiple records, which could impact performance for large datasets.
+    // 
+    // Workarounds:
+    // 1. Use the existing idx_timestamp index on eventTimestamp for time-based queries.
+    // 2. For cross-entrant queries, use the entrant relationship field directly and filter results in code.
+    // 3. If performance becomes an issue, consider denormalizing data or creating additional collections
+    //    to store pre-aggregated or indexed data for specific query patterns.
 }
 async function ensureUserAlertConfigsCollection(databases, config, context) {
     const collectionId = collections.userAlertConfigs;

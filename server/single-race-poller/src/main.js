@@ -123,8 +123,66 @@ export default async function main(context) {
         note: 'Data processing in progress, check database for updates'
       }
       
-      // Send response immediately
-      context.res.json(immediateResponse, 202) // 202 Accepted
+      // Defer background processing
+      setImmediate(async () => {
+        try {
+          // Fetch latest race data
+          const raceEventData = await executeApiCallWithTimeout(
+            fetchRaceEventData,
+            [nztabBaseUrl, raceId, context],
+            context,
+            12000, // 12-second timeout - no client waiting
+            0 // No retries for client-requested polls
+          )
+          
+          if (!raceEventData) {
+            context.error('NZTAB API fetch failed', { raceId })
+            return // Background processing failed
+          }
+          
+          let updatesProcessed = 0
+          let moneyFlowProcessed = 0
+          
+          // Process both entrants and money flow in parallel
+          const processingPromises = []
+          
+          // Update entrant data if available
+          if (raceEventData.entrants && raceEventData.entrants.length > 0) {
+            processingPromises.push(
+              processEntrants(databases, databaseId, raceId, raceEventData.entrants, context)
+                .then(count => { updatesProcessed = count })
+            )
+          }
+          
+          // Process money tracker data if available
+          if (raceEventData.money_tracker) {
+            processingPromises.push(
+              processMoneyTrackerData(databases, databaseId, raceEventData.money_tracker, context)
+                .then(count => { moneyFlowProcessed = count })
+            )
+          }
+          
+          // Wait for all processing to complete
+          await Promise.all(processingPromises)
+          
+          context.log('Background race polling completed successfully', {
+            raceId,
+            entrantsUpdated: updatesProcessed,
+            moneyFlowProcessed,
+            timestamp: new Date().toISOString()
+          })
+          
+        } catch (error) {
+          context.error('Background processing failed', {
+            raceId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            timestamp: new Date().toISOString()
+          })
+        }
+      })
+
+      // Send response immediately and terminate request handler
+      return context.res.json(immediateResponse, 202) // 202 Accepted
       
     } catch (error) {
       const response = {
@@ -134,64 +192,6 @@ export default async function main(context) {
       context.error('Race lookup failed', { raceId, error: error.message })
       return context.res.json(response, 404)
     }
-
-    // Continue processing in background after response sent
-    try {
-      // Fetch latest race data
-      const raceEventData = await executeApiCallWithTimeout(
-        fetchRaceEventData,
-        [nztabBaseUrl, raceId, context],
-        context,
-        12000, // 12-second timeout - no client waiting
-        0 // No retries for client-requested polls
-      )
-
-      if (!raceEventData) {
-        context.error('NZTAB API fetch failed', { raceId })
-        return // Background processing failed, but client already got response
-      }
-
-      let updatesProcessed = 0
-      let moneyFlowProcessed = 0
-
-      // Process both entrants and money flow in parallel
-      const processingPromises = []
-      
-      // Update entrant data if available
-      if (raceEventData.entrants && raceEventData.entrants.length > 0) {
-        processingPromises.push(
-          processEntrants(databases, databaseId, raceId, raceEventData.entrants, context)
-            .then(count => { updatesProcessed = count })
-        )
-      }
-
-      // Process money tracker data if available
-      if (raceEventData.money_tracker) {
-        processingPromises.push(
-          processMoneyTrackerData(databases, databaseId, raceEventData.money_tracker, context)
-            .then(count => { moneyFlowProcessed = count })
-        )
-      }
-
-      // Wait for all processing to complete
-      await Promise.all(processingPromises)
-
-      context.log('Background race polling completed successfully', {
-        raceId,
-        entrantsUpdated: updatesProcessed,
-        moneyFlowProcessed,
-        timestamp: new Date().toISOString()
-      })
-
-    } catch (error) {
-      context.error('Background processing failed', {
-        raceId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
-      })
-    }
-
-    // Function continues running in background, client already has response
 
   } catch (error) {
     handleError(error, 'Single race poller function', context, {
