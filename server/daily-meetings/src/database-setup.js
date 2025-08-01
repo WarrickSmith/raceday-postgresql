@@ -114,7 +114,8 @@ const createAttributesInParallel = async (databases, databaseId, collectionId, a
         context.log(`Parallel attribute creation completed in ${duration}ms: ${successCount} succeeded, ${failureCount} failed`);
         
         if (failureCount > 0) {
-            context.error(`Some attributes failed to create. This may be due to rate limiting or concurrent access.`);
+            const failedAttributes = results.filter(result => result === null).map((_, index) => attributesToCreate[index].key);
+            context.error(`Failed to create ${failureCount} attributes: ${failedAttributes.join(', ')}. This may be due to rate limiting or concurrent access.`);
         }
         
         return successCount;
