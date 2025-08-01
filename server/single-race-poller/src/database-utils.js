@@ -228,30 +228,28 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
 
     let entrantsProcessed = 0;
     
-    // Group money tracker entries by entrant_id to get the latest data for each
-    const entrantMoneyData = {};
+    // Process and save money tracker entries in a single pass
+    const processedEntrants = new Set();
     
     for (const entry of moneyTrackerData.entrants) {
-        if (entry.entrant_id) {
-            // Keep the latest entry for each entrant (assuming they're in chronological order)
-            entrantMoneyData[entry.entrant_id] = {
+        if (entry.entrant_id && !processedEntrants.has(entry.entrant_id)) {
+            // Save the latest entry for each entrant (assuming they're in chronological order)
+            const moneyData = {
                 hold_percentage: entry.hold_percentage,
                 bet_percentage: entry.bet_percentage
             };
-        }
-    }
-    
-    // Save money flow history for each entrant
-    for (const [entrantId, moneyData] of Object.entries(entrantMoneyData)) {
-        const success = await saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData, context);
-        if (success) {
-            entrantsProcessed++;
+            
+            const success = await saveMoneyFlowHistory(databases, databaseId, entry.entrant_id, moneyData, context);
+            if (success) {
+                entrantsProcessed++;
+                processedEntrants.add(entry.entrant_id);
+            }
         }
     }
     
     context.log('Processed money tracker data', {
         totalEntries: moneyTrackerData.entrants.length,
-        uniqueEntrants: Object.keys(entrantMoneyData).length,
+        uniqueEntrants: processedEntrants.size,
         entrantsProcessed
     });
     
