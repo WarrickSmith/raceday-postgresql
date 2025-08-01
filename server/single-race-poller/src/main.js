@@ -9,9 +9,13 @@ import {
 
 /**
  * Single Race Poller - HTTP-triggered function for high-frequency polling of specific races
- * Called by client applications for dynamic polling (15s, 30s, 1m, 2m intervals)
+ * 
+ * RECOMMENDED INTEGRATION: Use Appwrite Node.js SDK with Next.js Server Actions rather than
+ * direct HTTP calls. Server Actions provide better security, error handling, and timeout management.
+ * See README.md for implementation examples.
  * 
  * Expected payload: { raceId: "race-uuid" }
+ * HTTP endpoint maintained for compatibility and testing purposes.
  */
 export default async function main(context) {
   try {
@@ -26,45 +30,27 @@ export default async function main(context) {
     const apiKey = process.env['APPWRITE_API_KEY']
     const nztabBaseUrl = process.env['NZTAB_API_BASE_URL'] || 'https://api.tab.co.nz'
 
-    // Parse request payload - Handle Appwrite's inconsistent body parsing
+    // Parse request payload
+    // NOTE: This HTTP endpoint supports direct calls for compatibility, but the RECOMMENDED 
+    // approach is using Appwrite SDK with Next.js Server Actions for better reliability,
+    // security, and timeout handling. See README.md for implementation details.
+    
     let payload = {}
     
     try {
-      // Primary: Try parsing context.req.body as string (most reliable)
-      if (context.req.body && typeof context.req.body === 'string' && context.req.body.trim()) {
+      // Standard approach: Parse JSON body (works with SDK calls)
+      if (typeof context.req.body === 'string') {
         payload = JSON.parse(context.req.body)
-        context.log('Parsed JSON from body string', { payload })
-      }
-      // Fallback: Try parsing manually from raw bodyText
-      else if (context.req.bodyText && context.req.bodyText.trim()) {
-        payload = JSON.parse(context.req.bodyText)
-        context.log('Parsed JSON from bodyText', { payload })
-      }
-      // Fallback: Use automatically parsed JSON if supported
-      else if (context.req.body && typeof context.req.body === 'object') {
+      } else if (typeof context.req.body === 'object' && context.req.body !== null) {
         payload = context.req.body
-        context.log('Using automatically parsed JSON body', { payload })
-      }
-      // Final fallback: Query parameters (for testing)
-      else if (context.req.query?.raceId) {
-        payload.raceId = context.req.query.raceId
-        context.log('Using raceId from query parameters', { raceId: payload.raceId })
-      }
-      else {
-        context.log('No valid request payload found', {
-          bodyType: typeof context.req.body,
-          bodyValue: context.req.body,
-          bodyTextLength: context.req.bodyText?.length || 0,
-          method: context.req.method,
-          contentType: context.req.headers?.['content-type']
-        })
+      } else if (context.req.query?.raceId) {
+        // Fallback for testing via query parameters
+        payload = { raceId: context.req.query.raceId }
       }
     } catch (error) {
-      context.log('Failed to parse request payload', {
+      context.error('Invalid JSON payload', { 
         error: error.message,
-        bodyText: context.req.bodyText,
-        body: context.req.body,
-        bodyType: typeof context.req.body
+        bodyType: typeof context.req.body 
       })
     }
     
@@ -73,18 +59,16 @@ export default async function main(context) {
     if (!raceId) {
       const response = {
         success: false,
-        error: 'Missing required parameter: raceId'
+        error: 'Missing required parameter: raceId',
+        hint: 'Use Server Actions (recommended) or send JSON: {"raceId": "race-uuid"}'
       }
       return context.res.json(response, 400)
     }
 
     context.log('Single race polling request', {
       raceId,
-      payload,
-      bodyType: typeof context.req.body,
-      bodyValue: context.req.body,
       timestamp: new Date().toISOString(),
-      requestSource: 'client-app'
+      requestMethod: context.req.method
     })
 
     // Initialize Appwrite client
