@@ -12,14 +12,17 @@
     "deploy:meetings": "node scripts/deploy.js daily-meetings",
     "deploy:races": "node scripts/deploy.js daily-races",
     "deploy:poller": "node scripts/deploy.js race-data-poller",
+    "deploy:single-race": "node scripts/deploy.js single-race-poller",
     "meetings": "node scripts/run-function.js daily-meetings",
     "races": "node scripts/run-function.js daily-races",
     "poller": "node scripts/run-function.js race-data-poller",
+    "single-race": "node scripts/run-function.js single-race-poller",
     "execute": "node scripts/execute-function.js",
     "vars:meetings": "node scripts/update-vars-only.js daily-meetings",
     "vars:races": "node scripts/update-vars-only.js daily-races",
     "vars:poller": "node scripts/update-vars-only.js race-data-poller",
-    "vars:all": "npm run vars:meetings && npm run vars:races && npm run vars:poller"
+    "vars:single-race": "node scripts/update-vars-only.js single-race-poller",
+    "vars:all": "npm run vars:meetings && npm run vars:races && npm run vars:poller && npm run vars:single-race"
   },
   "dependencies": {
     "node-appwrite": "^17.0.0",

@@ -39,11 +39,28 @@ jobs:
       - name: Build application
         run: npm run build
 
-  backend-daily-entrants:
+  backend-configuration:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./server/daily-entrants
+        working-directory: ./server
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate consolidated appwrite.json
+        run: |
+          test -f appwrite.json && echo "✓ appwrite.json exists" || exit 1
+          node -e "const config = JSON.parse(require('fs').readFileSync('appwrite.json', 'utf8')); console.log('✓ appwrite.json is valid JSON with', Object.keys(config.functions || {}).length, 'functions')" || exit 1
+
+  backend-single-race-poller:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server/single-race-poller
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -55,7 +72,7 @@ jobs:
           cache-dependency-path: ./server/package-lock.json
       - name: Validate function configuration
         run: |
-          test -f appwrite.json && echo "✓ appwrite.json exists" || exit 1
+          test -f ../appwrite.json && echo "✓ consolidated appwrite.json exists" || exit 1
           test -f src/main.js && echo "✓ main.js exists" || exit 1
           test -f package.json && echo "✓ package.json exists" || exit 1
       - name: Install dependencies
@@ -80,7 +97,7 @@ jobs:
           cache-dependency-path: ./server/package-lock.json
       - name: Validate function configuration
         run: |
-          test -f appwrite.json && echo "✓ appwrite.json exists" || exit 1
+          test -f ../appwrite.json && echo "✓ consolidated appwrite.json exists" || exit 1
           test -f src/main.js && echo "✓ main.js exists" || exit 1
           test -f package.json && echo "✓ package.json exists" || exit 1
       - name: Install dependencies
@@ -105,7 +122,7 @@ jobs:
           cache-dependency-path: ./server/package-lock.json
       - name: Validate function configuration
         run: |
-          test -f appwrite.json && echo "✓ appwrite.json exists" || exit 1
+          test -f ../appwrite.json && echo "✓ consolidated appwrite.json exists" || exit 1
           test -f src/main.js && echo "✓ main.js exists" || exit 1
           test -f package.json && echo "✓ package.json exists" || exit 1
       - name: Install dependencies
@@ -129,7 +146,7 @@ jobs:
           cache: 'npm'
       - name: Validate function configuration
         run: |
-          test -f appwrite.json && echo "✓ appwrite.json exists" || exit 1
+          test -f ../appwrite.json && echo "✓ consolidated appwrite.json exists" || exit 1
           test -f src/main.js && echo "✓ main.js exists" || exit 1
           test -f package.json && echo "✓ package.json exists" || exit 1
       - name: Install dependencies

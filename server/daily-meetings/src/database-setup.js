@@ -43,7 +43,7 @@ const isAttributeAvailable = async (databases, databaseId, collectionId, attribu
         return false;
     }
 };
-const waitForAttributeAvailable = async (databases, databaseId, collectionId, attributeKey, context, maxRetries = 5, delayMs = 2000) => {
+const waitForAttributeAvailable = async (databases, databaseId, collectionId, attributeKey, context, maxRetries = 3, delayMs = 1000) => {
     context.log(`Starting to wait for attribute ${attributeKey} to become available...`);
     
     for (let i = 0; i < maxRetries; i++) {
@@ -71,6 +71,7 @@ const waitForAttributeAvailable = async (databases, databaseId, collectionId, at
     return false;
 };
 export async function ensureDatabaseSetup(config, context) {
+    const setupStartTime = Date.now();
     const client = new Client()
         .setEndpoint(config.endpoint)
         .setProject(config.projectId)
@@ -84,18 +85,30 @@ export async function ensureDatabaseSetup(config, context) {
             await databases.create(config.databaseId, 'RaceDay Database');
             context.log('Database created successfully');
         }
+        
+        const collectionsStart = Date.now();
         await ensureMeetingsCollection(databases, config, context);
         await ensureRacesCollection(databases, config, context);
+        
+        // Entrants collection is the most complex - track it separately
+        const entrantsStart = Date.now();
         await ensureEntrantsCollection(databases, config, context);
+        const entrantsDuration = Date.now() - entrantsStart;
+        context.log(`Entrants collection setup completed in ${entrantsDuration}ms`);
+        
         await ensureOddsHistoryCollection(databases, config, context);
         await ensureMoneyFlowHistoryCollection(databases, config, context);
         await ensureUserAlertConfigsCollection(databases, config, context);
         await ensureNotificationsCollection(databases, config, context);
-        context.log('Database setup verification completed');
+        
+        const totalDuration = Date.now() - setupStartTime;
+        context.log(`Database setup verification completed in ${totalDuration}ms`);
     }
     catch (error) {
+        const totalDuration = Date.now() - setupStartTime;
         context.error('Database setup failed', {
-            error: error instanceof Error ? error.message : 'Unknown error'
+            error: error instanceof Error ? error.message : 'Unknown error',
+            duration: totalDuration
         });
         throw error;
     }
@@ -107,8 +120,8 @@ async function ensureMeetingsCollection(databases, config, context) {
         context.log('Creating meetings collection...');
         await databases.createCollection(config.databaseId, collectionId, 'Meetings', [
             Permission.read(Role.any()),
-            Permission.create(Role.users()),
-            Permission.update(Role.users()),
+            Permission.create(Role.any()),
+            Permission.update(Role.any()),
             Permission.delete(Role.users()),
         ]);
     }
@@ -221,8 +234,8 @@ async function ensureRacesCollection(databases, config, context) {
         context.log('Creating races collection...');
         await databases.createCollection(config.databaseId, collectionId, 'Races', [
             Permission.read(Role.any()),
-            Permission.create(Role.users()),
-            Permission.update(Role.users()),
+            Permission.create(Role.any()),
+            Permission.update(Role.any()),
             Permission.delete(Role.users()),
         ]);
     }
@@ -307,6 +320,9 @@ async function ensureRacesCollection(databases, config, context) {
             else if (attr.type === 'integer') {
                 await databases.createIntegerAttribute(config.databaseId, collectionId, attr.key, attr.required);
             }
+            else if (attr.type === 'boolean') {
+                await databases.createBooleanAttribute(config.databaseId, collectionId, attr.key, attr.required);
+            }
         }
     }
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'meeting'))) {
@@ -367,8 +383,8 @@ async function ensureEntrantsCollection(databases, config, context) {
         context.log('Creating entrants collection...');
         await databases.createCollection(config.databaseId, collectionId, 'Entrants', [
             Permission.read(Role.any()),
-            Permission.create(Role.users()),
-            Permission.update(Role.users()),
+            Permission.create(Role.any()),
+            Permission.update(Role.any()),
             Permission.delete(Role.users()),
         ]);
     }
@@ -400,6 +416,7 @@ async function ensureEntrantsCollection(databases, config, context) {
         
         // Current race connections (may change on race day)
         { key: 'jockey', type: 'string', size: 255, required: false },
+        { key: 'trainerName', type: 'string', size: 255, required: false },
         { key: 'apprenticeIndicator', type: 'string', size: 50, required: false },
         { key: 'gear', type: 'string', size: 200, required: false },
         
@@ -416,27 +433,83 @@ async function ensureEntrantsCollection(databases, config, context) {
         // Speedmap positioning for live race strategy
         { key: 'settlingLengths', type: 'integer', required: false },
         
+        // Static entrant information (rarely changes)
+        { key: 'age', type: 'integer', required: false },
+        { key: 'sex', type: 'string', size: 10, required: false }, // M, F, G, etc
+        { key: 'colour', type: 'string', size: 20, required: false }, // B, BR, CH, etc
+        { key: 'foalingDate', type: 'string', size: 20, required: false }, // "Dec 23" format
+        { key: 'sire', type: 'string', size: 100, required: false },
+        { key: 'dam', type: 'string', size: 100, required: false },
+        { key: 'breeding', type: 'string', size: 200, required: false },
+        { key: 'owners', type: 'string', size: 255, required: false },
+        { key: 'trainerLocation', type: 'string', size: 100, required: false },
+        { key: 'country', type: 'string', size: 10, required: false }, // NZL, AUS
+        
+        // Performance and form data
+        { key: 'prizeMoney', type: 'string', size: 20, required: false }, // "4800" format
+        { key: 'bestTime', type: 'string', size: 20, required: false }, // "17.37" format
+        { key: 'lastTwentyStarts', type: 'string', size: 30, required: false }, // "21331" format
+        { key: 'winPercentage', type: 'string', size: 10, required: false }, // "40%" format
+        { key: 'placePercentage', type: 'string', size: 10, required: false }, // "100%" format
+        { key: 'rating', type: 'string', size: 20, required: false },
+        { key: 'handicapRating', type: 'string', size: 20, required: false },
+        { key: 'classLevel', type: 'string', size: 20, required: false },
+        
+        // Current race day specific information
+        { key: 'firstStartIndicator', type: 'boolean', required: false, default: false },
+        { key: 'formComment', type: 'string', size: 500, required: false },
+        
+        // Silk and visual information
+        { key: 'silkColours', type: 'string', size: 100, required: false },
+        { key: 'silkUrl64', type: 'string', size: 500, required: false },
+        { key: 'silkUrl128', type: 'string', size: 500, required: false },
+        
         // Import and update metadata
         { key: 'lastUpdated', type: 'datetime', required: false },
         { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
         { key: 'importedAt', type: 'datetime', required: false },
     ];
+    // Create attributes with progress tracking
+    let attributesCreated = 0;
+    const totalNewAttributes = requiredAttributes.length;
+    
     for (const attr of requiredAttributes) {
         if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
-            context.log(`Creating entrants attribute: ${attr.key}`);
-            if (attr.type === 'string') {
-                await databases.createStringAttribute(config.databaseId, collectionId, attr.key, attr.size, attr.required);
-            }
-            else if (attr.type === 'integer') {
-                await databases.createIntegerAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-            else if (attr.type === 'float') {
-                await databases.createFloatAttribute(config.databaseId, collectionId, attr.key, attr.required);
-            }
-            else if (attr.type === 'boolean') {
-                await databases.createBooleanAttribute(config.databaseId, collectionId, attr.key, attr.required, attr.default);
+            context.log(`Creating entrants attribute (${attributesCreated + 1}/${totalNewAttributes}): ${attr.key}`);
+            const startTime = Date.now();
+            
+            try {
+                if (attr.type === 'string') {
+                    await databases.createStringAttribute(config.databaseId, collectionId, attr.key, attr.size, attr.required);
+                }
+                else if (attr.type === 'integer') {
+                    await databases.createIntegerAttribute(config.databaseId, collectionId, attr.key, attr.required);
+                }
+                else if (attr.type === 'float') {
+                    await databases.createFloatAttribute(config.databaseId, collectionId, attr.key, attr.required);
+                }
+                else if (attr.type === 'boolean') {
+                    await databases.createBooleanAttribute(config.databaseId, collectionId, attr.key, attr.required, attr.default);
+                }
+                else if (attr.type === 'datetime') {
+                    await databases.createDatetimeAttribute(config.databaseId, collectionId, attr.key, attr.required);
+                }
+                
+                const duration = Date.now() - startTime;
+                context.log(`Created attribute ${attr.key} in ${duration}ms`);
+                attributesCreated++;
+            } catch (error) {
+                context.error(`Failed to create attribute ${attr.key}`, {
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    type: attr.type,
+                    duration: Date.now() - startTime
+                });
             }
         }
+    }
+    
+    if (attributesCreated > 0) {
+        context.log(`Created ${attributesCreated} new entrant attributes`);
     }
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'race'))) {
         context.log('Creating entrants->races relationship...');
@@ -526,6 +599,16 @@ async function ensureOddsHistoryCollection(databases, config, context) {
             context.log('eventTimestamp attribute is not available for index creation, skipping idx_timestamp index');
         }
     }
+    // Note: Appwrite does not support creating compound indexes that include relationship attributes.
+    // This limitation means that queries requiring both eventTimestamp and entrant fields cannot leverage
+    // a single compound index for optimized performance. Instead, such queries may require scanning
+    // multiple records, which could impact performance for large datasets.
+    // 
+    // Workarounds:
+    // 1. Use the existing idx_timestamp index on eventTimestamp for time-based queries.
+    // 2. For cross-entrant queries, use the entrant relationship field directly and filter results in code.
+    // 3. If performance becomes an issue, consider denormalizing data or creating additional collections
+    //    to store pre-aggregated or indexed data for specific query patterns.
 }
 async function ensureMoneyFlowHistoryCollection(databases, config, context) {
     const collectionId = collections.moneyFlowHistory;
@@ -540,13 +623,18 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
         ]);
     }
     const requiredAttributes = [
-        { key: 'holdPercentage', type: 'float', required: true },
+        { key: 'holdPercentage', type: 'float', required: false }, // Optional - used for hold_percentage data
+        { key: 'betPercentage', type: 'float', required: false },  // Optional - used for bet_percentage data
         { key: 'eventTimestamp', type: 'datetime', required: true },
+        { key: 'type', type: 'string', size: 20, required: true }, // Enum: 'hold_percentage' or 'bet_percentage'
     ];
     for (const attr of requiredAttributes) {
         if (!(await attributeExists(databases, config.databaseId, collectionId, attr.key))) {
             context.log(`Creating money flow history attribute: ${attr.key}`);
-            if (attr.type === 'datetime') {
+            if (attr.type === 'string') {
+                await databases.createStringAttribute(config.databaseId, collectionId, attr.key, attr.size, attr.required);
+            }
+            else if (attr.type === 'datetime') {
                 await databases.createDatetimeAttribute(config.databaseId, collectionId, attr.key, attr.required);
             }
             else if (attr.type === 'float') {
@@ -574,6 +662,16 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
             context.log('eventTimestamp attribute is not available for index creation, skipping idx_timestamp index');
         }
     }
+    // Note: Appwrite does not support creating compound indexes that include relationship attributes.
+    // This limitation means that queries requiring both eventTimestamp and entrant fields cannot leverage
+    // a single compound index for optimized performance. Instead, such queries may require scanning
+    // multiple records, which could impact performance for large datasets.
+    // 
+    // Workarounds:
+    // 1. Use the existing idx_timestamp index on eventTimestamp for time-based queries.
+    // 2. For cross-entrant queries, use the entrant relationship field directly and filter results in code.
+    // 3. If performance becomes an issue, consider denormalizing data or creating additional collections
+    //    to store pre-aggregated or indexed data for specific query patterns.
 }
 async function ensureUserAlertConfigsCollection(databases, config, context) {
     const collectionId = collections.userAlertConfigs;

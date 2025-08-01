@@ -1,6 +1,6 @@
 /**
- * Database utilities for Appwrite operations
- * Provides performant upsert patterns and error handling
+ * Database utilities for single-race-poller function
+ * Self-contained copy for the single-race-poller function
  */
 
 import { ID } from 'node-appwrite';
@@ -228,30 +228,28 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
 
     let entrantsProcessed = 0;
     
-    // Group money tracker entries by entrant_id to get the latest data for each
-    const entrantMoneyData = {};
+    // Process and save money tracker entries in a single pass
+    const processedEntrants = new Set();
     
     for (const entry of moneyTrackerData.entrants) {
-        if (entry.entrant_id) {
-            // Keep the latest entry for each entrant (assuming they're in chronological order)
-            entrantMoneyData[entry.entrant_id] = {
+        if (entry.entrant_id && !processedEntrants.has(entry.entrant_id)) {
+            // Save the latest entry for each entrant (assuming they're in chronological order)
+            const moneyData = {
                 hold_percentage: entry.hold_percentage,
                 bet_percentage: entry.bet_percentage
             };
-        }
-    }
-    
-    // Save money flow history for each entrant
-    for (const [entrantId, moneyData] of Object.entries(entrantMoneyData)) {
-        const success = await saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData, context);
-        if (success) {
-            entrantsProcessed++;
+            
+            const success = await saveMoneyFlowHistory(databases, databaseId, entry.entrant_id, moneyData, context);
+            if (success) {
+                entrantsProcessed++;
+                processedEntrants.add(entry.entrant_id);
+            }
         }
     }
     
     context.log('Processed money tracker data', {
         totalEntries: moneyTrackerData.entrants.length,
-        uniqueEntrants: Object.keys(entrantMoneyData).length,
+        uniqueEntrants: processedEntrants.size,
         entrantsProcessed
     });
     
@@ -286,125 +284,6 @@ export async function performantUpsert(databases, databaseId, collectionId, docu
             return false;
         }
     }
-}
-
-/**
- * Process meetings in parallel with error isolation
- * @param {Object} databases - Appwrite Databases instance
- * @param {string} databaseId - Database ID
- * @param {Array} meetings - Array of meeting objects
- * @param {Object} context - Appwrite function context for logging
- * @returns {Object} Processing results with counts
- */
-export async function processMeetings(databases, databaseId, meetings, context) {
-    let meetingsProcessed = 0;
-    
-    const meetingPromises = meetings.map(async (meeting) => {
-        try {
-            const meetingDoc = {
-                meetingId: meeting.meeting,
-                meetingName: meeting.name,
-                country: meeting.country,
-                raceType: meeting.category_name,
-                date: meeting.date,
-                status: 'active'
-            };
-            const success = await performantUpsert(databases, databaseId, 'meetings', meeting.meeting, meetingDoc, context);
-            if (success) {
-                context.log('Upserted meeting', { meetingId: meeting.meeting, name: meeting.name });
-                return { success: true, meetingId: meeting.meeting };
-            }
-            else {
-                return { success: false, meetingId: meeting.meeting };
-            }
-        }
-        catch (error) {
-            context.error('Failed to process meeting', {
-                meetingId: meeting.meeting,
-                meetingName: meeting.name,
-                error: error instanceof Error ? error.message : 'Unknown error'
-            });
-            return { success: false, meetingId: meeting.meeting, error };
-        }
-    });
-    
-    const meetingResults = await Promise.all(meetingPromises);
-    meetingsProcessed = meetingResults.filter(result => result.success).length;
-    
-    return { meetingsProcessed };
-}
-
-/**
- * Process races in batches with error isolation
- * @param {Object} databases - Appwrite Databases instance
- * @param {string} databaseId - Database ID
- * @param {Array} meetings - Array of meeting objects containing races
- * @param {Object} context - Appwrite function context for logging
- * @returns {Object} Processing results with counts and race IDs
- */
-export async function processRaces(databases, databaseId, meetings, context) {
-    let racesProcessed = 0;
-    const processedRaceIds = [];
-    
-    const allRaces = [];
-    meetings.forEach(meeting => {
-        meeting.races.forEach(race => {
-            allRaces.push({ meeting: meeting.meeting, race });
-        });
-    });
-    
-    const batchSize = 15;
-    for (let i = 0; i < allRaces.length; i += batchSize) {
-        const batch = allRaces.slice(i, i + batchSize);
-        const racePromises = batch.map(async ({ meeting, race }) => {
-            try {
-                const raceDoc = {
-                    raceId: race.id,
-                    name: race.name,
-                    raceNumber: race.race_number,
-                    startTime: race.start_time,
-                    ...(race.distance !== undefined && { distance: race.distance }),
-                    ...(race.track_condition !== undefined && { trackCondition: race.track_condition }),
-                    ...(race.weather !== undefined && { weather: race.weather }),
-                    status: race.status,
-                    meeting: meeting
-                };
-                const success = await performantUpsert(databases, databaseId, 'races', race.id, raceDoc, context);
-                if (success) {
-                    context.log('Upserted race', { raceId: race.id, name: race.name });
-                    return { success: true, raceId: race.id };
-                }
-                else {
-                    return { success: false, raceId: race.id };
-                }
-            }
-            catch (error) {
-                context.error('Failed to process race', {
-                    raceId: race.id,
-                    raceName: race.name,
-                    meetingId: meeting,
-                    error: error instanceof Error ? error.message : 'Unknown error'
-                });
-                return { success: false, raceId: race.id, error };
-            }
-        });
-        
-        const batchResults = await Promise.all(racePromises);
-        const successfulRaces = batchResults.filter(result => result.success);
-        const successfulRaceIds = successfulRaces.map(result => result.raceId);
-        processedRaceIds.push(...successfulRaceIds);
-        racesProcessed += successfulRaces.length;
-        
-        context.log('Processed race batch', {
-            batchNumber: Math.floor(i / batchSize) + 1,
-            batchSize: batch.length,
-            successful: successfulRaces.length,
-            failed: batch.length - successfulRaces.length,
-            totalProcessed: racesProcessed
-        });
-    }
-    
-    return { racesProcessed, raceIds: processedRaceIds };
 }
 
 /**

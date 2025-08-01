@@ -4,6 +4,29 @@
  */
 
 /**
+ * Safely convert and truncate a field to string with max length
+ * @param {any} value - The value to process
+ * @param {number} maxLength - Maximum allowed length
+ * @returns {string|undefined} Processed string or undefined if no value
+ */
+function safeStringField(value, maxLength) {
+    if (value === null || value === undefined) {
+        return undefined;
+    }
+    
+    let stringValue;
+    if (typeof value === 'string') {
+        stringValue = value;
+    } else if (typeof value === 'object') {
+        stringValue = JSON.stringify(value);
+    } else {
+        stringValue = String(value);
+    }
+    
+    return stringValue.length > maxLength ? stringValue.substring(0, maxLength) : stringValue;
+}
+
+/**
  * Performant upsert operation: try update first, create on 404
  * @param {Object} databases - Appwrite Databases instance
  * @param {string} databaseId - Database ID
@@ -19,6 +42,15 @@ export async function performantUpsert(databases, databaseId, collectionId, docu
         return true;
     }
     catch (error) {
+        // Log the update error for debugging
+        if (error && typeof error === 'object' && 'code' in error && error.code !== 404) {
+            context.error(`Update failed for ${collectionId} document (non-404 error)`, {
+                documentId,
+                updateError: error instanceof Error ? error.message : 'Unknown error',
+                errorCode: error.code
+            });
+        }
+        
         try {
             await databases.createDocument(databaseId, collectionId, documentId, data);
             return true;
@@ -153,47 +185,127 @@ export async function processRaces(databases, databaseId, meetings, context) {
 }
 
 /**
- * Process entrants for a specific race using existing database schema
+ * Process entrants for a specific race with comprehensive runner data
  * @param {Object} databases - Appwrite Databases instance
  * @param {string} databaseId - Database ID
  * @param {string} raceId - Race ID
- * @param {Array} entrants - Array of entrant objects
+ * @param {Array} entrants - Array of entrant objects from NZTAB API
  * @param {Object} context - Appwrite function context for logging
  * @returns {number} Number of entrants processed
  */
 export async function processEntrants(databases, databaseId, raceId, entrants, context) {
     let entrantsProcessed = 0;
     
-    context.log(`Processing ${entrants.length} entrants for race ${raceId}`);
+    context.log(`Processing ${entrants.length} entrants for race ${raceId} with comprehensive data`);
     
-    // Process each entrant using simple schema that matches existing database
+    // Process each entrant (runner) with comprehensive data
     for (const entrant of entrants) {
         try {
-            // Use minimal schema - only fields that definitely exist
             const entrantDoc = {
                 entrantId: entrant.entrant_id,
                 name: entrant.name,
                 runnerNumber: entrant.runner_number,
+                barrier: entrant.barrier,
                 isScratched: entrant.is_scratched || false,
+                isLateScratched: entrant.is_late_scratched || false,
+                isEmergency: entrant.is_emergency || false,
                 race: raceId
             };
+
+            // Current race day status
+            if (entrant.scratch_time) entrantDoc.scratchTime = entrant.scratch_time;
+            if (entrant.emergency_position) entrantDoc.emergencyPosition = entrant.emergency_position;
+            const runnerChange = safeStringField(entrant.runner_change, 500);
+            if (runnerChange) entrantDoc.runnerChange = runnerChange;
+            if (entrant.first_start_indicator) entrantDoc.firstStartIndicator = entrant.first_start_indicator;
+            
+            // Current race connections
+            const jockey = safeStringField(entrant.jockey, 255);
+            if (jockey) entrantDoc.jockey = jockey;
+            const trainerName = safeStringField(entrant.trainer_name, 255);
+            if (trainerName) entrantDoc.trainerName = trainerName;
+            const trainerLocation = safeStringField(entrant.trainer_location, 255);
+            if (trainerLocation) entrantDoc.trainerLocation = trainerLocation;
+            if (entrant.apprentice_indicator) entrantDoc.apprenticeIndicator = entrant.apprentice_indicator;
+            const gear = safeStringField(entrant.gear, 200);
+            if (gear) entrantDoc.gear = gear;
+            
+            // Weight information
+            if (entrant.weight?.allocated) entrantDoc.allocatedWeight = entrant.weight.allocated;
+            if (entrant.weight?.total) entrantDoc.totalWeight = entrant.weight.total;
+            if (entrant.allowance_weight) entrantDoc.allowanceWeight = entrant.allowance_weight;
+            
+            // Market information
+            if (entrant.market_name) entrantDoc.marketName = entrant.market_name;
+            if (entrant.primary_market !== undefined) entrantDoc.primaryMarket = entrant.primary_market;
+            if (entrant.favourite !== undefined) entrantDoc.favourite = entrant.favourite;
+            if (entrant.mover !== undefined) entrantDoc.mover = entrant.mover;
+            
+            // Current odds (frequently updated)
+            if (entrant.odds) {
+                if (entrant.odds.fixed_win !== undefined) entrantDoc.fixedWinOdds = entrant.odds.fixed_win;
+                if (entrant.odds.fixed_place !== undefined) entrantDoc.fixedPlaceOdds = entrant.odds.fixed_place;
+                if (entrant.odds.pool_win !== undefined) entrantDoc.poolWinOdds = entrant.odds.pool_win;
+                if (entrant.odds.pool_place !== undefined) entrantDoc.poolPlaceOdds = entrant.odds.pool_place;
+            }
+            
+            // Speedmap positioning
+            if (entrant.speedmap?.settling_lengths !== undefined) entrantDoc.settlingLengths = entrant.speedmap.settling_lengths;
+            
+            // Static entrant information (rarely changes)
+            if (entrant.age) entrantDoc.age = entrant.age;
+            if (entrant.sex) entrantDoc.sex = entrant.sex;
+            if (entrant.colour) entrantDoc.colour = entrant.colour;
+            if (entrant.foaling_date) entrantDoc.foalingDate = entrant.foaling_date;
+            if (entrant.sire) entrantDoc.sire = entrant.sire;
+            if (entrant.dam) entrantDoc.dam = entrant.dam;
+            if (entrant.breeding) entrantDoc.breeding = entrant.breeding;
+            const owners = safeStringField(entrant.owners, 255);
+            if (owners) entrantDoc.owners = owners;
+            if (entrant.country) entrantDoc.country = entrant.country;
+            
+            // Performance and form data (summarized for storage)
+            if (entrant.prize_money) entrantDoc.prizeMoney = entrant.prize_money;
+            if (entrant.best_time) entrantDoc.bestTime = entrant.best_time;
+            if (entrant.last_twenty_starts) entrantDoc.lastTwentyStarts = entrant.last_twenty_starts;
+            if (entrant.win_p) entrantDoc.winPercentage = entrant.win_p;
+            if (entrant.place_p) entrantDoc.placePercentage = entrant.place_p;
+            if (entrant.rating) entrantDoc.rating = entrant.rating;
+            if (entrant.handicap_rating) entrantDoc.handicapRating = entrant.handicap_rating;
+            if (entrant.class_level) entrantDoc.classLevel = entrant.class_level;
+            const formComment = safeStringField(entrant.form_comment, 500);
+            if (formComment) entrantDoc.formComment = formComment;
+            
+            // Silk and visual information
+            const silkColours = safeStringField(entrant.silk_colours, 100);
+            if (silkColours) entrantDoc.silkColours = silkColours;
+            if (entrant.silk_url_64x64) entrantDoc.silkUrl64 = entrant.silk_url_64x64;
+            if (entrant.silk_url_128x128) entrantDoc.silkUrl128 = entrant.silk_url_128x128;
+            
+            // Import metadata
+            entrantDoc.lastUpdated = new Date().toISOString();
+            entrantDoc.dataSource = 'NZTAB';
+            entrantDoc.importedAt = new Date().toISOString();
 
             const success = await performantUpsert(databases, databaseId, 'entrants', entrant.entrant_id, entrantDoc, context);
             if (success) {
                 entrantsProcessed++;
-                context.log('Upserted entrant', { 
+                context.log('Upserted comprehensive entrant data', { 
                     entrantId: entrant.entrant_id, 
                     name: entrant.name,
-                    raceId: raceId
+                    raceId: raceId,
+                    fixedWinOdds: entrantDoc.fixedWinOdds,
+                    isScratched: entrantDoc.isScratched
                 });
             }
         } catch (error) {
             context.error('Failed to process entrant', {
                 entrantId: entrant.entrant_id,
-                entrantName: entrant.name,
+                entrantName: entrant.name || 'Unknown',
                 raceId: raceId,
                 error: error instanceof Error ? error.message : 'Unknown error'
             });
+            // Continue with next entrant
         }
     }
     
@@ -243,7 +355,7 @@ export async function processDetailedRaces(databases, databaseId, detailedRaces,
                 ...(detailedData.type && { type: detailedData.type }),
                 ...(detailedData.start_type && { startType: detailedData.start_type }),
                 ...(detailedData.group && { group: detailedData.group }),
-                ...(detailedData.class && { class: detailedData.class }),
+                ...(detailedData.class && { class: safeStringField(detailedData.class, 20) }),
                 ...(detailedData.gait && { gait: detailedData.gait }),
                 
                 // Prize and field information
@@ -256,7 +368,7 @@ export async function processDetailedRaces(databases, databaseId, detailedRaces,
                 ...(detailedData.gender_conditions && { genderConditions: detailedData.gender_conditions }),
                 ...(detailedData.age_conditions && { ageConditions: detailedData.age_conditions }),
                 ...(detailedData.weight_and_handicap_conditions && { weightConditions: detailedData.weight_and_handicap_conditions }),
-                ...(detailedData.allowance_conditions !== undefined && { allowanceConditions: detailedData.allowance_conditions }),
+                ...(detailedData.allowance_conditions !== undefined && { allowanceConditions: Boolean(detailedData.allowance_conditions) }),
                 ...(detailedData.special_conditions && { specialConditions: detailedData.special_conditions }),
                 ...(detailedData.jockey_conditions && { jockeyConditions: detailedData.jockey_conditions }),
                 
