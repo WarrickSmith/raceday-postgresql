@@ -5,7 +5,7 @@ import { MeetingsListClient } from '@/components/dashboard/MeetingsListClient';
 import { MeetingsListSkeleton } from '@/components/skeletons/MeetingCardSkeleton';
 
 export const metadata: Metadata = {
-  title: 'Race Day - Today&apos;s Meetings',
+  title: "Race Day - Today's Meetings",
   description: 'View today&apos;s race meetings in chronological order with real-time updates',
   keywords: ['horse racing', 'harness racing', 'Australia', 'New Zealand', 'race meetings'],
 };
