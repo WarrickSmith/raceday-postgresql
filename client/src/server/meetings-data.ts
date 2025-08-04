@@ -26,7 +26,7 @@ export async function getMeetingsData(): Promise<Meeting[]> {
       [
         Query.equal('date', todayDateTime),
         Query.equal('country', ['AUS', 'NZ']),
-        Query.equal('category', [...SUPPORTED_RACE_TYPE_CODES]),
+        Query.equal('category', SUPPORTED_RACE_TYPE_CODES),
         Query.orderAsc('$createdAt'),
       ]
     );
