@@ -1,5 +1,6 @@
 import { getMeetingsData, getMeetingById } from '../meetings-data';
 import { createServerClient } from '@/lib/appwrite-server';
+import type { Databases } from 'node-appwrite';
 
 // Mock the Appwrite server client
 jest.mock('@/lib/appwrite-server', () => ({
@@ -14,7 +15,7 @@ jest.mock('@/lib/appwrite-server', () => ({
 const mockDatabases = {
   listDocuments: jest.fn(),
   getDocument: jest.fn(),
-};
+} as jest.Mocked<Pick<Databases, 'listDocuments' | 'getDocument'>>;
 
 const mockCreateServerClient = createServerClient as jest.MockedFunction<typeof createServerClient>;
 
@@ -22,7 +23,7 @@ describe('meetings-data', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCreateServerClient.mockResolvedValue({
-      databases: mockDatabases,
+      databases: mockDatabases as unknown as Databases,
     });
   });
 
@@ -31,7 +32,12 @@ describe('meetings-data', () => {
       const mockMeetings = [
         {
           $id: '1',
+          $sequence: 1,
+          $collectionId: 'meetings',
+          $databaseId: 'raceday-db',
           $createdAt: '2024-01-01T08:00:00Z',
+          $updatedAt: '2024-01-01T08:00:00Z',
+          $permissions: [],
           meetingId: 'meeting1',
           meetingName: 'Meeting 1',
           country: 'AU',
@@ -40,24 +46,47 @@ describe('meetings-data', () => {
         },
         {
           $id: '2',
+          $sequence: 2,
+          $collectionId: 'meetings',
+          $databaseId: 'raceday-db',
           $createdAt: '2024-01-01T06:00:00Z',
+          $updatedAt: '2024-01-01T06:00:00Z',
+          $permissions: [],
           meetingId: 'meeting2',
           meetingName: 'Meeting 2',
           country: 'NZ',
-          raceType: 'Harness',
+          raceType: 'Harness Horse Racing',
           date: '2024-01-01',
         },
       ];
 
       const mockRaces = [
-        { startTime: '2024-01-01T10:00:00Z' }, // Later race for meeting1
-        { startTime: '2024-01-01T09:00:00Z' }, // Earlier race for meeting2
+        { 
+          $id: 'race1',
+          $sequence: 1,
+          $collectionId: 'races',
+          $databaseId: 'raceday-db',
+          $createdAt: '2024-01-01T08:00:00Z',
+          $updatedAt: '2024-01-01T08:00:00Z',
+          $permissions: [],
+          startTime: '2024-01-01T10:00:00Z' 
+        }, // Later race for meeting1
+        { 
+          $id: 'race2',
+          $sequence: 2,
+          $collectionId: 'races',
+          $databaseId: 'raceday-db',
+          $createdAt: '2024-01-01T08:00:00Z',
+          $updatedAt: '2024-01-01T08:00:00Z',
+          $permissions: [],
+          startTime: '2024-01-01T09:00:00Z' 
+        }, // Earlier race for meeting2
       ];
 
       mockDatabases.listDocuments
-        .mockResolvedValueOnce({ documents: mockMeetings })
-        .mockResolvedValueOnce({ documents: [mockRaces[0]] }) // meeting1 races
-        .mockResolvedValueOnce({ documents: [mockRaces[1]] }); // meeting2 races
+        .mockResolvedValueOnce({ documents: mockMeetings, total: mockMeetings.length })
+        .mockResolvedValueOnce({ documents: [mockRaces[0]], total: 1 }) // meeting1 races
+        .mockResolvedValueOnce({ documents: [mockRaces[1]], total: 1 }); // meeting2 races
 
       const result = await getMeetingsData();
 
@@ -69,7 +98,7 @@ describe('meetings-data', () => {
     });
 
     it('should handle empty meetings response', async () => {
-      mockDatabases.listDocuments.mockResolvedValueOnce({ documents: [] });
+      mockDatabases.listDocuments.mockResolvedValueOnce({ documents: [], total: 0 });
 
       const result = await getMeetingsData();
 
@@ -88,7 +117,12 @@ describe('meetings-data', () => {
       const mockMeetings = [
         {
           $id: '1',
+          $sequence: 1,
+          $collectionId: 'meetings',
+          $databaseId: 'raceday-db',
           $createdAt: '2024-01-01T08:00:00Z',
+          $updatedAt: '2024-01-01T08:00:00Z',
+          $permissions: [],
           meetingId: 'meeting1',
           meetingName: 'Meeting 1',
           country: 'AU',
@@ -98,7 +132,7 @@ describe('meetings-data', () => {
       ];
 
       mockDatabases.listDocuments
-        .mockResolvedValueOnce({ documents: mockMeetings })
+        .mockResolvedValueOnce({ documents: mockMeetings, total: mockMeetings.length })
         .mockRejectedValueOnce(new Error('Race fetch error'));
 
       const result = await getMeetingsData();
@@ -112,6 +146,12 @@ describe('meetings-data', () => {
     it('should fetch meeting by ID', async () => {
       const mockMeeting = {
         $id: '1',
+        $sequence: 1,
+        $collectionId: 'meetings',
+        $databaseId: 'raceday-db',
+        $createdAt: '2024-01-01T08:00:00Z',
+        $updatedAt: '2024-01-01T08:00:00Z',
+        $permissions: [],
         meetingId: 'meeting1',
         meetingName: 'Test Meeting',
       };

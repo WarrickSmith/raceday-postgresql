@@ -1,6 +1,7 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useRealtimeMeetings } from '../useRealtimeMeetings';
 import { client, databases } from '@/lib/appwrite-client';
+import type { RealtimeResponseEvent, Models } from 'appwrite';
 
 // Mock Appwrite client
 jest.mock('@/lib/appwrite-client', () => ({
@@ -83,15 +84,24 @@ describe('useRealtimeMeetings', () => {
 
   it.skip('should handle meeting creation events', async () => {
     const mockUnsubscribe = jest.fn();
-    let subscriptionCallback: (response: { events: string[]; payload: unknown }) => void;
+    let subscriptionCallback: (response: RealtimeResponseEvent<unknown>) => void;
     
-    mockClient.subscribe.mockImplementation((_channels, callback: (response: { events: string[]; payload: unknown }) => void) => {
+    mockClient.subscribe.mockImplementation((_channels, callback: (response: RealtimeResponseEvent<unknown>) => void) => {
       subscriptionCallback = callback;
       return mockUnsubscribe;
     });
 
     mockDatabases.listDocuments.mockResolvedValue({
-      documents: [{ startTime: '2024-01-01T09:00:00Z' } as unknown],
+      documents: [{ 
+        $id: 'race1',
+        $sequence: 1,
+        $createdAt: '2024-01-01T08:00:00Z',
+        $updatedAt: '2024-01-01T08:00:00Z',
+        $collectionId: 'races',
+        $databaseId: 'raceday-db',
+        $permissions: [],
+        startTime: '2024-01-01T09:00:00Z' 
+      } as Models.Document],
       total: 1,
     });
 
@@ -117,6 +127,8 @@ describe('useRealtimeMeetings', () => {
     await act(async () => {
       subscriptionCallback!({
         events: ['databases.raceday-db.collections.meetings.documents.create'],
+        channels: ['databases.raceday-db.collections.meetings.documents'],
+        timestamp: Date.now(),
         payload: newMeeting,
       });
     });
@@ -152,15 +164,24 @@ describe('useRealtimeMeetings', () => {
 
   it.skip('should handle race time updates', async () => {
     const mockUnsubscribe = jest.fn();
-    let subscriptionCallback: (response: { events: string[]; payload: unknown }) => void;
+    let subscriptionCallback: (response: RealtimeResponseEvent<unknown>) => void;
     
-    mockClient.subscribe.mockImplementation((_channels, callback: (response: { events: string[]; payload: unknown }) => void) => {
+    mockClient.subscribe.mockImplementation((_channels, callback: (response: RealtimeResponseEvent<unknown>) => void) => {
       subscriptionCallback = callback;
       return mockUnsubscribe;
     });
 
     mockDatabases.listDocuments.mockResolvedValue({
-      documents: [{ startTime: '2024-01-01T08:30:00Z' } as unknown], // Earlier time
+      documents: [{ 
+        $id: 'race2',
+        $sequence: 2,
+        $createdAt: '2024-01-01T08:00:00Z',
+        $updatedAt: '2024-01-01T08:00:00Z',
+        $collectionId: 'races',
+        $databaseId: 'raceday-db',
+        $permissions: [],
+        startTime: '2024-01-01T08:30:00Z' 
+      } as Models.Document], // Earlier time
       total: 1,
     });
 
@@ -181,6 +202,8 @@ describe('useRealtimeMeetings', () => {
     await act(async () => {
       subscriptionCallback!({
         events: ['databases.raceday-db.collections.races.documents.update'],
+        channels: ['databases.raceday-db.collections.races.documents'],
+        timestamp: Date.now(),
         payload: raceUpdate,
       });
     });
