@@ -9,14 +9,17 @@ export async function getMeetingsData(): Promise<Meeting[]> {
     const today = new Date().toLocaleDateString('en-CA', {
       timeZone: 'Pacific/Auckland',
     });
-    // Query meetings for current day
+    
+    // Convert to datetime format to match database storage format
+    const todayDateTime = `${today}T00:00:00.000+00:00`;
+    // Query meetings for current day using datetime format
     const meetingsResponse = await databases.listDocuments(
       'raceday-db',
       'meetings',
       [
-        Query.equal('date', today),
+        Query.equal('date', todayDateTime),
         Query.equal('country', ['AUS', 'NZ']),
-        Query.equal('raceType', ['Thoroughbred Horse Racing', 'Harness']),
+        Query.equal('raceType', ['Thoroughbred Horse Racing', 'Harness Horse Racing']),
         Query.orderAsc('$createdAt'),
       ]
     );
