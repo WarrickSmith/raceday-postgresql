@@ -3,6 +3,12 @@ import { Meeting, Race } from '@/types/meetings';
 
 export async function getMeetingsData(): Promise<Meeting[]> {
   try {
+    // Check if we're in a build environment without proper env vars
+    if (!process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || !process.env.APPWRITE_API_KEY) {
+      console.warn('Appwrite environment variables not available, returning empty meetings data');
+      return [];
+    }
+    
     const { databases } = await createServerClient();
     
     // Get today's date using New Zealand timezone (consistent with server functions)
@@ -71,6 +77,12 @@ export async function getMeetingsData(): Promise<Meeting[]> {
 
 export async function getMeetingById(meetingId: string): Promise<Meeting | null> {
   try {
+    // Check if we're in a build environment without proper env vars
+    if (!process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || !process.env.APPWRITE_API_KEY) {
+      console.warn('Appwrite environment variables not available, returning null');
+      return null;
+    }
+    
     const { databases } = await createServerClient();
     
     const meeting = await databases.getDocument('raceday-db', 'meetings', meetingId);
