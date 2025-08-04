@@ -5,9 +5,10 @@ export async function getMeetingsData(): Promise<Meeting[]> {
   try {
     const { databases } = await createServerClient();
     
-    // Get today's date in ISO format
-    const today = new Date().toISOString().split('T')[0];
-    
+    // Get today's date using New Zealand timezone (consistent with server functions)
+    const today = new Date().toLocaleDateString('en-CA', {
+      timeZone: 'Pacific/Auckland',
+    });
     // Query meetings for current day
     const meetingsResponse = await databases.listDocuments(
       'raceday-db',
