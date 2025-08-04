@@ -106,14 +106,21 @@ describe('meetings-data', () => {
     });
 
     it('should handle database errors gracefully', async () => {
+      // Mock console.error to suppress expected error output
+      console.error = jest.fn();
+      
       mockDatabases.listDocuments.mockRejectedValueOnce(new Error('Database error'));
 
       const result = await getMeetingsData();
 
       expect(result).toEqual([]);
+      expect(console.error).toHaveBeenCalledWith('Error fetching meetings data:', expect.any(Error));
     });
 
     it('should handle race fetching errors for individual meetings', async () => {
+      // Mock console.error to suppress expected error output
+      console.error = jest.fn();
+      
       const mockMeetings = [
         {
           $id: '1',
@@ -139,6 +146,7 @@ describe('meetings-data', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].firstRaceTime).toBe('2024-01-01T08:00:00Z'); // Falls back to created time
+      expect(console.error).toHaveBeenCalledWith('Error fetching races for meeting meeting1:', expect.any(Error));
     });
   });
 
@@ -165,11 +173,15 @@ describe('meetings-data', () => {
     });
 
     it('should return null on error', async () => {
+      // Mock console.error to suppress expected error output
+      console.error = jest.fn();
+      
       mockDatabases.getDocument.mockRejectedValueOnce(new Error('Not found'));
 
       const result = await getMeetingById('invalid-id');
 
       expect(result).toBeNull();
+      expect(console.error).toHaveBeenCalledWith('Error fetching meeting invalid-id:', expect.any(Error));
     });
   });
 });

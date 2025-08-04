@@ -22,7 +22,7 @@ export function MeetingCardSkeleton() {
 
 export function MeetingsListSkeleton() {
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="meetings-skeleton">
       {Array.from({ length: 6 }, (_, i) => (
         <MeetingCardSkeleton key={i} />
       ))}

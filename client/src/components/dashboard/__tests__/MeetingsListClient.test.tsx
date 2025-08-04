@@ -67,6 +67,10 @@ describe('MeetingsListClient', () => {
   });
 
   it('should display error banner when error occurs', async () => {
+    // Mock console.error to suppress expected error output
+    const originalConsoleError = console.error;
+    console.error = jest.fn();
+    
     const mockRetry = jest.fn();
     mockUseRealtimeMeetings.mockReturnValue({
       meetings: mockMeetings,
@@ -98,6 +102,9 @@ describe('MeetingsListClient', () => {
     const retryButton = screen.getByText('Retry');
     fireEvent.click(retryButton);
     expect(mockRetry).toHaveBeenCalled();
+    
+    // Restore console.error
+    console.error = originalConsoleError;
   });
 
   it('should show empty state when no meetings', () => {
