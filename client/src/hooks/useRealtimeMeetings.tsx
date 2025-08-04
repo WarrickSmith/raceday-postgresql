@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { client, databases, Query } from '@/lib/appwrite-client';
 import { Meeting, Race } from '@/types/meetings';
+import { SUPPORTED_RACE_TYPE_CODES } from '@/constants/raceTypes';
 
 interface UseRealtimeMeetingsOptions {
   initialData: Meeting[];
@@ -94,8 +95,8 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
             const today = new Date().toISOString().split('T')[0];
             if (meeting.date === today && 
                 ['AUS', 'NZ'].includes(meeting.country) &&
-                // Use consistent race type filtering to match server implementation
-                ['Thoroughbred Horse Racing', 'Harness Horse Racing'].includes(meeting.raceType)) {
+                // Use category codes for consistent filtering
+                SUPPORTED_RACE_TYPE_CODES.includes(meeting.category)) {
               
               // Get first race time for chronological sorting
               const firstRaceTime = await fetchFirstRaceTime(meeting.meetingId);

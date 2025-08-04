@@ -3,6 +3,7 @@
 import { memo } from 'react';
 import { Meeting } from '@/types/meetings';
 import { AU, NZ } from 'country-flag-icons/react/3x2';
+import { getRaceTypeDisplay } from '@/constants/raceTypes';
 
 interface MeetingCardProps {
   meeting: Meeting;
@@ -59,15 +60,9 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
     );
   };
 
-  const getRaceTypeDisplay = (raceType: string) => {
-    switch (raceType) {
-      case 'Thoroughbred Horse Racing':
-        return 'Thoroughbred';
-      case 'Harness':
-        return 'Harness';
-      default:
-        return raceType;
-    }
+  const getDisplayRaceType = (meeting: Meeting): string => {
+    // Use category code for consistent display, fallback to raceType for legacy data
+    return meeting.category ? getRaceTypeDisplay(meeting.category) : meeting.raceType;
   };
 
   const getMeetingStatus = () => {
@@ -104,7 +99,7 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
             {meeting.meetingName}
           </h3>
           <p className="text-sm text-gray-600 mt-1">
-            {getRaceTypeDisplay(meeting.raceType)}
+            {getDisplayRaceType(meeting)}
           </p>
         </div>
         

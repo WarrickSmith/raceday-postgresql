@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { MeetingCard } from '../MeetingCard';
 import { Meeting } from '@/types/meetings';
+import { RACE_TYPE_CODES } from '@/constants/raceTypes';
 
 describe('MeetingCard', () => {
   const mockMeeting: Meeting = {
@@ -11,6 +12,7 @@ describe('MeetingCard', () => {
     meetingName: 'Flemington Race Meeting',
     country: 'AUS',
     raceType: 'Thoroughbred Horse Racing',
+    category: RACE_TYPE_CODES.THOROUGHBRED,
     date: '2024-01-01',
     firstRaceTime: '2024-01-01T10:00:00Z',
   };
@@ -71,7 +73,11 @@ describe('MeetingCard', () => {
   });
 
   it('should display race type correctly for Harness racing', () => {
-    const harnessMeeting = { ...mockMeeting, raceType: 'Harness' };
+    const harnessMeeting = { 
+      ...mockMeeting, 
+      raceType: 'Harness Horse Racing', 
+      category: RACE_TYPE_CODES.HARNESS 
+    };
     
     render(<MeetingCard meeting={harnessMeeting} />);
     

@@ -1,6 +1,7 @@
 import { getMeetingsData, getMeetingById } from '../meetings-data';
 import { createServerClient } from '@/lib/appwrite-server';
 import type { Databases } from 'node-appwrite';
+import { RACE_TYPE_CODES } from '@/constants/raceTypes';
 
 // Mock the Appwrite server client
 jest.mock('@/lib/appwrite-server', () => ({
@@ -42,6 +43,7 @@ describe('meetings-data', () => {
           meetingName: 'Meeting 1',
           country: 'AU',
           raceType: 'Thoroughbred Horse Racing',
+          category: RACE_TYPE_CODES.THOROUGHBRED,
           date: '2024-01-01',
         },
         {
@@ -56,6 +58,7 @@ describe('meetings-data', () => {
           meetingName: 'Meeting 2',
           country: 'NZ',
           raceType: 'Harness Horse Racing',
+          category: RACE_TYPE_CODES.HARNESS,
           date: '2024-01-01',
         },
       ];
@@ -134,6 +137,7 @@ describe('meetings-data', () => {
           meetingName: 'Meeting 1',
           country: 'AU',
           raceType: 'Thoroughbred Horse Racing',
+          category: RACE_TYPE_CODES.THOROUGHBRED,
           date: '2024-01-01',
         },
       ];
@@ -162,6 +166,10 @@ describe('meetings-data', () => {
         $permissions: [],
         meetingId: 'meeting1',
         meetingName: 'Test Meeting',
+        raceType: 'Thoroughbred Horse Racing',
+        category: RACE_TYPE_CODES.THOROUGHBRED,
+        country: 'AU',
+        date: '2024-01-01',
       };
 
       mockDatabases.getDocument.mockResolvedValueOnce(mockMeeting);

@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MeetingsListClient } from '../MeetingsListClient';
 import { useRealtimeMeetings } from '@/hooks/useRealtimeMeetings';
 import { Meeting } from '@/types/meetings';
+import { RACE_TYPE_CODES } from '@/constants/raceTypes';
 
 // Mock the real-time hook
 jest.mock('@/hooks/useRealtimeMeetings');
@@ -18,6 +19,7 @@ describe('MeetingsListClient', () => {
       meetingName: 'Flemington Race Meeting',
       country: 'AU',
       raceType: 'Thoroughbred Horse Racing',
+      category: RACE_TYPE_CODES.THOROUGHBRED,
       date: '2024-01-01',
       firstRaceTime: '2024-01-01T10:00:00Z',
     },
@@ -28,7 +30,8 @@ describe('MeetingsListClient', () => {
       meetingId: 'meeting2', 
       meetingName: 'Addington Harness',
       country: 'NZ',
-      raceType: 'Harness',
+      raceType: 'Harness Horse Racing',
+      category: RACE_TYPE_CODES.HARNESS,
       date: '2024-01-01',
       firstRaceTime: '2024-01-01T09:00:00Z',
     },

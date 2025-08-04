@@ -2,6 +2,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { useRealtimeMeetings } from '../useRealtimeMeetings';
 import { client, databases } from '@/lib/appwrite-client';
 import type { RealtimeResponseEvent, Models } from 'appwrite';
+import { RACE_TYPE_CODES } from '@/constants/raceTypes';
 
 // Mock Appwrite client
 jest.mock('@/lib/appwrite-client', () => ({
@@ -31,6 +32,7 @@ describe('useRealtimeMeetings', () => {
       meetingName: 'Test Meeting 1',
       country: 'AU',
       raceType: 'Thoroughbred Horse Racing',
+      category: RACE_TYPE_CODES.THOROUGHBRED,
       date: '2024-01-01',
       firstRaceTime: '2024-01-01T10:00:00Z',
     },
@@ -121,6 +123,7 @@ describe('useRealtimeMeetings', () => {
       meetingName: 'Test Meeting 2',
       country: 'NZ',
       raceType: 'Harness Horse Racing',
+      category: RACE_TYPE_CODES.HARNESS,
       date: '2024-01-01',
     };
 

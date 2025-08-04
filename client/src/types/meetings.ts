@@ -1,3 +1,7 @@
+import type { SUPPORTED_RACE_TYPE_CODES } from '@/constants/raceTypes';
+
+type SupportedRaceTypeCode = typeof SUPPORTED_RACE_TYPE_CODES[number];
+
 export interface Meeting {
   $id: string;
   $createdAt: string;
@@ -6,6 +10,7 @@ export interface Meeting {
   meetingName: string;
   country: string;
   raceType: string;
+  category: SupportedRaceTypeCode; // Race type code: H or T (currently supported)
   date: string;
   firstRaceTime?: string;
 }

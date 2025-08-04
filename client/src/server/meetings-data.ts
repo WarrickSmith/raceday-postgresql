@@ -1,5 +1,6 @@
 import { createServerClient, Query } from '@/lib/appwrite-server';
 import { Meeting, Race } from '@/types/meetings';
+import { SUPPORTED_RACE_TYPE_CODES } from '@/constants/raceTypes';
 
 export async function getMeetingsData(): Promise<Meeting[]> {
   try {
@@ -25,7 +26,7 @@ export async function getMeetingsData(): Promise<Meeting[]> {
       [
         Query.equal('date', todayDateTime),
         Query.equal('country', ['AUS', 'NZ']),
-        Query.equal('raceType', ['Thoroughbred Horse Racing', 'Harness Horse Racing']),
+        Query.equal('category', [...SUPPORTED_RACE_TYPE_CODES]),
         Query.orderAsc('$createdAt'),
       ]
     );
