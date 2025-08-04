@@ -2,8 +2,8 @@
 
 import { memo } from 'react';
 import { Meeting } from '@/types/meetings';
-import { AU, NZ } from 'country-flag-icons/react/3x2';
 import { getRaceTypeDisplay } from '@/constants/raceTypes';
+import { getCountryInfo, normalizeCountryCode } from '@/constants/countries';
 
 interface MeetingCardProps {
   meeting: Meeting;
@@ -24,38 +24,28 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
   };
 
   const getCountryFlag = (country: string) => {
-    const countryUpper = country?.toUpperCase();
+    const countryInfo = getCountryInfo(country);
+    const normalizedCode = normalizeCountryCode(country);
     
-    // Use SVG flag icons for reliable cross-platform display
-    if (countryUpper === 'AUS' || countryUpper === 'AU' || countryUpper === 'AUSTRALIA') {
+    if (countryInfo) {
+      const FlagComponent = countryInfo.flag;
       return (
         <span className="flex items-center space-x-2">
-          <AU 
+          <FlagComponent 
             className="w-8 h-6 rounded border border-gray-200 shadow-sm" 
-            title="Australia"
-            aria-label="Australia flag"
+            title={countryInfo.name}
+            aria-label={`${countryInfo.name} flag`}
           />
-          <span className="text-xs font-semibold text-blue-600">AUS</span>
-        </span>
-      );
-    }
-    
-    if (countryUpper === 'NZ' || countryUpper === 'NZL' || countryUpper === 'NEW ZEALAND') {
-      return (
-        <span className="flex items-center space-x-2">
-          <NZ 
-            className="w-8 h-6 rounded border border-gray-200 shadow-sm" 
-            title="New Zealand"
-            aria-label="New Zealand flag"
-          />
-          <span className="text-xs font-semibold text-green-600">NZ</span>
+          <span className={`text-sm font-bold ${countryInfo.textColor}`}>
+            {normalizedCode}
+          </span>
         </span>
       );
     }
     
     return (
       <span className="text-xs font-semibold text-gray-600 bg-gray-200 px-2 py-1 rounded">
-        {countryUpper || 'Unknown'}
+        {normalizedCode || 'Unknown'}
       </span>
     );
   };

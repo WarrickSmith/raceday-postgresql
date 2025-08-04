@@ -108,4 +108,20 @@ describe('MeetingCard', () => {
     const heading = screen.getByRole('heading', { level: 3 });
     expect(heading).toHaveClass('truncate');
   });
+
+  it('should display country code text beside flag', () => {
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    // Check that the country code text is visible
+    expect(screen.getByText('AUS')).toBeInTheDocument();
+    expect(screen.getByText('AUS')).toHaveClass('text-blue-600', 'font-bold');
+  });
+
+  it('should display NZ country code for New Zealand', () => {
+    const nzMeeting = { ...mockMeeting, country: 'NZ' };
+    render(<MeetingCard meeting={nzMeeting} />);
+    
+    expect(screen.getByText('NZ')).toBeInTheDocument();
+    expect(screen.getByText('NZ')).toHaveClass('text-green-600', 'font-bold');
+  });
 });

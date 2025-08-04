@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { client, databases, Query } from '@/lib/appwrite-client';
 import { Meeting, Race } from '@/types/meetings';
 import { SUPPORTED_RACE_TYPE_CODES } from '@/constants/raceTypes';
+import { isSupportedCountry } from '@/constants/countries';
 
 interface UseRealtimeMeetingsOptions {
   initialData: Meeting[];
@@ -16,6 +17,11 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
   const [connectionAttempts, setConnectionAttempts] = useState(0);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Memoize today's date to avoid recalculation on every real-time update
+  const today = useMemo(() => {
+    return new Date().toISOString().split('T')[0];
+  }, []);
 
   // Exponential backoff for connection retry
   const getRetryDelay = useCallback((attempts: number) => {
@@ -92,9 +98,8 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
             const meeting = payload as Meeting;
             
             // Filter for today's meetings only
-            const today = new Date().toISOString().split('T')[0];
             if (meeting.date === today && 
-                ['AUS', 'NZ'].includes(meeting.country) &&
+                isSupportedCountry(meeting.country) &&
                 // Use category codes for consistent filtering
                 SUPPORTED_RACE_TYPE_CODES.includes(meeting.category)) {
               
@@ -164,7 +169,7 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
         setupSubscriptions();
       }, getRetryDelay(attempts));
     }
-  }, [connectionAttempts, getRetryDelay, updateMeetings, removeMeeting, fetchFirstRaceTime, onError]);
+  }, [connectionAttempts, getRetryDelay, updateMeetings, removeMeeting, fetchFirstRaceTime, onError, today]);
 
   // Initialize subscriptions
   useEffect(() => {

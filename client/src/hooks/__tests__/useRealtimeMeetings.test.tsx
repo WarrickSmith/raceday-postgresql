@@ -30,7 +30,7 @@ describe('useRealtimeMeetings', () => {
       $updatedAt: '2024-01-01T08:00:00Z',
       meetingId: 'meeting1',
       meetingName: 'Test Meeting 1',
-      country: 'AU',
+      country: 'AUS',
       raceType: 'Thoroughbred Horse Racing',
       category: RACE_TYPE_CODES.THOROUGHBRED,
       date: '2024-01-01',
