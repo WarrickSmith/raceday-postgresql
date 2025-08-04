@@ -144,6 +144,7 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
+          cache-dependency-path: ./server/race-data-poller/package-lock.json
       - name: Validate function configuration
         run: |
           test -f ../appwrite.json && echo "✓ consolidated appwrite.json exists" || exit 1
