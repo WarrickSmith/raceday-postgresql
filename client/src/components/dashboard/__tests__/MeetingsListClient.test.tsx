@@ -165,6 +165,7 @@ describe('MeetingsListClient', () => {
         meetingName: 'New Meeting',
         country: 'AU',
         raceType: 'Thoroughbred Horse Racing',
+        category: RACE_TYPE_CODES.THOROUGHBRED,
         date: '2024-01-01',
         firstRaceTime: '2024-01-01T08:00:00Z',
       },
