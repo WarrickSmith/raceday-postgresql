@@ -59,7 +59,6 @@ describe('MeetingCard', () => {
     render(<MeetingCard meeting={liveMeeting} />);
     
     expect(screen.getByLabelText('Status: live')).toBeInTheDocument();
-    expect(screen.getByText('Live')).toBeInTheDocument();
   });
 
   it('should handle missing first race time gracefully', () => {

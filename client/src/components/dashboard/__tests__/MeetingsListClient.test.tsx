@@ -48,7 +48,7 @@ describe('MeetingsListClient', () => {
     render(<MeetingsListClient initialData={mockMeetings} />);
 
     expect(screen.getByText("Today's Race Meetings")).toBeInTheDocument();
-    expect(screen.getByText('Live')).toBeInTheDocument();
+    expect(screen.getByLabelText('Connected')).toBeInTheDocument();
     expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
     expect(screen.getByText('Addington Harness')).toBeInTheDocument();
   });
@@ -104,7 +104,7 @@ describe('MeetingsListClient', () => {
     mockUseRealtimeMeetings.mockReturnValue({
       meetings: [],
       isConnected: true,
-      connectionAttempts: 0,
+      connectionAttempts: 1, // Set to > 0 to avoid loading skeleton
       retry: jest.fn(),
     });
 
