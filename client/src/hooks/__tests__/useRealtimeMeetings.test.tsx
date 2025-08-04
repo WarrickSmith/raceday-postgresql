@@ -83,7 +83,7 @@ describe('useRealtimeMeetings', () => {
 
   it.skip('should handle meeting creation events', async () => {
     const mockUnsubscribe = jest.fn();
-    let subscriptionCallback: (response: { events: string[]; payload: any }) => void;
+    let subscriptionCallback: (response: { events: string[]; payload: unknown }) => void;
     
     mockClient.subscribe.mockImplementation((_channels, callback) => {
       subscriptionCallback = callback;
@@ -91,7 +91,7 @@ describe('useRealtimeMeetings', () => {
     });
 
     mockDatabases.listDocuments.mockResolvedValue({
-      documents: [{ startTime: '2024-01-01T09:00:00Z' } as any],
+      documents: [{ startTime: '2024-01-01T09:00:00Z' } as unknown],
       total: 1,
     });
 
@@ -152,7 +152,7 @@ describe('useRealtimeMeetings', () => {
 
   it.skip('should handle race time updates', async () => {
     const mockUnsubscribe = jest.fn();
-    let subscriptionCallback: (response: { events: string[]; payload: any }) => void;
+    let subscriptionCallback: (response: { events: string[]; payload: unknown }) => void;
     
     mockClient.subscribe.mockImplementation((_channels, callback) => {
       subscriptionCallback = callback;
@@ -160,7 +160,7 @@ describe('useRealtimeMeetings', () => {
     });
 
     mockDatabases.listDocuments.mockResolvedValue({
-      documents: [{ startTime: '2024-01-01T08:30:00Z' } as any], // Earlier time
+      documents: [{ startTime: '2024-01-01T08:30:00Z' } as unknown], // Earlier time
       total: 1,
     });
 
