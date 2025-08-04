@@ -85,7 +85,7 @@ describe('useRealtimeMeetings', () => {
     const mockUnsubscribe = jest.fn();
     let subscriptionCallback: (response: { events: string[]; payload: unknown }) => void;
     
-    mockClient.subscribe.mockImplementation((_channels, callback) => {
+    mockClient.subscribe.mockImplementation((_channels, callback: (response: { events: string[]; payload: unknown }) => void) => {
       subscriptionCallback = callback;
       return mockUnsubscribe;
     });
@@ -110,7 +110,7 @@ describe('useRealtimeMeetings', () => {
       meetingId: 'meeting2',
       meetingName: 'Test Meeting 2',
       country: 'NZ',
-      raceType: 'Harness',
+      raceType: 'Harness Horse Racing',
       date: '2024-01-01',
     };
 
@@ -154,7 +154,7 @@ describe('useRealtimeMeetings', () => {
     const mockUnsubscribe = jest.fn();
     let subscriptionCallback: (response: { events: string[]; payload: unknown }) => void;
     
-    mockClient.subscribe.mockImplementation((_channels, callback) => {
+    mockClient.subscribe.mockImplementation((_channels, callback: (response: { events: string[]; payload: unknown }) => void) => {
       subscriptionCallback = callback;
       return mockUnsubscribe;
     });

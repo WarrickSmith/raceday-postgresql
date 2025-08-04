@@ -94,7 +94,7 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
             const today = new Date().toISOString().split('T')[0];
             if (meeting.date === today && 
                 ['AUS', 'NZ'].includes(meeting.country) &&
-                ['Thoroughbred Horse Racing', 'Harness'].includes(meeting.raceType)) {
+                ['Thoroughbred Horse Racing', 'Harness Horse Racing'].includes(meeting.raceType)) {
               
               // Get first race time for chronological sorting
               const firstRaceTime = await fetchFirstRaceTime(meeting.meetingId);
