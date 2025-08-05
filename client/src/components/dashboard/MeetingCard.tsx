@@ -1,18 +1,17 @@
 'use client';
 
 import { memo, useState, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { Meeting } from '@/types/meetings';
 import { getRaceTypeDisplay } from '@/constants/raceTypes';
 import { getCountryInfo, normalizeCountryCode } from '@/constants/countries';
+import { RaceCardListSkeleton } from '@/components/skeletons/RaceCardSkeleton';
 
-// Direct import for debugging - bypass dynamic loading
-import { RacesList } from './RacesList';
-
-// // Lazy load RacesList component with next/dynamic for performance
-// const RacesList = dynamic(() => import('./RacesList').then(mod => ({ default: mod.RacesList })), {
-//   loading: () => <RaceCardListSkeleton count={5} />,
-//   ssr: false, // Client-side only for interactive expansion
-// });
+// Lazy load RacesList component with next/dynamic for performance
+const RacesList = dynamic(() => import('./RacesList').then(mod => ({ default: mod.RacesList })), {
+  loading: () => <RaceCardListSkeleton count={5} />,
+  ssr: false, // Client-side only for interactive expansion
+});
 
 interface MeetingCardProps {
   meeting: Meeting;

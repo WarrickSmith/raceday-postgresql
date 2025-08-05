@@ -13,51 +13,55 @@ expect.extend(toHaveNoViolations);
 jest.mock('@/hooks/useRacesForMeeting');
 const mockUseRacesForMeeting = useRacesForMeeting as jest.MockedFunction<typeof useRacesForMeeting>;
 
-// Mock the RacesList component directly
-jest.mock('../RacesList', () => ({
-  RacesList: ({ meetingId }: { meetingId: string }) => {
-    const { races, isLoading } = mockUseRacesForMeeting({ meetingId });
-    
-    if (isLoading) {
+// Mock the dynamic import with accessibility attributes
+jest.mock('next/dynamic', () => {
+  return () => {
+    const Component = ({ meetingId }: { meetingId: string }) => {
+      const { races, isLoading } = mockUseRacesForMeeting({ meetingId });
+      
+      if (isLoading) {
+        return (
+          <div 
+            data-testid={`races-list-${meetingId}`}
+            role="region"
+            aria-label="Loading races..."
+            aria-live="polite"
+          >
+            Loading races...
+          </div>
+        );
+      }
+
       return (
         <div 
           data-testid={`races-list-${meetingId}`}
           role="region"
-          aria-label="Loading races..."
-          aria-live="polite"
+          aria-label="Races for this meeting"
+          id={`races-${meetingId}`}
         >
-          Loading races...
+          <div className="sr-only" aria-live="polite">
+            {races.length} races scheduled
+          </div>
+          {races.map((race) => (
+            <div 
+              key={race.raceId} 
+              data-testid={`race-${race.raceId}`}
+              role="article"
+              aria-labelledby={`race-title-${race.raceId}`}
+              tabIndex={0}
+            >
+              <h4 id={`race-title-${race.raceId}`}>{race.name}</h4>
+              <span aria-label={`Race number ${race.raceNumber}`}>{race.raceNumber}</span>
+              <span aria-label={`Race status: ${race.status}`}>{race.status}</span>
+            </div>
+          ))}
         </div>
       );
-    }
-
-    return (
-      <div 
-        data-testid={`races-list-${meetingId}`}
-        role="region"
-        aria-label="Races for this meeting"
-        id={`races-${meetingId}`}
-      >
-        <div className="sr-only" aria-live="polite">
-          {races.length} races scheduled
-        </div>
-        {races.map((race) => (
-          <div 
-            key={race.raceId} 
-            data-testid={`race-${race.raceId}`}
-            role="article"
-            aria-labelledby={`race-title-${race.raceId}`}
-            tabIndex={0}
-          >
-            <h4 id={`race-title-${race.raceId}`}>{race.name}</h4>
-            <span aria-label={`Race number ${race.raceNumber}`}>{race.raceNumber}</span>
-            <span aria-label={`Race status: ${race.status}`}>{race.status}</span>
-          </div>
-        ))}
-      </div>
-    );
-  },
-}));
+    };
+    Component.displayName = 'MockedRacesList';
+    return Component;
+  };
+});
 
 describe('MeetingCard Accessibility Tests', () => {
   const mockMeeting: Meeting = {
