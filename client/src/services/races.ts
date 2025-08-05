@@ -19,18 +19,20 @@ if (process.env.NODE_ENV === 'development') {
  */
 
 // Debug helper - only available in development
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  window.debugRaceFetch = async (meetingId = '44f3707e-49a3-4b16-b6c3-456b8a1f9e9d') => {
-    try {
-      console.log('🔍 Debug: Testing race fetch for meetingId:', meetingId);
-      const result = await fetchRacesForMeeting(meetingId);
-      console.log('🔍 Debug: Race fetch result:', result.length, 'races');
-      return result;
-    } catch (error) {
-      console.error('🔍 Debug: Race fetch failed:', error);
-      return [];
-    }
-  };
+if (process.env.NODE_ENV === 'development') {
+  if (typeof window !== 'undefined') {
+    window.debugRaceFetch = async (meetingId = '44f3707e-49a3-4b16-b6c3-456b8a1f9e9d') => {
+      try {
+        console.log('🔍 Debug: Testing race fetch for meetingId:', meetingId);
+        const result = await fetchRacesForMeeting(meetingId);
+        console.log('🔍 Debug: Race fetch result:', result.length, 'races');
+        return result;
+      } catch (error) {
+        console.error('🔍 Debug: Race fetch failed:', error);
+        return [];
+      }
+    };
+  }
 }
 
 export interface RaceServiceError {
