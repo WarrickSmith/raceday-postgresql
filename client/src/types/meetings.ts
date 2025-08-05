@@ -21,7 +21,8 @@ export interface Race {
   $updatedAt: string;
   raceId: string;
   raceNumber: number;
-  raceName: string;
+  name: string;  // Race name field from database
+  raceName?: string;  // Optional legacy field
   startTime: string;
   meeting: string;
   status: string;
@@ -29,4 +30,9 @@ export interface Race {
 
 export interface MeetingWithRaces extends Meeting {
   races: Race[];
+}
+
+export interface MeetingWithExpandState extends Meeting {
+  isExpanded?: boolean;
+  races?: Race[];
 }
