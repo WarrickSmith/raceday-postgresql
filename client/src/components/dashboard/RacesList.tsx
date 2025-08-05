@@ -126,9 +126,6 @@ function RacesListComponent({
   // Sort races by race number to ensure correct order
   const sortedRaces = [...races].sort((a, b) => a.raceNumber - b.raceNumber);
 
-  // Performance optimization: For meetings with many races (>10), show notice
-  const shouldShowNotice = sortedRaces.length > 10;
-
   return (
     <div 
       className="mt-4 pl-6 border-l-2 border-blue-100"
@@ -143,15 +140,6 @@ function RacesListComponent({
           {sortedRaces.length} race{sortedRaces.length !== 1 ? 's' : ''} scheduled
         </p>
       </div>
-
-      {/* Performance notice for large race lists */}
-      {shouldShowNotice && (
-        <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">
-            This meeting has {sortedRaces.length} races. All races are shown for complete information.
-          </p>
-        </div>
-      )}
 
       {/* Races list */}
       <div className="space-y-2" data-testid={`races-list-${meetingId}`}>

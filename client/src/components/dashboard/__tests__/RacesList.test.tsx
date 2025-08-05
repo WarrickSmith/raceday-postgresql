@@ -124,7 +124,7 @@ describe('RacesList', () => {
     expect(screen.getByTestId('race-card-R002')).toBeInTheDocument();
   });
 
-  it('should show performance notice for many races', () => {
+  it('should handle many races without performance notice', () => {
     const manyRaces = Array.from({ length: 12 }, (_, i) => ({
       ...mockRaces[0],
       $id: `race${i + 1}`,
@@ -142,7 +142,9 @@ describe('RacesList', () => {
 
     render(<RacesList meetingId="meeting1" />);
 
-    expect(screen.getByText('This meeting has 12 races. All races are shown for complete information.')).toBeInTheDocument();
+    // Should render all races without any performance notice
+    expect(screen.getAllByTestId(/^race-card-/).length).toBe(12);
+    expect(screen.queryByText(/This meeting has \d+ races/)).not.toBeInTheDocument();
   });
 
   it('should pass onClick handler to race cards', () => {
