@@ -3,16 +3,12 @@ import { MeetingCard } from '../MeetingCard';
 import { Meeting } from '@/types/meetings';
 import { RACE_TYPE_CODES } from '@/constants/raceTypes';
 
-// Mock the dynamic RacesList import
-jest.mock('next/dynamic', () => {
-  return () => {
-    const Component = ({ meetingId }: { meetingId: string }) => (
-      <div data-testid={`races-list-${meetingId}`}>Mocked RacesList</div>
-    );
-    Component.displayName = 'MockedRacesList';
-    return Component;
-  };
-});
+// Mock the RacesList component directly
+jest.mock('../RacesList', () => ({
+  RacesList: ({ meetingId }: { meetingId: string }) => (
+    <div data-testid={`races-list-${meetingId}`}>Mocked RacesList</div>
+  ),
+}));
 
 describe('MeetingCard', () => {
   const mockMeeting: Meeting = {
