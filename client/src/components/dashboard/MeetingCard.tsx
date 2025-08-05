@@ -158,12 +158,14 @@ function MeetingCardComponent({ meeting, onRaceClick }: MeetingCardProps) {
           
           {/* Expand/Collapse Button */}
           <button
+            type="button"
             onClick={toggleExpanded}
             onKeyDown={handleKeyDown}
             className="p-2 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors"
             aria-expanded={isExpanded}
             aria-label={isExpanded ? 'Collapse races' : 'Expand to show races'}
             title={isExpanded ? 'Hide races' : 'Show races'}
+            tabIndex={0}
           >
             <svg 
               className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${

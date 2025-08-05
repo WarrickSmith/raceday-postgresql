@@ -18,8 +18,8 @@ if (process.env.NODE_ENV === 'development') {
  * Race data service functions for client-side operations
  */
 
-// Simple browser test to verify race fetching without recursion
-if (typeof window !== 'undefined') {
+// Debug helper - only available in development
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   window.debugRaceFetch = async (meetingId = '44f3707e-49a3-4b16-b6c3-456b8a1f9e9d') => {
     try {
       console.log('🔍 Debug: Testing race fetch for meetingId:', meetingId);
@@ -74,27 +74,29 @@ export async function fetchRacesForMeeting(meetingId: string): Promise<Race[]> {
         ]);
         
         // Filter races by meetingId on the client side
-        const filteredRaces = allRacesResponse.documents.filter((race: any) => {
+        const filteredRaces = allRacesResponse.documents.filter((race: Record<string, unknown>) => {
           // Check if meeting is a string ID
           if (typeof race.meeting === 'string') {
             return race.meeting === meetingId;
           }
           
           // Check if meeting is an object with meetingId property
-          if (typeof race.meeting === 'object' && race.meeting?.meetingId) {
-            return race.meeting.meetingId === meetingId;
+          if (typeof race.meeting === 'object' && race.meeting && 'meetingId' in race.meeting) {
+            return (race.meeting as Record<string, unknown>).meetingId === meetingId;
           }
           
           // Check if meeting is an object with $id property
-          if (typeof race.meeting === 'object' && race.meeting?.$id) {
-            return race.meeting.$id === meetingId;
+          if (typeof race.meeting === 'object' && race.meeting && '$id' in race.meeting) {
+            return (race.meeting as Record<string, unknown>).$id === meetingId;
           }
           
           return false;
         });
         
         // Sort by race number
-        filteredRaces.sort((a: any, b: any) => a.raceNumber - b.raceNumber);
+        filteredRaces.sort((a: Record<string, unknown>, b: Record<string, unknown>) =>
+          (a.raceNumber as number) - (b.raceNumber as number)
+        );
         
         response = { documents: filteredRaces };
         
@@ -114,7 +116,8 @@ export async function fetchRacesForMeeting(meetingId: string): Promise<Race[]> {
     if (process.env.NODE_ENV === 'development') {
       console.error('🚨 Error fetching races:', error);
     }
-    throw new Error(`Failed to fetch races: ${error}`);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`Failed to fetch races: ${errorMessage}`);
   }
 }
 
