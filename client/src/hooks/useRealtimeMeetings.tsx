@@ -5,6 +5,7 @@ import { client, databases, Query } from '@/lib/appwrite-client';
 import { Meeting, Race } from '@/types/meetings';
 import { SUPPORTED_RACE_TYPE_CODES } from '@/constants/raceTypes';
 import { isSupportedCountry } from '@/constants/countries';
+import { updateRaceInCache } from './useRacesForMeeting';
 
 interface UseRealtimeMeetingsOptions {
   initialData: Meeting[];
@@ -120,9 +121,14 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
             }
           }
           
-          // Handle race updates (for first race time changes)
+          // Handle race updates (for first race time changes and cache updates)
           if (events.some(e => e.includes('races.documents'))) {
             const race = payload as Race;
+            
+            // Update race cache for expanded meetings
+            if (events.some(e => e.includes('.update'))) {
+              updateRaceInCache(race.meeting, race);
+            }
             
             // Update meeting's first race time if this affects it
             setMeetings(prev => {
