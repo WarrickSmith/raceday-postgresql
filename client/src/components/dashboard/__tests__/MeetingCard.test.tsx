@@ -1,7 +1,18 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MeetingCard } from '../MeetingCard';
 import { Meeting } from '@/types/meetings';
 import { RACE_TYPE_CODES } from '@/constants/raceTypes';
+
+// Mock the dynamic RacesList import
+jest.mock('next/dynamic', () => {
+  return () => {
+    const Component = ({ meetingId }: { meetingId: string }) => (
+      <div data-testid={`races-list-${meetingId}`}>Mocked RacesList</div>
+    );
+    Component.displayName = 'MockedRacesList';
+    return Component;
+  };
+});
 
 describe('MeetingCard', () => {
   const mockMeeting: Meeting = {
@@ -123,5 +134,121 @@ describe('MeetingCard', () => {
     
     expect(screen.getByText('NZ')).toBeInTheDocument();
     expect(screen.getByText('NZ')).toHaveClass('text-green-600', 'font-bold');
+  });
+
+  it('should render expand/collapse button', () => {
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
+    expect(expandButton).toBeInTheDocument();
+    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('should toggle expand/collapse state when button is clicked', async () => {
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
+    
+    // Initially collapsed
+    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId(`races-list-${mockMeeting.meetingId}`)).not.toBeInTheDocument();
+    
+    // Click to expand
+    fireEvent.click(expandButton);
+    
+    expect(expandButton).toHaveAttribute('aria-expanded', 'true');
+    expect(expandButton).toHaveAccessibleName(/collapse races/i);
+    
+    // Wait for RacesList to be rendered
+    await waitFor(() => {
+      expect(screen.getByTestId(`races-list-${mockMeeting.meetingId}`)).toBeInTheDocument();
+    });
+    
+    // Click to collapse
+    fireEvent.click(expandButton);
+    
+    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
+    expect(expandButton).toHaveAccessibleName(/expand to show races/i);
+  });
+
+  it('should handle keyboard navigation for expand/collapse', async () => {
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
+    
+    // Test Enter key
+    fireEvent.keyDown(expandButton, { key: 'Enter' });
+    
+    expect(expandButton).toHaveAttribute('aria-expanded', 'true');
+    
+    await waitFor(() => {
+      expect(screen.getByTestId(`races-list-${mockMeeting.meetingId}`)).toBeInTheDocument();
+    });
+    
+    // Test Space key to collapse
+    fireEvent.keyDown(expandButton, { key: ' ' });
+    
+    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('should show chevron icon with correct rotation', () => {
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
+    const chevronIcon = expandButton.querySelector('svg');
+    
+    expect(chevronIcon).toBeInTheDocument();
+    expect(chevronIcon).toHaveClass('transition-transform');
+    
+    // Click to expand and check rotation
+    fireEvent.click(expandButton);
+    
+    expect(chevronIcon).toHaveClass('rotate-180');
+  });
+
+  it('should lazy load RacesList only when expanded', async () => {
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    // RacesList should not be in DOM initially
+    expect(screen.queryByTestId(`races-list-${mockMeeting.meetingId}`)).not.toBeInTheDocument();
+    
+    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
+    fireEvent.click(expandButton);
+    
+    // RacesList should be lazy loaded after expansion
+    await waitFor(() => {
+      expect(screen.getByTestId(`races-list-${mockMeeting.meetingId}`)).toBeInTheDocument();
+    });
+  });
+
+  it('should maintain expand state during re-renders', async () => {
+    const { rerender } = render(<MeetingCard meeting={mockMeeting} />);
+    
+    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
+    
+    // Expand the meeting
+    fireEvent.click(expandButton);
+    expect(expandButton).toHaveAttribute('aria-expanded', 'true');
+    
+    await waitFor(() => {
+      expect(screen.getByTestId(`races-list-${mockMeeting.meetingId}`)).toBeInTheDocument();
+    });
+    
+    // Re-render with updated meeting data (simulating real-time update)
+    const updatedMeeting = { ...mockMeeting, $updatedAt: '2024-01-01T09:00:00Z' };
+    rerender(<MeetingCard meeting={updatedMeeting} />);
+    
+    // Expand state should be maintained
+    expect(screen.getByRole('button', { name: /collapse races/i })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId(`races-list-${mockMeeting.meetingId}`)).toBeInTheDocument();
+  });
+
+  it('should have proper accessibility attributes for expand/collapse', () => {
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
+    
+    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
+    expect(expandButton).toHaveAttribute('aria-label', 'Expand to show races');
   });
 });
