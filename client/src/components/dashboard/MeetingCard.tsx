@@ -1,15 +1,38 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useState, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { Meeting } from '@/types/meetings';
 import { getRaceTypeDisplay } from '@/constants/raceTypes';
 import { getCountryInfo, normalizeCountryCode } from '@/constants/countries';
+import { RaceCardListSkeleton } from '@/components/skeletons/RaceCardSkeleton';
+
+// Lazy load RacesList component with next/dynamic for performance
+const RacesList = dynamic(() => import('./RacesList').then(mod => ({ default: mod.RacesList })), {
+  loading: () => <RaceCardListSkeleton count={5} />,
+  ssr: false, // Client-side only for interactive expansion
+});
 
 interface MeetingCardProps {
   meeting: Meeting;
+  onRaceClick?: (raceId: string) => void;
 }
 
-function MeetingCardComponent({ meeting }: MeetingCardProps) {
+function MeetingCardComponent({ meeting, onRaceClick }: MeetingCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Toggle expand/collapse state
+  const toggleExpanded = useCallback(() => {
+    setIsExpanded(prev => !prev);
+  }, []);
+
+  // Handle keyboard navigation
+  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggleExpanded();
+    }
+  }, [toggleExpanded]);
   const formatTime = (dateTimeString: string) => {
     try {
       const date = new Date(dateTimeString);
@@ -123,14 +146,55 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
           </span>
         </div>
         
-        <time 
-          dateTime={meeting.firstRaceTime}
-          className="text-sm font-medium text-gray-900"
-          aria-label={`First race at ${formatTime(meeting.firstRaceTime || meeting.$createdAt)}`}
-        >
-          {formatTime(meeting.firstRaceTime || meeting.$createdAt)}
-        </time>
+        <div className="flex items-center space-x-3">
+          <time 
+            dateTime={meeting.firstRaceTime}
+            className="text-sm font-medium text-gray-900"
+            aria-label={`First race at ${formatTime(meeting.firstRaceTime || meeting.$createdAt)}`}
+          >
+            {formatTime(meeting.firstRaceTime || meeting.$createdAt)}
+          </time>
+          
+          {/* Expand/Collapse Button */}
+          <button
+            type="button"
+            onClick={toggleExpanded}
+            onKeyDown={handleKeyDown}
+            className="p-2 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors"
+            aria-expanded={isExpanded}
+            aria-label={isExpanded ? 'Collapse races' : 'Expand to show races'}
+            title={isExpanded ? 'Hide races' : 'Show races'}
+            tabIndex={0}
+          >
+            <svg 
+              className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${
+                isExpanded ? 'rotate-180' : 'rotate-0'
+              }`}
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M19 9l-7 7-7-7" 
+              />
+            </svg>
+          </button>
+        </div>
       </div>
+
+      {/* Races List - Only render when expanded */}
+      {isExpanded && (
+        <div className="mt-4 transition-all duration-300 ease-in-out">
+          <RacesList 
+            meetingId={meeting.meetingId}
+            onRaceClick={onRaceClick}
+          />
+        </div>
+      )}
     </article>
   );
 }
@@ -141,6 +205,7 @@ export const MeetingCard = memo(MeetingCardComponent, (prevProps, nextProps) => 
   return (
     prevProps.meeting.$id === nextProps.meeting.$id &&
     prevProps.meeting.$updatedAt === nextProps.meeting.$updatedAt &&
-    prevProps.meeting.firstRaceTime === nextProps.meeting.firstRaceTime
+    prevProps.meeting.firstRaceTime === nextProps.meeting.firstRaceTime &&
+    prevProps.onRaceClick === nextProps.onRaceClick
   );
 });
