@@ -239,12 +239,54 @@ export const MeetingCard = memo(MeetingCardComponent, (prevProps, nextProps) => 
     prevProps.onCollapse === nextProps.onCollapse
   );
   
-  // Polling info changes frequently, so shallow comparison
-  const pollingEqual = (
-    prevProps.pollingInfo === nextProps.pollingInfo ||
-    (prevProps.pollingInfo?.performanceMetrics === nextProps.pollingInfo?.performanceMetrics &&
-     prevProps.pollingInfo?.pollingStates === nextProps.pollingInfo?.pollingStates)
-  );
+  // Polling info deep comparison to prevent unnecessary re-renders
+  const pollingEqual = (() => {
+    if (prevProps.pollingInfo === nextProps.pollingInfo) return true;
+    if (!prevProps.pollingInfo && !nextProps.pollingInfo) return true;
+    if (!prevProps.pollingInfo || !nextProps.pollingInfo) return false;
+    
+    // Compare triggerManualPoll function reference
+    if (prevProps.pollingInfo.triggerManualPoll !== nextProps.pollingInfo.triggerManualPoll) {
+      return false;
+    }
+    
+    // Deep compare performance metrics if both exist
+    const prevMetrics = prevProps.pollingInfo.performanceMetrics as Record<string, unknown>;
+    const nextMetrics = nextProps.pollingInfo.performanceMetrics as Record<string, unknown>;
+    
+    if (prevMetrics && nextMetrics) {
+      const metricsEqual = (
+        prevMetrics.totalPolls === nextMetrics.totalPolls &&
+        prevMetrics.averageLatency === nextMetrics.averageLatency &&
+        prevMetrics.errorRate === nextMetrics.errorRate
+      );
+      if (!metricsEqual) return false;
+    } else if (prevMetrics !== nextMetrics) {
+      return false;
+    }
+    
+    // Deep compare polling states keys and basic properties
+    const prevStates = prevProps.pollingInfo.pollingStates as Record<string, unknown>;
+    const nextStates = nextProps.pollingInfo.pollingStates as Record<string, unknown>;
+    
+    if (prevStates && nextStates) {
+      const prevKeys = Object.keys(prevStates);
+      const nextKeys = Object.keys(nextStates);
+      if (prevKeys.length !== nextKeys.length) return false;
+      
+      for (const key of prevKeys) {
+        if (!nextKeys.includes(key)) return false;
+        // Basic comparison of polling state structure
+        const prevState = prevStates[key] as Record<string, unknown>;
+        const nextState = nextStates[key] as Record<string, unknown>;
+        if (typeof prevState !== typeof nextState) return false;
+      }
+    } else if (prevStates !== nextStates) {
+      return false;
+    }
+    
+    return true;
+  })();
   
   return meetingEqual && callbacksEqual && pollingEqual;
 });

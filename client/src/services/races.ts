@@ -163,6 +163,23 @@ export const RACE_STATUS = {
 export type RaceStatus = typeof RACE_STATUS[keyof typeof RACE_STATUS];
 
 /**
+ * Sanitize status value for safe logging to prevent XSS/information disclosure
+ * @param status - Raw status value to sanitize
+ * @returns string - Safe version for logging
+ */
+function sanitizeStatusForLogging(status: unknown): string {
+  if (status === null) return '[null]';
+  if (status === undefined) return '[undefined]';
+  if (typeof status === 'string') {
+    // Limit length and remove potentially dangerous characters
+    return status.slice(0, 50).replace(/[<>&"']/g, '');
+  }
+  if (typeof status === 'number') return String(status);
+  if (typeof status === 'boolean') return String(status);
+  return '[object]';
+}
+
+/**
  * Validate if a status string is a valid race status
  * @param status - Status string to validate
  * @returns boolean - True if status is valid
@@ -200,7 +217,7 @@ export function sanitizeRaceStatus(
   const upperStatus = normalizedStatus.toUpperCase();
   for (const validStatus of Object.values(RACE_STATUS)) {
     if (validStatus.toUpperCase() === upperStatus) {
-      console.warn(`Race status case mismatch: "${normalizedStatus}" corrected to "${validStatus}"`);
+      console.warn(`Race status case mismatch: "${sanitizeStatusForLogging(status)}" corrected to "${validStatus}"`);
       return validStatus;
     }
   }
@@ -233,12 +250,12 @@ export function sanitizeRaceStatus(
   
   const mappedStatus = statusMappings[normalizedStatus.toLowerCase().replace(/\s+/g, '')];
   if (mappedStatus) {
-    console.warn(`Race status mapped: "${normalizedStatus}" -> "${mappedStatus}"`);
+    console.warn(`Race status mapped: "${sanitizeStatusForLogging(status)}" -> "${mappedStatus}"`);
     return mappedStatus;
   }
   
   // If all else fails, use fallback and log error
-  console.error(`Invalid race status provided: "${normalizedStatus}", using fallback: "${fallback}"`);
+  console.error(`Invalid race status provided: "${sanitizeStatusForLogging(status)}", using fallback: "${fallback}"`);
   return fallback;
 }
 

@@ -203,8 +203,9 @@ export async function pollRace(raceId: string): Promise<PollRaceResponse | PollR
       // Construct function execution URL
       const functionUrl = `${endpoint}/functions/single-race-poller/executions`;
       
-      const executionPayload = {
-        body: JSON.stringify({ raceId }),
+      // Prepare the payload for function execution
+      const functionPayload = {
+        raceId,
         async: true, // Execute asynchronously for better performance
       };
 
@@ -222,7 +223,7 @@ export async function pollRace(raceId: string): Promise<PollRaceResponse | PollR
             'X-Appwrite-Project': projectId,
             'X-Appwrite-Key': apiKey,
           },
-          body: JSON.stringify(executionPayload),
+          body: JSON.stringify(functionPayload),
           signal: controller.signal,
         });
 
@@ -245,7 +246,7 @@ export async function pollRace(raceId: string): Promise<PollRaceResponse | PollR
           pollingTriggered: true,
           expectedLatency,
           nextPollRecommended,
-          executionId: executionResult.$id,
+          executionId: executionResult?.$id || 'unknown',
           processingTime: `${processingTime}ms`,
           urgency,
         } as PollRaceResponse;
