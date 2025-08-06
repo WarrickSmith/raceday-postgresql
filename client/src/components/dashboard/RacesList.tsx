@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo } from 'react';
+import React, { memo, useEffect } from 'react';
 import { RaceCard } from './RaceCard';
 import { RaceCardListSkeleton } from '@/components/skeletons/RaceCardSkeleton';
 import { useRacesForMeeting } from '@/hooks/useRacesForMeeting';
@@ -8,11 +8,13 @@ import { useRacesForMeeting } from '@/hooks/useRacesForMeeting';
 interface RacesListProps {
   meetingId: string;
   onRaceClick?: (raceId: string) => void;
+  onRacesLoaded?: (races: unknown) => void;
 }
 
 function RacesListComponent({ 
   meetingId, 
-  onRaceClick 
+  onRaceClick,
+  onRacesLoaded 
 }: RacesListProps) {
   // Only add debugging in development
   if (process.env.NODE_ENV === 'development') {
@@ -24,6 +26,13 @@ function RacesListComponent({
     meetingId,
     enabled: !!meetingId,
   });
+
+  // Call onRacesLoaded when races are loaded
+  useEffect(() => {
+    if (races.length > 0 && onRacesLoaded) {
+      onRacesLoaded(races);
+    }
+  }, [races, onRacesLoaded]);
   
   if (process.env.NODE_ENV === 'development') {
     console.log('📝 RacesList hook result:', { racesCount: races.length, isLoading, error });
@@ -160,6 +169,7 @@ export const RacesList = memo(RacesListComponent, (prevProps, nextProps) => {
   // Custom comparison function for optimization
   return (
     prevProps.meetingId === nextProps.meetingId &&
-    prevProps.onRaceClick === nextProps.onRaceClick
+    prevProps.onRaceClick === nextProps.onRaceClick &&
+    prevProps.onRacesLoaded === nextProps.onRacesLoaded
   );
 });

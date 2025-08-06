@@ -13,18 +13,39 @@ const RacesList = dynamic(() => import('./RacesList').then(mod => ({ default: mo
   ssr: false, // Client-side only for interactive expansion
 });
 
+interface PollingInfo {
+  triggerManualPoll: (raceId: string) => Promise<void>;
+  pollingStates: Record<string, unknown>;
+  performanceMetrics: Record<string, unknown>;
+}
+
 interface MeetingCardProps {
   meeting: Meeting;
   onRaceClick?: (raceId: string) => void;
+  onExpand?: (meetingId: string, races: unknown[]) => void;
+  onCollapse?: (meetingId: string) => void;
+  pollingInfo?: PollingInfo;
 }
 
-function MeetingCardComponent({ meeting, onRaceClick }: MeetingCardProps) {
+function MeetingCardComponent({ meeting, onRaceClick, onExpand, onCollapse, pollingInfo }: MeetingCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Suppress unused warning - pollingInfo is used in memo comparison
+  void pollingInfo;
 
   // Toggle expand/collapse state
   const toggleExpanded = useCallback(() => {
-    setIsExpanded(prev => !prev);
-  }, []);
+    const willExpand = !isExpanded;
+    setIsExpanded(willExpand);
+    
+    if (willExpand) {
+      // Will expand - races will be loaded by RacesList component
+      // The onExpand callback will be called when races are actually loaded
+    } else {
+      // Collapsing
+      onCollapse?.(meeting.meetingId);
+    }
+  }, [isExpanded, meeting.meetingId, onCollapse]);
 
   // Handle keyboard navigation
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
@@ -192,6 +213,10 @@ function MeetingCardComponent({ meeting, onRaceClick }: MeetingCardProps) {
           <RacesList 
             meetingId={meeting.meetingId}
             onRaceClick={onRaceClick}
+            onRacesLoaded={(loadedRaces) => {
+              const racesArray = Array.isArray(loadedRaces) ? loadedRaces : [];
+              onExpand?.(meeting.meetingId, racesArray);
+            }}
           />
         </div>
       )}
@@ -202,10 +227,66 @@ function MeetingCardComponent({ meeting, onRaceClick }: MeetingCardProps) {
 // Memoize component to prevent unnecessary re-renders
 export const MeetingCard = memo(MeetingCardComponent, (prevProps, nextProps) => {
   // Custom comparison function for optimization
-  return (
+  const meetingEqual = (
     prevProps.meeting.$id === nextProps.meeting.$id &&
     prevProps.meeting.$updatedAt === nextProps.meeting.$updatedAt &&
-    prevProps.meeting.firstRaceTime === nextProps.meeting.firstRaceTime &&
-    prevProps.onRaceClick === nextProps.onRaceClick
+    prevProps.meeting.firstRaceTime === nextProps.meeting.firstRaceTime
   );
+  
+  const callbacksEqual = (
+    prevProps.onRaceClick === nextProps.onRaceClick &&
+    prevProps.onExpand === nextProps.onExpand &&
+    prevProps.onCollapse === nextProps.onCollapse
+  );
+  
+  // Polling info deep comparison to prevent unnecessary re-renders
+  const pollingEqual = (() => {
+    if (prevProps.pollingInfo === nextProps.pollingInfo) return true;
+    if (!prevProps.pollingInfo && !nextProps.pollingInfo) return true;
+    if (!prevProps.pollingInfo || !nextProps.pollingInfo) return false;
+    
+    // Compare triggerManualPoll function reference
+    if (prevProps.pollingInfo.triggerManualPoll !== nextProps.pollingInfo.triggerManualPoll) {
+      return false;
+    }
+    
+    // Deep compare performance metrics if both exist
+    const prevMetrics = prevProps.pollingInfo.performanceMetrics as Record<string, unknown>;
+    const nextMetrics = nextProps.pollingInfo.performanceMetrics as Record<string, unknown>;
+    
+    if (prevMetrics && nextMetrics) {
+      const metricsEqual = (
+        prevMetrics.totalPolls === nextMetrics.totalPolls &&
+        prevMetrics.averageLatency === nextMetrics.averageLatency &&
+        prevMetrics.errorRate === nextMetrics.errorRate
+      );
+      if (!metricsEqual) return false;
+    } else if (prevMetrics !== nextMetrics) {
+      return false;
+    }
+    
+    // Deep compare polling states keys and basic properties
+    const prevStates = prevProps.pollingInfo.pollingStates as Record<string, unknown>;
+    const nextStates = nextProps.pollingInfo.pollingStates as Record<string, unknown>;
+    
+    if (prevStates && nextStates) {
+      const prevKeys = Object.keys(prevStates);
+      const nextKeys = Object.keys(nextStates);
+      if (prevKeys.length !== nextKeys.length) return false;
+      
+      for (const key of prevKeys) {
+        if (!nextKeys.includes(key)) return false;
+        // Basic comparison of polling state structure
+        const prevState = prevStates[key] as Record<string, unknown>;
+        const nextState = nextStates[key] as Record<string, unknown>;
+        if (typeof prevState !== typeof nextState) return false;
+      }
+    } else if (prevStates !== nextStates) {
+      return false;
+    }
+    
+    return true;
+  })();
+  
+  return meetingEqual && callbacksEqual && pollingEqual;
 });

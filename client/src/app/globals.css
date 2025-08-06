@@ -26,3 +26,160 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+/* Race Status Badge Components */
+.race-status-badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all duration-200 ease-in-out;
+}
+
+/* Status-specific animations and styling */
+.race-status-open {
+  @apply bg-green-100 text-green-800 border-green-200;
+}
+
+.race-status-closed {
+  @apply bg-yellow-100 text-yellow-800 border-yellow-200;
+  animation: gentle-pulse 2s ease-in-out infinite;
+}
+
+.race-status-running {
+  @apply bg-blue-100 text-blue-800 border-blue-200;
+  animation: running-pulse 1.5s ease-in-out infinite;
+}
+
+.race-status-interim {
+  @apply bg-purple-100 text-purple-800 border-purple-200;
+  animation: gentle-pulse 3s ease-in-out infinite;
+}
+
+.race-status-finalized {
+  @apply bg-gray-100 text-gray-800 border-gray-200;
+}
+
+.race-status-unknown {
+  @apply bg-gray-50 text-gray-600 border-gray-100;
+}
+
+/* Status indicator animations */
+@keyframes gentle-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes running-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.03);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+  }
+}
+
+/* Status transition animations */
+.race-status-transition {
+  animation: status-change 0.3s ease-in-out;
+}
+
+@keyframes status-change {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  .race-status-badge,
+  .race-status-transition {
+    animation: none;
+  }
+  
+  .race-status-closed,
+  .race-status-running,
+  .race-status-interim {
+    animation: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .race-status-open {
+    @apply bg-green-200 text-green-900 border-green-400;
+  }
+  
+  .race-status-closed {
+    @apply bg-yellow-200 text-yellow-900 border-yellow-400;
+  }
+  
+  .race-status-running {
+    @apply bg-blue-200 text-blue-900 border-blue-400;
+  }
+  
+  .race-status-interim {
+    @apply bg-purple-200 text-purple-900 border-purple-400;
+  }
+  
+  .race-status-finalized {
+    @apply bg-gray-200 text-gray-900 border-gray-400;
+  }
+}
+
+/* Focus indicators for interactive status badges */
+.race-status-badge:focus-visible {
+  @apply outline-2 outline-offset-2 outline-blue-500;
+}
+
+/* Status icon styling */
+.status-icon {
+  @apply w-2 h-2 rounded-full mr-1.5 flex-shrink-0;
+}
+
+.status-icon-running {
+  @apply bg-blue-400;
+  animation: icon-pulse 1s ease-in-out infinite;
+}
+
+.status-icon-closed {
+  @apply bg-yellow-400;
+  animation: icon-gentle-pulse 2s ease-in-out infinite;
+}
+
+@keyframes icon-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes icon-gentle-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Responsive adjustments for status badges */
+@media (max-width: 640px) {
+  .race-status-badge {
+    @apply px-2 py-0.5 text-xs;
+  }
+}
