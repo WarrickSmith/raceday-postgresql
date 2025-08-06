@@ -149,7 +149,7 @@ describe('RaceCard', () => {
       const invalidStatuses = ['invalid', '', null, undefined, 123, 'OPEN', 'open', 'Final'];
       
       invalidStatuses.forEach((invalidStatus) => {
-        const { rerender } = render(<RaceCard race={{ ...mockRace, status: invalidStatus as any }} />);
+        const { rerender } = render(<RaceCard race={{ ...mockRace, status: invalidStatus as string }} />);
         
         // Should display a valid status (sanitized)
         const statusElements = screen.getAllByRole('status');
@@ -191,7 +191,7 @@ describe('RaceCard', () => {
     });
 
     it('should show validation warnings for corrected statuses', () => {
-      render(<RaceCard race={{ ...mockRace, status: 'invalid-status' as any }} />);
+      render(<RaceCard race={{ ...mockRace, status: 'invalid-status' as string }} />);
       
       // Should have visual indicator for corrected status
       const statusElements = screen.getAllByRole('status');

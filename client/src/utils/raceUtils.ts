@@ -119,7 +119,7 @@ export function groupRacesByPollingUrgency(races: Race[]): {
       } else {
         groups.inactive.push(race);
       }
-    } catch (error) {
+    } catch {
       groups.inactive.push(race);
     }
   }

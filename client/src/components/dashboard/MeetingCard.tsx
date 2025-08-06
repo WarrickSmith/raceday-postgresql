@@ -29,12 +29,9 @@ interface MeetingCardProps {
 
 function MeetingCardComponent({ meeting, onRaceClick, onExpand, onCollapse, pollingInfo }: MeetingCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [races, setRaces] = useState<unknown[]>([]);
-
-  // Handle race data loaded from RacesList
-  const handleRacesLoaded = useCallback((loadedRaces: unknown[]) => {
-    setRaces(loadedRaces);
-  }, []);
+  
+  // Suppress unused warning - pollingInfo is used in memo comparison
+  void pollingInfo;
 
   // Toggle expand/collapse state
   const toggleExpanded = useCallback(() => {
@@ -216,10 +213,8 @@ function MeetingCardComponent({ meeting, onRaceClick, onExpand, onCollapse, poll
           <RacesList 
             meetingId={meeting.meetingId}
             onRaceClick={onRaceClick}
-            pollingInfo={pollingInfo}
             onRacesLoaded={(loadedRaces) => {
               const racesArray = Array.isArray(loadedRaces) ? loadedRaces : [];
-              handleRacesLoaded(racesArray);
               onExpand?.(meeting.meetingId, racesArray);
             }}
           />

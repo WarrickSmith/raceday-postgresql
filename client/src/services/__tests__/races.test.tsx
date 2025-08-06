@@ -243,11 +243,11 @@ describe('Race Status Validation Functions', () => {
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
       
       // Test with various invalid inputs
-      const nullStyles = getRaceStatusBadgeStyles(null as any);
+      const nullStyles = getRaceStatusBadgeStyles(null as unknown as string);
       expect(nullStyles).toBeDefined();
       expect(nullStyles.isValid).toBe(false);
       
-      const undefinedStyles = getRaceStatusBadgeStyles(undefined as any);
+      const undefinedStyles = getRaceStatusBadgeStyles(undefined as unknown as string);
       expect(undefinedStyles).toBeDefined();
       expect(undefinedStyles.isValid).toBe(false);
       
@@ -282,7 +282,7 @@ describe('Race Status Validation Functions', () => {
 
     it('should not create memory leaks with repeated calls', () => {
       // Create many objects and ensure they can be garbage collected
-      const initialMemory = (performance as any).memory?.usedJSHeapSize || 0;
+      const initialMemory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize || 0;
       
       for (let i = 0; i < 100; i++) {
         const styles = getRaceStatusBadgeStyles(RACE_STATUS.RUNNING);
@@ -291,11 +291,11 @@ describe('Race Status Validation Functions', () => {
       }
       
       // Force garbage collection if available (development only)
-      if ((global as any).gc) {
-        (global as any).gc();
+      if ((global as unknown as { gc?: () => void }).gc) {
+        (global as unknown as { gc: () => void }).gc();
       }
       
-      const finalMemory = (performance as any).memory?.usedJSHeapSize || 0;
+      const finalMemory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize || 0;
       
       // Memory should not have grown significantly
       if (initialMemory > 0 && finalMemory > 0) {

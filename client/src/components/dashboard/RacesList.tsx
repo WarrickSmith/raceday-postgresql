@@ -8,14 +8,12 @@ import { useRacesForMeeting } from '@/hooks/useRacesForMeeting';
 interface RacesListProps {
   meetingId: string;
   onRaceClick?: (raceId: string) => void;
-  pollingInfo?: unknown;
   onRacesLoaded?: (races: unknown) => void;
 }
 
 function RacesListComponent({ 
   meetingId, 
   onRaceClick,
-  pollingInfo: _pollingInfo,
   onRacesLoaded 
 }: RacesListProps) {
   // Only add debugging in development
@@ -172,7 +170,6 @@ export const RacesList = memo(RacesListComponent, (prevProps, nextProps) => {
   return (
     prevProps.meetingId === nextProps.meetingId &&
     prevProps.onRaceClick === nextProps.onRaceClick &&
-    prevProps.pollingInfo === nextProps.pollingInfo &&
     prevProps.onRacesLoaded === nextProps.onRacesLoaded
   );
 });

@@ -50,7 +50,7 @@ function isInHighFrequencyWindow(startTime: string): boolean {
  * @param status - Current race status
  * @returns object with urgency level and expected latency
  */
-function getPollingUrgency(startTime: string, _status: string) {
+function getPollingUrgency(startTime: string) {
   try {
     const raceStart = new Date(startTime);
     const now = new Date();
@@ -184,8 +184,7 @@ export async function pollRace(raceId: string): Promise<PollRaceResponse | PollR
 
     // Get polling urgency and expected latency
     const { urgency, expectedLatency, nextPollRecommended } = getPollingUrgency(
-      race.startTime, 
-      race.status
+      race.startTime
     );
 
     // Trigger single-race-poller function via Appwrite Functions
@@ -322,7 +321,7 @@ export async function getPollRecommendation(raceId: string): Promise<{
     const race = await databases.getDocument('raceday-db', 'races', raceId) as unknown as Race;
     
     const validation = validateRaceForPolling(race);
-    const { urgency } = getPollingUrgency(race.startTime, race.status);
+    const { urgency } = getPollingUrgency(race.startTime);
     
     return {
       shouldShowPollOption: validation.shouldPoll,

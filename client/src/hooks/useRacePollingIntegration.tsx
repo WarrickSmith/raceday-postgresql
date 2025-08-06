@@ -178,7 +178,7 @@ export function useRacePollingIntegration({
     if (Object.keys(newStates).length > 0) {
       setPollingStates(prev => ({ ...prev, ...newStates }));
     }
-  }, [races, enableAutoPolling, isConnected]);
+  }, [races, enableAutoPolling, isConnected, pollingStates]);
 
   return {
     pollingStates,
