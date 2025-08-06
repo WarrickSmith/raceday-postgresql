@@ -47,6 +47,11 @@ body {
   animation: running-pulse 1.5s ease-in-out infinite;
 }
 
+.race-status-interim {
+  @apply bg-purple-100 text-purple-800 border-purple-200;
+  animation: gentle-pulse 3s ease-in-out infinite;
+}
+
 .race-status-finalized {
   @apply bg-gray-100 text-gray-800 border-gray-200;
 }
@@ -105,7 +110,8 @@ body {
   }
   
   .race-status-closed,
-  .race-status-running {
+  .race-status-running,
+  .race-status-interim {
     animation: none;
   }
 }
@@ -122,6 +128,10 @@ body {
   
   .race-status-running {
     @apply bg-blue-200 text-blue-900 border-blue-400;
+  }
+  
+  .race-status-interim {
+    @apply bg-purple-200 text-purple-900 border-purple-400;
   }
   
   .race-status-finalized {

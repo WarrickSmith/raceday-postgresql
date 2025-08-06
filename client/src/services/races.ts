@@ -156,6 +156,7 @@ export const RACE_STATUS = {
   OPEN: 'Open',
   CLOSED: 'Closed',
   RUNNING: 'Running',
+  INTERIM: 'Interim',
   FINALIZED: 'Finalized',
 } as const;
 
@@ -211,6 +212,10 @@ export function sanitizeRaceStatus(
     'complete': RACE_STATUS.FINALIZED,
     'completed': RACE_STATUS.FINALIZED,
     'ended': RACE_STATUS.FINALIZED,
+    'provisional': RACE_STATUS.INTERIM,
+    'preliminary': RACE_STATUS.INTERIM,
+    'temp': RACE_STATUS.INTERIM,
+    'temporary': RACE_STATUS.INTERIM,
     'live': RACE_STATUS.RUNNING,
     'active': RACE_STATUS.RUNNING,
     'racing': RACE_STATUS.RUNNING,
@@ -278,9 +283,10 @@ export function validateStatusTransition(fromStatus: string, toStatus: string): 
   
   // Define valid transitions
   const validTransitions: Record<RaceStatus, RaceStatus[]> = {
-    [RACE_STATUS.OPEN]: [RACE_STATUS.CLOSED, RACE_STATUS.RUNNING, RACE_STATUS.FINALIZED],
-    [RACE_STATUS.CLOSED]: [RACE_STATUS.RUNNING, RACE_STATUS.FINALIZED, RACE_STATUS.OPEN], // Can reopen
-    [RACE_STATUS.RUNNING]: [RACE_STATUS.FINALIZED],
+    [RACE_STATUS.OPEN]: [RACE_STATUS.CLOSED, RACE_STATUS.RUNNING, RACE_STATUS.INTERIM, RACE_STATUS.FINALIZED],
+    [RACE_STATUS.CLOSED]: [RACE_STATUS.RUNNING, RACE_STATUS.INTERIM, RACE_STATUS.FINALIZED, RACE_STATUS.OPEN], // Can reopen
+    [RACE_STATUS.RUNNING]: [RACE_STATUS.INTERIM, RACE_STATUS.FINALIZED],
+    [RACE_STATUS.INTERIM]: [RACE_STATUS.FINALIZED], // Interim results become final
     [RACE_STATUS.FINALIZED]: [], // Final state - no transitions allowed
   };
   
@@ -318,6 +324,8 @@ export function getRaceStatusColor(status: string): string {
       return 'text-yellow-600';
     case RACE_STATUS.RUNNING:
       return 'text-blue-600';
+    case RACE_STATUS.INTERIM:
+      return 'text-purple-600';
     case RACE_STATUS.FINALIZED:
       return 'text-gray-600';
     default:
@@ -368,6 +376,18 @@ export function getRaceStatusBadgeStyles(status: string) {
         borderClass: 'border-blue-200',
         icon: '🔵',
         ariaLabel: 'Race is currently in progress',
+        urgency: 'assertive' as const,
+        isValid: isValidRaceStatus(status),
+      };
+    case RACE_STATUS.INTERIM:
+      return {
+        status: sanitizedStatus,
+        containerClass: 'race-status-badge race-status-interim',
+        textClass: 'text-purple-800',
+        bgClass: 'bg-purple-100',
+        borderClass: 'border-purple-200',
+        icon: '🟣',
+        ariaLabel: 'Race finished with provisional results',
         urgency: 'assertive' as const,
         isValid: isValidRaceStatus(status),
       };
@@ -438,6 +458,8 @@ export function getRaceStatusDescription(status: string): string {
       return 'Betting is closed for this race. The race is about to start.';
     case RACE_STATUS.RUNNING:
       return 'This race is currently in progress. Betting is not available.';
+    case RACE_STATUS.INTERIM:
+      return 'This race has finished with provisional results. Final results pending confirmation.';
     case RACE_STATUS.FINALIZED:
       return 'This race has been completed. Results are available.';
     default:
