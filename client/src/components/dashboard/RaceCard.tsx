@@ -1,8 +1,12 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useRef, useEffect, useState } from 'react';
 import { Race } from '@/types/meetings';
-import { getRaceStatusColor } from '@/services/races';
+import { 
+  getRaceStatusBadgeStyles, 
+  shouldAnnounceStatusChange,
+  getRaceStatusDescription 
+} from '@/services/races';
 
 interface RaceCardProps {
   race: Race;
@@ -10,6 +14,28 @@ interface RaceCardProps {
 }
 
 function RaceCardComponent({ race, onClick }: RaceCardProps) {
+  const [previousStatus, setPreviousStatus] = useState<string>('');
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const liveRegionRef = useRef<HTMLDivElement>(null);
+  const statusAnnouncementRef = useRef<HTMLDivElement>(null);
+
+  // Handle status change announcements for accessibility
+  useEffect(() => {
+    if (previousStatus && shouldAnnounceStatusChange(previousStatus, race.status)) {
+      // Announce status change to screen readers
+      if (statusAnnouncementRef.current) {
+        statusAnnouncementRef.current.textContent = 
+          `Race ${race.raceNumber} status changed from ${previousStatus} to ${race.status}. ${getRaceStatusDescription(race.status)}`;
+      }
+      
+      // Trigger visual transition animation
+      setIsTransitioning(true);
+      const timer = setTimeout(() => setIsTransitioning(false), 300);
+      return () => clearTimeout(timer);
+    }
+    setPreviousStatus(race.status);
+  }, [race.status, previousStatus, race.raceNumber]);
+
   const formatTime = (dateTimeString: string) => {
     try {
       const date = new Date(dateTimeString);
@@ -39,20 +65,74 @@ function RaceCardComponent({ race, onClick }: RaceCardProps) {
     }
   };
 
-  const getRaceStatusDisplay = (status: string) => {
-    const statusColorClass = getRaceStatusColor(status);
-    const bgColorClass = status === 'Running' ? 'bg-blue-50' : 
-                        status === 'Open' ? 'bg-green-50' :
-                        status === 'Closed' ? 'bg-yellow-50' : 'bg-gray-50';
+  const renderEnhancedStatusBadge = (status: string) => {
+    const styles = getRaceStatusBadgeStyles(status);
+    
+    // Use sanitized status for display and validation
+    const displayStatus = styles.status;
+    const isStatusValid = styles.isValid;
     
     return (
-      <span 
-        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${bgColorClass} ${statusColorClass}`}
-        aria-label={`Race status: ${status}`}
-      >
-        {status === 'Running' && <span className="w-2 h-2 bg-blue-400 rounded-full mr-1 animate-pulse"></span>}
-        {status}
-      </span>
+      <div className="relative">
+        <span 
+          className={`${
+            styles.containerClass
+          } ${isTransitioning ? 'race-status-transition' : ''} ${
+            !isStatusValid ? 'border-dashed opacity-90' : ''
+          }`}
+          role="status"
+          aria-label={`${styles.ariaLabel}${!isStatusValid ? '. Status was corrected from invalid value.' : ''}`}
+          title={`${getRaceStatusDescription(displayStatus)}${!isStatusValid ? ' (Status was automatically corrected)' : ''}`}
+        >
+          {/* Status icon with appropriate animation */}
+          {displayStatus === 'Running' && (
+            <span className="status-icon status-icon-running" aria-hidden="true"></span>
+          )}
+          {displayStatus === 'Closed' && (
+            <span className="status-icon status-icon-closed" aria-hidden="true"></span>
+          )}
+          
+          {/* Validation warning icon for invalid statuses */}
+          {!isStatusValid && (
+            <span 
+              className="w-2 h-2 bg-orange-400 rounded-full mr-1.5 flex-shrink-0" 
+              aria-hidden="true"
+              title="Status was automatically corrected"
+            ></span>
+          )}
+          
+          {/* Status text */}
+          <span className="font-medium">{displayStatus}</span>
+          
+          {/* Emoji indicator for color-blind users */}
+          <span 
+            className="ml-1.5" 
+            aria-hidden="true"
+            role="img"
+          >
+            {styles.icon}
+          </span>
+        </span>
+        
+        {/* Live region for status change announcements */}
+        <div 
+          ref={statusAnnouncementRef}
+          className="sr-only"
+          aria-live={styles.urgency}
+          aria-atomic="true"
+        ></div>
+        
+        {/* Live region for status validation warnings (development only) */}
+        {process.env.NODE_ENV === 'development' && !isStatusValid && (
+          <div 
+            className="sr-only"
+            aria-live="polite"
+            role="status"
+          >
+            Warning: Race status was corrected from &quot;{status}&quot; to &quot;{displayStatus}&quot;
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -89,7 +169,7 @@ function RaceCardComponent({ race, onClick }: RaceCardProps) {
         </div>
         
         <div className="flex-shrink-0">
-          {getRaceStatusDisplay(race.status)}
+          {renderEnhancedStatusBadge(race.status)}
         </div>
       </div>
       
@@ -106,18 +186,34 @@ function RaceCardComponent({ race, onClick }: RaceCardProps) {
           {formatTime(race.startTime)}
         </time>
       </div>
+      
+      {/* Global live region for accessibility announcements */}
+      <div 
+        ref={liveRegionRef}
+        className="sr-only"
+        aria-live="polite"
+        aria-atomic="true"
+        role="status"
+      ></div>
     </div>
   );
 }
 
 // Memoize component to prevent unnecessary re-renders
+// Enhanced comparison for real-time status updates
 export const RaceCard = memo(RaceCardComponent, (prevProps, nextProps) => {
-  // Custom comparison function for optimization
-  return (
+  // Custom comparison function optimized for status changes and real-time updates
+  const raceFieldsEqual = (
     prevProps.race.$id === nextProps.race.$id &&
     prevProps.race.$updatedAt === nextProps.race.$updatedAt &&
     prevProps.race.status === nextProps.race.status &&
     prevProps.race.startTime === nextProps.race.startTime &&
-    prevProps.onClick === nextProps.onClick
+    prevProps.race.name === nextProps.race.name &&
+    prevProps.race.raceNumber === nextProps.race.raceNumber
   );
+  
+  const propsEqual = prevProps.onClick === nextProps.onClick;
+  
+  // Only re-render if race data or onClick handler changed
+  return raceFieldsEqual && propsEqual;
 });

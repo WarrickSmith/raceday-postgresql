@@ -13,18 +13,42 @@ const RacesList = dynamic(() => import('./RacesList').then(mod => ({ default: mo
   ssr: false, // Client-side only for interactive expansion
 });
 
+interface PollingInfo {
+  triggerManualPoll: (raceId: string) => Promise<void>;
+  pollingStates: Record<string, unknown>;
+  performanceMetrics: Record<string, unknown>;
+}
+
 interface MeetingCardProps {
   meeting: Meeting;
   onRaceClick?: (raceId: string) => void;
+  onExpand?: (meetingId: string, races: unknown[]) => void;
+  onCollapse?: (meetingId: string) => void;
+  pollingInfo?: PollingInfo;
 }
 
-function MeetingCardComponent({ meeting, onRaceClick }: MeetingCardProps) {
+function MeetingCardComponent({ meeting, onRaceClick, onExpand, onCollapse, pollingInfo }: MeetingCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [races, setRaces] = useState<unknown[]>([]);
+
+  // Handle race data loaded from RacesList
+  const handleRacesLoaded = useCallback((loadedRaces: unknown[]) => {
+    setRaces(loadedRaces);
+  }, []);
 
   // Toggle expand/collapse state
   const toggleExpanded = useCallback(() => {
-    setIsExpanded(prev => !prev);
-  }, []);
+    const willExpand = !isExpanded;
+    setIsExpanded(willExpand);
+    
+    if (willExpand) {
+      // Will expand - races will be loaded by RacesList component
+      // The onExpand callback will be called when races are actually loaded
+    } else {
+      // Collapsing
+      onCollapse?.(meeting.meetingId);
+    }
+  }, [isExpanded, meeting.meetingId, onCollapse]);
 
   // Handle keyboard navigation
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
@@ -192,6 +216,12 @@ function MeetingCardComponent({ meeting, onRaceClick }: MeetingCardProps) {
           <RacesList 
             meetingId={meeting.meetingId}
             onRaceClick={onRaceClick}
+            pollingInfo={pollingInfo}
+            onRacesLoaded={(loadedRaces) => {
+              const racesArray = Array.isArray(loadedRaces) ? loadedRaces : [];
+              handleRacesLoaded(racesArray);
+              onExpand?.(meeting.meetingId, racesArray);
+            }}
           />
         </div>
       )}
@@ -202,10 +232,24 @@ function MeetingCardComponent({ meeting, onRaceClick }: MeetingCardProps) {
 // Memoize component to prevent unnecessary re-renders
 export const MeetingCard = memo(MeetingCardComponent, (prevProps, nextProps) => {
   // Custom comparison function for optimization
-  return (
+  const meetingEqual = (
     prevProps.meeting.$id === nextProps.meeting.$id &&
     prevProps.meeting.$updatedAt === nextProps.meeting.$updatedAt &&
-    prevProps.meeting.firstRaceTime === nextProps.meeting.firstRaceTime &&
-    prevProps.onRaceClick === nextProps.onRaceClick
+    prevProps.meeting.firstRaceTime === nextProps.meeting.firstRaceTime
   );
+  
+  const callbacksEqual = (
+    prevProps.onRaceClick === nextProps.onRaceClick &&
+    prevProps.onExpand === nextProps.onExpand &&
+    prevProps.onCollapse === nextProps.onCollapse
+  );
+  
+  // Polling info changes frequently, so shallow comparison
+  const pollingEqual = (
+    prevProps.pollingInfo === nextProps.pollingInfo ||
+    (prevProps.pollingInfo?.performanceMetrics === nextProps.pollingInfo?.performanceMetrics &&
+     prevProps.pollingInfo?.pollingStates === nextProps.pollingInfo?.pollingStates)
+  );
+  
+  return meetingEqual && callbacksEqual && pollingEqual;
 });
