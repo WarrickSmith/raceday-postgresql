@@ -3,9 +3,9 @@ import { createServerClient, Query } from '@/lib/appwrite-server';
 import { Race, Meeting } from '@/types/meetings';
 
 interface RaceDetailPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 async function getRaceById(raceId: string): Promise<{ race: Race; meeting: Meeting } | null> {

@@ -37,7 +37,7 @@ describe('RaceDetailPage', () => {
 
   const mockDatabases = {
     listDocuments: jest.fn(),
-  };
+  } as any;
 
   beforeEach(() => {
     jest.clearAllMocks();
