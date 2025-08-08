@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { MeetingCard } from './MeetingCard';
 import { MeetingsListSkeleton } from '../skeletons/MeetingCardSkeleton';
 import { useRealtimeMeetings } from '@/hooks/useRealtimeMeetings';
@@ -13,6 +14,7 @@ interface MeetingsListClientProps {
 }
 
 export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pollingError, setPollingError] = useState<string | null>(null);
 
@@ -39,6 +41,11 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
       setTimeout(() => setPollingError(null), 10000);
     }
   }, []);
+
+  // Handle race click navigation
+  const handleRaceClick = useCallback((raceId: string) => {
+    router.push(`/race/${raceId}`);
+  }, [router]);
 
   const { meetings, isConnected, connectionAttempts, retry } = useRealtimeMeetings({
     initialData,
@@ -88,6 +95,7 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
       <MeetingCard 
         key={meeting.$id} 
         meeting={meeting}
+        onRaceClick={handleRaceClick}
         onExpand={handleMeetingExpand as (meetingId: string, races: unknown[]) => void}
         onCollapse={handleMeetingCollapse}
         pollingInfo={{
@@ -97,7 +105,7 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
         }}
       />
     ));
-  }, [meetings, handleMeetingExpand, handleMeetingCollapse, triggerManualPoll, pollingStates, performanceMetrics]);
+  }, [meetings, handleRaceClick, handleMeetingExpand, handleMeetingCollapse, triggerManualPoll, pollingStates, performanceMetrics]);
 
   // Show loading state only if we have no data
   if (!meetings.length && connectionAttempts === 0) {
