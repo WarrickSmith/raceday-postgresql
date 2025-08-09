@@ -16,7 +16,7 @@ export default function NotFound() {
               Race Not Found
             </h1>
             <p className="text-gray-600 mb-4">
-              The race you're looking for doesn't exist or may have been removed. Please check the race ID and try again.
+              The race you&apos;re looking for doesn&apos;t exist or may have been removed. Please check the race ID and try again.
             </p>
             
             <Link

@@ -9,6 +9,7 @@ jest.mock('@/lib/appwrite-server');
 
 const mockNotFound = notFound as jest.MockedFunction<typeof notFound>;
 const mockCreateServerClient = createServerClient as jest.MockedFunction<typeof createServerClient>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockQuery = Query as any;
 
 describe('RaceDetailPage', () => {
@@ -37,6 +38,7 @@ describe('RaceDetailPage', () => {
 
   const mockDatabases = {
     listDocuments: jest.fn(),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
 
   beforeEach(() => {
