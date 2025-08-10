@@ -26,6 +26,8 @@ export interface Race {
   startTime: string;
   meeting: string;
   status: string;
+  distance?: number;  // Race distance in metres
+  trackCondition?: string;  // Track condition (e.g. "Good 3", "Heavy 8")
 }
 
 export interface MeetingWithRaces extends Meeting {

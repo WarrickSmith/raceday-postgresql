@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { createServerClient, Query } from '@/lib/appwrite-server';
 import { Race, Meeting } from '@/types/meetings';
+import { RaceHeader } from '@/components/race-view/RaceHeader';
 
 interface RaceDetailPageProps {
   params: Promise<{
@@ -42,6 +43,8 @@ async function getRaceById(raceId: string): Promise<{ race: Race; meeting: Meeti
       startTime: raceData.startTime,
       meeting: raceData.meeting.meetingId, // Extract the meetingId for the Race interface
       status: raceData.status,
+      distance: raceData.distance,
+      trackCondition: raceData.trackCondition,
     };
 
     const meeting: Meeting = {
@@ -72,91 +75,19 @@ export default async function RaceDetailPage({ params }: RaceDetailPageProps) {
   }
 
   const { race, meeting } = raceData;
-  
-  const formatTime = (dateTimeString: string) => {
-    try {
-      const date = new Date(dateTimeString);
-      if (isNaN(date.getTime())) {
-        return 'TBA';
-      }
-      return date.toLocaleTimeString('en-AU', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      });
-    } catch {
-      return 'TBA';
-    }
-  };
 
   return (
     <main className="container mx-auto px-4 py-8" role="main">
       <div className="max-w-4xl mx-auto">
         {/* Race Header */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="mb-4">
-            <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-              <span>{meeting.country}</span>
-              <span>•</span>
-              <span>{meeting.meetingName}</span>
-              <span>•</span>
-              <time dateTime={race.startTime}>
-                {formatTime(race.startTime)}
-              </time>
-            </div>
-            
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Race {race.raceNumber}: {race.name}
-            </h1>
-            
-            <div className="flex items-center gap-4">
-              <div className="flex items-center">
-                <span className="text-sm text-gray-500">Race ID:</span>
-                <span className="ml-2 text-sm font-mono text-gray-700">{race.raceId}</span>
-              </div>
-              
-              <div className="flex items-center">
-                <span className="text-sm text-gray-500">Status:</span>
-                <span 
-                  className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${
-                    race.status === 'Open' ? 'bg-green-100 text-green-800' :
-                    race.status === 'Closed' ? 'bg-yellow-100 text-yellow-800' :
-                    race.status === 'Running' ? 'bg-blue-100 text-blue-800' :
-                    race.status === 'Finalized' ? 'bg-gray-100 text-gray-800' :
-                    'bg-gray-100 text-gray-600'
-                  }`}
-                  role="status"
-                  aria-label={`Race status: ${race.status}`}
-                >
-                  {race.status}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <RaceHeader initialRace={race} meeting={meeting} />
 
-        {/* Race Details Placeholder */}
+        {/* Future Features Placeholder */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Race Details</h2>
-          <div className="text-gray-600">
-            <p className="mb-2">
-              <strong>Meeting:</strong> {meeting.meetingName} ({meeting.country})
+          <div className="p-4 bg-blue-50 rounded-lg">
+            <p className="text-blue-800 text-sm">
+              <strong>Coming Soon:</strong> Detailed entrant information, odds, and form guide will be available in future updates.
             </p>
-            <p className="mb-2">
-              <strong>Race Type:</strong> {meeting.raceType}
-            </p>
-            <p className="mb-2">
-              <strong>Start Time:</strong> {formatTime(race.startTime)}
-            </p>
-            <p className="mb-4">
-              <strong>Current Status:</strong> {race.status}
-            </p>
-            
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <p className="text-blue-800 text-sm">
-                <strong>Note:</strong> Detailed race information including entrants and additional data will be available in future updates.
-              </p>
-            </div>
           </div>
         </div>
       </div>
