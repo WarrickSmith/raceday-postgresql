@@ -38,3 +38,20 @@ export interface MeetingWithExpandState extends Meeting {
   isExpanded?: boolean;
   races?: Race[];
 }
+
+export interface Entrant {
+  $id: string;
+  $createdAt: string;
+  $updatedAt: string;
+  entrantId: string;
+  name: string;  // Runner name
+  runnerNumber: number;  // Saddlecloth number
+  jockey?: string;
+  trainerName?: string;
+  weight?: number;
+  silkUrl?: string;
+  isScratched: boolean;
+  race: string;  // Race ID this entrant belongs to
+  winOdds?: number;  // Current win odds
+  placeOdds?: number;  // Current place odds
+}
