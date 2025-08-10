@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { client } from '@/lib/appwrite-client';
 import { Race } from '@/types/meetings';
 
@@ -13,10 +13,6 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
-  const updateRace = useCallback((updatedRace: Partial<Race>) => {
-    setRace(prevRace => ({ ...prevRace, ...updatedRace }));
-    setLastUpdate(new Date());
-  }, []);
 
   useEffect(() => {
     // Subscribe only to this specific race to minimize network overhead
@@ -32,17 +28,22 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
           if (response.payload && response.payload.$id === initialRace.$id) {
             const changes = response.payload;
             
-            // Only trigger updates for significant changes
-            const hasSignificantChange = (
-              changes.status !== race.status ||
-              changes.startTime !== race.startTime ||
-              changes.distance !== race.distance ||
-              changes.trackCondition !== race.trackCondition
-            );
-            
-            if (hasSignificantChange) {
-              updateRace(changes);
-            }
+            // Only trigger updates for significant changes by comparing current race state
+            setRace(currentRace => {
+              const hasSignificantChange = (
+                changes.status && changes.status !== currentRace.status ||
+                changes.startTime && changes.startTime !== currentRace.startTime ||
+                changes.distance && changes.distance !== currentRace.distance ||
+                changes.trackCondition && changes.trackCondition !== currentRace.trackCondition
+              );
+              
+              if (hasSignificantChange) {
+                setLastUpdate(new Date());
+                return { ...currentRace, ...changes };
+              }
+              
+              return currentRace;
+            });
             setIsConnected(true);
           }
         });
@@ -70,7 +71,7 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
         clearTimeout(retryTimeout);
       }
     };
-  }, [initialRace.$id, updateRace, race.status, race.startTime, race.distance, race.trackCondition]);
+  }, [initialRace.$id]);
 
   // Update countdown every second, but only if race hasn't started
   useEffect(() => {
