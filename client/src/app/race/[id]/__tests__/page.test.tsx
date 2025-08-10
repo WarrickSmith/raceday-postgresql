@@ -114,7 +114,7 @@ describe('RaceDetailPage', () => {
     // Check semantic landmarks
     expect(screen.getByRole('main')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole('banner')).toBeInTheDocument();
   });
 
   it('should have proper accessibility attributes', async () => {
@@ -157,7 +157,7 @@ describe('RaceDetailPage', () => {
     const component = await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
     render(component as React.ReactElement);
 
-    expect(screen.getAllByText('TBA')).toHaveLength(2); // One in time element, one in details section
+    expect(screen.getByText('TBA')).toBeInTheDocument(); // Only one TBA in consolidated header
   });
 
   it('should query database with correct parameters', async () => {
