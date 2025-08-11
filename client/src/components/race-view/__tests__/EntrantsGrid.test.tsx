@@ -2,15 +2,52 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { EntrantsGrid } from '../EntrantsGrid';
-import { Entrant } from '@/types/meetings';
+import { Entrant, OddsHistoryData } from '@/types/meetings';
 
 // Mock the useRealtimeEntrants hook
 jest.mock('@/hooks/useRealtimeEntrants', () => ({
   useRealtimeEntrants: jest.fn(),
 }));
 
+// Mock the SparklineChart component
+jest.mock('../SparklineChart', () => ({
+  SparklineChart: ({ 'data-testid': dataTestId, 'aria-label': ariaLabel, data }: {
+    'data-testid'?: string;
+    'aria-label'?: string;
+    data?: unknown[];
+  }) => (
+    <div 
+      data-testid={dataTestId}
+      aria-label={ariaLabel}
+      role="img"
+    >
+      {data && data.length > 1 ? 'sparkline-chart' : '—'}
+    </div>
+  ),
+}));
+
 import * as useRealtimeEntrantsModule from '@/hooks/useRealtimeEntrants';
 const mockUseRealtimeEntrants = useRealtimeEntrantsModule.useRealtimeEntrants as jest.MockedFunction<typeof useRealtimeEntrantsModule.useRealtimeEntrants>;
+
+// Mock odds history data
+const mockOddsHistory: OddsHistoryData[] = [
+  {
+    $id: 'oh1',
+    $createdAt: '2025-08-11T10:00:00Z',
+    $updatedAt: '2025-08-11T10:00:00Z',
+    entrant: '1',
+    winOdds: 4.0,
+    timestamp: '2025-08-11T10:00:00Z'
+  },
+  {
+    $id: 'oh2',
+    $createdAt: '2025-08-11T10:05:00Z',
+    $updatedAt: '2025-08-11T10:05:00Z',
+    entrant: '1',
+    winOdds: 3.5,
+    timestamp: '2025-08-11T10:05:00Z'
+  }
+];
 
 const mockEntrants: Entrant[] = [
   {
@@ -30,6 +67,7 @@ const mockEntrants: Entrant[] = [
     placeOdds: 1.80,
     holdPercentage: 25.50,
     moneyFlowTrend: 'up' as const,
+    oddsHistory: mockOddsHistory,
   },
   {
     $id: '2',
@@ -76,6 +114,7 @@ describe('EntrantsGrid', () => {
       isConnected: true,
       oddsUpdates: {},
       moneyFlowUpdates: {},
+      oddsHistoryUpdates: {},
     });
   });
 
@@ -92,6 +131,7 @@ describe('EntrantsGrid', () => {
     expect(screen.getByText('Win Odds')).toBeInTheDocument();
     expect(screen.getByText('Place Odds')).toBeInTheDocument();
     expect(screen.getByText('Money%')).toBeInTheDocument();
+    expect(screen.getByText('Trend')).toBeInTheDocument(); // New sparkline column
 
     // Check entrant count in header
     expect(screen.getByText('Race Entrants (3)')).toBeInTheDocument();
@@ -156,6 +196,7 @@ describe('EntrantsGrid', () => {
       isConnected: false,
       oddsUpdates: {},
       moneyFlowUpdates: {},
+      oddsHistoryUpdates: {},
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -173,6 +214,7 @@ describe('EntrantsGrid', () => {
         '1': { win: 3.50, timestamp: new Date() }, // Previous odds
       },
       moneyFlowUpdates: {},
+      oddsHistoryUpdates: {},
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -201,6 +243,7 @@ describe('EntrantsGrid', () => {
       isConnected: true,
       oddsUpdates: {},
       moneyFlowUpdates: {},
+      oddsHistoryUpdates: {},
     });
 
     render(<EntrantsGrid initialEntrants={[]} raceId="race1" />);
@@ -218,7 +261,7 @@ describe('EntrantsGrid', () => {
 
     // Check column headers
     const columnHeaders = screen.getAllByRole('columnheader');
-    expect(columnHeaders).toHaveLength(5); // Added Money% column
+    expect(columnHeaders).toHaveLength(6); // Updated for Trend column
     columnHeaders.forEach(header => {
       expect(header).toHaveAttribute('scope', 'col');
     });
@@ -249,6 +292,7 @@ describe('EntrantsGrid', () => {
         '2': { place: 3.20, timestamp: new Date() },
       },
       moneyFlowUpdates: {},
+      oddsHistoryUpdates: {},
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -293,6 +337,7 @@ describe('EntrantsGrid', () => {
         '1': { holdPercentage: 26.75, timestamp: new Date() },
         '3': { holdPercentage: 9.25, timestamp: new Date() },
       },
+      oddsHistoryUpdates: {},
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -311,6 +356,7 @@ describe('EntrantsGrid', () => {
       moneyFlowUpdates: {
         '2': { holdPercentage: 16.50, timestamp: new Date() },
       },
+      oddsHistoryUpdates: {},
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -330,5 +376,107 @@ describe('EntrantsGrid', () => {
 
     // Check description exists
     expect(screen.getByText(/Money flow percentage shows the current hold percentage/)).toBeInTheDocument();
+  });
+
+  // Sparkline specific tests
+  test('renders sparklines for entrants with odds history', () => {
+    render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
+
+    // Should render sparkline for entrant with odds history
+    expect(screen.getByTestId('sparkline-1')).toBeInTheDocument();
+    expect(screen.getByLabelText('Odds trend for Thunder Bolt')).toBeInTheDocument();
+  });
+
+  test('displays dash for scratched entrants in trend column', () => {
+    render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
+
+    // Scratched entrant should show dash instead of sparkline
+    const scratchedRow = screen.getByText('Lightning Fast').closest('tr');
+    const trendCell = scratchedRow?.querySelector('td:last-child');
+    expect(trendCell).toHaveTextContent('—');
+    
+    // Should not render sparkline for scratched entrant
+    expect(screen.queryByTestId('sparkline-2')).not.toBeInTheDocument();
+  });
+
+  test('displays dash for entrants without odds history', () => {
+    const entrantsWithoutHistory = mockEntrants.map(entrant => ({
+      ...entrant,
+      oddsHistory: undefined
+    }));
+
+    mockUseRealtimeEntrants.mockReturnValue({
+      entrants: entrantsWithoutHistory,
+      isConnected: true,
+      oddsUpdates: {},
+      moneyFlowUpdates: {},
+      oddsHistoryUpdates: {},
+    });
+
+    render(<EntrantsGrid initialEntrants={entrantsWithoutHistory} raceId="race1" />);
+
+    // All trend columns should show dashes
+    const trendCells = screen.getAllByText('—');
+    expect(trendCells.length).toBeGreaterThanOrEqual(2); // At least in trend columns
+  });
+
+  test('announces odds history updates for screen readers', () => {
+    mockUseRealtimeEntrants.mockReturnValue({
+      entrants: mockEntrants,
+      isConnected: true,
+      oddsUpdates: {},
+      moneyFlowUpdates: {},
+      oddsHistoryUpdates: {
+        '1': { newEntry: mockOddsHistory[0], timestamp: new Date() },
+        '3': { newEntry: mockOddsHistory[1], timestamp: new Date() },
+      },
+    });
+
+    render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
+
+    const liveRegion = screen.getByLabelText('Live entrant updates');
+    expect(liveRegion).toHaveTextContent('Odds history updated for 2 entrants');
+  });
+
+  test('announces combined updates including odds history', () => {
+    mockUseRealtimeEntrants.mockReturnValue({
+      entrants: mockEntrants,
+      isConnected: true,
+      oddsUpdates: {
+        '1': { win: 3.75, timestamp: new Date() },
+      },
+      moneyFlowUpdates: {
+        '2': { holdPercentage: 16.50, timestamp: new Date() },
+      },
+      oddsHistoryUpdates: {
+        '3': { newEntry: mockOddsHistory[0], timestamp: new Date() },
+      },
+    });
+
+    render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
+
+    const liveRegion = screen.getByLabelText('Live entrant updates');
+    expect(liveRegion).toHaveTextContent('Odds updated for 1 entrant Money flow updated for 1 entrant Odds history updated for 1 entrant');
+  });
+
+  test('trend column has proper accessibility attributes', () => {
+    render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
+
+    // Check Trend column header accessibility
+    const trendHeader = screen.getByText('Trend');
+    expect(trendHeader).toHaveAttribute('scope', 'col');
+    expect(trendHeader).toHaveAttribute('role', 'columnheader');
+    expect(trendHeader).toHaveAttribute('aria-describedby', 'trend-description');
+
+    // Check trend description exists
+    expect(screen.getByText(/Trend column displays sparkline charts showing the recent history of Win odds/)).toBeInTheDocument();
+  });
+
+  test('sparkline charts have proper accessibility attributes', () => {
+    render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
+
+    const sparkline = screen.getByTestId('sparkline-1');
+    expect(sparkline).toHaveAttribute('role', 'img');
+    expect(sparkline).toHaveAttribute('aria-label', 'Odds trend for Thunder Bolt');
   });
 });
