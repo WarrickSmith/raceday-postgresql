@@ -3,6 +3,12 @@
 import React, { useMemo } from 'react';
 import { OddsHistoryData } from '@/types/meetings';
 
+const SPARKLINE_COLORS = {
+  neutral: '#6b7280', // gray-500
+  down: '#ef4444', // red-500 (odds shortening)
+  up: '#3b82f6', // blue-500 (odds lengthening)
+} as const;
+
 interface SparklineChartProps {
   data: OddsHistoryData[];
   width?: number;
@@ -25,7 +31,7 @@ export const SparklineChart = React.memo<SparklineChartProps>(function Sparkline
     if (!data || data.length < 2) {
       return { 
         path: '', 
-        strokeColor: '#6b7280', // Gray for no data
+        strokeColor: SPARKLINE_COLORS.neutral,
         trendDirection: 'neutral' as const
       };
     }
@@ -42,7 +48,7 @@ export const SparklineChart = React.memo<SparklineChartProps>(function Sparkline
       const pathData = `M 0 ${y} L ${width} ${y}`;
       return { 
         path: pathData, 
-        strokeColor: '#6b7280', // Gray for flat line
+        strokeColor: SPARKLINE_COLORS.neutral,
         trendDirection: 'neutral' as const
       };
     }
@@ -64,16 +70,16 @@ export const SparklineChart = React.memo<SparklineChartProps>(function Sparkline
     const firstValue = values[0];
     const lastValue = values[values.length - 1];
     let trendDirection: 'up' | 'down' | 'neutral' = 'neutral';
-    let strokeColor = '#6b7280'; // Default gray
+    let strokeColor = SPARKLINE_COLORS.neutral;
 
     if (lastValue < firstValue) {
-      // Odds shortening (getting lower) - red/pink
+      // Odds shortening (getting lower)
       trendDirection = 'down';
-      strokeColor = '#ef4444'; // red-500
+      strokeColor = SPARKLINE_COLORS.down;
     } else if (lastValue > firstValue) {
-      // Odds lengthening (getting higher) - blue/purple  
+      // Odds lengthening (getting higher)
       trendDirection = 'up';
-      strokeColor = '#3b82f6'; // blue-500
+      strokeColor = SPARKLINE_COLORS.up;
     }
 
     return { path: pathData, strokeColor, trendDirection };
@@ -98,7 +104,7 @@ export const SparklineChart = React.memo<SparklineChartProps>(function Sparkline
     }
   }, [data, trendDirection]);
 
-  if (!data || data.length === 0) {
+  if (!data?.length) {
     return (
       <div 
         className={`inline-flex items-center justify-center ${className}`}
