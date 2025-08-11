@@ -40,7 +40,7 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 
 # Copy scripts directory and package.json for runtime initialization
-COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+# COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
 # Install only the dependencies needed for setup scripts (dotenv and node-appwrite)
