@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { createServerClient, Query } from '@/lib/appwrite-server';
-import { Race, Meeting, Entrant } from '@/types/meetings';
+import { Race, Meeting, Entrant, MoneyFlowHistory } from '@/types/meetings';
 import { RaceHeader } from '@/components/race-view/RaceHeader';
 import { EntrantsGrid } from '@/components/race-view/EntrantsGrid';
 
@@ -67,21 +67,38 @@ async function getRaceById(raceId: string): Promise<{ race: Race; meeting: Meeti
       [Query.equal('race', raceData.$id)]
     );
 
-    // Fetch money flow data for all entrants
+    // Fetch money flow data for all entrants efficiently using batch query
     const entrantIds = entrantsQuery.documents.map(doc => doc.$id);
-    const moneyFlowQueries = entrantIds.map(entrantId => 
-      databases.listDocuments(
-        'raceday-db',
-        'money-flow-history',
-        [
-          Query.equal('entrant', entrantId),
-          Query.orderDesc('$createdAt'),
-          Query.limit(2) // Get current and previous for trend calculation
-        ]
-      )
+    
+    // Use a single query to get all money flow history for these entrants
+    const moneyFlowQuery = await databases.listDocuments(
+      'raceday-db',
+      'money-flow-history',
+      [
+        Query.equal('entrant', entrantIds), // Batch query for all entrants at once
+        Query.orderDesc('$createdAt'),
+        Query.limit(100) // Reasonable limit for all entrant histories combined
+      ]
     );
 
-    const moneyFlowResults = await Promise.all(moneyFlowQueries);
+    // Group results by entrant for processing
+    const moneyFlowByEntrant = new Map<string, MoneyFlowHistory[]>();
+    moneyFlowQuery.documents.forEach(doc => {
+      const moneyFlowDoc = doc as unknown as MoneyFlowHistory;
+      const entrantId = moneyFlowDoc.entrant;
+      if (!moneyFlowByEntrant.has(entrantId)) {
+        moneyFlowByEntrant.set(entrantId, []);
+      }
+      moneyFlowByEntrant.get(entrantId)!.push(moneyFlowDoc);
+    });
+
+    // Process money flow data for trend calculation
+    const moneyFlowResults = entrantIds.map(entrantId => {
+      const histories = moneyFlowByEntrant.get(entrantId) || [];
+      // Sort by creation date descending and take only the 2 most recent
+      histories.sort((a, b) => new Date(b.$createdAt).getTime() - new Date(a.$createdAt).getTime());
+      return { documents: histories.slice(0, 2) };
+    });
     const moneyFlowMap = new Map();
     
     moneyFlowResults.forEach((result, index) => {

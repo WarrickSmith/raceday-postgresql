@@ -45,6 +45,24 @@ export interface EntrantSubscriptionResponse {
   events?: string[];
 }
 
+// Money flow subscription callback interface for type safety
+export interface MoneyFlowSubscriptionResponse {
+  payload?: {
+    entrant?: string;
+    holdPercentage?: number;
+  };
+  events?: string[];
+}
+
+// MoneyFlowHistory document interface
+export interface MoneyFlowHistory {
+  $id: string;
+  $createdAt: string;
+  $updatedAt: string;
+  entrant: string;
+  holdPercentage: number;
+}
+
 export interface Entrant {
   $id: string;
   $createdAt: string;

@@ -85,7 +85,7 @@ const EntrantRow = memo(function EntrantRow({
       <td 
         role="gridcell"
         className="px-6 py-4 whitespace-nowrap text-sm font-mono text-right text-gray-900"
-        aria-label={entrant.isScratched ? 'Money flow: Not available (scratched)' : `Money flow: ${formatMoneyFlow(entrant.holdPercentage)}`}
+        aria-describedby="money-flow-description"
       >
         <div className="flex items-center justify-end">
           <span>{entrant.isScratched ? '—' : formatMoneyFlow(entrant.holdPercentage)}</span>
@@ -143,7 +143,7 @@ export const EntrantsGrid = memo(function EntrantsGrid({ initialEntrants, raceId
           className={`ml-1 text-xs ${
             entrant.moneyFlowTrend === 'up' ? 'text-red-600' : 'text-blue-600'
           }`}
-          aria-label={`Money flow ${entrant.moneyFlowTrend === 'up' ? 'increasing' : 'decreasing'}`}
+          aria-label={`Market interest ${entrant.moneyFlowTrend === 'up' ? 'increasing' : 'decreasing'}`}
         >
           {entrant.moneyFlowTrend === 'up' ? '↑' : '↓'}
         </span>

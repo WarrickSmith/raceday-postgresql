@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { client } from '@/lib/appwrite-client';
-import { Entrant, EntrantSubscriptionResponse } from '@/types/meetings';
+import { Entrant, EntrantSubscriptionResponse, MoneyFlowSubscriptionResponse } from '@/types/meetings';
 
 interface UseRealtimeEntrantsProps {
   initialEntrants: Entrant[];
@@ -95,7 +95,7 @@ export function useRealtimeEntrants({ initialEntrants, raceId }: UseRealtimeEntr
         });
         
         // Subscribe to money flow updates
-        moneyFlowUnsubscribe = client.subscribe(moneyFlowChannel, (response: { payload?: { entrant?: string; holdPercentage?: number }; events?: string[] }) => {
+        moneyFlowUnsubscribe = client.subscribe(moneyFlowChannel, (response: MoneyFlowSubscriptionResponse) => {
           if (!response.payload || !response.payload.entrant) {
             return;
           }
