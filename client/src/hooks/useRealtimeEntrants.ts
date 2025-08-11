@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { client } from '@/lib/appwrite-client';
-import { Entrant, EntrantSubscriptionResponse, MoneyFlowSubscriptionResponse } from '@/types/meetings';
+import { Entrant, EntrantSubscriptionResponse, MoneyFlowSubscriptionResponse, OddsHistorySubscriptionResponse, OddsHistoryData } from '@/types/meetings';
 
 interface UseRealtimeEntrantsProps {
   initialEntrants: Entrant[];
@@ -14,6 +14,7 @@ export function useRealtimeEntrants({ initialEntrants, raceId }: UseRealtimeEntr
   const [isConnected, setIsConnected] = useState(false);
   const [oddsUpdates, setOddsUpdates] = useState<Record<string, { win?: number; place?: number; timestamp: Date }>>({});
   const [moneyFlowUpdates, setMoneyFlowUpdates] = useState<Record<string, { holdPercentage?: number; trend?: 'up' | 'down' | 'neutral'; timestamp: Date }>>({});
+  const [oddsHistoryUpdates, setOddsHistoryUpdates] = useState<Record<string, { newEntry?: OddsHistoryData; timestamp: Date }>>({});
   
   // Memoize entrants to prevent unnecessary re-renders
   const memoizedEntrants = useMemo(() => entrants, [entrants]);
@@ -68,9 +69,11 @@ export function useRealtimeEntrants({ initialEntrants, raceId }: UseRealtimeEntr
     // Subscribe to entrants collection for this race
     const entrantsChannel = `databases.raceday-db.collections.entrants.documents`;
     const moneyFlowChannel = `databases.raceday-db.collections.money-flow-history.documents`;
+    const oddsHistoryChannel = `databases.raceday-db.collections.odds-history.documents`;
     
     let entrantsUnsubscribe: (() => void) | null = null;
     let moneyFlowUnsubscribe: (() => void) | null = null;
+    let oddsHistoryUnsubscribe: (() => void) | null = null;
     let retryTimeout: NodeJS.Timeout | null = null;
 
     const setupSubscriptions = async () => {
@@ -142,6 +145,45 @@ export function useRealtimeEntrants({ initialEntrants, raceId }: UseRealtimeEntr
           }
         });
         
+        // Subscribe to odds history updates
+        oddsHistoryUnsubscribe = client.subscribe(oddsHistoryChannel, (response: OddsHistorySubscriptionResponse) => {
+          if (!response.payload || !response.payload.entrant) {
+            return;
+          }
+
+          const eventType = response.events?.[0];
+          
+          if (eventType?.includes('create')) {
+            // Add new odds history entry to the corresponding entrant
+            const entrantId = response.payload.entrant;
+            const newOddsEntry = response.payload as OddsHistoryData;
+            
+            setEntrants(currentEntrants => {
+              return currentEntrants.map(entrant => {
+                if (entrant.$id === entrantId) {
+                  const updatedOddsHistory = [...(entrant.oddsHistory || []), newOddsEntry]
+                    .sort((a, b) => new Date(a.$createdAt).getTime() - new Date(b.$createdAt).getTime());
+                  
+                  return {
+                    ...entrant,
+                    oddsHistory: updatedOddsHistory
+                  };
+                }
+                return entrant;
+              });
+            });
+            
+            // Track odds history updates for batching and performance
+            setOddsHistoryUpdates(prev => ({
+              ...prev,
+              [entrantId]: {
+                newEntry: newOddsEntry,
+                timestamp: new Date()
+              }
+            }));
+          }
+        });
+        
         setIsConnected(true);
       } catch (error) {
         console.error('Failed to setup subscriptions:', error);
@@ -163,6 +205,9 @@ export function useRealtimeEntrants({ initialEntrants, raceId }: UseRealtimeEntr
       }
       if (moneyFlowUnsubscribe) {
         moneyFlowUnsubscribe();
+      }
+      if (oddsHistoryUnsubscribe) {
+        oddsHistoryUnsubscribe();
       }
       if (retryTimeout) {
         clearTimeout(retryTimeout);
@@ -196,6 +241,17 @@ export function useRealtimeEntrants({ initialEntrants, raceId }: UseRealtimeEntr
         });
         return updated;
       });
+      
+      // Clean up odds history updates
+      setOddsHistoryUpdates(prev => {
+        const updated = { ...prev };
+        Object.keys(updated).forEach(key => {
+          if (updated[key].timestamp < thirtySecondsAgo) {
+            delete updated[key];
+          }
+        });
+        return updated;
+      });
     }, 30000);
 
     return () => clearInterval(interval);
@@ -206,5 +262,6 @@ export function useRealtimeEntrants({ initialEntrants, raceId }: UseRealtimeEntr
     isConnected,
     oddsUpdates,
     moneyFlowUpdates,
+    oddsHistoryUpdates,
   };
 }
