@@ -28,6 +28,8 @@ const mockEntrants: Entrant[] = [
     race: 'race1',
     winOdds: 3.50,
     placeOdds: 1.80,
+    holdPercentage: 25.50,
+    moneyFlowTrend: 'up' as const,
   },
   {
     $id: '2',
@@ -44,6 +46,8 @@ const mockEntrants: Entrant[] = [
     race: 'race1',
     winOdds: 8.00,
     placeOdds: 3.20,
+    holdPercentage: 15.25,
+    moneyFlowTrend: 'neutral' as const,
   },
   {
     $id: '3',
@@ -60,6 +64,8 @@ const mockEntrants: Entrant[] = [
     race: 'race1',
     winOdds: 12.00,
     placeOdds: 4.50,
+    holdPercentage: 8.75,
+    moneyFlowTrend: 'down' as const,
   },
 ];
 
@@ -69,6 +75,7 @@ describe('EntrantsGrid', () => {
       entrants: mockEntrants,
       isConnected: true,
       oddsUpdates: {},
+      moneyFlowUpdates: {},
     });
   });
 
@@ -84,6 +91,7 @@ describe('EntrantsGrid', () => {
     expect(screen.getByText('Runner / Jockey / Trainer')).toBeInTheDocument();
     expect(screen.getByText('Win Odds')).toBeInTheDocument();
     expect(screen.getByText('Place Odds')).toBeInTheDocument();
+    expect(screen.getByText('Money%')).toBeInTheDocument();
 
     // Check entrant count in header
     expect(screen.getByText('Race Entrants (3)')).toBeInTheDocument();
@@ -147,6 +155,7 @@ describe('EntrantsGrid', () => {
       entrants: mockEntrants,
       isConnected: false,
       oddsUpdates: {},
+      moneyFlowUpdates: {},
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -163,6 +172,7 @@ describe('EntrantsGrid', () => {
       oddsUpdates: {
         '1': { win: 3.50, timestamp: new Date() }, // Previous odds
       },
+      moneyFlowUpdates: {},
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -190,6 +200,7 @@ describe('EntrantsGrid', () => {
       entrants: [],
       isConnected: true,
       oddsUpdates: {},
+      moneyFlowUpdates: {},
     });
 
     render(<EntrantsGrid initialEntrants={[]} raceId="race1" />);
@@ -207,7 +218,7 @@ describe('EntrantsGrid', () => {
 
     // Check column headers
     const columnHeaders = screen.getAllByRole('columnheader');
-    expect(columnHeaders).toHaveLength(4);
+    expect(columnHeaders).toHaveLength(5); // Added Money% column
     columnHeaders.forEach(header => {
       expect(header).toHaveAttribute('scope', 'col');
     });
@@ -237,11 +248,87 @@ describe('EntrantsGrid', () => {
         '1': { win: 3.50, timestamp: new Date() },
         '2': { place: 3.20, timestamp: new Date() },
       },
+      moneyFlowUpdates: {},
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
 
     const liveRegion = screen.getByLabelText('Live entrant updates');
     expect(liveRegion).toHaveTextContent('Odds updated for 2 entrants');
+  });
+
+  // Money Flow specific tests
+  test('displays money flow percentages correctly', () => {
+    render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
+
+    // Check money flow percentages for active entrants
+    expect(screen.getByText('25.50%')).toBeInTheDocument();
+    expect(screen.getByText('8.75%')).toBeInTheDocument();
+  });
+
+  test('displays money flow trend indicators', () => {
+    render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
+
+    // Check for trend indicators
+    expect(screen.getByLabelText('Money flow increasing')).toBeInTheDocument();
+    expect(screen.getByLabelText('Money flow decreasing')).toBeInTheDocument();
+  });
+
+  test('handles scratched entrants money flow correctly', () => {
+    render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
+
+    // Scratched entrant should show em-dash for money flow
+    const scratchedRow = screen.getByText('Lightning Fast').closest('tr');
+    const moneyFlowCells = scratchedRow?.querySelectorAll('td');
+    const moneyFlowCell = moneyFlowCells?.[4]; // Money flow is 5th column (0-indexed)
+    expect(moneyFlowCell).toHaveTextContent('—');
+  });
+
+  test('announces money flow updates for screen readers', () => {
+    mockUseRealtimeEntrants.mockReturnValue({
+      entrants: mockEntrants,
+      isConnected: true,
+      oddsUpdates: {},
+      moneyFlowUpdates: {
+        '1': { holdPercentage: 26.75, timestamp: new Date() },
+        '3': { holdPercentage: 9.25, timestamp: new Date() },
+      },
+    });
+
+    render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
+
+    const liveRegion = screen.getByLabelText('Live entrant updates');
+    expect(liveRegion).toHaveTextContent('Money flow updated for 2 entrants');
+  });
+
+  test('announces both odds and money flow updates together', () => {
+    mockUseRealtimeEntrants.mockReturnValue({
+      entrants: mockEntrants,
+      isConnected: true,
+      oddsUpdates: {
+        '1': { win: 3.75, timestamp: new Date() },
+      },
+      moneyFlowUpdates: {
+        '2': { holdPercentage: 16.50, timestamp: new Date() },
+      },
+    });
+
+    render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
+
+    const liveRegion = screen.getByLabelText('Live entrant updates');
+    expect(liveRegion).toHaveTextContent('Odds updated for 1 entrant Money flow updated for 1 entrant');
+  });
+
+  test('money flow column has proper accessibility attributes', () => {
+    render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
+
+    // Check Money% column header accessibility
+    const moneyFlowHeader = screen.getByText('Money%');
+    expect(moneyFlowHeader).toHaveAttribute('scope', 'col');
+    expect(moneyFlowHeader).toHaveAttribute('role', 'columnheader');
+    expect(moneyFlowHeader).toHaveAttribute('aria-describedby', 'money-flow-description');
+
+    // Check description exists
+    expect(screen.getByText(/Money flow percentage shows the current hold percentage/)).toBeInTheDocument();
   });
 });

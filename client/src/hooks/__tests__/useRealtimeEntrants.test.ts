@@ -71,9 +71,10 @@ describe('useRealtimeEntrants', () => {
     expect(result.current.entrants).toEqual(mockEntrants);
     expect(result.current.isConnected).toBe(true); // Connection is established when subscription is set up
     expect(result.current.oddsUpdates).toEqual({});
+    expect(result.current.moneyFlowUpdates).toEqual({});
   });
 
-  test('sets up subscription on mount', () => {
+  test('sets up subscriptions on mount', () => {
     renderHook(() =>
       useRealtimeEntrants({
         initialEntrants: mockEntrants,
@@ -85,13 +86,19 @@ describe('useRealtimeEntrants', () => {
       'databases.raceday-db.collections.entrants.documents',
       expect.any(Function)
     );
+    expect(mockClient.subscribe).toHaveBeenCalledWith(
+      'databases.raceday-db.collections.money-flow-history.documents',
+      expect.any(Function)
+    );
   });
 
   test('updates entrant when receiving update event', () => {
-    let subscriptionCallback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void;
+    let entrantsCallback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockClient.subscribe as any).mockImplementation((_: string, callback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void) => {
-      subscriptionCallback = callback;
+    (mockClient.subscribe as any).mockImplementation((channel: string, callback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void) => {
+      if (channel.includes('entrants')) {
+        entrantsCallback = callback;
+      }
       return jest.fn();
     });
 
@@ -104,7 +111,7 @@ describe('useRealtimeEntrants', () => {
 
     // Simulate an entrant update
     act(() => {
-      subscriptionCallback({
+      entrantsCallback({
         payload: {
           $id: '1',
           race: 'race1',
@@ -120,10 +127,12 @@ describe('useRealtimeEntrants', () => {
   });
 
   test('ignores updates for different race', () => {
-    let subscriptionCallback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void;
+    let entrantsCallback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockClient.subscribe as any).mockImplementation((_: string, callback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void) => {
-      subscriptionCallback = callback;
+    (mockClient.subscribe as any).mockImplementation((channel: string, callback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void) => {
+      if (channel.includes('entrants')) {
+        entrantsCallback = callback;
+      }
       return jest.fn();
     });
 
@@ -138,7 +147,7 @@ describe('useRealtimeEntrants', () => {
 
     // Simulate an entrant update for different race
     act(() => {
-      subscriptionCallback({
+      entrantsCallback({
         payload: {
           $id: '1',
           race: 'race2', // Different race
@@ -154,10 +163,12 @@ describe('useRealtimeEntrants', () => {
   });
 
   test('adds new entrant when receiving create event', () => {
-    let subscriptionCallback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void;
+    let entrantsCallback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockClient.subscribe as any).mockImplementation((_: string, callback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void) => {
-      subscriptionCallback = callback;
+    (mockClient.subscribe as any).mockImplementation((channel: string, callback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void) => {
+      if (channel.includes('entrants')) {
+        entrantsCallback = callback;
+      }
       return jest.fn();
     });
 
@@ -187,7 +198,7 @@ describe('useRealtimeEntrants', () => {
 
     // Simulate a new entrant creation
     act(() => {
-      subscriptionCallback({
+      entrantsCallback({
         payload: newEntrant,
         events: ['databases.raceday-db.collections.entrants.documents.create'],
       });
@@ -198,10 +209,12 @@ describe('useRealtimeEntrants', () => {
   });
 
   test('removes entrant when receiving delete event', () => {
-    let subscriptionCallback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void;
+    let entrantsCallback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockClient.subscribe as any).mockImplementation((_: string, callback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void) => {
-      subscriptionCallback = callback;
+    (mockClient.subscribe as any).mockImplementation((channel: string, callback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void) => {
+      if (channel.includes('entrants')) {
+        entrantsCallback = callback;
+      }
       return jest.fn();
     });
 
@@ -214,7 +227,7 @@ describe('useRealtimeEntrants', () => {
 
     // Simulate entrant deletion
     act(() => {
-      subscriptionCallback({
+      entrantsCallback({
         payload: {
           $id: '1',
           race: 'race1',
@@ -228,10 +241,12 @@ describe('useRealtimeEntrants', () => {
   });
 
   test('tracks odds updates', () => {
-    let subscriptionCallback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void;
+    let entrantsCallback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockClient.subscribe as any).mockImplementation((_: string, callback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void) => {
-      subscriptionCallback = callback;
+    (mockClient.subscribe as any).mockImplementation((channel: string, callback: (response: { payload?: Partial<Entrant> & { $id: string }; events?: string[] }) => void) => {
+      if (channel.includes('entrants')) {
+        entrantsCallback = callback;
+      }
       return jest.fn();
     });
 
@@ -244,7 +259,7 @@ describe('useRealtimeEntrants', () => {
 
     // Simulate odds update
     act(() => {
-      subscriptionCallback({
+      entrantsCallback({
         payload: {
           $id: '1',
           race: 'race1',
@@ -278,7 +293,7 @@ describe('useRealtimeEntrants', () => {
 
     expect(result.current.isConnected).toBe(false);
     expect(consoleSpy).toHaveBeenCalledWith(
-      'Failed to setup entrants subscription:',
+      'Failed to setup subscriptions:',
       expect.any(Error)
     );
 
