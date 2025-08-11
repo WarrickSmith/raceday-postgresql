@@ -56,7 +56,8 @@ describe('RaceDetailPage', () => {
     // Mock successful race query with populated meeting data
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
-      .mockResolvedValueOnce({ documents: [] }); // Entrants query (empty for now)
+      .mockResolvedValueOnce({ documents: [] }) // Entrants query (empty for now)
+      .mockResolvedValueOnce({ documents: [] }); // Money flow query
 
     const component = await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
     render(component as React.ReactElement);
@@ -108,7 +109,8 @@ describe('RaceDetailPage', () => {
   it('should have proper semantic HTML structure', async () => {
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
-      .mockResolvedValueOnce({ documents: [] }); // Entrants query
+      .mockResolvedValueOnce({ documents: [] }) // Entrants query
+      .mockResolvedValueOnce({ documents: [] }); // Money flow query
 
     const component = await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
     render(component as React.ReactElement);
@@ -122,7 +124,8 @@ describe('RaceDetailPage', () => {
   it('should have proper accessibility attributes', async () => {
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
-      .mockResolvedValueOnce({ documents: [] }); // Entrants query
+      .mockResolvedValueOnce({ documents: [] }) // Entrants query
+      .mockResolvedValueOnce({ documents: [] }); // Money flow query
 
     const component = await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
     render(component as React.ReactElement);
@@ -139,7 +142,8 @@ describe('RaceDetailPage', () => {
     // Test just one status case to avoid cleanup issues
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [{ ...mockRaceWithMeeting, status: 'Open' }] }) // Race query
-      .mockResolvedValueOnce({ documents: [] }); // Entrants query
+      .mockResolvedValueOnce({ documents: [] }) // Entrants query
+      .mockResolvedValueOnce({ documents: [] }); // Money flow query
 
     const component = await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
     render(component as React.ReactElement);
@@ -157,7 +161,8 @@ describe('RaceDetailPage', () => {
 
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [raceWithInvalidTime] }) // Race query
-      .mockResolvedValueOnce({ documents: [] }); // Entrants query
+      .mockResolvedValueOnce({ documents: [] }) // Entrants query
+      .mockResolvedValueOnce({ documents: [] }); // Money flow query
 
     const component = await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
     render(component as React.ReactElement);
@@ -168,7 +173,8 @@ describe('RaceDetailPage', () => {
   it('should query database with correct parameters', async () => {
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
-      .mockResolvedValueOnce({ documents: [] }); // Entrants query
+      .mockResolvedValueOnce({ documents: [] }) // Entrants query
+      .mockResolvedValueOnce({ documents: [] }); // Money flow query
 
     await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
 
@@ -189,8 +195,17 @@ describe('RaceDetailPage', () => {
         expect.objectContaining({ attribute: 'race', values: [mockRaceWithMeeting.$id] })
       ])
     );
+
+    // Check money flow query
+    expect(mockDatabases.listDocuments).toHaveBeenCalledWith(
+      'raceday-db',
+      'money-flow-history',
+      expect.arrayContaining([
+        expect.objectContaining({ attribute: 'entrant', values: [[]] }) // Empty entrants array
+      ])
+    );
     
-    // Should be called twice (race + entrants queries)
-    expect(mockDatabases.listDocuments).toHaveBeenCalledTimes(2);
+    // Should be called three times (race + entrants + money flow queries)
+    expect(mockDatabases.listDocuments).toHaveBeenCalledTimes(3);
   });
 });

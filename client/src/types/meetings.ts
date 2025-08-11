@@ -45,6 +45,24 @@ export interface EntrantSubscriptionResponse {
   events?: string[];
 }
 
+// Money flow subscription callback interface for type safety
+export interface MoneyFlowSubscriptionResponse {
+  payload?: {
+    entrant?: string;
+    holdPercentage?: number;
+  };
+  events?: string[];
+}
+
+// MoneyFlowHistory document interface
+export interface MoneyFlowHistory {
+  $id: string;
+  $createdAt: string;
+  $updatedAt: string;
+  entrant: string;
+  holdPercentage: number;
+}
+
 export interface Entrant {
   $id: string;
   $createdAt: string;
@@ -60,4 +78,8 @@ export interface Entrant {
   race: string;  // Race ID this entrant belongs to
   winOdds?: number;  // Current win odds
   placeOdds?: number;  // Current place odds
+  holdPercentage?: number;  // Current money flow percentage
+  previousHoldPercentage?: number;  // Previous money flow for trend calculation
+  moneyFlowTrend?: 'up' | 'down' | 'neutral';  // Trend direction for display
+  moneyFlowHistory?: string[];  // MoneyFlowHistory collection relationship
 }

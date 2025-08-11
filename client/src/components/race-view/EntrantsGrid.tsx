@@ -8,11 +8,15 @@ import { useRealtimeEntrants } from '@/hooks/useRealtimeEntrants';
 const EntrantRow = memo(function EntrantRow({ 
   entrant,
   getTrendIndicator,
-  formatOdds
+  formatOdds,
+  formatMoneyFlow,
+  moneyFlowTrend
 }: {
   entrant: Entrant;
   getTrendIndicator: (entrantId: string, type: 'win' | 'place') => React.ReactNode;
   formatOdds: (odds?: number) => string;
+  formatMoneyFlow: (percentage?: number) => string;
+  moneyFlowTrend: React.ReactNode;
 }) {
   return (
     <tr 
@@ -76,6 +80,18 @@ const EntrantRow = memo(function EntrantRow({
           {!entrant.isScratched && getTrendIndicator(entrant.$id, 'place')}
         </div>
       </td>
+      
+      {/* Money Flow */}
+      <td 
+        role="gridcell"
+        className="px-6 py-4 whitespace-nowrap text-sm font-mono text-right text-gray-900"
+        aria-describedby="money-flow-description"
+      >
+        <div className="flex items-center justify-end">
+          <span>{entrant.isScratched ? '—' : formatMoneyFlow(entrant.holdPercentage)}</span>
+          {moneyFlowTrend}
+        </div>
+      </td>
     </tr>
   );
 });
@@ -86,7 +102,7 @@ interface EntrantsGridProps {
 }
 
 export const EntrantsGrid = memo(function EntrantsGrid({ initialEntrants, raceId }: EntrantsGridProps) {
-  const { entrants, isConnected, oddsUpdates } = useRealtimeEntrants({
+  const { entrants, isConnected, oddsUpdates, moneyFlowUpdates } = useRealtimeEntrants({
     initialEntrants,
     raceId,
   });
@@ -102,6 +118,40 @@ export const EntrantsGrid = memo(function EntrantsGrid({ initialEntrants, raceId
     };
     return formatter;
   }, []);
+  
+  // Memoized money flow formatting function
+  const formatMoneyFlow = useMemo(() => {
+    const formatter = (percentage?: number) => {
+      if (percentage === undefined || percentage === null) return '—';
+      return `${percentage.toFixed(2)}%`;
+    };
+    return formatter;
+  }, []);
+  
+  // Memoized money flow trend calculations
+  const moneyFlowTrends = useMemo(() => {
+    const trends: Record<string, React.ReactNode> = {};
+    
+    sortedEntrants.forEach(entrant => {
+      if (entrant.isScratched || !entrant.moneyFlowTrend || entrant.moneyFlowTrend === 'neutral') {
+        trends[entrant.$id] = null;
+        return;
+      }
+      
+      trends[entrant.$id] = (
+        <span 
+          className={`ml-1 text-xs ${
+            entrant.moneyFlowTrend === 'up' ? 'text-red-600' : 'text-blue-600'
+          }`}
+          aria-label={`Market interest ${entrant.moneyFlowTrend === 'up' ? 'increasing' : 'decreasing'}`}
+        >
+          {entrant.moneyFlowTrend === 'up' ? '↑' : '↓'}
+        </span>
+      );
+    });
+    
+    return trends;
+  }, [sortedEntrants]);
 
   // Create a memoized map of entrant odds for efficient lookups
   const entrantOddsMap = useMemo(() => {
@@ -223,6 +273,14 @@ export const EntrantsGrid = memo(function EntrantsGrid({ initialEntrants, raceId
               >
                 Place Odds
               </th>
+              <th 
+                scope="col" 
+                className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider font-mono"
+                role="columnheader"
+                aria-describedby="money-flow-description"
+              >
+                Money%
+              </th>
             </tr>
           </thead>
           <tbody 
@@ -235,6 +293,8 @@ export const EntrantsGrid = memo(function EntrantsGrid({ initialEntrants, raceId
                 entrant={entrant}
                 getTrendIndicator={getTrendIndicator}
                 formatOdds={formatOdds}
+                formatMoneyFlow={formatMoneyFlow}
+                moneyFlowTrend={moneyFlowTrends[entrant.$id]}
               />
             ))}
           </tbody>
@@ -243,7 +303,12 @@ export const EntrantsGrid = memo(function EntrantsGrid({ initialEntrants, raceId
       
       {/* Description for screen readers */}
       <div id="entrants-description" className="sr-only">
-        Data grid showing race entrants with saddlecloth numbers, runner names, jockey and trainer information, and current win and place odds. Odds are updated in real-time and include trend indicators showing whether odds have increased or decreased.
+        Data grid showing race entrants with saddlecloth numbers, runner names, jockey and trainer information, current win and place odds, and money flow percentages. Odds and money flow are updated in real-time and include trend indicators showing whether values have increased or decreased.
+      </div>
+      
+      {/* Money flow column description for screen readers */}
+      <div id="money-flow-description" className="sr-only">
+        Money flow percentage shows the current hold percentage for each entrant, representing market interest and betting volume.
       </div>
       
       {/* Live region for real-time updates */}
@@ -256,6 +321,9 @@ export const EntrantsGrid = memo(function EntrantsGrid({ initialEntrants, raceId
       >
         {Object.keys(oddsUpdates).length > 0 && (
           `Odds updated for ${Object.keys(oddsUpdates).length} entrant${Object.keys(oddsUpdates).length === 1 ? '' : 's'}`
+        )}
+        {Object.keys(moneyFlowUpdates).length > 0 && (
+          ` Money flow updated for ${Object.keys(moneyFlowUpdates).length} entrant${Object.keys(moneyFlowUpdates).length === 1 ? '' : 's'}`
         )}
       </div>
     </div>
