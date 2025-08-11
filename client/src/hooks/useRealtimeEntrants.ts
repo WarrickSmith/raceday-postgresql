@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { client } from '@/lib/appwrite-client';
 import { Entrant, EntrantSubscriptionResponse, MoneyFlowSubscriptionResponse, OddsHistorySubscriptionResponse, OddsHistoryData } from '@/types/meetings';
 
@@ -18,6 +18,26 @@ export function useRealtimeEntrants({ initialEntrants, raceId }: UseRealtimeEntr
   
   // Memoize entrants to prevent unnecessary re-renders
   const memoizedEntrants = useMemo(() => entrants, [entrants]);
+  
+  // Batch update mechanism to reduce re-renders when multiple updates arrive rapidly
+  const batchUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingUpdatesRef = useRef<Array<() => void>>([]);
+  
+  const batchUpdate = useCallback((updateFn: () => void) => {
+    pendingUpdatesRef.current.push(updateFn);
+    
+    // Clear existing timeout and set a new one
+    if (batchUpdateTimeoutRef.current) {
+      clearTimeout(batchUpdateTimeoutRef.current);
+    }
+    
+    // Execute all pending updates after a short delay
+    batchUpdateTimeoutRef.current = setTimeout(() => {
+      const updates = pendingUpdatesRef.current;
+      pendingUpdatesRef.current = [];
+      updates.forEach(update => update());
+    }, 50); // 50ms batching window
+  }, []);
   
   const updateEntrant = useCallback((updatedEntrant: Partial<Entrant> & { $id: string }) => {
     setEntrants(currentEntrants => {
@@ -114,7 +134,7 @@ export function useRealtimeEntrants({ initialEntrants, raceId }: UseRealtimeEntr
               return;
             }
             
-            // Calculate trend by comparing with current entrant data
+            // Use callback pattern to calculate trend and avoid unnecessary re-renders
             setEntrants(currentEntrants => {
               return currentEntrants.map(entrant => {
                 if (entrant.$id === entrantId) {
@@ -158,18 +178,21 @@ export function useRealtimeEntrants({ initialEntrants, raceId }: UseRealtimeEntr
             const entrantId = response.payload.entrant;
             const newOddsEntry = response.payload as OddsHistoryData;
             
-            setEntrants(currentEntrants => {
-              return currentEntrants.map(entrant => {
-                if (entrant.$id === entrantId) {
-                  const updatedOddsHistory = [...(entrant.oddsHistory || []), newOddsEntry]
-                    .sort((a, b) => new Date(a.$createdAt).getTime() - new Date(b.$createdAt).getTime());
-                  
-                  return {
-                    ...entrant,
-                    oddsHistory: updatedOddsHistory
-                  };
-                }
-                return entrant;
+            // Use batching to prevent rapid re-renders when multiple odds history updates arrive
+            batchUpdate(() => {
+              setEntrants(currentEntrants => {
+                return currentEntrants.map(entrant => {
+                  if (entrant.$id === entrantId) {
+                    const updatedOddsHistory = [...(entrant.oddsHistory || []), newOddsEntry]
+                      .sort((a, b) => new Date(a.$createdAt).getTime() - new Date(b.$createdAt).getTime());
+                    
+                    return {
+                      ...entrant,
+                      oddsHistory: updatedOddsHistory
+                    };
+                  }
+                  return entrant;
+                });
               });
             });
             
@@ -212,8 +235,11 @@ export function useRealtimeEntrants({ initialEntrants, raceId }: UseRealtimeEntr
       if (retryTimeout) {
         clearTimeout(retryTimeout);
       }
+      if (batchUpdateTimeoutRef.current) {
+        clearTimeout(batchUpdateTimeoutRef.current);
+      }
     };
-  }, [raceId, updateEntrant, addEntrant, removeEntrant]);
+  }, [raceId, updateEntrant, addEntrant, removeEntrant, batchUpdate]);
 
   // Clean up old updates after 30 seconds
   useEffect(() => {
