@@ -57,7 +57,8 @@ describe('RaceDetailPage', () => {
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
       .mockResolvedValueOnce({ documents: [] }) // Entrants query (empty for now)
-      .mockResolvedValueOnce({ documents: [] }); // Money flow query
+      .mockResolvedValueOnce({ documents: [] }) // Money flow query
+      .mockResolvedValueOnce({ documents: [] }); // Odds history query
 
     const component = await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
     render(component as React.ReactElement);
@@ -110,7 +111,8 @@ describe('RaceDetailPage', () => {
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
       .mockResolvedValueOnce({ documents: [] }) // Entrants query
-      .mockResolvedValueOnce({ documents: [] }); // Money flow query
+      .mockResolvedValueOnce({ documents: [] }) // Money flow query
+      .mockResolvedValueOnce({ documents: [] }); // Odds history query
 
     const component = await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
     render(component as React.ReactElement);
@@ -125,7 +127,8 @@ describe('RaceDetailPage', () => {
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
       .mockResolvedValueOnce({ documents: [] }) // Entrants query
-      .mockResolvedValueOnce({ documents: [] }); // Money flow query
+      .mockResolvedValueOnce({ documents: [] }) // Money flow query
+      .mockResolvedValueOnce({ documents: [] }); // Odds history query
 
     const component = await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
     render(component as React.ReactElement);
@@ -143,7 +146,8 @@ describe('RaceDetailPage', () => {
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [{ ...mockRaceWithMeeting, status: 'Open' }] }) // Race query
       .mockResolvedValueOnce({ documents: [] }) // Entrants query
-      .mockResolvedValueOnce({ documents: [] }); // Money flow query
+      .mockResolvedValueOnce({ documents: [] }) // Money flow query
+      .mockResolvedValueOnce({ documents: [] }); // Odds history query
 
     const component = await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
     render(component as React.ReactElement);
@@ -162,7 +166,8 @@ describe('RaceDetailPage', () => {
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [raceWithInvalidTime] }) // Race query
       .mockResolvedValueOnce({ documents: [] }) // Entrants query
-      .mockResolvedValueOnce({ documents: [] }); // Money flow query
+      .mockResolvedValueOnce({ documents: [] }) // Money flow query
+      .mockResolvedValueOnce({ documents: [] }); // Odds history query
 
     const component = await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
     render(component as React.ReactElement);
@@ -174,7 +179,8 @@ describe('RaceDetailPage', () => {
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
       .mockResolvedValueOnce({ documents: [] }) // Entrants query
-      .mockResolvedValueOnce({ documents: [] }); // Money flow query
+      .mockResolvedValueOnce({ documents: [] }) // Money flow query
+      .mockResolvedValueOnce({ documents: [] }); // Odds history query
 
     await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
 
@@ -205,7 +211,16 @@ describe('RaceDetailPage', () => {
       ])
     );
     
-    // Should be called three times (race + entrants + money flow queries)
-    expect(mockDatabases.listDocuments).toHaveBeenCalledTimes(3);
+    // Check odds history query
+    expect(mockDatabases.listDocuments).toHaveBeenCalledWith(
+      'raceday-db',
+      'odds-history',
+      expect.arrayContaining([
+        expect.objectContaining({ attribute: 'entrant', values: [[]] }) // Empty entrants array
+      ])
+    );
+    
+    // Should be called four times (race + entrants + money flow + odds history queries)
+    expect(mockDatabases.listDocuments).toHaveBeenCalledTimes(4);
   });
 });
