@@ -4,6 +4,8 @@ import { Race, Meeting, Entrant, MoneyFlowHistory, OddsHistoryData } from '@/typ
 import { RaceHeader } from '@/components/race-view/RaceHeader';
 import { EntrantsGrid } from '@/components/race-view/EntrantsGrid';
 
+const ODDS_HISTORY_QUERY_LIMIT = 500;
+
 interface RaceDetailPageProps {
   params: Promise<{
     id: string;
@@ -99,7 +101,7 @@ async function getRaceById(raceId: string): Promise<{ race: Race; meeting: Meeti
       [
         Query.equal('entrant', entrantIds), // Batch query for all entrants at once
         Query.orderDesc('$createdAt'),
-        Query.limit(500) // Reasonable limit for sparkline data (all entrant histories combined)
+        Query.limit(ODDS_HISTORY_QUERY_LIMIT) // Reasonable limit for sparkline data (all entrant histories combined)
       ]
     );
 
