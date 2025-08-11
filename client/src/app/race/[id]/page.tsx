@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { createServerClient, Query } from '@/lib/appwrite-server';
-import { Race, Meeting, Entrant, MoneyFlowHistory } from '@/types/meetings';
+import { Race, Meeting, Entrant, MoneyFlowHistory, OddsHistoryData } from '@/types/meetings';
 import { RaceHeader } from '@/components/race-view/RaceHeader';
 import { EntrantsGrid } from '@/components/race-view/EntrantsGrid';
 
@@ -92,6 +92,28 @@ async function getRaceById(raceId: string): Promise<{ race: Race; meeting: Meeti
       moneyFlowByEntrant.get(entrantId)!.push(moneyFlowDoc);
     });
 
+    // Fetch odds history data for all entrants efficiently using batch query
+    const oddsHistoryQuery = await databases.listDocuments(
+      'raceday-db',
+      'odds-history',
+      [
+        Query.equal('entrant', entrantIds), // Batch query for all entrants at once
+        Query.orderDesc('$createdAt'),
+        Query.limit(500) // Reasonable limit for sparkline data (all entrant histories combined)
+      ]
+    );
+
+    // Group odds history results by entrant for processing
+    const oddsHistoryByEntrant = new Map<string, OddsHistoryData[]>();
+    oddsHistoryQuery.documents.forEach(doc => {
+      const oddsHistoryDoc = doc as unknown as OddsHistoryData;
+      const entrantId = oddsHistoryDoc.entrant;
+      if (!oddsHistoryByEntrant.has(entrantId)) {
+        oddsHistoryByEntrant.set(entrantId, []);
+      }
+      oddsHistoryByEntrant.get(entrantId)!.push(oddsHistoryDoc);
+    });
+
     // Process money flow data for trend calculation
     const moneyFlowResults = entrantIds.map(entrantId => {
       const histories = moneyFlowByEntrant.get(entrantId) || [];
@@ -125,6 +147,10 @@ async function getRaceById(raceId: string): Promise<{ race: Race; meeting: Meeti
     const entrants: Entrant[] = entrantsQuery.documents.map((doc) => {
       const moneyFlowData = moneyFlowMap.get(doc.$id) || {};
       
+      // Get odds history data for this entrant, sorted by creation date ascending for sparkline
+      const oddsHistory = oddsHistoryByEntrant.get(doc.$id) || [];
+      oddsHistory.sort((a, b) => new Date(a.$createdAt).getTime() - new Date(b.$createdAt).getTime());
+      
       return {
         $id: doc.$id,
         $createdAt: doc.$createdAt,
@@ -140,6 +166,7 @@ async function getRaceById(raceId: string): Promise<{ race: Race; meeting: Meeti
         race: doc.race,
         winOdds: doc.winOdds,
         placeOdds: doc.placeOdds,
+        oddsHistory: oddsHistory, // Add odds history data for sparkline
         ...moneyFlowData
       };
     });
