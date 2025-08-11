@@ -67,22 +67,65 @@ async function getRaceById(raceId: string): Promise<{ race: Race; meeting: Meeti
       [Query.equal('race', raceData.$id)]
     );
 
-    const entrants: Entrant[] = entrantsQuery.documents.map((doc) => ({
-      $id: doc.$id,
-      $createdAt: doc.$createdAt,
-      $updatedAt: doc.$updatedAt,
-      entrantId: doc.entrantId,
-      name: doc.name,
-      runnerNumber: doc.runnerNumber,
-      jockey: doc.jockey,
-      trainerName: doc.trainerName,
-      weight: doc.weight,
-      silkUrl: doc.silkUrl,
-      isScratched: doc.isScratched,
-      race: doc.race,
-      winOdds: doc.winOdds,
-      placeOdds: doc.placeOdds,
-    }));
+    // Fetch money flow data for all entrants
+    const entrantIds = entrantsQuery.documents.map(doc => doc.$id);
+    const moneyFlowQueries = entrantIds.map(entrantId => 
+      databases.listDocuments(
+        'raceday-db',
+        'money-flow-history',
+        [
+          Query.equal('entrant', entrantId),
+          Query.orderDesc('$createdAt'),
+          Query.limit(2) // Get current and previous for trend calculation
+        ]
+      )
+    );
+
+    const moneyFlowResults = await Promise.all(moneyFlowQueries);
+    const moneyFlowMap = new Map();
+    
+    moneyFlowResults.forEach((result, index) => {
+      const entrantId = entrantIds[index];
+      const histories = result.documents;
+      
+      if (histories.length > 0) {
+        const current = histories[0];
+        const previous = histories[1];
+        
+        let trend: 'up' | 'down' | 'neutral' = 'neutral';
+        if (previous && current.holdPercentage !== previous.holdPercentage) {
+          trend = current.holdPercentage > previous.holdPercentage ? 'up' : 'down';
+        }
+        
+        moneyFlowMap.set(entrantId, {
+          holdPercentage: current.holdPercentage,
+          previousHoldPercentage: previous?.holdPercentage,
+          moneyFlowTrend: trend
+        });
+      }
+    });
+
+    const entrants: Entrant[] = entrantsQuery.documents.map((doc) => {
+      const moneyFlowData = moneyFlowMap.get(doc.$id) || {};
+      
+      return {
+        $id: doc.$id,
+        $createdAt: doc.$createdAt,
+        $updatedAt: doc.$updatedAt,
+        entrantId: doc.entrantId,
+        name: doc.name,
+        runnerNumber: doc.runnerNumber,
+        jockey: doc.jockey,
+        trainerName: doc.trainerName,
+        weight: doc.weight,
+        silkUrl: doc.silkUrl,
+        isScratched: doc.isScratched,
+        race: doc.race,
+        winOdds: doc.winOdds,
+        placeOdds: doc.placeOdds,
+        ...moneyFlowData
+      };
+    });
     
     return { race, meeting, entrants };
   } catch (error) {
