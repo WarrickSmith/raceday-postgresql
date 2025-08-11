@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react';
 import { Entrant } from '@/types/meetings';
 import { useRealtimeEntrants } from '@/hooks/useRealtimeEntrants';
+import { SparklineChart } from './SparklineChart';
 
 // Memoized EntrantRow component to prevent unnecessary re-renders
 const EntrantRow = memo(function EntrantRow({ 
@@ -92,6 +93,28 @@ const EntrantRow = memo(function EntrantRow({
           {moneyFlowTrend}
         </div>
       </td>
+      
+      {/* Trend (Sparkline) */}
+      <td 
+        role="gridcell"
+        className="px-6 py-4 whitespace-nowrap text-sm text-center"
+        aria-describedby="trend-description"
+      >
+        <div className="flex items-center justify-center space-x-2">
+          {entrant.isScratched || !entrant.oddsHistory?.length ? (
+            <span className="text-gray-400 text-xs">—</span>
+          ) : (
+            <SparklineChart
+              data={entrant.oddsHistory}
+              width={80}
+              height={24}
+              className="mx-auto"
+              data-testid={`sparkline-${entrant.$id}`}
+              aria-label={`Odds trend for ${entrant.name}`}
+            />
+          )}
+        </div>
+      </td>
     </tr>
   );
 });
@@ -102,7 +125,7 @@ interface EntrantsGridProps {
 }
 
 export const EntrantsGrid = memo(function EntrantsGrid({ initialEntrants, raceId }: EntrantsGridProps) {
-  const { entrants, isConnected, oddsUpdates, moneyFlowUpdates } = useRealtimeEntrants({
+  const { entrants, isConnected, oddsUpdates, moneyFlowUpdates, oddsHistoryUpdates } = useRealtimeEntrants({
     initialEntrants,
     raceId,
   });
@@ -281,6 +304,14 @@ export const EntrantsGrid = memo(function EntrantsGrid({ initialEntrants, raceId
               >
                 Money%
               </th>
+              <th 
+                scope="col" 
+                className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                role="columnheader"
+                aria-describedby="trend-description"
+              >
+                Trend
+              </th>
             </tr>
           </thead>
           <tbody 
@@ -303,12 +334,17 @@ export const EntrantsGrid = memo(function EntrantsGrid({ initialEntrants, raceId
       
       {/* Description for screen readers */}
       <div id="entrants-description" className="sr-only">
-        Data grid showing race entrants with saddlecloth numbers, runner names, jockey and trainer information, current win and place odds, and money flow percentages. Odds and money flow are updated in real-time and include trend indicators showing whether values have increased or decreased.
+        Data grid showing race entrants with saddlecloth numbers, runner names, jockey and trainer information, current win and place odds, money flow percentages, and trend sparkline charts. Odds and money flow are updated in real-time and include trend indicators showing whether values have increased or decreased.
       </div>
       
       {/* Money flow column description for screen readers */}
       <div id="money-flow-description" className="sr-only">
         Money flow percentage shows the current hold percentage for each entrant, representing market interest and betting volume.
+      </div>
+      
+      {/* Trend column description for screen readers */}
+      <div id="trend-description" className="sr-only">
+        Trend column displays sparkline charts showing the recent history of Win odds for each entrant, allowing you to spot betting trends at a glance.
       </div>
       
       {/* Live region for real-time updates */}
@@ -324,6 +360,9 @@ export const EntrantsGrid = memo(function EntrantsGrid({ initialEntrants, raceId
         )}
         {Object.keys(moneyFlowUpdates).length > 0 && (
           ` Money flow updated for ${Object.keys(moneyFlowUpdates).length} entrant${Object.keys(moneyFlowUpdates).length === 1 ? '' : 's'}`
+        )}
+        {Object.keys(oddsHistoryUpdates || {}).length > 0 && (
+          ` Odds history updated for ${Object.keys(oddsHistoryUpdates || {}).length} entrant${Object.keys(oddsHistoryUpdates || {}).length === 1 ? '' : 's'}`
         )}
       </div>
     </div>

@@ -63,6 +63,22 @@ export interface MoneyFlowHistory {
   holdPercentage: number;
 }
 
+// OddsHistory document interface for sparkline data
+export interface OddsHistoryData {
+  $id: string;
+  $createdAt: string;
+  $updatedAt: string;
+  entrant: string;
+  winOdds: number;
+  timestamp: string;
+}
+
+// Odds history subscription callback interface for type safety
+export interface OddsHistorySubscriptionResponse {
+  payload?: Partial<OddsHistoryData> & { $id: string };
+  events?: string[];
+}
+
 export interface Entrant {
   $id: string;
   $createdAt: string;
@@ -82,4 +98,6 @@ export interface Entrant {
   previousHoldPercentage?: number;  // Previous money flow for trend calculation
   moneyFlowTrend?: 'up' | 'down' | 'neutral';  // Trend direction for display
   moneyFlowHistory?: string[];  // MoneyFlowHistory collection relationship
+  oddsHistory?: OddsHistoryData[];  // Array of odds history data for sparkline
+  oddsHistoryRelationship?: string[];  // OddsHistory collection relationship
 }
