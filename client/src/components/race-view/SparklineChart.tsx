@@ -70,7 +70,7 @@ export const SparklineChart = React.memo<SparklineChartProps>(function Sparkline
     const firstValue = values[0];
     const lastValue = values[values.length - 1];
     let trendDirection: 'up' | 'down' | 'neutral' = 'neutral';
-    let strokeColor = SPARKLINE_COLORS.neutral;
+    let strokeColor: string = SPARKLINE_COLORS.neutral;
 
     if (lastValue < firstValue) {
       // Odds shortening (getting lower)
