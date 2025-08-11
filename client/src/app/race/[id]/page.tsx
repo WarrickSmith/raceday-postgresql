@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation';
 import { createServerClient, Query } from '@/lib/appwrite-server';
-import { Race, Meeting } from '@/types/meetings';
+import { Race, Meeting, Entrant } from '@/types/meetings';
 import { RaceHeader } from '@/components/race-view/RaceHeader';
+import { EntrantsGrid } from '@/components/race-view/EntrantsGrid';
 
 interface RaceDetailPageProps {
   params: Promise<{
@@ -9,7 +10,7 @@ interface RaceDetailPageProps {
   }>;
 }
 
-async function getRaceById(raceId: string): Promise<{ race: Race; meeting: Meeting } | null> {
+async function getRaceById(raceId: string): Promise<{ race: Race; meeting: Meeting; entrants: Entrant[] } | null> {
   try {
     const { databases } = await createServerClient();
     
@@ -59,7 +60,31 @@ async function getRaceById(raceId: string): Promise<{ race: Race; meeting: Meeti
       date: raceData.meeting.date,
     };
     
-    return { race, meeting };
+    // Fetch entrants for this race
+    const entrantsQuery = await databases.listDocuments(
+      'raceday-db',
+      'entrants',
+      [Query.equal('race', raceData.$id)]
+    );
+
+    const entrants: Entrant[] = entrantsQuery.documents.map((doc) => ({
+      $id: doc.$id,
+      $createdAt: doc.$createdAt,
+      $updatedAt: doc.$updatedAt,
+      entrantId: doc.entrantId,
+      name: doc.name,
+      runnerNumber: doc.runnerNumber,
+      jockey: doc.jockey,
+      trainerName: doc.trainerName,
+      weight: doc.weight,
+      silkUrl: doc.silkUrl,
+      isScratched: doc.isScratched,
+      race: doc.race,
+      winOdds: doc.winOdds,
+      placeOdds: doc.placeOdds,
+    }));
+    
+    return { race, meeting, entrants };
   } catch (error) {
     console.error('Error fetching race details:', error);
     return null;
@@ -74,7 +99,7 @@ export default async function RaceDetailPage({ params }: RaceDetailPageProps) {
     notFound();
   }
 
-  const { race, meeting } = raceData;
+  const { race, meeting, entrants } = raceData;
 
   return (
     <main className="container mx-auto px-4 py-8" role="main">
@@ -82,14 +107,8 @@ export default async function RaceDetailPage({ params }: RaceDetailPageProps) {
         {/* Race Header */}
         <RaceHeader initialRace={race} meeting={meeting} />
 
-        {/* Future Features Placeholder */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="p-4 bg-blue-50 rounded-lg">
-            <p className="text-blue-800 text-sm">
-              <strong>Coming Soon:</strong> Detailed entrant information, odds, and form guide will be available in future updates.
-            </p>
-          </div>
-        </div>
+        {/* Entrants Grid */}
+        <EntrantsGrid initialEntrants={entrants} raceId={race.$id} />
       </div>
     </main>
   );

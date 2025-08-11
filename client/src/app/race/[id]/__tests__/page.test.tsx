@@ -55,7 +55,8 @@ describe('RaceDetailPage', () => {
   it('should render race details when race exists', async () => {
     // Mock successful race query with populated meeting data
     mockDatabases.listDocuments
-      .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] });
+      .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
+      .mockResolvedValueOnce({ documents: [] }); // Entrants query (empty for now)
 
     const component = await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
     render(component as React.ReactElement);
@@ -69,7 +70,7 @@ describe('RaceDetailPage', () => {
   });
 
   it('should call notFound when race does not exist', async () => {
-    // Mock empty race query
+    // Mock empty race query (no need for entrants query since race doesn't exist)
     mockDatabases.listDocuments.mockResolvedValueOnce({ documents: [] });
     mockNotFound.mockImplementation(() => {
       throw new Error('NEXT_NOT_FOUND');
@@ -80,7 +81,7 @@ describe('RaceDetailPage', () => {
   });
 
   it('should call notFound when race has invalid meeting data', async () => {
-    // Mock race with missing meeting data
+    // Mock race with missing meeting data (no need for entrants query since validation fails)
     const raceWithoutMeeting = { ...mockRaceWithMeeting, meeting: null };
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [raceWithoutMeeting] });
@@ -94,7 +95,7 @@ describe('RaceDetailPage', () => {
   });
 
   it('should call notFound when database query fails', async () => {
-    // Mock database error
+    // Mock database error (no need for entrants query since first query fails)
     mockDatabases.listDocuments.mockRejectedValueOnce(new Error('Database error'));
     mockNotFound.mockImplementation(() => {
       throw new Error('NEXT_NOT_FOUND');
@@ -106,7 +107,8 @@ describe('RaceDetailPage', () => {
 
   it('should have proper semantic HTML structure', async () => {
     mockDatabases.listDocuments
-      .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] });
+      .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
+      .mockResolvedValueOnce({ documents: [] }); // Entrants query
 
     const component = await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
     render(component as React.ReactElement);
@@ -119,7 +121,8 @@ describe('RaceDetailPage', () => {
 
   it('should have proper accessibility attributes', async () => {
     mockDatabases.listDocuments
-      .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] });
+      .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
+      .mockResolvedValueOnce({ documents: [] }); // Entrants query
 
     const component = await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
     render(component as React.ReactElement);
@@ -135,7 +138,8 @@ describe('RaceDetailPage', () => {
   it('should display race status with proper styling', async () => {
     // Test just one status case to avoid cleanup issues
     mockDatabases.listDocuments
-      .mockResolvedValueOnce({ documents: [{ ...mockRaceWithMeeting, status: 'Open' }] });
+      .mockResolvedValueOnce({ documents: [{ ...mockRaceWithMeeting, status: 'Open' }] }) // Race query
+      .mockResolvedValueOnce({ documents: [] }); // Entrants query
 
     const component = await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
     render(component as React.ReactElement);
@@ -152,7 +156,8 @@ describe('RaceDetailPage', () => {
     };
 
     mockDatabases.listDocuments
-      .mockResolvedValueOnce({ documents: [raceWithInvalidTime] });
+      .mockResolvedValueOnce({ documents: [raceWithInvalidTime] }) // Race query
+      .mockResolvedValueOnce({ documents: [] }); // Entrants query
 
     const component = await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
     render(component as React.ReactElement);
@@ -162,7 +167,8 @@ describe('RaceDetailPage', () => {
 
   it('should query database with correct parameters', async () => {
     mockDatabases.listDocuments
-      .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] });
+      .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
+      .mockResolvedValueOnce({ documents: [] }); // Entrants query
 
     await RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) });
 
@@ -175,7 +181,16 @@ describe('RaceDetailPage', () => {
       ])
     );
     
-    // Should only be called once (no separate meeting query)
-    expect(mockDatabases.listDocuments).toHaveBeenCalledTimes(1);
+    // Check entrants query
+    expect(mockDatabases.listDocuments).toHaveBeenCalledWith(
+      'raceday-db',
+      'entrants',
+      expect.arrayContaining([
+        expect.objectContaining({ attribute: 'race', values: [mockRaceWithMeeting.$id] })
+      ])
+    );
+    
+    // Should be called twice (race + entrants queries)
+    expect(mockDatabases.listDocuments).toHaveBeenCalledTimes(2);
   });
 });

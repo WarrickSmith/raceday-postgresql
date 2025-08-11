@@ -158,6 +158,7 @@ export const RACE_STATUS = {
   RUNNING: 'Running',
   INTERIM: 'Interim',
   FINALIZED: 'Finalized',
+  ABANDONED: 'Abandoned',
 } as const;
 
 export type RaceStatus = typeof RACE_STATUS[keyof typeof RACE_STATUS];
@@ -246,6 +247,12 @@ export function sanitizeRaceStatus(
     'soon': RACE_STATUS.CLOSED,
     'imminent': RACE_STATUS.CLOSED,
     'starting': RACE_STATUS.CLOSED,
+    'cancelled': RACE_STATUS.ABANDONED,
+    'canceled': RACE_STATUS.ABANDONED,
+    'called off': RACE_STATUS.ABANDONED,
+    'calledoff': RACE_STATUS.ABANDONED,
+    'postponed': RACE_STATUS.ABANDONED,
+    'void': RACE_STATUS.ABANDONED,
   };
   
   const mappedStatus = statusMappings[normalizedStatus.toLowerCase().replace(/\s+/g, '')];
@@ -300,11 +307,12 @@ export function validateStatusTransition(fromStatus: string, toStatus: string): 
   
   // Define valid transitions
   const validTransitions: Record<RaceStatus, RaceStatus[]> = {
-    [RACE_STATUS.OPEN]: [RACE_STATUS.CLOSED, RACE_STATUS.RUNNING, RACE_STATUS.INTERIM, RACE_STATUS.FINALIZED],
-    [RACE_STATUS.CLOSED]: [RACE_STATUS.RUNNING, RACE_STATUS.INTERIM, RACE_STATUS.FINALIZED, RACE_STATUS.OPEN], // Can reopen
-    [RACE_STATUS.RUNNING]: [RACE_STATUS.INTERIM, RACE_STATUS.FINALIZED],
-    [RACE_STATUS.INTERIM]: [RACE_STATUS.FINALIZED], // Interim results become final
+    [RACE_STATUS.OPEN]: [RACE_STATUS.CLOSED, RACE_STATUS.RUNNING, RACE_STATUS.INTERIM, RACE_STATUS.FINALIZED, RACE_STATUS.ABANDONED],
+    [RACE_STATUS.CLOSED]: [RACE_STATUS.RUNNING, RACE_STATUS.INTERIM, RACE_STATUS.FINALIZED, RACE_STATUS.OPEN, RACE_STATUS.ABANDONED], // Can reopen or be abandoned
+    [RACE_STATUS.RUNNING]: [RACE_STATUS.INTERIM, RACE_STATUS.FINALIZED, RACE_STATUS.ABANDONED],
+    [RACE_STATUS.INTERIM]: [RACE_STATUS.FINALIZED, RACE_STATUS.ABANDONED], // Interim results become final or abandoned
     [RACE_STATUS.FINALIZED]: [], // Final state - no transitions allowed
+    [RACE_STATUS.ABANDONED]: [], // Abandoned state - no transitions allowed
   };
   
   const allowedTransitions = validTransitions[fromStatus as RaceStatus] || [];
@@ -420,6 +428,18 @@ export function getRaceStatusBadgeStyles(status: string) {
         urgency: 'polite' as const,
         isValid: isValidRaceStatus(status),
       };
+    case RACE_STATUS.ABANDONED:
+      return {
+        status: sanitizedStatus,
+        containerClass: 'race-status-badge race-status-abandoned',
+        textClass: 'text-red-800',
+        bgClass: 'bg-red-100',
+        borderClass: 'border-red-200',
+        icon: '⛔',
+        ariaLabel: 'Race has been abandoned',
+        urgency: 'assertive' as const,
+        isValid: isValidRaceStatus(status),
+      };
     default:
       return {
         status: sanitizedStatus,
@@ -455,6 +475,9 @@ export function shouldAnnounceStatusChange(oldStatus: string, newStatus: string)
     [RACE_STATUS.OPEN, RACE_STATUS.CLOSED],
     [RACE_STATUS.CLOSED, RACE_STATUS.RUNNING],
     [RACE_STATUS.RUNNING, RACE_STATUS.FINALIZED],
+    [RACE_STATUS.OPEN, RACE_STATUS.ABANDONED],
+    [RACE_STATUS.CLOSED, RACE_STATUS.ABANDONED],
+    [RACE_STATUS.RUNNING, RACE_STATUS.ABANDONED],
   ];
   
   return significantTransitions.some(
@@ -479,6 +502,8 @@ export function getRaceStatusDescription(status: string): string {
       return 'This race has finished with provisional results. Final results pending confirmation.';
     case RACE_STATUS.FINALIZED:
       return 'This race has been completed. Results are available.';
+    case RACE_STATUS.ABANDONED:
+      return 'This race has been abandoned or cancelled. All bets are void.';
     default:
       return 'Race status is not available or unknown.';
   }
