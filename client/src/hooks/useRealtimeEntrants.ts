@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { client } from '@/lib/appwrite-client';
-import { Entrant } from '@/types/meetings';
+import { Entrant, EntrantSubscriptionResponse } from '@/types/meetings';
 
 interface UseRealtimeEntrantsProps {
   initialEntrants: Entrant[];
@@ -60,10 +60,7 @@ export function useRealtimeEntrants({ initialEntrants, raceId }: UseRealtimeEntr
 
     const setupEntrantsSubscription = async () => {
       try {
-        entrantsUnsubscribe = client.subscribe(entrantsChannel, (response: { 
-          payload?: Partial<Entrant> & { $id: string };
-          events?: string[];
-        }) => {
+        entrantsUnsubscribe = client.subscribe(entrantsChannel, (response: EntrantSubscriptionResponse) => {
           if (!response.payload || response.payload.race !== raceId) {
             return; // Only process updates for our race
           }

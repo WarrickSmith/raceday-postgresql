@@ -103,26 +103,55 @@ export const EntrantsGrid = memo(function EntrantsGrid({ initialEntrants, raceId
     return formatter;
   }, []);
 
+  // Create a memoized map of entrant odds for efficient lookups
+  const entrantOddsMap = useMemo(() => {
+    const oddsMap: Record<string, { winOdds?: number; placeOdds?: number }> = {};
+    sortedEntrants.forEach(entrant => {
+      oddsMap[entrant.$id] = {
+        winOdds: entrant.winOdds,
+        placeOdds: entrant.placeOdds
+      };
+    });
+    return oddsMap;
+  }, [sortedEntrants]);
+
+  // Memoized trend calculation that only recalculates when specific entrant data changes
   const getTrendIndicator = useMemo(() => {
+    const trendCache: Record<string, React.ReactNode> = {};
+    
     const indicator = (entrantId: string, type: 'win' | 'place') => {
+      const cacheKey = `${entrantId}-${type}`;
+      
+      // Return cached result if available
+      if (cacheKey in trendCache) {
+        return trendCache[cacheKey];
+      }
+      
       const update = oddsUpdates[entrantId];
-      if (!update) return null;
+      if (!update) {
+        trendCache[cacheKey] = null;
+        return null;
+      }
       
       const currentOdds = type === 'win' ? 
-        sortedEntrants.find(e => e.$id === entrantId)?.winOdds :
-        sortedEntrants.find(e => e.$id === entrantId)?.placeOdds;
+        entrantOddsMap[entrantId]?.winOdds :
+        entrantOddsMap[entrantId]?.placeOdds;
       const previousOdds = type === 'win' ? update.win : update.place;
       
-      if (!currentOdds || !previousOdds || currentOdds === previousOdds) return null;
-      
-      if (currentOdds > previousOdds) {
-        return <span className="text-blue-600 ml-1 text-xs" aria-label="odds lengthened">↑</span>;
-      } else {
-        return <span className="text-red-600 ml-1 text-xs" aria-label="odds shortened">↓</span>;
+      if (!currentOdds || !previousOdds || currentOdds === previousOdds) {
+        trendCache[cacheKey] = null;
+        return null;
       }
+      
+      const result = currentOdds > previousOdds ? 
+        <span className="text-blue-600 ml-1 text-xs" aria-label="odds lengthened">↑</span> :
+        <span className="text-red-600 ml-1 text-xs" aria-label="odds shortened">↓</span>;
+      
+      trendCache[cacheKey] = result;
+      return result;
     };
     return indicator;
-  }, [oddsUpdates, sortedEntrants]);
+  }, [oddsUpdates, entrantOddsMap]);
 
   if (sortedEntrants.length === 0) {
     return (

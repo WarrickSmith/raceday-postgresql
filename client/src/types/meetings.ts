@@ -39,6 +39,12 @@ export interface MeetingWithExpandState extends Meeting {
   races?: Race[];
 }
 
+// Appwrite real-time subscription response type for entrants
+export interface EntrantSubscriptionResponse {
+  payload?: Partial<Entrant> & { $id: string };
+  events?: string[];
+}
+
 export interface Entrant {
   $id: string;
   $createdAt: string;
