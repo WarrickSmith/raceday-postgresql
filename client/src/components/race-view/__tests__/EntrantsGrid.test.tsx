@@ -270,8 +270,8 @@ describe('EntrantsGrid', () => {
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
 
     // Check for trend indicators
-    expect(screen.getByLabelText('Money flow increasing')).toBeInTheDocument();
-    expect(screen.getByLabelText('Money flow decreasing')).toBeInTheDocument();
+    expect(screen.getByLabelText('Market interest increasing')).toBeInTheDocument();
+    expect(screen.getByLabelText('Market interest decreasing')).toBeInTheDocument();
   });
 
   test('handles scratched entrants money flow correctly', () => {
