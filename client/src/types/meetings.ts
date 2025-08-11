@@ -60,4 +60,8 @@ export interface Entrant {
   race: string;  // Race ID this entrant belongs to
   winOdds?: number;  // Current win odds
   placeOdds?: number;  // Current place odds
+  holdPercentage?: number;  // Current money flow percentage
+  previousHoldPercentage?: number;  // Previous money flow for trend calculation
+  moneyFlowTrend?: 'up' | 'down' | 'neutral';  // Trend direction for display
+  moneyFlowHistory?: string[];  // MoneyFlowHistory collection relationship
 }
