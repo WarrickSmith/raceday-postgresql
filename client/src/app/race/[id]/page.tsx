@@ -82,7 +82,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
     console.log('[DEBUG] Fetching entrants for race:', {
       raceId: raceData.$id,
       raceName: raceData.name,
-      raceIdFromParams: params.id,
+      raceIdFromParams: raceId,
       queryField: 'race',
       raceDataKeys: Object.keys(raceData)
     });
