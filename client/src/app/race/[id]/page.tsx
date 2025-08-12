@@ -3,6 +3,7 @@ import { createServerClient, Query } from '@/lib/appwrite-server';
 import { Race, Meeting, Entrant, MoneyFlowHistory, OddsHistoryData } from '@/types/meetings';
 import { RaceHeader } from '@/components/race-view/RaceHeader';
 import { EntrantsGrid } from '@/components/race-view/EntrantsGrid';
+import { coordinateIntelligentPolling } from '@/app/actions/race-polling';
 
 const ODDS_HISTORY_QUERY_LIMIT = 500;
 
@@ -12,7 +13,22 @@ interface RaceDetailPageProps {
   }>;
 }
 
-async function getRaceById(raceId: string): Promise<{ race: Race; meeting: Meeting; entrants: Entrant[] } | null> {
+/**
+ * Comprehensive data fetching with batch optimization for race ecosystem
+ * Fetches race, meeting, entrants, odds-history, and money-flow-history efficiently
+ */
+async function getComprehensiveRaceData(raceId: string): Promise<{
+  race: Race; 
+  meeting: Meeting; 
+  entrants: Entrant[];
+  dataFreshness: {
+    lastUpdated: string;
+    entrantsDataAge: number;
+    oddsHistoryCount: number;
+    moneyFlowHistoryCount: number;
+  };
+  pollingTriggered?: boolean;
+} | null> {
   try {
     const { databases } = await createServerClient();
     
@@ -62,28 +78,50 @@ async function getRaceById(raceId: string): Promise<{ race: Race; meeting: Meeti
       date: raceData.meeting.date,
     };
     
-    // Fetch entrants for this race
+    // Fetch entrants for this race with batch optimization
     const entrantsQuery = await databases.listDocuments(
       'raceday-db',
       'entrants',
-      [Query.equal('race', raceData.$id)]
+      [
+        Query.equal('race', raceData.$id),
+        Query.orderAsc('runnerNumber') // Order by runner number for consistent display
+      ]
     );
+
+    // Calculate data freshness metrics
+    const now = new Date();
+    const entrantsDataAge = entrantsQuery.documents.length > 0 
+      ? Math.round((now.getTime() - new Date(entrantsQuery.documents[0].$updatedAt).getTime()) / 1000)
+      : 0;
 
     // Fetch money flow data for all entrants efficiently using batch query
     const entrantIds = entrantsQuery.documents.map(doc => doc.$id);
     
-    // Use a single query to get all money flow history for these entrants
-    const moneyFlowQuery = await databases.listDocuments(
-      'raceday-db',
-      'money-flow-history',
-      [
-        Query.equal('entrant', entrantIds), // Batch query for all entrants at once
-        Query.orderDesc('$createdAt'),
-        Query.limit(100) // Reasonable limit for all entrant histories combined
-      ]
-    );
+    // Parallel execution of both history queries for optimal performance
+    const [moneyFlowQuery, oddsHistoryQuery] = await Promise.all([
+      // Money flow history batch query
+      databases.listDocuments(
+        'raceday-db',
+        'money-flow-history',
+        [
+          Query.equal('entrant', entrantIds), // Batch query for all entrants at once
+          Query.orderDesc('$createdAt'),
+          Query.limit(200) // Increased limit for comprehensive data
+        ]
+      ),
+      // Odds history batch query
+      databases.listDocuments(
+        'raceday-db',
+        'odds-history',
+        [
+          Query.equal('entrant', entrantIds), // Batch query for all entrants at once
+          Query.orderDesc('$createdAt'),
+          Query.limit(ODDS_HISTORY_QUERY_LIMIT)
+        ]
+      )
+    ]);
 
-    // Group results by entrant for processing
+    // Group results by entrant for processing with enhanced data structure
     const moneyFlowByEntrant = new Map<string, MoneyFlowHistory[]>();
     moneyFlowQuery.documents.forEach(doc => {
       const moneyFlowDoc = doc as unknown as MoneyFlowHistory;
@@ -93,17 +131,6 @@ async function getRaceById(raceId: string): Promise<{ race: Race; meeting: Meeti
       }
       moneyFlowByEntrant.get(entrantId)!.push(moneyFlowDoc);
     });
-
-    // Fetch odds history data for all entrants efficiently using batch query
-    const oddsHistoryQuery = await databases.listDocuments(
-      'raceday-db',
-      'odds-history',
-      [
-        Query.equal('entrant', entrantIds), // Batch query for all entrants at once
-        Query.orderDesc('$createdAt'),
-        Query.limit(ODDS_HISTORY_QUERY_LIMIT) // Reasonable limit for sparkline data (all entrant histories combined)
-      ]
-    );
 
     // Group odds history results by entrant for processing
     const oddsHistoryByEntrant = new Map<string, OddsHistoryData[]>();
@@ -173,7 +200,34 @@ async function getRaceById(raceId: string): Promise<{ race: Race; meeting: Meeti
       };
     });
     
-    return { race, meeting, entrants };
+    // Calculate comprehensive data freshness metrics
+    const dataFreshness = {
+      lastUpdated: now.toISOString(),
+      entrantsDataAge,
+      oddsHistoryCount: oddsHistoryQuery.documents.length,
+      moneyFlowHistoryCount: moneyFlowQuery.documents.length
+    };
+
+    // Trigger intelligent polling coordination proactively
+    // This ensures data availability is maintained for all races
+    let pollingTriggered = false;
+    try {
+      // Fire and forget - don't wait for polling coordination
+      coordinateIntelligentPolling().catch(error => {
+        console.log('Background polling coordination failed:', error.message);
+      });
+      pollingTriggered = true;
+    } catch (error) {
+      console.log('Failed to initiate polling coordination:', error);
+    }
+
+    return { 
+      race, 
+      meeting, 
+      entrants, 
+      dataFreshness,
+      pollingTriggered
+    };
   } catch (error) {
     console.error('Error fetching race details:', error);
     return null;
@@ -182,22 +236,29 @@ async function getRaceById(raceId: string): Promise<{ race: Race; meeting: Meeti
 
 export default async function RaceDetailPage({ params }: RaceDetailPageProps) {
   const { id } = await params;
-  const raceData = await getRaceById(id);
+  const raceData = await getComprehensiveRaceData(id);
   
   if (!raceData) {
     notFound();
   }
 
-  const { race, meeting, entrants } = raceData;
+  const { race, meeting, entrants, dataFreshness } = raceData;
 
   return (
     <main className="container mx-auto px-4 py-8" role="main">
       <div className="max-w-4xl mx-auto">
         {/* Race Header */}
-        <RaceHeader initialRace={race} meeting={meeting} />
+        <RaceHeader 
+          initialRace={race} 
+          meeting={meeting} 
+        />
 
-        {/* Entrants Grid */}
-        <EntrantsGrid initialEntrants={entrants} raceId={race.$id} />
+        {/* Entrants Grid with comprehensive real-time data */}
+        <EntrantsGrid 
+          initialEntrants={entrants} 
+          raceId={race.$id}
+          dataFreshness={dataFreshness}
+        />
       </div>
     </main>
   );

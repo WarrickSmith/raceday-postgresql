@@ -1,8 +1,8 @@
 'use client';
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState, useCallback } from 'react';
 import { Entrant } from '@/types/meetings';
-import { useRealtimeEntrants } from '@/hooks/useRealtimeEntrants';
+import { useComprehensiveRealtime } from '@/hooks/useComprehensiveRealtimeFixed';
 import { SparklineChart } from './SparklineChart';
 
 // Memoized EntrantRow component to prevent unnecessary re-renders
@@ -122,13 +122,83 @@ const EntrantRow = memo(function EntrantRow({
 interface EntrantsGridProps {
   initialEntrants: Entrant[];
   raceId: string;
+  dataFreshness?: {
+    lastUpdated: string;
+    entrantsDataAge: number;
+    oddsHistoryCount: number;
+    moneyFlowHistoryCount: number;
+  };
 }
 
-export const EntrantsGrid = memo(function EntrantsGrid({ initialEntrants, raceId }: EntrantsGridProps) {
-  const { entrants, isConnected, oddsUpdates, moneyFlowUpdates, oddsHistoryUpdates } = useRealtimeEntrants({
+export const EntrantsGrid = memo(function EntrantsGrid({ 
+  initialEntrants, 
+  raceId, 
+  dataFreshness 
+}: EntrantsGridProps) {
+  const [showPerformancePanel, setShowPerformancePanel] = useState(false);
+  const [updateNotifications, setUpdateNotifications] = useState(true);
+  
+  const realtimeResult = useComprehensiveRealtime({
     initialEntrants,
     raceId,
+    dataFreshness
   });
+  
+  const { 
+    entrants, 
+    connectionState, 
+    recentUpdates, 
+    updateCounts, 
+    performance, 
+    triggerReconnect,
+    clearUpdateHistory 
+  } = realtimeResult;
+  
+  // Legacy compatibility for existing logic (commented out as not used)
+  // const isConnected = connectionState.isConnected;
+  const oddsUpdates = useMemo(() => {
+    const recent = recentUpdates.filter(u => u.type === 'entrant' && u.timestamp > new Date(Date.now() - 10000));
+    return recent.reduce((acc, update) => {
+      if (update.entrantId && typeof update.data.winOdds === 'number') {
+        acc[update.entrantId] = {
+          win: update.data.winOdds as number,
+          place: typeof update.data.placeOdds === 'number' ? update.data.placeOdds as number : undefined,
+          timestamp: update.timestamp
+        };
+      }
+      return acc;
+    }, {} as Record<string, { win?: number; place?: number; timestamp: Date }>);
+  }, [recentUpdates]);
+  
+  const moneyFlowUpdates = useMemo(() => {
+    const recent = recentUpdates.filter(u => u.type === 'moneyFlow' && u.timestamp > new Date(Date.now() - 10000));
+    return recent.reduce((acc, update) => {
+      if (update.entrantId && typeof update.data.holdPercentage === 'number') {
+        acc[update.entrantId] = {
+          holdPercentage: update.data.holdPercentage as number,
+          timestamp: update.timestamp
+        };
+      }
+      return acc;
+    }, {} as Record<string, { holdPercentage?: number; timestamp: Date }>);
+  }, [recentUpdates]);
+  
+  const oddsHistoryUpdates = useMemo(() => {
+    const recent = recentUpdates.filter(u => u.type === 'oddsHistory' && u.timestamp > new Date(Date.now() - 10000));
+    return recent.reduce((acc, update) => {
+      if (update.entrantId && update.data && typeof update.data === 'object') {
+        acc[update.entrantId] = {
+          newEntry: update.data as Record<string, unknown>,
+          timestamp: update.timestamp
+        };
+      }
+      return acc;
+    }, {} as Record<string, { newEntry?: Record<string, unknown>; timestamp: Date }>);
+  }, [recentUpdates]);
+  
+  const togglePerformancePanel = useCallback(() => {
+    setShowPerformancePanel(prev => !prev);
+  }, []);
   // Sort entrants by runner number for consistent display
   const sortedEntrants = useMemo(() => {
     return [...entrants].sort((a, b) => a.runnerNumber - b.runnerNumber);
@@ -241,22 +311,127 @@ export const EntrantsGrid = memo(function EntrantsGrid({ initialEntrants, raceId
   return (
     <div className="bg-white rounded-lg shadow-md">
       <div className="p-6 border-b border-gray-200">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-gray-900">
             Race Entrants ({sortedEntrants.length})
           </h2>
-          <span 
-            className={`text-xs px-2 py-1 rounded-full ${
-              isConnected 
-                ? 'bg-green-100 text-green-700' 
-                : 'bg-red-100 text-red-700'
-            }`}
-            aria-live="polite"
-            aria-label={isConnected ? 'Connected to live odds' : 'Disconnected from live odds'}
-          >
-            {isConnected ? '🔄 Live' : '📶 Disconnected'}
-          </span>
+          <div className="flex items-center space-x-3">
+            {/* Data Freshness Indicator */}
+            {dataFreshness && (
+              <div className="text-xs text-gray-500">
+                Data: {Math.round(dataFreshness.entrantsDataAge / 60)}min ago
+              </div>
+            )}
+            
+            {/* Performance Toggle */}
+            <button
+              onClick={togglePerformancePanel}
+              className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+              aria-label="Toggle performance monitoring panel"
+            >
+              📊 Stats
+            </button>
+            
+            {/* Enhanced Connection Status */}
+            <div className="flex items-center space-x-2">
+              <span 
+                className={`text-xs px-2 py-1 rounded-full transition-colors ${
+                  connectionState.isConnected 
+                    ? 'bg-green-100 text-green-700' 
+                    : 'bg-red-100 text-red-700'
+                }`}
+                aria-live="polite"
+                aria-label={connectionState.isConnected ? 'Connected to live data' : 'Disconnected from live data'}
+              >
+                {connectionState.isConnected ? '🔄 Live' : '📶 Disconnected'}
+              </span>
+              
+              {!connectionState.isConnected && connectionState.connectionAttempts > 0 && (
+                <button
+                  onClick={triggerReconnect}
+                  className="text-xs px-2 py-1 rounded bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"
+                  aria-label="Retry connection"
+                >
+                  🔄 Retry
+                </button>
+              )}
+            </div>
+          </div>
         </div>
+        
+        {/* Performance Monitoring Panel */}
+        {showPerformancePanel && (
+          <div className="bg-gray-50 rounded-lg p-4 text-sm space-y-3 border border-gray-200">
+            <div className="flex justify-between items-center">
+              <h3 className="font-medium text-gray-900">Real-time Performance</h3>
+              <button
+                onClick={clearUpdateHistory}
+                className="text-xs px-2 py-1 rounded bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors"
+                aria-label="Clear update history"
+              >
+                Clear History
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <div className="text-xs text-gray-500">Connection</div>
+                <div className={`font-medium ${
+                  connectionState.isConnected ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {connectionState.isConnected ? 'Connected' : 'Disconnected'}
+                </div>
+                <div className="text-xs text-gray-400">
+                  {connectionState.subscriptionCount} channels
+                </div>
+              </div>
+              
+              <div>
+                <div className="text-xs text-gray-500">Updates/min</div>
+                <div className="font-medium text-blue-600">
+                  {performance.updatesPerMinute}
+                </div>
+                <div className="text-xs text-gray-400">
+                  Avg latency: {Math.round(performance.averageUpdateLatency)}ms
+                </div>
+              </div>
+              
+              <div>
+                <div className="text-xs text-gray-500">Update Counts</div>
+                <div className="font-medium text-purple-600">
+                  E:{updateCounts.entrants} M:{updateCounts.moneyFlow} O:{updateCounts.oddsHistory}
+                </div>
+                <div className="text-xs text-gray-400">
+                  Batch efficiency: {Math.round(performance.batchEfficiency)}%
+                </div>
+              </div>
+              
+              <div>
+                <div className="text-xs text-gray-500">Memory Usage</div>
+                <div className="font-medium text-indigo-600">
+                  {Math.round(performance.memoryUsage / 1024)}KB
+                </div>
+                <div className="text-xs text-gray-400">
+                  {recentUpdates.length} recent updates
+                </div>
+              </div>
+            </div>
+            
+            {recentUpdates.length > 0 && (
+              <div>
+                <div className="text-xs text-gray-500 mb-2">Recent Updates</div>
+                <div className="space-y-1 max-h-20 overflow-y-auto">
+                  {recentUpdates.slice(-3).map((update, idx) => (
+                    <div key={idx} className="text-xs text-gray-600 flex justify-between">
+                      <span>{update.type} {update.entrantId ? `(${update.entrantId.slice(-4)})` : ''}</span>
+                      <span>{update.timestamp.toLocaleTimeString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       
       <div className="overflow-x-auto">
@@ -347,7 +522,7 @@ export const EntrantsGrid = memo(function EntrantsGrid({ initialEntrants, raceId
         Trend column displays sparkline charts showing the recent history of Win odds for each entrant, allowing you to spot betting trends at a glance.
       </div>
       
-      {/* Live region for real-time updates */}
+      {/* Enhanced Live region for real-time updates with comprehensive notifications */}
       <div 
         aria-live="polite" 
         aria-atomic="false" 
@@ -355,15 +530,62 @@ export const EntrantsGrid = memo(function EntrantsGrid({ initialEntrants, raceId
         id="entrants-updates"
         aria-label="Live entrant updates"
       >
-        {Object.keys(oddsUpdates).length > 0 && (
-          `Odds updated for ${Object.keys(oddsUpdates).length} entrant${Object.keys(oddsUpdates).length === 1 ? '' : 's'}`
+        {updateNotifications && (
+          <>
+            {/* Connection status changes */}
+            {connectionState.isConnected ? '' : 'Connection lost. Attempting to reconnect.'}
+            
+            {/* Update notifications with more detail */}
+            {Object.keys(oddsUpdates).length > 0 && (
+              `Odds updated for ${Object.keys(oddsUpdates).length} entrant${Object.keys(oddsUpdates).length === 1 ? '' : 's'}`
+            )}
+            {Object.keys(moneyFlowUpdates).length > 0 && (
+              ` Money flow updated for ${Object.keys(moneyFlowUpdates).length} entrant${Object.keys(moneyFlowUpdates).length === 1 ? '' : 's'}`
+            )}
+            {Object.keys(oddsHistoryUpdates || {}).length > 0 && (
+              ` Odds trend data updated for ${Object.keys(oddsHistoryUpdates || {}).length} entrant${Object.keys(oddsHistoryUpdates || {}).length === 1 ? '' : 's'}`
+            )}
+            
+            {/* Performance alerts */}
+            {performance.updatesPerMinute > 50 && (
+              ' High update frequency detected. Data is very active.'
+            )}
+            {performance.averageUpdateLatency > 1000 && (
+              ' Slower update speeds detected. Data may be delayed.'
+            )}
+          </>
         )}
-        {Object.keys(moneyFlowUpdates).length > 0 && (
-          ` Money flow updated for ${Object.keys(moneyFlowUpdates).length} entrant${Object.keys(moneyFlowUpdates).length === 1 ? '' : 's'}`
-        )}
-        {Object.keys(oddsHistoryUpdates || {}).length > 0 && (
-          ` Odds history updated for ${Object.keys(oddsHistoryUpdates || {}).length} entrant${Object.keys(oddsHistoryUpdates || {}).length === 1 ? '' : 's'}`
-        )}
+      </div>
+      
+      {/* Update notification toggle */}
+      <div className="p-3 border-t border-gray-100 bg-gray-50">
+        <div className="flex justify-between items-center text-xs">
+          <div className="flex items-center space-x-4">
+            <span className="text-gray-500">
+              Last update: {recentUpdates.length > 0 
+                ? recentUpdates[recentUpdates.length - 1].timestamp.toLocaleTimeString()
+                : 'No updates yet'
+              }
+            </span>
+            {connectionState.averageLatency > 0 && (
+              <span className="text-gray-500">
+                Avg latency: {Math.round(connectionState.averageLatency)}ms
+              </span>
+            )}
+          </div>
+          
+          <button
+            onClick={() => setUpdateNotifications(!updateNotifications)}
+            className={`px-2 py-1 rounded text-xs transition-colors ${
+              updateNotifications 
+                ? 'bg-blue-100 text-blue-700' 
+                : 'bg-gray-200 text-gray-600'
+            }`}
+            aria-label={updateNotifications ? 'Disable update announcements' : 'Enable update announcements'}
+          >
+            {updateNotifications ? '🔊 Announcements On' : '🔇 Announcements Off'}
+          </button>
+        </div>
       </div>
     </div>
   );
