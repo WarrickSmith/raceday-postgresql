@@ -2,13 +2,16 @@ import { render, screen } from '@testing-library/react';
 import { notFound } from 'next/navigation';
 import RaceDetailPage from '../page';
 import { createServerClient, Query } from '@/lib/appwrite-server';
+import { coordinateIntelligentPolling } from '@/app/actions/race-polling';
 
 // Mock the dependencies
 jest.mock('next/navigation');
 jest.mock('@/lib/appwrite-server');
+jest.mock('@/app/actions/race-polling');
 
 const mockNotFound = notFound as jest.MockedFunction<typeof notFound>;
 const mockCreateServerClient = createServerClient as jest.MockedFunction<typeof createServerClient>;
+const mockCoordinateIntelligentPolling = coordinateIntelligentPolling as jest.MockedFunction<typeof coordinateIntelligentPolling>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockQuery = Query as any;
 
@@ -45,6 +48,13 @@ describe('RaceDetailPage', () => {
     jest.clearAllMocks();
     mockCreateServerClient.mockResolvedValue({
       databases: mockDatabases,
+    });
+
+    // Mock intelligent polling coordination to prevent database errors
+    mockCoordinateIntelligentPolling.mockResolvedValue({
+      success: true,
+      strategy: 'batch',
+      message: 'Test polling coordination completed'
     });
 
     // Mock Query functions
