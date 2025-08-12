@@ -97,8 +97,8 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
     // Fetch money flow data for all entrants efficiently using batch query
     const entrantIds = entrantsQuery.documents.map(doc => doc.$id);
     
-    // Parallel execution of both history queries for optimal performance
-    const [moneyFlowQuery, oddsHistoryQuery] = await Promise.all([
+    // Only fetch history data if there are entrants (avoid empty Query.equal calls)
+    const [moneyFlowQuery, oddsHistoryQuery] = entrantIds.length > 0 ? await Promise.all([
       // Money flow history batch query
       databases.listDocuments(
         'raceday-db',
@@ -119,7 +119,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
           Query.limit(ODDS_HISTORY_QUERY_LIMIT)
         ]
       )
-    ]);
+    ]) : [{ documents: [] }, { documents: [] }]; // Return empty results if no entrants
 
     // Group results by entrant for processing with enhanced data structure
     const moneyFlowByEntrant = new Map<string, MoneyFlowHistory[]>();
