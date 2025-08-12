@@ -292,7 +292,7 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
             // Current race day status
             if (entrant.scratch_time) entrantDoc.scratchTime = entrant.scratch_time;
             if (entrant.emergency_position) entrantDoc.emergencyPosition = entrant.emergency_position;
-            if (entrant.runner_change) entrantDoc.runnerChange = entrant.runner_change;
+            if (entrant.runner_change) entrantDoc.runnerChange = safeStringField(entrant.runner_change, 500);
             if (entrant.first_start_indicator) entrantDoc.firstStartIndicator = entrant.first_start_indicator;
             
             // Current race connections
