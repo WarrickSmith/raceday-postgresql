@@ -143,30 +143,59 @@ export function useComprehensiveRealtime({
       subscriptionsRef.current.moneyFlow = client.subscribe(channels.moneyFlow, (response: MoneyFlowSubscriptionResponse) => {
         if (!response.payload || !response.payload.entrant) return;
         
-        const entrantId = response.payload.entrant;
+        const entrantRef = response.payload.entrant;
+        // Handle both string IDs and document references
+        const entrantId = typeof entrantRef === 'string' ? entrantRef : (entrantRef as any)?.$id || String(entrantRef);
         const holdPercentage = response.payload.holdPercentage;
         
-        setEntrants(current => current.map(entrant => {
-          if (entrant.$id === entrantId && holdPercentage !== undefined) {
-            let trend: 'up' | 'down' | 'neutral' = 'neutral';
-            if (entrant.holdPercentage !== undefined && holdPercentage !== entrant.holdPercentage) {
-              trend = holdPercentage > entrant.holdPercentage ? 'up' : 'down';
+        console.log('[DEBUG] Money flow update received:', {
+          entrantRef,
+          entrantId,
+          holdPercentage,
+          payload: response.payload
+        });
+        
+        setEntrants(current => {
+          console.log('[DEBUG] Current entrants:', current.map(e => ({ id: e.$id, name: e.name })));
+          
+          const updated = current.map(entrant => {
+            if (entrant.$id === entrantId && holdPercentage !== undefined) {
+              let trend: 'up' | 'down' | 'neutral' = 'neutral';
+              if (entrant.holdPercentage !== undefined && holdPercentage !== entrant.holdPercentage) {
+                trend = holdPercentage > entrant.holdPercentage ? 'up' : 'down';
+              }
+              
+              console.log('[DEBUG] Updating entrant money flow:', {
+                entrantId: entrant.$id,
+                entrantName: entrant.name,
+                oldHoldPercentage: entrant.holdPercentage,
+                newHoldPercentage: holdPercentage,
+                trend
+              });
+              
+              return {
+                ...entrant,
+                previousHoldPercentage: entrant.holdPercentage,
+                holdPercentage: holdPercentage,
+                moneyFlowTrend: trend
+              };
             }
-            
-            return {
-              ...entrant,
-              previousHoldPercentage: entrant.holdPercentage,
-              holdPercentage: holdPercentage,
-              moneyFlowTrend: trend
-            };
-          }
-          return entrant;
-        }));
+            return entrant;
+          });
+          
+          console.log('[DEBUG] Updated entrants with money flow:', updated.map(e => ({ 
+            id: e.$id, 
+            name: e.name, 
+            holdPercentage: e.holdPercentage 
+          })));
+          
+          return updated;
+        });
         
         setRecentUpdates(prev => [...prev.slice(-50), {
-          type: 'moneyFlow',
+          type: 'moneyFlow' as const,
           entrantId,
-          data: response.payload,
+          data: response.payload as Record<string, unknown>,
           timestamp: new Date(),
           acknowledged: false
         }].slice(-100));
@@ -199,9 +228,9 @@ export function useComprehensiveRealtime({
         }));
         
         setRecentUpdates(prev => [...prev.slice(-50), {
-          type: 'oddsHistory',
+          type: 'oddsHistory' as const,
           entrantId,
-          data: newOddsEntry,
+          data: newOddsEntry as unknown as Record<string, unknown>,
           timestamp: new Date(),
           acknowledged: false
         }].slice(-100));
