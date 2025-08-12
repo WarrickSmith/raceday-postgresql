@@ -145,7 +145,7 @@ export function useComprehensiveRealtime({
         
         const entrantRef = response.payload.entrant;
         // Handle both string IDs and document references
-        const entrantId = typeof entrantRef === 'string' ? entrantRef : (entrantRef as any)?.$id || String(entrantRef);
+        const entrantId = typeof entrantRef === 'string' ? entrantRef : (entrantRef as { $id?: string })?.$id || String(entrantRef);
         const holdPercentage = response.payload.holdPercentage;
         
         console.log('[DEBUG] Money flow update received:', {

@@ -25,16 +25,18 @@ export async function GET(
     }
 
     // Check if all races are finalized
-    const allRacesFinalized = racesQuery.documents.every((race: any) => 
-      race.status === 'Final' || race.status === 'Abandoned'
-    );
+    const allRacesFinalized = racesQuery.documents.every((race) => {
+      const raceData = race as unknown as { status: string };
+      return raceData.status === 'Final' || raceData.status === 'Abandoned';
+    });
 
     return NextResponse.json({ 
       isCompleted: allRacesFinalized,
       totalRaces: racesQuery.documents.length,
-      finalizedRaces: racesQuery.documents.filter((race: any) => 
-        race.status === 'Final' || race.status === 'Abandoned'
-      ).length
+      finalizedRaces: racesQuery.documents.filter((race) => {
+        const raceData = race as unknown as { status: string };
+        return raceData.status === 'Final' || raceData.status === 'Abandoned';
+      }).length
     });
     
   } catch (error) {

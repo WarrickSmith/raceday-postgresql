@@ -138,9 +138,10 @@ function MeetingCardComponent({ meeting, onRaceClick, onExpand, onCollapse, poll
     
     // 1. If we have expanded race data, check if all races are finalized
     if (races && Array.isArray(races) && races.length > 0) {
-      const allRacesFinalized = races.every((race: any) => 
-        race.status === 'Final' || race.status === 'Abandoned'
-      );
+      const allRacesFinalized = races.every((race) => {
+        const raceData = race as { status: string };
+        return raceData.status === 'Final' || raceData.status === 'Abandoned';
+      });
       
       if (allRacesFinalized) {
         return 'completed';

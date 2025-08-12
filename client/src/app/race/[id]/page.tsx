@@ -135,7 +135,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
     // Group odds history results by entrant for processing and map to correct format
     const oddsHistoryByEntrant = new Map<string, OddsHistoryData[]>();
     oddsHistoryQuery.documents.forEach(doc => {
-      const rawDoc = doc as any;
+      const rawDoc = doc as unknown as { entrant: string; type: string; [key: string]: unknown };
       const entrantId = rawDoc.entrant;
       
       // Only include win odds for sparklines (pool_win preferred, fixed_win as fallback)
@@ -145,12 +145,12 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       
       // Map the database fields to the expected interface format
       const oddsHistoryDoc: OddsHistoryData = {
-        $id: rawDoc.$id,
-        $createdAt: rawDoc.$createdAt,
-        $updatedAt: rawDoc.$updatedAt,
+        $id: rawDoc.$id as string,
+        $createdAt: rawDoc.$createdAt as string,
+        $updatedAt: rawDoc.$updatedAt as string,
         entrant: rawDoc.entrant,
-        winOdds: rawDoc.odds, // Map 'odds' field to 'winOdds'
-        timestamp: rawDoc.eventTimestamp || rawDoc.$createdAt
+        winOdds: rawDoc.odds as number, // Map 'odds' field to 'winOdds'
+        timestamp: (rawDoc.eventTimestamp || rawDoc.$createdAt) as string
       };
       
       if (!oddsHistoryByEntrant.has(entrantId)) {

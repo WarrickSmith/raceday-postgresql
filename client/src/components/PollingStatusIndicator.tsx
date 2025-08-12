@@ -28,8 +28,6 @@ export function PollingStatusIndicator() {
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-
     const fetchStatus = async () => {
       try {
         const pollingStatus = await getPollingStatus();
@@ -44,10 +42,10 @@ export function PollingStatusIndicator() {
     fetchStatus();
 
     // Poll every 30 seconds for status updates
-    interval = setInterval(fetchStatus, 30000);
+    const interval = setInterval(fetchStatus, 30000);
 
     return () => {
-      if (interval) clearInterval(interval);
+      clearInterval(interval);
     };
   }, []);
 
