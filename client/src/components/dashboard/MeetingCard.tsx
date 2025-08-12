@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Meeting } from '@/types/meetings';
 import { getRaceTypeDisplay } from '@/constants/raceTypes';
@@ -29,9 +29,37 @@ interface MeetingCardProps {
 
 function MeetingCardComponent({ meeting, onRaceClick, onExpand, onCollapse, pollingInfo }: MeetingCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [loadedRaces, setLoadedRaces] = useState<unknown[]>([]);
+  const [isCompleted, setIsCompleted] = useState<boolean | null>(null);
   
   // Suppress unused warning - pollingInfo is used in memo comparison
   void pollingInfo;
+
+  // Check if meeting is completed on mount with lightweight query
+  useEffect(() => {
+    const checkMeetingCompletion = async () => {
+      try {
+        // Make a lightweight API call to check race statuses
+        const response = await fetch(`/api/meetings/${meeting.meetingId}/status`);
+        if (response.ok) {
+          const data = await response.json();
+          setIsCompleted(data.isCompleted);
+        }
+      } catch (error) {
+        console.log('Failed to check meeting completion status:', error);
+        // Fallback to time-based heuristic for old meetings
+        if (meeting.firstRaceTime) {
+          const now = new Date();
+          const firstRaceTime = new Date(meeting.firstRaceTime);
+          const hoursSinceFirstRace = (now.getTime() - firstRaceTime.getTime()) / (1000 * 60 * 60);
+          // Assume meeting is completed if it started more than 6 hours ago
+          setIsCompleted(hoursSinceFirstRace > 6);
+        }
+      }
+    };
+
+    checkMeetingCompletion();
+  }, [meeting.meetingId, meeting.firstRaceTime]);
 
   // Toggle expand/collapse state
   const toggleExpanded = useCallback(() => {
@@ -43,6 +71,7 @@ function MeetingCardComponent({ meeting, onRaceClick, onExpand, onCollapse, poll
       // The onExpand callback will be called when races are actually loaded
     } else {
       // Collapsing
+      setLoadedRaces([]);
       onCollapse?.(meeting.meetingId);
     }
   }, [isExpanded, meeting.meetingId, onCollapse]);
@@ -99,19 +128,38 @@ function MeetingCardComponent({ meeting, onRaceClick, onExpand, onCollapse, poll
     return meeting.category ? getRaceTypeDisplay(meeting.category) : meeting.raceType;
   };
 
-  const getMeetingStatus = () => {
+  const getMeetingStatus = (races?: unknown[]) => {
     if (!meeting.firstRaceTime) return 'upcoming';
     
     const now = new Date();
     const firstRaceTime = new Date(meeting.firstRaceTime);
     
+    // Check completion status from multiple sources in priority order:
+    
+    // 1. If we have expanded race data, check if all races are finalized
+    if (races && Array.isArray(races) && races.length > 0) {
+      const allRacesFinalized = races.every((race: any) => 
+        race.status === 'Final' || race.status === 'Abandoned'
+      );
+      
+      if (allRacesFinalized) {
+        return 'completed';
+      }
+    }
+    
+    // 2. If we have completion status from API/heuristic check
+    if (isCompleted === true) {
+      return 'completed';
+    }
+    
+    // 3. Fallback to time-based logic
     if (firstRaceTime > now) return 'upcoming';
     if (firstRaceTime <= now) return 'live';
     
     return 'upcoming';
   };
 
-  const status = getMeetingStatus();
+  const status = getMeetingStatus(loadedRaces);
   const statusColors = {
     upcoming: 'border-blue-200 bg-blue-50',
     live: 'border-green-200 bg-green-50',
@@ -215,6 +263,7 @@ function MeetingCardComponent({ meeting, onRaceClick, onExpand, onCollapse, poll
             onRaceClick={onRaceClick}
             onRacesLoaded={(loadedRaces) => {
               const racesArray = Array.isArray(loadedRaces) ? loadedRaces : [];
+              setLoadedRaces(racesArray);
               onExpand?.(meeting.meetingId, racesArray);
             }}
           />

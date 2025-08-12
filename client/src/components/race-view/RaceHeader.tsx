@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState, useEffect } from 'react';
 import { Race, Meeting } from '@/types/meetings';
 import { useRealtimeRace } from '@/hooks/useRealtimeRace';
 import { formatDistance, formatRaceTime, formatCategory } from '@/utils/raceFormatters';
@@ -14,35 +14,68 @@ export const RaceHeader = memo(function RaceHeader({ initialRace, meeting }: Rac
   const { race, isConnected } = useRealtimeRace({ initialRace });
   const formattedTime = useMemo(() => formatRaceTime(race.startTime), [race.startTime]);
 
-  const timeToStart = useMemo(() => {
-    try {
-      const now = new Date();
-      const raceTime = new Date(race.startTime);
-      if (isNaN(raceTime.getTime())) {
-        return null;
+  const [timeToStart, setTimeToStart] = useState<string | null>(null);
+
+  // Dynamic countdown that updates every second
+  useEffect(() => {
+    const updateCountdown = () => {
+      try {
+        const now = new Date();
+        const raceTime = new Date(race.startTime);
+        if (isNaN(raceTime.getTime())) {
+          setTimeToStart(null);
+          return;
+        }
+        
+        const diff = raceTime.getTime() - now.getTime();
+        
+        if (diff <= 0) {
+          // Race should have started - check if it's delayed
+          const delayDiff = Math.abs(diff);
+          const delayMinutes = Math.floor(delayDiff / (1000 * 60));
+          const delaySeconds = Math.floor((delayDiff % (1000 * 60)) / 1000);
+          
+          if (race.status === 'Open' && delayDiff > 30000) { // More than 30 seconds late
+            if (delayMinutes > 0) {
+              setTimeToStart(`Delayed: ${delayMinutes}:${delaySeconds.toString().padStart(2, '0')}`);
+            } else {
+              setTimeToStart(`Delayed: 0:${delaySeconds.toString().padStart(2, '0')}`);
+            }
+          } else {
+            setTimeToStart('Started');
+          }
+          return;
+        }
+        
+        const totalMinutes = Math.floor(diff / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        const hours = Math.floor(totalMinutes / 60);
+        const remainingMinutes = totalMinutes % 60;
+        
+        if (hours > 0) {
+          setTimeToStart(`${hours}h ${remainingMinutes}m`);
+        } else if (totalMinutes > 5) {
+          setTimeToStart(`${totalMinutes}m`);
+        } else if (totalMinutes > 0) {
+          // Show minutes and seconds when less than 5 minutes
+          setTimeToStart(`${totalMinutes}:${seconds.toString().padStart(2, '0')}`);
+        } else {
+          // Show just seconds when less than a minute
+          setTimeToStart(`${seconds}s`);
+        }
+      } catch {
+        setTimeToStart(null);
       }
-      
-      const diff = raceTime.getTime() - now.getTime();
-      
-      if (diff <= 0) {
-        return 'Started';
-      }
-      
-      const minutes = Math.floor(diff / (1000 * 60));
-      const hours = Math.floor(minutes / 60);
-      const remainingMinutes = minutes % 60;
-      
-      if (hours > 0) {
-        return `${hours}h ${remainingMinutes}m`;
-      } else if (minutes > 0) {
-        return `${minutes}m`;
-      } else {
-        return 'Starting soon';
-      }
-    } catch {
-      return null;
-    }
-  }, [race.startTime]);
+    };
+
+    // Initial call
+    updateCountdown();
+    
+    // Update every second
+    const interval = setInterval(updateCountdown, 1000);
+    
+    return () => clearInterval(interval);
+  }, [race.startTime, race.status]);
 
   const statusColor = useMemo(() => {
     const status = race.status?.toLowerCase();
@@ -150,7 +183,9 @@ export const RaceHeader = memo(function RaceHeader({ initialRace, meeting }: Rac
               <div className="flex items-center">
                 <span className="text-sm text-gray-500" id="time-to-start-label">Time to start:</span>
                 <span 
-                  className="ml-2 text-sm font-semibold text-gray-800"
+                  className={`ml-2 text-sm font-semibold ${
+                    timeToStart.startsWith('Delayed:') ? 'text-red-600' : 'text-gray-800'
+                  }`}
                   aria-live="polite"
                   aria-labelledby="time-to-start-label"
                   aria-describedby="countdown-description"

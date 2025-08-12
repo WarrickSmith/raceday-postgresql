@@ -47,7 +47,26 @@ const EntrantRow = memo(function EntrantRow({
           {entrant.name}
         </div>
         {entrant.jockey && (
-          <div className="text-sm text-gray-500" aria-label={`Jockey: ${entrant.jockey}`}>
+          <div className="text-sm text-gray-500 flex items-center" aria-label={`Jockey: ${entrant.jockey}`}>
+            {entrant.silkUrl ? (
+              <img 
+                src={entrant.silkUrl}
+                alt={`Racing silks for ${entrant.name}`}
+                className="w-4 h-4 rounded mr-2 border border-gray-200 flex-shrink-0"
+                onError={(e) => {
+                  // Hide the image if it fails to load
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            ) : (
+              // Placeholder silk icon when no silk URL is available
+              <div 
+                className="w-4 h-4 rounded mr-2 border border-gray-200 flex-shrink-0 bg-gradient-to-br from-blue-100 to-red-100 flex items-center justify-center"
+                title={`Racing silks placeholder for ${entrant.name}`}
+              >
+                <span className="text-[8px] font-bold text-gray-600">#{entrant.runnerNumber}</span>
+              </div>
+            )}
             <span className="text-xs font-medium text-gray-400">J:</span> {entrant.jockey}
           </div>
         )}
@@ -423,7 +442,7 @@ export const EntrantsGrid = memo(function EntrantsGrid({
                 <div className="space-y-1 max-h-20 overflow-y-auto">
                   {recentUpdates.slice(-3).map((update, idx) => (
                     <div key={idx} className="text-xs text-gray-600 flex justify-between">
-                      <span>{update.type} {update.entrantId ? `(${update.entrantId.slice(-4)})` : ''}</span>
+                      <span>{update.type} {update.entrantId && typeof update.entrantId === 'string' ? `(${update.entrantId.slice(-4)})` : ''}</span>
                       <span>{update.timestamp.toLocaleTimeString()}</span>
                     </div>
                   ))}

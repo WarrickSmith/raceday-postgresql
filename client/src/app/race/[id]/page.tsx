@@ -132,11 +132,27 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       moneyFlowByEntrant.get(entrantId)!.push(moneyFlowDoc);
     });
 
-    // Group odds history results by entrant for processing
+    // Group odds history results by entrant for processing and map to correct format
     const oddsHistoryByEntrant = new Map<string, OddsHistoryData[]>();
     oddsHistoryQuery.documents.forEach(doc => {
-      const oddsHistoryDoc = doc as unknown as OddsHistoryData;
-      const entrantId = oddsHistoryDoc.entrant;
+      const rawDoc = doc as any;
+      const entrantId = rawDoc.entrant;
+      
+      // Only include win odds for sparklines (pool_win preferred, fixed_win as fallback)
+      if (rawDoc.type !== 'pool_win' && rawDoc.type !== 'fixed_win') {
+        return;
+      }
+      
+      // Map the database fields to the expected interface format
+      const oddsHistoryDoc: OddsHistoryData = {
+        $id: rawDoc.$id,
+        $createdAt: rawDoc.$createdAt,
+        $updatedAt: rawDoc.$updatedAt,
+        entrant: rawDoc.entrant,
+        winOdds: rawDoc.odds, // Map 'odds' field to 'winOdds'
+        timestamp: rawDoc.eventTimestamp || rawDoc.$createdAt
+      };
+      
       if (!oddsHistoryByEntrant.has(entrantId)) {
         oddsHistoryByEntrant.set(entrantId, []);
       }
@@ -193,8 +209,8 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
         silkUrl: doc.silkUrl,
         isScratched: doc.isScratched,
         race: doc.race,
-        winOdds: doc.winOdds,
-        placeOdds: doc.placeOdds,
+        winOdds: doc.poolWinOdds || doc.fixedWinOdds,
+        placeOdds: doc.poolPlaceOdds || doc.fixedPlaceOdds,
         oddsHistory: oddsHistory, // Add odds history data for sparkline
         ...moneyFlowData
       };
