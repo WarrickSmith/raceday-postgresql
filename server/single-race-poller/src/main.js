@@ -126,6 +126,32 @@ export default async function main(context) {
           
           let updatesProcessed = 0
           let moneyFlowProcessed = 0
+          let raceStatusUpdated = false
+          
+          // Update race status if available and different from current status
+          if (raceEventData.race && raceEventData.race.status) {
+            try {
+              // Get current race status to compare
+              const currentRace = await databases.getDocument(databaseId, 'races', raceId);
+              
+              if (currentRace.status !== raceEventData.race.status) {
+                await databases.updateDocument(databaseId, 'races', raceId, {
+                  status: raceEventData.race.status
+                });
+                raceStatusUpdated = true;
+                context.log(`Updated race status`, { 
+                  raceId, 
+                  oldStatus: currentRace.status, 
+                  newStatus: raceEventData.race.status 
+                });
+              }
+            } catch (error) {
+              context.error('Failed to update race status', {
+                raceId,
+                error: error instanceof Error ? error.message : 'Unknown error'
+              });
+            }
+          }
           
           // Process both entrants and money flow in parallel
           const processingPromises = []
@@ -153,6 +179,7 @@ export default async function main(context) {
             raceId,
             entrantsUpdated: updatesProcessed,
             moneyFlowProcessed,
+            raceStatusUpdated,
             timestamp: new Date().toISOString()
           })
           

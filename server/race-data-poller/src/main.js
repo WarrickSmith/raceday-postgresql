@@ -88,6 +88,25 @@ export default async function main(context) {
           continue
         }
 
+        // Update race status if available and different
+        if (raceEventData.race && raceEventData.race.status && raceEventData.race.status !== race.status) {
+          try {
+            await databases.updateDocument(databaseId, 'races', race.raceId, {
+              status: raceEventData.race.status
+            });
+            context.log(`Updated race status`, { 
+              raceId: race.raceId, 
+              oldStatus: race.status, 
+              newStatus: raceEventData.race.status 
+            });
+          } catch (error) {
+            context.error('Failed to update race status', {
+              raceId: race.raceId,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+          }
+        }
+
         // Update entrant data if available
         if (raceEventData.entrants && raceEventData.entrants.length > 0) {
           const entrantsUpdated = await processEntrants(

@@ -431,6 +431,29 @@ export async function batchProcessRaces(databases, databaseId, raceResults, cont
             
             let entrantsProcessed = 0;
             let moneyFlowProcessed = 0;
+            let raceStatusUpdated = false;
+            
+            // Update race status if available and different from current status
+            if (raceResult.data.race && raceResult.data.race.status) {
+                try {
+                    // Get current race status to compare
+                    const currentRace = await databases.getDocument(databaseId, 'races', raceResult.raceId);
+                    
+                    if (currentRace.status !== raceResult.data.race.status) {
+                        await databases.updateDocument(databaseId, 'races', raceResult.raceId, {
+                            status: raceResult.data.race.status
+                        });
+                        raceStatusUpdated = true;
+                        context.log(`Updated race status`, { 
+                            raceId: raceResult.raceId, 
+                            oldStatus: currentRace.status, 
+                            newStatus: raceResult.data.race.status 
+                        });
+                    }
+                } catch (error) {
+                    collectBatchError(errors, error, raceResult.raceId, 'updateRaceStatus', context);
+                }
+            }
             
             // Process both entrants and money flow in parallel
             const processingPromises = [];
@@ -467,13 +490,15 @@ export async function batchProcessRaces(databases, databaseId, raceResults, cont
                 success: true,
                 entrantsProcessed,
                 moneyFlowProcessed,
+                raceStatusUpdated,
                 processedAt: new Date().toISOString()
             });
             
             context.log('Successfully processed race', {
                 raceId: raceResult.raceId,
                 entrantsProcessed,
-                moneyFlowProcessed
+                moneyFlowProcessed,
+                raceStatusUpdated
             });
             
         } catch (error) {
