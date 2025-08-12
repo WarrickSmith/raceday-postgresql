@@ -79,6 +79,14 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
     };
     
     // Fetch entrants for this race with batch optimization
+    console.log('[DEBUG] Fetching entrants for race:', {
+      raceId: raceData.$id,
+      raceName: raceData.name,
+      raceIdFromParams: params.id,
+      queryField: 'race',
+      raceDataKeys: Object.keys(raceData)
+    });
+    
     const entrantsQuery = await databases.listDocuments(
       'raceday-db',
       'entrants',
@@ -87,6 +95,37 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
         Query.orderAsc('runnerNumber') // Order by runner number for consistent display
       ]
     );
+    
+    console.log('[DEBUG] Entrants query result:', {
+      raceId: raceData.$id,
+      entrantsFound: entrantsQuery.documents.length,
+      totalEntrantsInCollection: entrantsQuery.total,
+      firstEntrant: entrantsQuery.documents.length > 0 ? {
+        entrantId: entrantsQuery.documents[0].$id,
+        name: entrantsQuery.documents[0].name,
+        raceField: entrantsQuery.documents[0].race
+      } : null
+    });
+    
+    // Also check if there are any entrants at all for this race ID using a broader query
+    try {
+      const allEntrantsForRace = await databases.listDocuments(
+        'raceday-db',
+        'entrants',
+        [Query.limit(10)] // Get first 10 entrants to inspect
+      );
+      console.log('[DEBUG] Sample entrants in collection:', {
+        totalEntrants: allEntrantsForRace.total,
+        sampleEntrants: allEntrantsForRace.documents.slice(0, 3).map(doc => ({
+          id: doc.$id,
+          name: doc.name,
+          raceField: doc.race,
+          raceFieldType: typeof doc.race
+        }))
+      });
+    } catch (error) {
+      console.log('[DEBUG] Failed to fetch sample entrants:', error);
+    }
 
     // Calculate data freshness metrics
     const now = new Date();
