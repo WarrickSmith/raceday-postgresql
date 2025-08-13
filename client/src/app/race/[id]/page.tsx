@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { createServerClient, Query } from '@/lib/appwrite-server';
-import { Race, Meeting, Entrant, MoneyFlowHistory, OddsHistoryData } from '@/types/meetings';
+import { Race, Meeting, Entrant, MoneyFlowHistory, OddsHistoryData, RaceNavigationData } from '@/types/meetings';
 import { RaceHeader } from '@/components/race-view/RaceHeader';
 import { EntrantsGrid } from '@/components/race-view/EntrantsGrid';
 
@@ -21,6 +21,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
   race: Race; 
   meeting: Meeting; 
   entrants: Entrant[];
+  navigationData: RaceNavigationData;
   dataFreshness: {
     lastUpdated: string;
     entrantsDataAge: number;
@@ -97,6 +98,40 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
     // Fetch money flow data for all entrants efficiently using batch query
     const entrantIds = entrantsQuery.documents.map(doc => doc.$id);
     
+    // Fetch navigation data - previous, next, and next scheduled races
+    const [previousRaceQuery, nextRaceQuery, nextScheduledRaceQuery] = await Promise.all([
+      // Previous scheduled race query
+      databases.listDocuments(
+        'raceday-db',
+        'races',
+        [
+          Query.lessThan('startTime', raceData.startTime),
+          Query.orderDesc('startTime'),
+          Query.limit(1)
+        ]
+      ),
+      // Next scheduled race query  
+      databases.listDocuments(
+        'raceday-db',
+        'races',
+        [
+          Query.greaterThan('startTime', raceData.startTime),
+          Query.orderAsc('startTime'),
+          Query.limit(1)
+        ]
+      ),
+      // Next scheduled race query - find race nearest to current time irrespective of current race
+      databases.listDocuments(
+        'raceday-db',
+        'races',
+        [
+          Query.greaterThan('startTime', now.toISOString()),
+          Query.orderAsc('startTime'),
+          Query.limit(1)
+        ]
+      )
+    ]);
+
     // Only fetch history data if there are entrants (avoid empty Query.equal calls)
     const [moneyFlowQuery, oddsHistoryQuery] = entrantIds.length > 0 ? await Promise.all([
       // Money flow history batch query
@@ -216,6 +251,28 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       };
     });
     
+    // Process navigation data with meeting information
+    const navigationData: RaceNavigationData = {
+      previousRace: previousRaceQuery.documents.length > 0 ? {
+        raceId: previousRaceQuery.documents[0].raceId,
+        name: previousRaceQuery.documents[0].name,
+        startTime: previousRaceQuery.documents[0].startTime,
+        meetingName: previousRaceQuery.documents[0].meeting?.meetingName || 'Unknown Meeting'
+      } : null,
+      nextRace: nextRaceQuery.documents.length > 0 ? {
+        raceId: nextRaceQuery.documents[0].raceId,
+        name: nextRaceQuery.documents[0].name,
+        startTime: nextRaceQuery.documents[0].startTime,
+        meetingName: nextRaceQuery.documents[0].meeting?.meetingName || 'Unknown Meeting'
+      } : null,
+      nextScheduledRace: nextScheduledRaceQuery.documents.length > 0 ? {
+        raceId: nextScheduledRaceQuery.documents[0].raceId,
+        name: nextScheduledRaceQuery.documents[0].name,
+        startTime: nextScheduledRaceQuery.documents[0].startTime,
+        meetingName: nextScheduledRaceQuery.documents[0].meeting?.meetingName || 'Unknown Meeting'
+      } : null
+    };
+
     // Calculate comprehensive data freshness metrics
     const dataFreshness = {
       lastUpdated: now.toISOString(),
@@ -231,6 +288,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       race, 
       meeting, 
       entrants, 
+      navigationData,
       dataFreshness,
 
     };
@@ -248,7 +306,7 @@ export default async function RaceDetailPage({ params }: RaceDetailPageProps) {
     notFound();
   }
 
-  const { race, meeting, entrants, dataFreshness } = raceData;
+  const { race, meeting, entrants, navigationData, dataFreshness } = raceData;
 
   return (
     <main className="container mx-auto px-4 py-8" role="main">
@@ -257,6 +315,7 @@ export default async function RaceDetailPage({ params }: RaceDetailPageProps) {
         <RaceHeader 
           initialRace={race} 
           meeting={meeting} 
+          navigationData={navigationData}
         />
 
         {/* Entrants Grid with comprehensive real-time data */}
