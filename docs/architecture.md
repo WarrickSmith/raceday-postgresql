@@ -1,20 +1,22 @@
-# System Architecture Document: RaceDay v2.0
+# System Architecture Document: RaceDay v4.7
 
 - **Project:** RaceDay
-- **Version:** 2.0 (Microservices Refactoring)
+- **Version:** 4.7 (Enhanced Race Display Interface)
 - **Author:** Winston (Architect)
-- **Date:** 2025-07-23
-- **Status:** Final
+- **Date:** 2025-08-13
+- **Status:** Updated for Money Flow Visualization
 
 ## 1. System Overview
 
-The RaceDay application uses a **microservices backend architecture** (Appwrite Cloud), a decoupled Next.js frontend, and real-time data synchronization. This version refactors the previous monolithic data import function into specialized pipeline functions to eliminate resource contention and hanging issues.
+The RaceDay application uses a **microservices backend architecture** (Appwrite Cloud), a decoupled Next.js frontend, and real-time data synchronization. This version introduces comprehensive money flow visualization and enhanced race monitoring capabilities optimized for professional betting terminal layouts.
 
-**Key Architectural Changes in v2.0:**
-- Monolithic `daily-race-importer` broken into 3 specialized functions
-- Sequential pipeline execution with proper resource allocation
-- Enhanced error handling and timeout protection
-- Optimized data fetching strategy with real-time invalidation
+**Key Architectural Changes in v4.7:**
+- Enhanced race display interface with money flow timeline visualization
+- New money flow history tracking with time-series data aligned to polling windows
+- Advanced real-time grid components with horizontal scrolling and sortable columns
+- Race navigation system with contextual status and pool information
+- Performance-optimized rendering for desktop-first data density requirements
+- Jockey silks integration and enhanced visual indicators
 
 ---
 
@@ -64,6 +66,28 @@ The daily data import is now handled by three sequential functions with 10-minut
 - **Purpose:** Process user alert configurations and create notifications
 - **Processing:** Threshold evaluation, user filtering, notification creation
 
+### 2.3. Enhanced Functions (v4.7)
+
+#### money-flow-tracker (Event-triggered)
+- **Specification:** s-1vcpu-1gb
+- **Trigger:** Database events on entrant odds/pool updates
+- **Purpose:** Capture and store incremental money flow changes for timeline visualization
+- **Processing:** Calculate time-to-start, polling intervals, incremental amounts, pool percentages
+- **Output:** Records in money-flow-history collection aligned with polling windows
+
+#### race-pools-aggregator (Event-triggered) 
+- **Specification:** s-1vcpu-512mb
+- **Trigger:** Database events on entrant pool updates
+- **Purpose:** Maintain race-level pool totals for footer display
+- **Processing:** Aggregate win/place/quinella/trifecta pools, update race-pools collection
+- **Output:** Real-time pool totals for race footer status bar
+
+#### jockey-silks-enricher (HTTP-triggered)
+- **Specification:** s-1vcpu-512mb
+- **Purpose:** Fetch and cache jockey silk data from external sources
+- **Processing:** API calls to racing data providers, color analysis, icon generation
+- **Output:** Enriched jockey-silks collection with visual data
+
 ---
 
 ## 3. Frontend Architecture (Next.js 15+)
@@ -91,19 +115,201 @@ useRealtime(
 - Automatic cache invalidation when backend functions update data
 - Graceful degradation on connection issues
 
-### 3.2. Component Architecture
+### 3.2. Enhanced Component Architecture (v4.7)
 
 ```
 src/
 ├── app/                    # Next.js App Router
 │   ├── (main)/page.tsx    # Dashboard with meetings list
-│   └── race/[id]/page.tsx # Race detail with entrants grid
+│   └── race/[id]/page.tsx # Enhanced race detail with money flow grid
 ├── components/
 │   ├── dashboard/         # MeetingsList, FilterControls
-│   ├── race/             # EntrantsGrid, OddsSparkline
-│   └── alerts/           # AlertsModal, NotificationToast
-├── hooks/                # useRealtime, useMeetings, useRaceData
-└── services/             # API service layer
+│   ├── race/             # Enhanced race components
+│   │   ├── RaceHeader.tsx         # Navigation + status + pools
+│   │   ├── EnhancedEntrantsGrid.tsx # Money flow timeline grid
+│   │   ├── MoneyFlowColumns.tsx   # Horizontal scrolling time columns
+│   │   ├── PoolToggle.tsx         # Win/Place/Odds view switcher
+│   │   ├── JockeySilks.tsx        # Silk color/pattern display
+│   │   ├── SortableColumns.tsx    # Interactive column sorting
+│   │   └── RaceFooter.tsx         # Pool totals + results + status
+│   ├── alerts/           # AlertsModal, NotificationToast
+│   └── ui/               # Shared UI primitives
+│       ├── DataTable.tsx          # High-performance data grid
+│       ├── MoneyFlowIndicator.tsx # Change visualization
+│       └── StatusIndicator.tsx    # Race status with timing
+├── hooks/                # Enhanced real-time hooks
+│   ├── useRealtime.ts             # Base real-time subscription
+│   ├── useMoneyFlowData.ts        # Money flow history queries
+│   ├── useRaceNavigation.ts       # Race switching logic
+│   ├── useGridSorting.ts          # Column sorting state
+│   └── usePoolToggle.ts           # Pool view switching
+├── services/             # API service layer
+│   ├── moneyFlowService.ts        # Money flow data queries
+│   ├── racePoolsService.ts        # Pool totals service
+│   └── jockeySilksService.ts      # Silk data service
+└── types/                # Enhanced type definitions
+    ├── moneyFlow.ts               # Money flow data types
+    ├── racePools.ts               # Pool data types
+    └── jockeySilks.ts             # Silk data types
+```
+
+### 3.3. Enhanced Race Interface Implementation (v4.7)
+
+#### Data Fetching Strategy
+
+**Server-Side Rendering (SSR) First Paint:**
+```typescript
+// /race/[id]/page.tsx
+export default async function RacePage({ params }: { params: { id: string } }) {
+  const supabase = createServerClient();
+  
+  // Parallel data fetching for first paint
+  const [raceData, entrants, moneyFlowHistory, racePools] = await Promise.all([
+    supabase.from('races').select('*').eq('raceId', params.id).single(),
+    supabase.from('entrants').select('*, jockey_silks(*)').eq('race', params.id),
+    supabase.from('money-flow-history')
+      .select('*')
+      .eq('entrant.race', params.id)
+      .gte('pollingTimestamp', /* T-60m */)
+      .order('pollingTimestamp', { ascending: true }),
+    supabase.from('race-pools').select('*').eq('race', params.id).single()
+  ]);
+
+  return <EnhancedRaceView initialData={{ raceData, entrants, moneyFlowHistory, racePools }} />;
+}
+```
+
+**Client-Side Real-Time Updates:**
+```typescript
+// Enhanced real-time subscription with money flow tracking
+function useEnhancedRaceData(raceId: string, initialData: InitialRaceData) {
+  const [data, setData] = useState(initialData);
+  
+  useEffect(() => {
+    const subscriptions = [
+      // Real-time entrant updates
+      supabase.channel(`race:${raceId}:entrants`)
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'entrants', filter: `race=eq.${raceId}` },
+          handleEntrantUpdate
+        ),
+      
+      // Money flow history updates  
+      supabase.channel(`race:${raceId}:money-flow`)
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'money-flow-history' },
+          handleMoneyFlowUpdate
+        ),
+        
+      // Race pools updates
+      supabase.channel(`race:${raceId}:pools`)
+        .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'race-pools', filter: `race=eq.${raceId}` },
+          handlePoolsUpdate
+        )
+    ];
+    
+    subscriptions.forEach(sub => sub.subscribe());
+    return () => subscriptions.forEach(sub => sub.unsubscribe());
+  }, [raceId]);
+  
+  return data;
+}
+```
+
+#### Enhanced Grid Component Architecture
+
+**Money Flow Timeline Grid:**
+```typescript
+// High-performance grid with virtualization for desktop data density
+interface MoneyFlowGridProps {
+  entrants: EntrantWithHistory[];
+  timeColumns: TimeColumn[];
+  poolView: 'win' | 'place' | 'odds';
+  sortConfig: SortConfig;
+  onSort: (column: string) => void;
+}
+
+function EnhancedEntrantsGrid({ entrants, timeColumns, poolView, sortConfig, onSort }: MoneyFlowGridProps) {
+  const virtualizer = useVirtualizer({
+    count: entrants.length,
+    getScrollElement: () => gridRef.current,
+    estimateSize: () => 60, // Fixed row height for performance
+    overscan: 5
+  });
+
+  return (
+    <div className="relative">
+      {/* Sticky header with sortable columns */}
+      <GridHeader 
+        timeColumns={timeColumns}
+        sortConfig={sortConfig}
+        onSort={onSort}
+        poolView={poolView}
+      />
+      
+      {/* Virtualized grid body */}
+      <div ref={gridRef} className="h-[600px] overflow-auto">
+        <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
+          {virtualizer.getVirtualItems().map((virtualItem) => (
+            <GridRow
+              key={virtualItem.key}
+              entrant={entrants[virtualItem.index]}
+              timeColumns={timeColumns}
+              poolView={poolView}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: `${virtualItem.size}px`,
+                transform: `translateY(${virtualItem.start}px)`
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+**Horizontal Scrolling Time Columns:**
+```typescript
+// Optimized horizontal scroll for time period columns
+function MoneyFlowColumns({ entrant, timeColumns, poolView }: MoneyFlowColumnsProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  
+  // Smooth scrolling with momentum
+  const { scrollX, scrollXProgress } = useScroll({ container: scrollRef });
+  
+  return (
+    <div ref={scrollRef} className="flex overflow-x-auto snap-x snap-mandatory">
+      {timeColumns.map((column, index) => {
+        const moneyData = entrant.moneyFlowHistory.find(
+          h => h.timeToStart === column.timeToStart
+        );
+        
+        return (
+          <motion.div
+            key={column.id}
+            className="min-w-[80px] snap-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: index * 0.02 }}
+          >
+            <MoneyFlowCell
+              data={moneyData}
+              poolView={poolView}
+              timeColumn={column}
+              isRecentChange={moneyData?.pollingTimestamp > Date.now() - 30000}
+            />
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
 ```
 
 ---
@@ -131,6 +337,19 @@ isScratched (boolean), race (relationship → races)
 odds (float), eventTimestamp (datetime, indexed), type (string),
 entrant (relationship → entrants)
 
+-- money-flow-history: NEW - Time-series money flow data for timeline visualization
+winPoolAmount (float), placePoolAmount (float), totalPoolAmount (float),
+poolPercentage (float), incrementalAmount (float), pollingTimestamp (datetime, indexed),
+timeToStart (integer), pollingInterval (string), entrant (relationship → entrants)
+
+-- race-pools: NEW - Race-level pool totals tracking
+winPoolTotal (float), placePoolTotal (float), quinellaPoolTotal (float),
+trifectaPoolTotal (float), lastUpdated (datetime), race (relationship → races)
+
+-- jockey-silks: NEW - Jockey silk color and pattern data
+silkId (string, unique), primaryColor (string), secondaryColor (string),
+pattern (string), iconUrl (string), jockeyName (string, indexed)
+
 -- user-alert-configs: User notification preferences  
 userId (string, indexed), alertType (string), threshold (float),
 enabled (boolean), entrant (relationship → entrants)
@@ -146,6 +365,9 @@ type (string), read (boolean), raceId (string), entrantId (string)
 - **races:** idx_race_id (unique), idx_start_time, idx_status
 - **entrants:** idx_entrant_id (unique), idx_runner_number
 - **odds-history:** idx_timestamp, idx_entrant_timestamp (compound)
+- **money-flow-history:** idx_polling_timestamp, idx_entrant_polling (compound), idx_time_to_start
+- **race-pools:** idx_race_id (unique), idx_last_updated
+- **jockey-silks:** idx_silk_id (unique), idx_jockey_name
 - **user-alert-configs:** idx_user_id, idx_user_entrant (compound)
 
 ---
@@ -260,37 +482,86 @@ const raceData = await Promise.race([
 | race-data-poller | 120s | 1.5GB | >99.5% |
 | alert-evaluator | 30s | 100MB | >99.9% |
 
-### 7.2. Frontend Performance Targets
+### 7.2. Enhanced Frontend Performance Targets (v4.7)
 
-- **Initial Load:** < 500ms for cached data
-- **Real-time Updates:** < 2s latency
-- **Core Web Vitals:** LCP < 2.5s, FID < 100ms, CLS < 0.1
-- **Bundle Size:** < 250KB initial, < 50KB per route
+**Core Performance Requirements:**
+- **Initial Load:** < 200ms for cached race data (SSR first paint)
+- **Real-time Updates:** < 100ms latency for money flow changes
+- **Race Switching:** < 300ms total transition time
+- **Grid Rendering:** < 50ms for 20+ runners with full money flow data
+- **Horizontal Scroll:** 60fps smooth scrolling for time columns
+
+**Desktop-Optimized Targets:**
+- **Data Density:** Support 12+ time columns without performance degradation
+- **Sorting Performance:** < 100ms sort time for any column with 20+ rows
+- **Memory Usage:** < 100MB for single race view with full history
+- **Bundle Size:** < 350KB initial (increased for enhanced grid components)
+
+**Real-Time Performance:**
+- **WebSocket Latency:** < 50ms from backend update to grid re-render
+- **Update Batching:** Max 10 updates/second to prevent UI thrashing
+- **Change Indicators:** < 16ms animation frame updates for ⚡ indicators
 
 ---
 
-## 8. Migration from v1.4
+## 8. Migration to v4.7 Enhanced Race Interface
 
-### 8.1. Breaking Changes
+### 8.1. New Features & Components
 
-- `daily-race-importer` function removed, replaced with 3-function pipeline
-- Function resource specifications updated
-- Scheduling changed from single daily execution to staggered pipeline
-- Error handling improved with better isolation and logging
+**Enhanced Database Schema:**
+- New `money-flow-history` collection for timeline visualization data
+- New `race-pools` collection for real-time pool totals tracking  
+- New `jockey-silks` collection for visual silk data
+- Additional indexes for optimized money flow queries
 
-### 8.2. Data Compatibility  
+**New Backend Functions:**
+- `money-flow-tracker` - Event-triggered money flow history capture
+- `race-pools-aggregator` - Real-time pool totals maintenance
+- `jockey-silks-enricher` - HTTP-triggered silk data enrichment
 
-- All existing database collections remain unchanged
-- New attributes added: races.actualStart, races.silkUrl, entrants.silkUrl
-- Existing data preserved, new pipeline populates additional fields
+**Enhanced Frontend Components:**
+- `EnhancedEntrantsGrid` with virtualization and money flow timeline
+- `MoneyFlowColumns` with horizontal scrolling time periods
+- `RaceHeader` with navigation and contextual status
+- `RaceFooter` with pool totals and race results
 
-### 8.3. Deployment Steps
+### 8.2. Data Migration Strategy
 
-1. Deploy updated appwrite.json configuration
-2. Deploy new microservices functions
-3. Remove old daily-race-importer function
-4. Monitor pipeline execution starting at 17:00 UTC
-5. Verify data flow: meetings → races → entrants → real-time updates
+**Backward Compatibility:**
+- All existing collections and data preserved
+- New collections added alongside existing schema
+- Existing race pages continue to work during migration
+- Progressive enhancement approach for new features
+
+**Historical Data Population:**
+- Money flow history will be populated from next polling cycle
+- Existing odds-history data can be converted to money flow format
+- Jockey silks data populated on-demand via enricher function
+
+### 8.3. Deployment Steps (v4.7)
+
+1. **Database Schema Updates:**
+   - Deploy new collections: `money-flow-history`, `race-pools`, `jockey-silks`
+   - Add optimized indexes for time-series queries
+   - Maintain existing collections unchanged
+
+2. **Backend Function Deployment:**
+   - Deploy `money-flow-tracker` event-triggered function  
+   - Deploy `race-pools-aggregator` for pool totals
+   - Deploy `jockey-silks-enricher` HTTP endpoint
+   - Update existing `race-data-poller` to populate new collections
+
+3. **Frontend Component Deployment:**
+   - Deploy enhanced components with feature flags
+   - Implement progressive enhancement strategy
+   - A/B test enhanced grid vs existing grid
+   - Monitor performance metrics during rollout
+
+4. **Validation & Monitoring:**
+   - Verify money flow data population aligns with polling windows
+   - Confirm real-time updates work across all new collections
+   - Monitor performance targets: <200ms first paint, <100ms updates
+   - Validate horizontal scrolling and sorting performance
 
 ---
 
@@ -303,12 +574,25 @@ const raceData = await Promise.race([
 - **Data completeness:** >95% of races have complete entrant data
 - **Real-time latency:** <2s from backend update to frontend display
 
-### 9.2. Business Metrics
+### 9.2. Enhanced Business Metrics (v4.7)
 
-- **User experience:** Sub-second dashboard load times
-- **Data freshness:** Real-time odds updates during race hours
-- **System reliability:** >99.9% uptime during peak racing periods
-- **Alert delivery:** >99% successful notification delivery
+**User Experience Metrics:**
+- **Race page load:** <200ms initial paint for enhanced grid interface
+- **Money flow visualization:** Users can identify significant changes within 5 seconds
+- **Race switching efficiency:** <300ms transition preserves user context
+- **Data scanning accuracy:** 95% reduction in time to spot unusual money patterns
+
+**Professional Interface Metrics:**
+- **Desktop optimization:** Support for 12+ time columns without performance degradation
+- **Information density:** 20+ runners with full money flow history displayable simultaneously  
+- **Real-time responsiveness:** <100ms latency for money flow change indicators
+- **Multi-race monitoring:** Seamless navigation between races maintains analytical flow
+
+**Data Richness Metrics:**
+- **Historical completeness:** >90% of money flow data captured across polling windows
+- **Pool tracking accuracy:** Real-time pool totals updated within 2 seconds of backend changes
+- **Visual enhancement:** Jockey silks displayed for >85% of active runners
+- **Sort/filter performance:** <100ms response time for any grid operation
 
 ---
 
@@ -341,6 +625,15 @@ This guide provides:
 
 ## 11. Conclusion
 
-The RaceDay v2.0 microservices architecture eliminates the resource contention and hanging issues of the monolithic approach while providing better scalability, observability, and maintainability. The sequential pipeline design with proper resource allocation ensures reliable daily data import, while the optimized real-time system provides excellent user experience with sub-2-second update latency.
+The RaceDay v4.7 enhanced race interface architecture builds upon the proven v2.0 microservices foundation to deliver professional-grade betting terminal capabilities with comprehensive money flow visualization. The new architecture introduces sophisticated time-series data tracking, high-performance grid rendering, and desktop-optimized data density while maintaining the system's reliability and real-time responsiveness.
 
-This architecture is production-ready and designed for immediate deployment on the existing Appwrite Cloud infrastructure.
+**Key v4.7 Achievements:**
+- **Professional Interface:** Desktop-first design supporting 12+ time columns with horizontal scrolling
+- **Money Flow Intelligence:** Real-time tracking and visualization of betting patterns aligned with polling windows  
+- **Performance Excellence:** <200ms first paint, <100ms real-time updates, <300ms race switching
+- **Enhanced Data Model:** New collections for money flow history, pool tracking, and jockey silks
+- **Backward Compatibility:** Seamless integration with existing v2.0 architecture without breaking changes
+
+The enhanced architecture delivers Bloomberg Terminal-style information density and real-time capabilities while maintaining the robust microservices foundation. This design is production-ready and optimized for immediate deployment with progressive enhancement strategy to minimize risk.
+
+**Next Phase:** Document sharding recommended for specialized team focus areas - frontend components, backend functions, and database optimization can now be developed independently while maintaining architectural coherence.
