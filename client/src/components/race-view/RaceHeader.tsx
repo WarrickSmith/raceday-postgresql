@@ -1,16 +1,18 @@
 'use client';
 
 import { memo, useMemo, useState, useEffect } from 'react';
-import { Race, Meeting } from '@/types/meetings';
+import { Race, Meeting, RaceNavigationData } from '@/types/meetings';
 import { useRealtimeRace } from '@/hooks/useRealtimeRace';
 import { formatDistance, formatRaceTime, formatCategory } from '@/utils/raceFormatters';
+import { RaceNavigation } from './RaceNavigation';
 
 interface RaceHeaderProps {
   initialRace: Race;
   meeting: Meeting;
+  navigationData: RaceNavigationData;
 }
 
-export const RaceHeader = memo(function RaceHeader({ initialRace, meeting }: RaceHeaderProps) {
+export const RaceHeader = memo(function RaceHeader({ initialRace, meeting, navigationData }: RaceHeaderProps) {
   const { race, isConnected } = useRealtimeRace({ initialRace });
   const formattedTime = useMemo(() => formatRaceTime(race.startTime), [race.startTime]);
 
@@ -95,6 +97,13 @@ export const RaceHeader = memo(function RaceHeader({ initialRace, meeting }: Rac
 
   return (
     <header className="bg-white rounded-lg shadow-md p-6 mb-6" role="banner">
+      {/* Race Navigation */}
+      <div className="mb-4 pb-4 border-b border-gray-200">
+        <RaceNavigation 
+          navigationData={navigationData}
+          currentRaceId={race.raceId}
+        />
+      </div>
       {/* Screen reader announcement for race updates */}
       <div 
         aria-live="assertive" 
