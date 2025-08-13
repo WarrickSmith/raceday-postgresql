@@ -485,6 +485,16 @@ export async function batchProcessRaces(databases, databaseId, raceResults, cont
             // Wait for all processing to complete
             await Promise.all(processingPromises);
             
+            // Update last_poll_time for master scheduler coordination
+            try {
+                await databases.updateDocument(databaseId, 'races', raceResult.raceId, {
+                    last_poll_time: new Date().toISOString()
+                });
+                context.log(`Updated last_poll_time for race ${raceResult.raceId}`);
+            } catch (error) {
+                collectBatchError(errors, error, raceResult.raceId, 'updateLastPollTime', context);
+            }
+            
             processingResults.push({
                 raceId: raceResult.raceId,
                 success: true,

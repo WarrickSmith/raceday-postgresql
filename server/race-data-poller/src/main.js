@@ -132,6 +132,19 @@ export default async function main(context) {
           })
         }
 
+        // Update last_poll_time to coordinate with master scheduler
+        try {
+          await databases.updateDocument(databaseId, 'races', race.raceId, {
+            last_poll_time: now.toISOString()
+          });
+          context.log(`Updated last_poll_time for race ${race.raceId}`);
+        } catch (error) {
+          context.error('Failed to update last_poll_time', {
+            raceId: race.raceId,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+
         racesPolled++
         context.log(`Completed polling race ${race.raceId}`)
 

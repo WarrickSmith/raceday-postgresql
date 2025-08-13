@@ -175,6 +175,19 @@ export default async function main(context) {
           // Wait for all processing to complete
           await Promise.all(processingPromises)
           
+          // Update last_poll_time for master scheduler coordination
+          try {
+            await databases.updateDocument(databaseId, 'races', raceId, {
+              last_poll_time: new Date().toISOString()
+            });
+            context.log(`Updated last_poll_time for race ${raceId}`);
+          } catch (error) {
+            context.error('Failed to update last_poll_time', {
+              raceId,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+          }
+          
           context.log('Background race polling completed successfully', {
             raceId,
             entrantsUpdated: updatesProcessed,
