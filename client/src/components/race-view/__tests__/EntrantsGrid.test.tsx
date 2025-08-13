@@ -132,7 +132,9 @@ describe('EntrantsGrid', () => {
         batchEfficiency: 1,
         memoryUsage: 1024
       },
-      unsubscribe: jest.fn()
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
   });
 
@@ -232,7 +234,9 @@ describe('EntrantsGrid', () => {
         batchEfficiency: 0,
         memoryUsage: 1024
       },
-      unsubscribe: jest.fn()
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -274,7 +278,9 @@ describe('EntrantsGrid', () => {
         batchEfficiency: 1,
         memoryUsage: 1024
       },
-      unsubscribe: jest.fn()
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -321,7 +327,9 @@ describe('EntrantsGrid', () => {
         batchEfficiency: 1,
         memoryUsage: 1024
       },
-      unsubscribe: jest.fn()
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={[]} raceId="race1" />);
@@ -400,7 +408,9 @@ describe('EntrantsGrid', () => {
         batchEfficiency: 1,
         memoryUsage: 1024
       },
-      unsubscribe: jest.fn()
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -475,7 +485,9 @@ describe('EntrantsGrid', () => {
         batchEfficiency: 1,
         memoryUsage: 1024
       },
-      unsubscribe: jest.fn()
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -523,7 +535,9 @@ describe('EntrantsGrid', () => {
         batchEfficiency: 1,
         memoryUsage: 1024
       },
-      unsubscribe: jest.fn()
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -595,7 +609,9 @@ describe('EntrantsGrid', () => {
         batchEfficiency: 1,
         memoryUsage: 1024
       },
-      unsubscribe: jest.fn()
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={entrantsWithoutHistory} raceId="race1" />);
@@ -621,14 +637,14 @@ describe('EntrantsGrid', () => {
           type: 'oddsHistory',
           entrantId: '1',
           timestamp: new Date(),
-          data: mockOddsHistory[0],
+          data: mockOddsHistory[0] as unknown as Record<string, unknown>,
           acknowledged: false
         },
         {
           type: 'oddsHistory',
           entrantId: '3',
           timestamp: new Date(),
-          data: mockOddsHistory[1],
+          data: mockOddsHistory[1] as unknown as Record<string, unknown>,
           acknowledged: false
         }
       ],
@@ -644,7 +660,9 @@ describe('EntrantsGrid', () => {
         batchEfficiency: 1,
         memoryUsage: 1024
       },
-      unsubscribe: jest.fn()
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -683,7 +701,7 @@ describe('EntrantsGrid', () => {
           type: 'oddsHistory',
           entrantId: '3',
           timestamp: new Date(),
-          data: mockOddsHistory[0],
+          data: mockOddsHistory[0] as unknown as Record<string, unknown>,
           acknowledged: false
         }
       ],
@@ -699,7 +717,9 @@ describe('EntrantsGrid', () => {
         batchEfficiency: 1,
         memoryUsage: 1024
       },
-      unsubscribe: jest.fn()
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
