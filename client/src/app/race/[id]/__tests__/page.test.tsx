@@ -2,16 +2,16 @@ import { render, screen } from '@testing-library/react';
 import { notFound } from 'next/navigation';
 import RaceDetailPage from '../page';
 import { createServerClient, Query } from '@/lib/appwrite-server';
-import { coordinateIntelligentPolling } from '@/app/actions/race-polling';
+
 
 // Mock the dependencies
 jest.mock('next/navigation');
 jest.mock('@/lib/appwrite-server');
-jest.mock('@/app/actions/race-polling');
+
 
 const mockNotFound = notFound as jest.MockedFunction<typeof notFound>;
 const mockCreateServerClient = createServerClient as jest.MockedFunction<typeof createServerClient>;
-const mockCoordinateIntelligentPolling = coordinateIntelligentPolling as jest.MockedFunction<typeof coordinateIntelligentPolling>;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockQuery = Query as any;
 
@@ -46,16 +46,21 @@ describe('RaceDetailPage', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    
+    // Reset database mock to clean state
+    mockDatabases.listDocuments.mockReset();
+    
     mockCreateServerClient.mockResolvedValue({
       databases: mockDatabases,
     });
 
-    // Mock intelligent polling coordination to prevent database errors
-    mockCoordinateIntelligentPolling.mockResolvedValue({
-      success: true,
-      strategy: 'batch',
-      message: 'Test polling coordination completed'
+    // Mock notFound to throw an error to prevent execution continuation
+    mockNotFound.mockImplementation(() => {
+      throw new Error('NEXT_NOT_FOUND');
     });
+
+    // Note: Autonomous server-side polling handles all data updates
+    // No client-side polling coordination needed in tests
 
     // Mock Query functions
     mockQuery.equal = jest.fn().mockImplementation((attr, value) => ({ attribute: attr, values: [value] }));
@@ -63,6 +68,11 @@ describe('RaceDetailPage', () => {
   });
 
   it('should render race details when race exists', async () => {
+    // Don't throw error for successful case - override the beforeEach mock
+    mockNotFound.mockImplementation((() => {
+      // For successful cases, notFound should not be called
+    }) as jest.MockedFunction<typeof notFound>);
+    
     // Mock successful race query with populated meeting data
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
@@ -84,10 +94,7 @@ describe('RaceDetailPage', () => {
   it('should call notFound when race does not exist', async () => {
     // Mock empty race query (no need for entrants query since race doesn't exist)
     mockDatabases.listDocuments.mockResolvedValueOnce({ documents: [] });
-    mockNotFound.mockImplementation(() => {
-      throw new Error('NEXT_NOT_FOUND');
-    });
-
+    
     await expect(RaceDetailPage({ params: Promise.resolve({ id: 'non-existent' }) })).rejects.toThrow('NEXT_NOT_FOUND');
     expect(mockNotFound).toHaveBeenCalled();
   });
@@ -98,10 +105,6 @@ describe('RaceDetailPage', () => {
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [raceWithoutMeeting] });
     
-    mockNotFound.mockImplementation(() => {
-      throw new Error('NEXT_NOT_FOUND');
-    });
-
     await expect(RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) })).rejects.toThrow('NEXT_NOT_FOUND');
     expect(mockNotFound).toHaveBeenCalled();
   });
@@ -109,15 +112,17 @@ describe('RaceDetailPage', () => {
   it('should call notFound when database query fails', async () => {
     // Mock database error (no need for entrants query since first query fails)
     mockDatabases.listDocuments.mockRejectedValueOnce(new Error('Database error'));
-    mockNotFound.mockImplementation(() => {
-      throw new Error('NEXT_NOT_FOUND');
-    });
-
+    
     await expect(RaceDetailPage({ params: Promise.resolve({ id: 'R001' }) })).rejects.toThrow('NEXT_NOT_FOUND');
     expect(mockNotFound).toHaveBeenCalled();
   });
 
   it('should have proper semantic HTML structure', async () => {
+    // Don't throw error for successful case - override the beforeEach mock
+    mockNotFound.mockImplementation((() => {
+      // For successful cases, notFound should not be called
+    }) as jest.MockedFunction<typeof notFound>);
+    
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
       .mockResolvedValueOnce({ documents: [] }) // Entrants query
@@ -134,6 +139,11 @@ describe('RaceDetailPage', () => {
   });
 
   it('should have proper accessibility attributes', async () => {
+    // Don't throw error for successful case - override the beforeEach mock
+    mockNotFound.mockImplementation((() => {
+      // For successful cases, notFound should not be called
+    }) as jest.MockedFunction<typeof notFound>);
+    
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
       .mockResolvedValueOnce({ documents: [] }) // Entrants query
@@ -152,6 +162,11 @@ describe('RaceDetailPage', () => {
   });
 
   it('should display race status with proper styling', async () => {
+    // Don't throw error for successful case - override the beforeEach mock
+    mockNotFound.mockImplementation((() => {
+      // For successful cases, notFound should not be called
+    }) as jest.MockedFunction<typeof notFound>);
+    
     // Test just one status case to avoid cleanup issues
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [{ ...mockRaceWithMeeting, status: 'Open' }] }) // Race query
@@ -168,6 +183,11 @@ describe('RaceDetailPage', () => {
   });
 
   it('should handle invalid time gracefully', async () => {
+    // Don't throw error for successful case - override the beforeEach mock
+    mockNotFound.mockImplementation((() => {
+      // For successful cases, notFound should not be called
+    }) as jest.MockedFunction<typeof notFound>);
+    
     const raceWithInvalidTime = {
       ...mockRaceWithMeeting,
       startTime: 'invalid-time',
@@ -186,9 +206,24 @@ describe('RaceDetailPage', () => {
   });
 
   it('should query database with correct parameters', async () => {
+    // Don't throw error for successful case - override the beforeEach mock
+    mockNotFound.mockImplementation((() => {
+      // For successful cases, notFound should not be called
+    }) as jest.MockedFunction<typeof notFound>);
+    
+    // Mock an entrant to trigger all 4 queries
+    const mockEntrant = {
+      $id: 'entrant1',
+      $createdAt: '2024-01-01T08:00:00Z',
+      $updatedAt: '2024-01-01T08:00:00Z',
+      runnerNumber: 1,
+      runnerName: 'Test Horse',
+      race: mockRaceWithMeeting.$id,
+    };
+    
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
-      .mockResolvedValueOnce({ documents: [] }) // Entrants query
+      .mockResolvedValueOnce({ documents: [mockEntrant] }) // Entrants query
       .mockResolvedValueOnce({ documents: [] }) // Money flow query
       .mockResolvedValueOnce({ documents: [] }); // Odds history query
 
@@ -217,7 +252,7 @@ describe('RaceDetailPage', () => {
       'raceday-db',
       'money-flow-history',
       expect.arrayContaining([
-        expect.objectContaining({ attribute: 'entrant', values: [[]] }) // Empty entrants array
+        expect.objectContaining({ attribute: 'entrant', values: [['entrant1']] })
       ])
     );
     
@@ -226,7 +261,7 @@ describe('RaceDetailPage', () => {
       'raceday-db',
       'odds-history',
       expect.arrayContaining([
-        expect.objectContaining({ attribute: 'entrant', values: [[]] }) // Empty entrants array
+        expect.objectContaining({ attribute: 'entrant', values: [['entrant1']] })
       ])
     );
     
