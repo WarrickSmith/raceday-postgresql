@@ -79,6 +79,39 @@ export interface OddsHistorySubscriptionResponse {
   events?: string[];
 }
 
+// Navigation event handler types
+export type NavigationHandler = (direction: 'previous' | 'next') => void;
+export type NavigationErrorHandler = (error: Error) => void;
+
+// Race navigation data interfaces
+export interface RaceNavigationData {
+  previousRace?: {
+    raceId: string;
+    name: string;
+    startTime: string;
+    meetingName: string;
+  } | null;
+  nextRace?: {
+    raceId: string;
+    name: string;
+    startTime: string;
+    meetingName: string;
+  } | null;
+  nextScheduledRace?: {
+    raceId: string;
+    name: string;
+    startTime: string;
+    meetingName: string;
+  } | null;
+}
+
+// Navigation button state interfaces
+export interface NavigationButtonState {
+  isLoading: boolean;
+  disabled: boolean;
+  disabledReason?: string;
+}
+
 export interface Entrant {
   $id: string;
   $createdAt: string;
