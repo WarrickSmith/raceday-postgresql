@@ -381,6 +381,9 @@ async function ensureRacesCollection(databases, config, context) {
         { key: 'lastUpdated', type: 'datetime', required: false },
         { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
         { key: 'importedAt', type: 'datetime', required: false },
+        
+        // Polling coordination (for master race scheduler)
+        { key: 'last_poll_time', type: 'datetime', required: false }, // Tracks when race was last polled by master scheduler
     ];
     // Create attributes in parallel for improved performance
     await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);

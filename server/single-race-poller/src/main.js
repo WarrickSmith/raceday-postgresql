@@ -126,6 +126,32 @@ export default async function main(context) {
           
           let updatesProcessed = 0
           let moneyFlowProcessed = 0
+          let raceStatusUpdated = false
+          
+          // Update race status if available and different from current status
+          if (raceEventData.race && raceEventData.race.status) {
+            try {
+              // Get current race status to compare
+              const currentRace = await databases.getDocument(databaseId, 'races', raceId);
+              
+              if (currentRace.status !== raceEventData.race.status) {
+                await databases.updateDocument(databaseId, 'races', raceId, {
+                  status: raceEventData.race.status
+                });
+                raceStatusUpdated = true;
+                context.log(`Updated race status`, { 
+                  raceId, 
+                  oldStatus: currentRace.status, 
+                  newStatus: raceEventData.race.status 
+                });
+              }
+            } catch (error) {
+              context.error('Failed to update race status', {
+                raceId,
+                error: error instanceof Error ? error.message : 'Unknown error'
+              });
+            }
+          }
           
           // Process both entrants and money flow in parallel
           const processingPromises = []
@@ -149,10 +175,24 @@ export default async function main(context) {
           // Wait for all processing to complete
           await Promise.all(processingPromises)
           
+          // Update last_poll_time for master scheduler coordination
+          try {
+            await databases.updateDocument(databaseId, 'races', raceId, {
+              last_poll_time: new Date().toISOString()
+            });
+            context.log(`Updated last_poll_time for race ${raceId}`);
+          } catch (error) {
+            context.error('Failed to update last_poll_time', {
+              raceId,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+          }
+          
           context.log('Background race polling completed successfully', {
             raceId,
             entrantsUpdated: updatesProcessed,
             moneyFlowProcessed,
+            raceStatusUpdated,
             timestamp: new Date().toISOString()
           })
           

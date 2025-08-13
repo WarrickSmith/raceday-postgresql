@@ -88,6 +88,25 @@ export default async function main(context) {
           continue
         }
 
+        // Update race status if available and different
+        if (raceEventData.race && raceEventData.race.status && raceEventData.race.status !== race.status) {
+          try {
+            await databases.updateDocument(databaseId, 'races', race.raceId, {
+              status: raceEventData.race.status
+            });
+            context.log(`Updated race status`, { 
+              raceId: race.raceId, 
+              oldStatus: race.status, 
+              newStatus: raceEventData.race.status 
+            });
+          } catch (error) {
+            context.error('Failed to update race status', {
+              raceId: race.raceId,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+          }
+        }
+
         // Update entrant data if available
         if (raceEventData.entrants && raceEventData.entrants.length > 0) {
           const entrantsUpdated = await processEntrants(
@@ -111,6 +130,19 @@ export default async function main(context) {
           context.log(`Processed money tracker data for race ${race.raceId}`, {
             entrantsProcessed: moneyFlowProcessed,
           })
+        }
+
+        // Update last_poll_time to coordinate with master scheduler
+        try {
+          await databases.updateDocument(databaseId, 'races', race.raceId, {
+            last_poll_time: now.toISOString()
+          });
+          context.log(`Updated last_poll_time for race ${race.raceId}`);
+        } catch (error) {
+          context.error('Failed to update last_poll_time', {
+            raceId: race.raceId,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
         }
 
         racesPolled++

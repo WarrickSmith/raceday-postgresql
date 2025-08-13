@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Meeting } from '@/types/meetings';
 import { getRaceTypeDisplay } from '@/constants/raceTypes';
@@ -13,39 +13,46 @@ const RacesList = dynamic(() => import('./RacesList').then(mod => ({ default: mo
   ssr: false, // Client-side only for interactive expansion
 });
 
-interface PollingInfo {
-  triggerManualPoll: (raceId: string) => Promise<void>;
-  pollingStates: Record<string, unknown>;
-  performanceMetrics: Record<string, unknown>;
-}
-
 interface MeetingCardProps {
   meeting: Meeting;
   onRaceClick?: (raceId: string) => void;
-  onExpand?: (meetingId: string, races: unknown[]) => void;
-  onCollapse?: (meetingId: string) => void;
-  pollingInfo?: PollingInfo;
 }
 
-function MeetingCardComponent({ meeting, onRaceClick, onExpand, onCollapse, pollingInfo }: MeetingCardProps) {
+function MeetingCardComponent({ meeting, onRaceClick }: MeetingCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isCompleted, setIsCompleted] = useState<boolean | null>(null);
   
-  // Suppress unused warning - pollingInfo is used in memo comparison
-  void pollingInfo;
+
+  // Check if meeting is completed on mount with lightweight query
+  useEffect(() => {
+    const checkMeetingCompletion = async () => {
+      try {
+        // Make a lightweight API call to check race statuses
+        const response = await fetch(`/api/meetings/${meeting.meetingId}/status`);
+        if (response.ok) {
+          const data = await response.json();
+          setIsCompleted(data.isCompleted);
+        }
+      } catch (error) {
+        console.log('Failed to check meeting completion status:', error);
+        // Fallback to time-based heuristic for old meetings
+        if (meeting.firstRaceTime) {
+          const now = new Date();
+          const firstRaceTime = new Date(meeting.firstRaceTime);
+          const hoursSinceFirstRace = (now.getTime() - firstRaceTime.getTime()) / (1000 * 60 * 60);
+          // Assume meeting is completed if it started more than 6 hours ago
+          setIsCompleted(hoursSinceFirstRace > 6);
+        }
+      }
+    };
+
+    checkMeetingCompletion();
+  }, [meeting.meetingId, meeting.firstRaceTime]);
 
   // Toggle expand/collapse state
   const toggleExpanded = useCallback(() => {
-    const willExpand = !isExpanded;
-    setIsExpanded(willExpand);
-    
-    if (willExpand) {
-      // Will expand - races will be loaded by RacesList component
-      // The onExpand callback will be called when races are actually loaded
-    } else {
-      // Collapsing
-      onCollapse?.(meeting.meetingId);
-    }
-  }, [isExpanded, meeting.meetingId, onCollapse]);
+    setIsExpanded(!isExpanded);
+  }, [isExpanded]);
 
   // Handle keyboard navigation
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
@@ -99,19 +106,39 @@ function MeetingCardComponent({ meeting, onRaceClick, onExpand, onCollapse, poll
     return meeting.category ? getRaceTypeDisplay(meeting.category) : meeting.raceType;
   };
 
-  const getMeetingStatus = () => {
+  const getMeetingStatus = (races?: unknown[]) => {
     if (!meeting.firstRaceTime) return 'upcoming';
     
     const now = new Date();
     const firstRaceTime = new Date(meeting.firstRaceTime);
     
+    // Check completion status from multiple sources in priority order:
+    
+    // 1. If we have expanded race data, check if all races are finalized
+    if (races && Array.isArray(races) && races.length > 0) {
+      const allRacesFinalized = races.every((race) => {
+        const raceData = race as { status: string };
+        return raceData.status === 'Final' || raceData.status === 'Abandoned';
+      });
+      
+      if (allRacesFinalized) {
+        return 'completed';
+      }
+    }
+    
+    // 2. If we have completion status from API/heuristic check
+    if (isCompleted === true) {
+      return 'completed';
+    }
+    
+    // 3. Fallback to time-based logic
     if (firstRaceTime > now) return 'upcoming';
     if (firstRaceTime <= now) return 'live';
     
     return 'upcoming';
   };
 
-  const status = getMeetingStatus();
+  const status = getMeetingStatus([]);
   const statusColors = {
     upcoming: 'border-blue-200 bg-blue-50',
     live: 'border-green-200 bg-green-50',
@@ -213,10 +240,6 @@ function MeetingCardComponent({ meeting, onRaceClick, onExpand, onCollapse, poll
           <RacesList 
             meetingId={meeting.meetingId}
             onRaceClick={onRaceClick}
-            onRacesLoaded={(loadedRaces) => {
-              const racesArray = Array.isArray(loadedRaces) ? loadedRaces : [];
-              onExpand?.(meeting.meetingId, racesArray);
-            }}
           />
         </div>
       )}
@@ -234,59 +257,8 @@ export const MeetingCard = memo(MeetingCardComponent, (prevProps, nextProps) => 
   );
   
   const callbacksEqual = (
-    prevProps.onRaceClick === nextProps.onRaceClick &&
-    prevProps.onExpand === nextProps.onExpand &&
-    prevProps.onCollapse === nextProps.onCollapse
+    prevProps.onRaceClick === nextProps.onRaceClick
   );
   
-  // Polling info deep comparison to prevent unnecessary re-renders
-  const pollingEqual = (() => {
-    if (prevProps.pollingInfo === nextProps.pollingInfo) return true;
-    if (!prevProps.pollingInfo && !nextProps.pollingInfo) return true;
-    if (!prevProps.pollingInfo || !nextProps.pollingInfo) return false;
-    
-    // Compare triggerManualPoll function reference
-    if (prevProps.pollingInfo.triggerManualPoll !== nextProps.pollingInfo.triggerManualPoll) {
-      return false;
-    }
-    
-    // Deep compare performance metrics if both exist
-    const prevMetrics = prevProps.pollingInfo.performanceMetrics as Record<string, unknown>;
-    const nextMetrics = nextProps.pollingInfo.performanceMetrics as Record<string, unknown>;
-    
-    if (prevMetrics && nextMetrics) {
-      const metricsEqual = (
-        prevMetrics.totalPolls === nextMetrics.totalPolls &&
-        prevMetrics.averageLatency === nextMetrics.averageLatency &&
-        prevMetrics.errorRate === nextMetrics.errorRate
-      );
-      if (!metricsEqual) return false;
-    } else if (prevMetrics !== nextMetrics) {
-      return false;
-    }
-    
-    // Deep compare polling states keys and basic properties
-    const prevStates = prevProps.pollingInfo.pollingStates as Record<string, unknown>;
-    const nextStates = nextProps.pollingInfo.pollingStates as Record<string, unknown>;
-    
-    if (prevStates && nextStates) {
-      const prevKeys = Object.keys(prevStates);
-      const nextKeys = Object.keys(nextStates);
-      if (prevKeys.length !== nextKeys.length) return false;
-      
-      for (const key of prevKeys) {
-        if (!nextKeys.includes(key)) return false;
-        // Basic comparison of polling state structure
-        const prevState = prevStates[key] as Record<string, unknown>;
-        const nextState = nextStates[key] as Record<string, unknown>;
-        if (typeof prevState !== typeof nextState) return false;
-      }
-    } else if (prevStates !== nextStates) {
-      return false;
-    }
-    
-    return true;
-  })();
-  
-  return meetingEqual && callbacksEqual && pollingEqual;
+  return meetingEqual && callbacksEqual;
 });

@@ -1,9 +1,10 @@
 /**
- * Database utilities for single-race-poller function
- * Self-contained copy for the single-race-poller function
+ * Database utilities for batch-race-poller function
+ * Optimized for batch processing multiple races with shared connection pooling
  */
 
 import { ID } from 'node-appwrite';
+import { collectBatchError } from './error-handlers.js';
 
 /**
  * Safely convert and truncate a field to string with max length
@@ -79,11 +80,6 @@ async function saveOddsHistory(databases, databaseId, entrantId, newOdds, curren
                 eventTimestamp: timestamp
             });
             recordsCreated++;
-            context.log('Saved fixed win odds history', { 
-                entrantId, 
-                newOdds: newOdds.fixed_win,
-                previousOdds: currentData?.fixedWinOdds || 'none'
-            });
         }
 
         // Save fixed place odds history if changed
@@ -97,11 +93,6 @@ async function saveOddsHistory(databases, databaseId, entrantId, newOdds, curren
                 eventTimestamp: timestamp
             });
             recordsCreated++;
-            context.log('Saved fixed place odds history', { 
-                entrantId, 
-                newOdds: newOdds.fixed_place,
-                previousOdds: currentData?.fixedPlaceOdds || 'none'
-            });
         }
 
         // Save pool win odds history if changed
@@ -115,11 +106,6 @@ async function saveOddsHistory(databases, databaseId, entrantId, newOdds, curren
                 eventTimestamp: timestamp
             });
             recordsCreated++;
-            context.log('Saved pool win odds history', { 
-                entrantId, 
-                newOdds: newOdds.pool_win,
-                previousOdds: currentData?.poolWinOdds || 'none'
-            });
         }
 
         // Save pool place odds history if changed  
@@ -133,11 +119,6 @@ async function saveOddsHistory(databases, databaseId, entrantId, newOdds, curren
                 eventTimestamp: timestamp
             });
             recordsCreated++;
-            context.log('Saved pool place odds history', { 
-                entrantId, 
-                newOdds: newOdds.pool_place,
-                previousOdds: currentData?.poolPlaceOdds || 'none'
-            });
         }
 
     } catch (error) {
@@ -194,12 +175,6 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
             recordsCreated++;
         }
 
-        context.log('Saved money flow history', { 
-            entrantId, 
-            holdPercentageValue: moneyData.hold_percentage,
-            betPercentageValue: moneyData.bet_percentage,
-            recordsCreated
-        });
         return recordsCreated > 0;
     } catch (error) {
         context.error('Failed to save money flow history', {
@@ -218,11 +193,12 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
  * @param {string} databaseId - Database ID
  * @param {Object} moneyTrackerData - Money tracker data from API response
  * @param {Object} context - Appwrite function context for logging
+ * @param {string} raceId - Race ID for batch processing context
  * @returns {number} Number of entrants processed for money flow
  */
-export async function processMoneyTrackerData(databases, databaseId, moneyTrackerData, context) {
+export async function processMoneyTrackerData(databases, databaseId, moneyTrackerData, context, raceId = 'unknown') {
     if (!moneyTrackerData || !moneyTrackerData.entrants || !Array.isArray(moneyTrackerData.entrants)) {
-        context.log('No money tracker entrants data available');
+        context.log('No money tracker entrants data available', { raceId });
         return 0;
     }
 
@@ -248,6 +224,7 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
     }
     
     context.log('Processed money tracker data', {
+        raceId,
         totalEntries: moneyTrackerData.entrants.length,
         uniqueEntrants: processedEntrants.size,
         entrantsProcessed
@@ -387,7 +364,8 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
                 if (historyRecords > 0) {
                     context.log('Created odds history records', { 
                         entrantId: entrant.entrant_id, 
-                        recordsCreated: historyRecords 
+                        recordsCreated: historyRecords,
+                        raceId
                     });
                 }
             }
@@ -417,4 +395,160 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
     }
     
     return entrantsProcessed;
+}
+
+/**
+ * Batch process multiple races efficiently with shared database connection
+ * @param {Object} databases - Appwrite Databases instance (shared connection)
+ * @param {string} databaseId - Database ID
+ * @param {Array} raceResults - Array of race results from batchFetchRaceEventData
+ * @param {Object} context - Appwrite function context for logging
+ * @returns {Object} Batch processing summary
+ */
+export async function batchProcessRaces(databases, databaseId, raceResults, context) {
+    const processingResults = [];
+    const errors = [];
+    
+    context.log('Starting batch race processing', {
+        totalRaces: raceResults.length,
+        successfulFetches: raceResults.filter(r => r.success).length
+    });
+
+    for (const raceResult of raceResults) {
+        if (!raceResult.success || !raceResult.data) {
+            processingResults.push({
+                raceId: raceResult.raceId,
+                success: false,
+                entrantsProcessed: 0,
+                moneyFlowProcessed: 0,
+                reason: 'Failed to fetch race data'
+            });
+            continue;
+        }
+
+        try {
+            context.log(`Processing race data: ${raceResult.raceId}`);
+            
+            let entrantsProcessed = 0;
+            let moneyFlowProcessed = 0;
+            let raceStatusUpdated = false;
+            
+            // Update race status if available and different from current status
+            if (raceResult.data.race && raceResult.data.race.status) {
+                try {
+                    // Get current race status to compare
+                    const currentRace = await databases.getDocument(databaseId, 'races', raceResult.raceId);
+                    
+                    if (currentRace.status !== raceResult.data.race.status) {
+                        await databases.updateDocument(databaseId, 'races', raceResult.raceId, {
+                            status: raceResult.data.race.status
+                        });
+                        raceStatusUpdated = true;
+                        context.log(`Updated race status`, { 
+                            raceId: raceResult.raceId, 
+                            oldStatus: currentRace.status, 
+                            newStatus: raceResult.data.race.status 
+                        });
+                    }
+                } catch (error) {
+                    collectBatchError(errors, error, raceResult.raceId, 'updateRaceStatus', context);
+                }
+            }
+            
+            // Process both entrants and money flow in parallel
+            const processingPromises = [];
+            
+            // Update entrant data if available
+            if (raceResult.data.entrants && raceResult.data.entrants.length > 0) {
+                processingPromises.push(
+                    processEntrants(databases, databaseId, raceResult.raceId, raceResult.data.entrants, context)
+                        .then(count => { entrantsProcessed = count; })
+                        .catch(error => {
+                            collectBatchError(errors, error, raceResult.raceId, 'processEntrants', context);
+                            entrantsProcessed = 0;
+                        })
+                );
+            }
+            
+            // Process money tracker data if available
+            if (raceResult.data.money_tracker) {
+                processingPromises.push(
+                    processMoneyTrackerData(databases, databaseId, raceResult.data.money_tracker, context, raceResult.raceId)
+                        .then(count => { moneyFlowProcessed = count; })
+                        .catch(error => {
+                            collectBatchError(errors, error, raceResult.raceId, 'processMoneyTrackerData', context);
+                            moneyFlowProcessed = 0;
+                        })
+                );
+            }
+            
+            // Wait for all processing to complete
+            await Promise.all(processingPromises);
+            
+            // Update last_poll_time for master scheduler coordination
+            try {
+                await databases.updateDocument(databaseId, 'races', raceResult.raceId, {
+                    last_poll_time: new Date().toISOString()
+                });
+                context.log(`Updated last_poll_time for race ${raceResult.raceId}`);
+            } catch (error) {
+                collectBatchError(errors, error, raceResult.raceId, 'updateLastPollTime', context);
+            }
+            
+            processingResults.push({
+                raceId: raceResult.raceId,
+                success: true,
+                entrantsProcessed,
+                moneyFlowProcessed,
+                raceStatusUpdated,
+                processedAt: new Date().toISOString()
+            });
+            
+            context.log('Successfully processed race', {
+                raceId: raceResult.raceId,
+                entrantsProcessed,
+                moneyFlowProcessed,
+                raceStatusUpdated
+            });
+            
+        } catch (error) {
+            collectBatchError(errors, error, raceResult.raceId, 'batchProcessRaces', context);
+            
+            processingResults.push({
+                raceId: raceResult.raceId,
+                success: false,
+                entrantsProcessed: 0,
+                moneyFlowProcessed: 0,
+                reason: error instanceof Error ? error.message : 'Unknown error'
+            });
+        }
+    }
+    
+    // Calculate summary statistics
+    const successful = processingResults.filter(r => r.success);
+    const totalEntrantsProcessed = processingResults.reduce((sum, r) => sum + r.entrantsProcessed, 0);
+    const totalMoneyFlowProcessed = processingResults.reduce((sum, r) => sum + r.moneyFlowProcessed, 0);
+    
+    const summary = {
+        totalRaces: raceResults.length,
+        successfulRaces: successful.length,
+        failedRaces: raceResults.length - successful.length,
+        totalEntrantsProcessed,
+        totalMoneyFlowProcessed,
+        totalErrors: errors.length,
+        processingResults,
+        errors,
+        timestamp: new Date().toISOString()
+    };
+    
+    context.log('Batch race processing completed', {
+        totalRaces: summary.totalRaces,
+        successfulRaces: summary.successfulRaces,
+        failedRaces: summary.failedRaces,
+        totalEntrantsProcessed,
+        totalMoneyFlowProcessed,
+        totalErrors: summary.totalErrors
+    });
+    
+    return summary;
 }

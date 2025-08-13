@@ -4,9 +4,9 @@ import '@testing-library/jest-dom';
 import { EntrantsGrid } from '../EntrantsGrid';
 import { Entrant, OddsHistoryData } from '@/types/meetings';
 
-// Mock the useRealtimeEntrants hook
-jest.mock('@/hooks/useRealtimeEntrants', () => ({
-  useRealtimeEntrants: jest.fn(),
+// Mock the useComprehensiveRealtimeFixed hook
+jest.mock('@/hooks/useComprehensiveRealtimeFixed', () => ({
+  useComprehensiveRealtime: jest.fn(),
 }));
 
 // Mock the SparklineChart component
@@ -26,8 +26,8 @@ jest.mock('../SparklineChart', () => ({
   ),
 }));
 
-import * as useRealtimeEntrantsModule from '@/hooks/useRealtimeEntrants';
-const mockUseRealtimeEntrants = useRealtimeEntrantsModule.useRealtimeEntrants as jest.MockedFunction<typeof useRealtimeEntrantsModule.useRealtimeEntrants>;
+import * as useComprehensiveRealtimeModule from '@/hooks/useComprehensiveRealtimeFixed';
+const mockUseComprehensiveRealtime = useComprehensiveRealtimeModule.useComprehensiveRealtime as jest.MockedFunction<typeof useComprehensiveRealtimeModule.useComprehensiveRealtime>;
 
 // Mock odds history data
 const mockOddsHistory: OddsHistoryData[] = [
@@ -109,12 +109,32 @@ const mockEntrants: Entrant[] = [
 
 describe('EntrantsGrid', () => {
   beforeEach(() => {
-    mockUseRealtimeEntrants.mockReturnValue({
+    mockUseComprehensiveRealtime.mockReturnValue({
       entrants: mockEntrants,
-      isConnected: true,
-      oddsUpdates: {},
-      moneyFlowUpdates: {},
-      oddsHistoryUpdates: {},
+      race: undefined,
+      connectionState: {
+        isConnected: true,
+        connectionAttempts: 1,
+        lastConnected: new Date(),
+        subscriptionCount: 4,
+        averageLatency: 50
+      },
+      recentUpdates: [],
+      updateCounts: {
+        entrants: 0,
+        race: 0,
+        moneyFlow: 0,
+        oddsHistory: 0
+      },
+      performance: {
+        averageUpdateLatency: 50,
+        updatesPerMinute: 0,
+        batchEfficiency: 1,
+        memoryUsage: 1024
+      },
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
   });
 
@@ -191,12 +211,32 @@ describe('EntrantsGrid', () => {
   });
 
   test('shows disconnected status when not connected', () => {
-    mockUseRealtimeEntrants.mockReturnValue({
+    mockUseComprehensiveRealtime.mockReturnValue({
       entrants: mockEntrants,
-      isConnected: false,
-      oddsUpdates: {},
-      moneyFlowUpdates: {},
-      oddsHistoryUpdates: {},
+      race: undefined,
+      connectionState: {
+        isConnected: false,
+        connectionAttempts: 3,
+        lastConnected: null,
+        subscriptionCount: 0,
+        averageLatency: 0
+      },
+      recentUpdates: [],
+      updateCounts: {
+        entrants: 0,
+        race: 0,
+        moneyFlow: 0,
+        oddsHistory: 0
+      },
+      performance: {
+        averageUpdateLatency: 0,
+        updatesPerMinute: 0,
+        batchEfficiency: 0,
+        memoryUsage: 1024
+      },
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -205,16 +245,42 @@ describe('EntrantsGrid', () => {
   });
 
   test('displays trend indicators for odds changes', () => {
-    mockUseRealtimeEntrants.mockReturnValue({
+    mockUseComprehensiveRealtime.mockReturnValue({
       entrants: [
         { ...mockEntrants[0], winOdds: 4.00 }, // Odds increased
       ],
-      isConnected: true,
-      oddsUpdates: {
-        '1': { win: 3.50, timestamp: new Date() }, // Previous odds
+      race: undefined,
+      connectionState: {
+        isConnected: true,
+        connectionAttempts: 1,
+        lastConnected: new Date(),
+        subscriptionCount: 4,
+        averageLatency: 50
       },
-      moneyFlowUpdates: {},
-      oddsHistoryUpdates: {},
+      recentUpdates: [
+        {
+          type: 'entrant',
+          entrantId: '1',
+          timestamp: new Date(),
+          data: { winOdds: 3.50 },
+          acknowledged: false
+        }
+      ],
+      updateCounts: {
+        entrants: 1,
+        race: 0,
+        moneyFlow: 0,
+        oddsHistory: 0
+      },
+      performance: {
+        averageUpdateLatency: 50,
+        updatesPerMinute: 0,
+        batchEfficiency: 1,
+        memoryUsage: 1024
+      },
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -238,12 +304,32 @@ describe('EntrantsGrid', () => {
   });
 
   test('displays empty state when no entrants', () => {
-    mockUseRealtimeEntrants.mockReturnValue({
+    mockUseComprehensiveRealtime.mockReturnValue({
       entrants: [],
-      isConnected: true,
-      oddsUpdates: {},
-      moneyFlowUpdates: {},
-      oddsHistoryUpdates: {},
+      race: undefined,
+      connectionState: {
+        isConnected: true,
+        connectionAttempts: 1,
+        lastConnected: new Date(),
+        subscriptionCount: 4,
+        averageLatency: 50
+      },
+      recentUpdates: [],
+      updateCounts: {
+        entrants: 0,
+        race: 0,
+        moneyFlow: 0,
+        oddsHistory: 0
+      },
+      performance: {
+        averageUpdateLatency: 50,
+        updatesPerMinute: 0,
+        batchEfficiency: 1,
+        memoryUsage: 1024
+      },
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={[]} raceId="race1" />);
@@ -274,25 +360,57 @@ describe('EntrantsGrid', () => {
     expect(screen.getByLabelText('Live entrant updates')).toBeInTheDocument();
   });
 
-  test('calls useRealtimeEntrants with correct parameters', () => {
+  test('calls useComprehensiveRealtime with correct parameters', () => {
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
 
-    expect(mockUseRealtimeEntrants).toHaveBeenCalledWith({
+    expect(mockUseComprehensiveRealtime).toHaveBeenCalledWith({
       initialEntrants: mockEntrants,
       raceId: 'race1',
     });
   });
 
   test('announces odds updates for screen readers', () => {
-    mockUseRealtimeEntrants.mockReturnValue({
+    mockUseComprehensiveRealtime.mockReturnValue({
       entrants: mockEntrants,
-      isConnected: true,
-      oddsUpdates: {
-        '1': { win: 3.50, timestamp: new Date() },
-        '2': { place: 3.20, timestamp: new Date() },
+      race: undefined,
+      connectionState: {
+        isConnected: true,
+        connectionAttempts: 1,
+        lastConnected: new Date(),
+        subscriptionCount: 4,
+        averageLatency: 50
       },
-      moneyFlowUpdates: {},
-      oddsHistoryUpdates: {},
+      recentUpdates: [
+        {
+          type: 'entrant',
+          entrantId: '1',
+          timestamp: new Date(),
+          data: { winOdds: 3.50 },
+          acknowledged: false
+        },
+        {
+          type: 'entrant',
+          entrantId: '2',
+          timestamp: new Date(),
+          data: { winOdds: 7.50, placeOdds: 3.20 },
+          acknowledged: false
+        }
+      ],
+      updateCounts: {
+        entrants: 2,
+        race: 0,
+        moneyFlow: 0,
+        oddsHistory: 0
+      },
+      performance: {
+        averageUpdateLatency: 50,
+        updatesPerMinute: 0,
+        batchEfficiency: 1,
+        memoryUsage: 1024
+      },
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -329,15 +447,47 @@ describe('EntrantsGrid', () => {
   });
 
   test('announces money flow updates for screen readers', () => {
-    mockUseRealtimeEntrants.mockReturnValue({
+    mockUseComprehensiveRealtime.mockReturnValue({
       entrants: mockEntrants,
-      isConnected: true,
-      oddsUpdates: {},
-      moneyFlowUpdates: {
-        '1': { holdPercentage: 26.75, timestamp: new Date() },
-        '3': { holdPercentage: 9.25, timestamp: new Date() },
+      race: undefined,
+      connectionState: {
+        isConnected: true,
+        connectionAttempts: 1,
+        lastConnected: new Date(),
+        subscriptionCount: 4,
+        averageLatency: 50
       },
-      oddsHistoryUpdates: {},
+      recentUpdates: [
+        {
+          type: 'moneyFlow',
+          entrantId: '1',
+          timestamp: new Date(),
+          data: { holdPercentage: 26.75 },
+          acknowledged: false
+        },
+        {
+          type: 'moneyFlow',
+          entrantId: '3',
+          timestamp: new Date(),
+          data: { holdPercentage: 9.25 },
+          acknowledged: false
+        }
+      ],
+      updateCounts: {
+        entrants: 0,
+        race: 0,
+        moneyFlow: 2,
+        oddsHistory: 0
+      },
+      performance: {
+        averageUpdateLatency: 50,
+        updatesPerMinute: 0,
+        batchEfficiency: 1,
+        memoryUsage: 1024
+      },
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -347,16 +497,47 @@ describe('EntrantsGrid', () => {
   });
 
   test('announces both odds and money flow updates together', () => {
-    mockUseRealtimeEntrants.mockReturnValue({
+    mockUseComprehensiveRealtime.mockReturnValue({
       entrants: mockEntrants,
-      isConnected: true,
-      oddsUpdates: {
-        '1': { win: 3.75, timestamp: new Date() },
+      race: undefined,
+      connectionState: {
+        isConnected: true,
+        connectionAttempts: 1,
+        lastConnected: new Date(),
+        subscriptionCount: 4,
+        averageLatency: 50
       },
-      moneyFlowUpdates: {
-        '2': { holdPercentage: 16.50, timestamp: new Date() },
+      recentUpdates: [
+        {
+          type: 'entrant',
+          entrantId: '1',
+          timestamp: new Date(),
+          data: { winOdds: 3.75 },
+          acknowledged: false
+        },
+        {
+          type: 'moneyFlow',
+          entrantId: '2',
+          timestamp: new Date(),
+          data: { holdPercentage: 16.50 },
+          acknowledged: false
+        }
+      ],
+      updateCounts: {
+        entrants: 1,
+        race: 0,
+        moneyFlow: 1,
+        oddsHistory: 0
       },
-      oddsHistoryUpdates: {},
+      performance: {
+        averageUpdateLatency: 50,
+        updatesPerMinute: 0,
+        batchEfficiency: 1,
+        memoryUsage: 1024
+      },
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
@@ -405,12 +586,32 @@ describe('EntrantsGrid', () => {
       oddsHistory: undefined
     }));
 
-    mockUseRealtimeEntrants.mockReturnValue({
+    mockUseComprehensiveRealtime.mockReturnValue({
       entrants: entrantsWithoutHistory,
-      isConnected: true,
-      oddsUpdates: {},
-      moneyFlowUpdates: {},
-      oddsHistoryUpdates: {},
+      race: undefined,
+      connectionState: {
+        isConnected: true,
+        connectionAttempts: 1,
+        lastConnected: new Date(),
+        subscriptionCount: 4,
+        averageLatency: 50
+      },
+      recentUpdates: [],
+      updateCounts: {
+        entrants: 0,
+        race: 0,
+        moneyFlow: 0,
+        oddsHistory: 0
+      },
+      performance: {
+        averageUpdateLatency: 50,
+        updatesPerMinute: 0,
+        batchEfficiency: 1,
+        memoryUsage: 1024
+      },
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={entrantsWithoutHistory} raceId="race1" />);
@@ -421,42 +622,110 @@ describe('EntrantsGrid', () => {
   });
 
   test('announces odds history updates for screen readers', () => {
-    mockUseRealtimeEntrants.mockReturnValue({
+    mockUseComprehensiveRealtime.mockReturnValue({
       entrants: mockEntrants,
-      isConnected: true,
-      oddsUpdates: {},
-      moneyFlowUpdates: {},
-      oddsHistoryUpdates: {
-        '1': { newEntry: mockOddsHistory[0], timestamp: new Date() },
-        '3': { newEntry: mockOddsHistory[1], timestamp: new Date() },
+      race: undefined,
+      connectionState: {
+        isConnected: true,
+        connectionAttempts: 1,
+        lastConnected: new Date(),
+        subscriptionCount: 4,
+        averageLatency: 50
       },
+      recentUpdates: [
+        {
+          type: 'oddsHistory',
+          entrantId: '1',
+          timestamp: new Date(),
+          data: mockOddsHistory[0] as unknown as Record<string, unknown>,
+          acknowledged: false
+        },
+        {
+          type: 'oddsHistory',
+          entrantId: '3',
+          timestamp: new Date(),
+          data: mockOddsHistory[1] as unknown as Record<string, unknown>,
+          acknowledged: false
+        }
+      ],
+      updateCounts: {
+        entrants: 0,
+        race: 0,
+        moneyFlow: 0,
+        oddsHistory: 2
+      },
+      performance: {
+        averageUpdateLatency: 50,
+        updatesPerMinute: 0,
+        batchEfficiency: 1,
+        memoryUsage: 1024
+      },
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
 
     const liveRegion = screen.getByLabelText('Live entrant updates');
-    expect(liveRegion).toHaveTextContent('Odds history updated for 2 entrants');
+    expect(liveRegion).toHaveTextContent('Odds trend data updated for 2 entrants');
   });
 
   test('announces combined updates including odds history', () => {
-    mockUseRealtimeEntrants.mockReturnValue({
+    mockUseComprehensiveRealtime.mockReturnValue({
       entrants: mockEntrants,
-      isConnected: true,
-      oddsUpdates: {
-        '1': { win: 3.75, timestamp: new Date() },
+      race: undefined,
+      connectionState: {
+        isConnected: true,
+        connectionAttempts: 1,
+        lastConnected: new Date(),
+        subscriptionCount: 4,
+        averageLatency: 50
       },
-      moneyFlowUpdates: {
-        '2': { holdPercentage: 16.50, timestamp: new Date() },
+      recentUpdates: [
+        {
+          type: 'entrant',
+          entrantId: '1',
+          timestamp: new Date(),
+          data: { winOdds: 3.75 },
+          acknowledged: false
+        },
+        {
+          type: 'moneyFlow',
+          entrantId: '2',
+          timestamp: new Date(),
+          data: { holdPercentage: 16.50 },
+          acknowledged: false
+        },
+        {
+          type: 'oddsHistory',
+          entrantId: '3',
+          timestamp: new Date(),
+          data: mockOddsHistory[0] as unknown as Record<string, unknown>,
+          acknowledged: false
+        }
+      ],
+      updateCounts: {
+        entrants: 1,
+        race: 0,
+        moneyFlow: 1,
+        oddsHistory: 1
       },
-      oddsHistoryUpdates: {
-        '3': { newEntry: mockOddsHistory[0], timestamp: new Date() },
+      performance: {
+        averageUpdateLatency: 50,
+        updatesPerMinute: 0,
+        batchEfficiency: 1,
+        memoryUsage: 1024
       },
+      triggerReconnect: jest.fn(),
+      acknowledgUpdate: jest.fn(),
+      clearUpdateHistory: jest.fn()
     });
 
     render(<EntrantsGrid initialEntrants={mockEntrants} raceId="race1" />);
 
     const liveRegion = screen.getByLabelText('Live entrant updates');
-    expect(liveRegion).toHaveTextContent('Odds updated for 1 entrant Money flow updated for 1 entrant Odds history updated for 1 entrant');
+    expect(liveRegion).toHaveTextContent('Odds updated for 1 entrant Money flow updated for 1 entrant Odds trend data updated for 1 entrant');
   });
 
   test('trend column has proper accessibility attributes', () => {

@@ -155,3 +155,28 @@ jobs:
       - name: Validate JavaScript syntax
         run: |
           node -c src/main.js && echo "✓ main.js syntax valid" || exit 1
+
+  backend-batch-race-poller:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server/batch-race-poller
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: ./server/package-lock.json
+      - name: Validate function configuration
+        run: |
+          test -f ../appwrite.json && echo "✓ consolidated appwrite.json exists" || exit 1
+          test -f src/main.js && echo "✓ main.js exists" || exit 1
+          test -f package.json && echo "✓ package.json exists" || exit 1
+      - name: Install dependencies
+        run: npm install
+      - name: Validate JavaScript syntax
+        run: |
+          node -c src/main.js && echo "✓ main.js syntax valid" || exit 1
