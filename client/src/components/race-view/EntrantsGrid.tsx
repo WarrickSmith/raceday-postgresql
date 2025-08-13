@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useMemo, useState, useCallback } from 'react';
+import Image from 'next/image';
 import { Entrant } from '@/types/meetings';
 import { useComprehensiveRealtime } from '@/hooks/useComprehensiveRealtimeFixed';
 import { SparklineChart } from './SparklineChart';
@@ -49,9 +50,11 @@ const EntrantRow = memo(function EntrantRow({
         {entrant.jockey && (
           <div className="text-sm text-gray-500 flex items-center" aria-label={`Jockey: ${entrant.jockey}`}>
             {entrant.silkUrl ? (
-              <img 
+              <Image 
                 src={entrant.silkUrl}
                 alt={`Racing silks for ${entrant.name}`}
+                width={16}
+                height={16}
                 className="w-4 h-4 rounded mr-2 border border-gray-200 flex-shrink-0"
                 onError={(e) => {
                   // Hide the image if it fails to load
