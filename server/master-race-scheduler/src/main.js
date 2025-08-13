@@ -446,33 +446,44 @@ async function runSchedulerLogic(context) {
 }
 
 /**
- * Calculate required polling interval based on race timing and status
- * @param {number} timeToStartMinutes - Minutes until race start (negative if race has started)
- * @param {string} raceStatus - Current race status
+ * Calculate required polling interval using STATUS-DRIVEN logic
+ * 
+ * Primary logic: Poll aggressively while status='Open' regardless of scheduled time
+ * Secondary logic: Use time-based intervals only within status categories
+ * 
+ * This ensures 'Closed' status is never missed due to race delays
+ * 
+ * @param {number} timeToStartMinutes - Minutes until race start (negative if race has started)  
+ * @param {string} raceStatus - Current race status (primary determinant)
  * @returns {number} Polling interval in minutes
  */
 function getPollingInterval(timeToStartMinutes, raceStatus) {
-  // Post-start polling based on status
-  if (timeToStartMinutes <= 0) {
-    if (raceStatus === 'Closed') {
-      return 0.5 // 30 seconds - Closed to Interim
-    } else if (raceStatus === 'Interim') {
-      return 5 // 5 minutes - Interim to Final
+  // STATUS-DRIVEN POLLING: Primary logic based on race status, not time
+  
+  // Open status: Keep aggressive polling until race actually closes
+  if (raceStatus === 'Open') {
+    if (timeToStartMinutes <= 5) {
+      return 0.25 // 15 seconds - aggressive polling until actually closed
+    } else if (timeToStartMinutes <= 10) {
+      return 1 // 1 minute - frequent polling as race approaches
+    } else if (timeToStartMinutes <= 20) {
+      return 2 // 2 minutes - moderate polling
     } else {
-      return 5 // Default 5 minutes for other post-start statuses
+      return 5 // 5 minutes - standard polling for distant races
     }
   }
   
-  // Pre-start polling based on time to start
-  if (timeToStartMinutes > 60) {
-    return 5 // T-60m+: Poll every 5 minutes
-  } else if (timeToStartMinutes > 20) {
-    return 5 // T-60m to T-20m: Poll every 5 minutes
-  } else if (timeToStartMinutes > 10) {
-    return 2 // T-20m to T-10m: Poll every 2 minutes
-  } else if (timeToStartMinutes > 5) {
-    return 1 // T-10m to T-5m: Poll every 1 minute
+  // Post-open status polling (race has actually started transitioning)
+  if (raceStatus === 'Closed') {
+    return 0.5 // 30 seconds - closed to running transition
+  } else if (raceStatus === 'Running') {
+    return 0.5 // 30 seconds - running to interim transition  
+  } else if (raceStatus === 'Interim') {
+    return 5 // 5 minutes - interim to final transition
+  } else if (raceStatus === 'Finalized' || raceStatus === 'Abandoned') {
+    return 30 // 30 minutes - race completed, very low frequency
   } else {
-    return 0.25 // T-5m to Start: Poll every 15 seconds
+    // Fallback for unknown statuses - treat as active
+    return timeToStartMinutes <= 5 ? 0.25 : 2
   }
 }
