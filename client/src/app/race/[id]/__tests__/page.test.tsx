@@ -77,6 +77,9 @@ describe('RaceDetailPage', () => {
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
       .mockResolvedValueOnce({ documents: [] }) // Entrants query (empty for now)
+      .mockResolvedValueOnce({ documents: [] }) // Previous race query
+      .mockResolvedValueOnce({ documents: [] }) // Next race query
+      .mockResolvedValueOnce({ documents: [] }) // Next scheduled race query
       .mockResolvedValueOnce({ documents: [] }) // Money flow query
       .mockResolvedValueOnce({ documents: [] }); // Odds history query
 
@@ -126,6 +129,9 @@ describe('RaceDetailPage', () => {
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
       .mockResolvedValueOnce({ documents: [] }) // Entrants query
+      .mockResolvedValueOnce({ documents: [] }) // Previous race query
+      .mockResolvedValueOnce({ documents: [] }) // Next race query
+      .mockResolvedValueOnce({ documents: [] }) // Next scheduled race query
       .mockResolvedValueOnce({ documents: [] }) // Money flow query
       .mockResolvedValueOnce({ documents: [] }); // Odds history query
 
@@ -147,6 +153,9 @@ describe('RaceDetailPage', () => {
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
       .mockResolvedValueOnce({ documents: [] }) // Entrants query
+      .mockResolvedValueOnce({ documents: [] }) // Previous race query
+      .mockResolvedValueOnce({ documents: [] }) // Next race query
+      .mockResolvedValueOnce({ documents: [] }) // Next scheduled race query
       .mockResolvedValueOnce({ documents: [] }) // Money flow query
       .mockResolvedValueOnce({ documents: [] }); // Odds history query
 
@@ -171,6 +180,9 @@ describe('RaceDetailPage', () => {
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [{ ...mockRaceWithMeeting, status: 'Open' }] }) // Race query
       .mockResolvedValueOnce({ documents: [] }) // Entrants query
+      .mockResolvedValueOnce({ documents: [] }) // Previous race query
+      .mockResolvedValueOnce({ documents: [] }) // Next race query
+      .mockResolvedValueOnce({ documents: [] }) // Next scheduled race query
       .mockResolvedValueOnce({ documents: [] }) // Money flow query
       .mockResolvedValueOnce({ documents: [] }); // Odds history query
 
@@ -196,6 +208,9 @@ describe('RaceDetailPage', () => {
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [raceWithInvalidTime] }) // Race query
       .mockResolvedValueOnce({ documents: [] }) // Entrants query
+      .mockResolvedValueOnce({ documents: [] }) // Previous race query
+      .mockResolvedValueOnce({ documents: [] }) // Next race query
+      .mockResolvedValueOnce({ documents: [] }) // Next scheduled race query
       .mockResolvedValueOnce({ documents: [] }) // Money flow query
       .mockResolvedValueOnce({ documents: [] }); // Odds history query
 
@@ -224,6 +239,9 @@ describe('RaceDetailPage', () => {
     mockDatabases.listDocuments
       .mockResolvedValueOnce({ documents: [mockRaceWithMeeting] }) // Race query
       .mockResolvedValueOnce({ documents: [mockEntrant] }) // Entrants query
+      .mockResolvedValueOnce({ documents: [] }) // Previous race query
+      .mockResolvedValueOnce({ documents: [] }) // Next race query
+      .mockResolvedValueOnce({ documents: [] }) // Next scheduled race query
       .mockResolvedValueOnce({ documents: [] }) // Money flow query
       .mockResolvedValueOnce({ documents: [] }); // Odds history query
 
@@ -265,7 +283,7 @@ describe('RaceDetailPage', () => {
       ])
     );
     
-    // Should be called four times (race + entrants + money flow + odds history queries)
-    expect(mockDatabases.listDocuments).toHaveBeenCalledTimes(4);
+    // Should be called seven times (race + entrants + previous + next + next scheduled + money flow + odds history queries)
+    expect(mockDatabases.listDocuments).toHaveBeenCalledTimes(7);
   });
 });

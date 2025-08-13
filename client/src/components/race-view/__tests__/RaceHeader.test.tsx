@@ -4,11 +4,20 @@
 
 import { render, screen } from '@testing-library/react';
 import { RaceHeader } from '../RaceHeader';
-import { Race, Meeting } from '@/types/meetings';
+import { Race, Meeting, RaceNavigationData } from '@/types/meetings';
 
 // Mock the real-time hook
 jest.mock('@/hooks/useRealtimeRace', () => ({
   useRealtimeRace: jest.fn(),
+}));
+
+// Mock Next.js navigation
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(() => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+  })),
 }));
 
 // Get the mocked hook
@@ -41,6 +50,27 @@ const mockMeeting: Meeting = {
   date: '2025-08-10',
 };
 
+const mockNavigationData: RaceNavigationData = {
+  previousRace: {
+    raceId: 'prev-race-123',
+    name: 'Previous Race',
+    startTime: '2025-08-10T09:50:00.000Z',
+    meetingName: 'ROTORUA'
+  },
+  nextRace: {
+    raceId: 'next-race-123',
+    name: 'Next Race',
+    startTime: '2025-08-10T10:50:00.000Z',
+    meetingName: 'ROTORUA'
+  },
+  nextScheduledRace: {
+    raceId: 'scheduled-race-123',
+    name: 'Scheduled Race',
+    startTime: '2025-08-10T11:20:00.000Z',
+    meetingName: 'AUCKLAND'
+  }
+};
+
 describe('RaceHeader', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -52,7 +82,7 @@ describe('RaceHeader', () => {
   });
 
   it('renders race information correctly', () => {
-    render(<RaceHeader initialRace={mockRace} meeting={mockMeeting} />);
+    render(<RaceHeader initialRace={mockRace} meeting={mockMeeting} navigationData={mockNavigationData} />);
 
     // Check race title
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Race 1: Maiden Plate');
@@ -81,7 +111,7 @@ describe('RaceHeader', () => {
       lastUpdate: new Date(),
     });
     
-    render(<RaceHeader initialRace={raceWithShortDistance} meeting={mockMeeting} />);
+    render(<RaceHeader initialRace={raceWithShortDistance} meeting={mockMeeting} navigationData={mockNavigationData} />);
     expect(screen.getByText('800m')).toBeInTheDocument();
   });
 
@@ -98,7 +128,7 @@ describe('RaceHeader', () => {
       lastUpdate: new Date(),
     });
     
-    render(<RaceHeader initialRace={raceWithoutOptionalFields} meeting={mockMeeting} />);
+    render(<RaceHeader initialRace={raceWithoutOptionalFields} meeting={mockMeeting} navigationData={mockNavigationData} />);
     
     // Should still render without distance and track condition
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Race 1: Maiden Plate');
@@ -110,7 +140,7 @@ describe('RaceHeader', () => {
   });
 
   it('shows connection status indicator', () => {
-    render(<RaceHeader initialRace={mockRace} meeting={mockMeeting} />);
+    render(<RaceHeader initialRace={mockRace} meeting={mockMeeting} navigationData={mockNavigationData} />);
     
     const liveIndicator = screen.getByText('🔄 Live');
     expect(liveIndicator).toBeInTheDocument();
@@ -118,7 +148,7 @@ describe('RaceHeader', () => {
   });
 
   it('displays time information correctly', () => {
-    render(<RaceHeader initialRace={mockRace} meeting={mockMeeting} />);
+    render(<RaceHeader initialRace={mockRace} meeting={mockMeeting} navigationData={mockNavigationData} />);
     
     // Should show formatted time
     const timeElement = screen.getByRole('time');
@@ -127,7 +157,7 @@ describe('RaceHeader', () => {
   });
 
   it('has proper accessibility attributes', () => {
-    render(<RaceHeader initialRace={mockRace} meeting={mockMeeting} />);
+    render(<RaceHeader initialRace={mockRace} meeting={mockMeeting} navigationData={mockNavigationData} />);
     
     // Check main heading has proper accessibility attributes
     const heading = screen.getByRole('heading', { level: 1 });
@@ -151,7 +181,7 @@ describe('RaceHeader', () => {
       lastUpdate: new Date(),
     });
     
-    render(<RaceHeader initialRace={raceWithInvalidTime} meeting={mockMeeting} />);
+    render(<RaceHeader initialRace={raceWithInvalidTime} meeting={mockMeeting} navigationData={mockNavigationData} />);
     
     // Should show 'TBA' for invalid time
     expect(screen.getByText('TBA')).toBeInTheDocument();
