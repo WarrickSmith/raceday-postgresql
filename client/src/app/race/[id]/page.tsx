@@ -3,7 +3,7 @@ import { createServerClient, Query } from '@/lib/appwrite-server';
 import { Race, Meeting, Entrant, MoneyFlowHistory, OddsHistoryData } from '@/types/meetings';
 import { RaceHeader } from '@/components/race-view/RaceHeader';
 import { EntrantsGrid } from '@/components/race-view/EntrantsGrid';
-import { coordinateIntelligentPolling } from '@/app/actions/race-polling';
+
 
 const ODDS_HISTORY_QUERY_LIMIT = 500;
 
@@ -27,7 +27,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
     oddsHistoryCount: number;
     moneyFlowHistoryCount: number;
   };
-  pollingTriggered?: boolean;
+
 } | null> {
   try {
     const { databases } = await createServerClient();
@@ -224,25 +224,15 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       moneyFlowHistoryCount: moneyFlowQuery.documents.length
     };
 
-    // Trigger intelligent polling coordination proactively
-    // This ensures data availability is maintained for all races
-    let pollingTriggered = false;
-    try {
-      // Fire and forget - don't wait for polling coordination
-      coordinateIntelligentPolling().catch(error => {
-        console.log('Background polling coordination failed:', error.message);
-      });
-      pollingTriggered = true;
-    } catch (error) {
-      console.log('Failed to initiate polling coordination:', error);
-    }
+    // Note: Autonomous server-side polling now handles all data updates
+    // No client-side polling coordination needed
 
     return { 
       race, 
       meeting, 
       entrants, 
       dataFreshness,
-      pollingTriggered
+
     };
   } catch (error) {
     console.error('Error fetching race details:', error);
