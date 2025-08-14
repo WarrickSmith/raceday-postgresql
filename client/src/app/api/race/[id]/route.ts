@@ -1,22 +1,49 @@
-import { notFound } from 'next/navigation';
+import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, Query } from '@/lib/appwrite-server';
 import { Race, Meeting, Entrant, MoneyFlowHistory, OddsHistoryData, RaceNavigationData } from '@/types/meetings';
-import { RaceProvider } from '@/contexts/RaceContext';
-import { RacePageContent } from '@/components/race-view/RacePageContent';
-import type { RaceStatus } from '@/types/racePools';
-
 
 const ODDS_HISTORY_QUERY_LIMIT = 500;
 
-interface RaceDetailPageProps {
-  params: Promise<{
-    id: string;
-  }>;
+/**
+ * API route for client-side race data fetching
+ * Reuses the same comprehensive data fetching logic as the page component
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: raceId } = await params;
+    
+    if (!raceId) {
+      return NextResponse.json({ error: 'Race ID is required' }, { status: 400 });
+    }
+
+    // Check if this is a navigation request (fast mode)
+    const url = new URL(request.url);
+    const isNavigation = url.searchParams.get('nav') === 'true';
+    
+    const raceData = isNavigation 
+      ? await getNavigationRaceData(raceId)
+      : await getComprehensiveRaceData(raceId);
+    
+    if (!raceData) {
+      return NextResponse.json({ error: 'Race not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(raceData);
+  } catch (error) {
+    console.error('API Error fetching race data:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
 }
 
 /**
  * Comprehensive data fetching with batch optimization for race ecosystem
- * Fetches race, meeting, entrants, odds-history, and money-flow-history efficiently
+ * Identical to the server-side function in the page component
  */
 async function getComprehensiveRaceData(raceId: string): Promise<{
   race: Race; 
@@ -29,7 +56,6 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
     oddsHistoryCount: number;
     moneyFlowHistoryCount: number;
   };
-
 } | null> {
   try {
     const { databases } = await createServerClient();
@@ -282,16 +308,12 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       moneyFlowHistoryCount: moneyFlowQuery.documents.length
     };
 
-    // Note: Autonomous server-side polling now handles all data updates
-    // No client-side polling coordination needed
-
     return { 
       race, 
       meeting, 
       entrants, 
       navigationData,
       dataFreshness,
-
     };
   } catch (error) {
     console.error('Error fetching race details:', error);
@@ -299,17 +321,176 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
   }
 }
 
-export default async function RaceDetailPage({ params }: RaceDetailPageProps) {
-  const { id } = await params;
-  const raceData = await getComprehensiveRaceData(id);
-  
-  if (!raceData) {
-    notFound();
-  }
+/**
+ * Fast navigation data fetching - optimized for speed
+ * Only fetches essential data needed for navigation updates
+ */
+async function getNavigationRaceData(raceId: string): Promise<{
+  race: Race; 
+  meeting: Meeting; 
+  entrants: Entrant[];
+  navigationData: RaceNavigationData;
+  dataFreshness: {
+    lastUpdated: string;
+    entrantsDataAge: number;
+    oddsHistoryCount: number;
+    moneyFlowHistoryCount: number;
+  };
+} | null> {
+  try {
+    const { databases } = await createServerClient();
+    
+    // Fetch race with meeting data - only essential fields
+    const raceQuery = await databases.listDocuments(
+      'raceday-db', 
+      'races',
+      [Query.equal('raceId', raceId), Query.limit(1)]
+    );
 
-  return (
-    <RaceProvider initialData={raceData}>
-      <RacePageContent />
-    </RaceProvider>
-  );
+    if (!raceQuery.documents.length) {
+      return null;
+    }
+
+    const raceData = raceQuery.documents[0];
+    
+    if (!raceData.meeting || !raceData.meeting.meetingId) {
+      return null;
+    }
+
+    // Convert to expected format (same as comprehensive version)
+    const race: Race = {
+      $id: raceData.$id,
+      $createdAt: raceData.$createdAt,
+      $updatedAt: raceData.$updatedAt,
+      raceId: raceData.raceId,
+      raceNumber: raceData.raceNumber,
+      name: raceData.name,
+      startTime: raceData.startTime,
+      meeting: raceData.meeting.meetingId,
+      status: raceData.status,
+      distance: raceData.distance,
+      trackCondition: raceData.trackCondition,
+    };
+
+    const meeting: Meeting = {
+      $id: raceData.meeting.$id,
+      $createdAt: raceData.meeting.$createdAt,
+      $updatedAt: raceData.meeting.$updatedAt,
+      meetingId: raceData.meeting.meetingId,
+      meetingName: raceData.meeting.meetingName,
+      country: raceData.meeting.country,
+      raceType: raceData.meeting.raceType,
+      category: raceData.meeting.category,
+      date: raceData.meeting.date,
+    };
+    
+    // Fetch basic entrants data - no history data for speed
+    const entrantsQuery = await databases.listDocuments(
+      'raceday-db',
+      'entrants',
+      [
+        Query.equal('race', raceData.$id),
+        Query.orderAsc('runnerNumber')
+      ]
+    );
+
+    // Calculate basic data freshness
+    const now = new Date();
+    const entrantsDataAge = entrantsQuery.documents.length > 0 
+      ? Math.round((now.getTime() - new Date(entrantsQuery.documents[0].$updatedAt).getTime()) / 1000)
+      : 0;
+
+    // Only fetch navigation data - skip history data for speed
+    const [previousRaceQuery, nextRaceQuery, nextScheduledRaceQuery] = await Promise.all([
+      databases.listDocuments(
+        'raceday-db',
+        'races',
+        [
+          Query.lessThan('startTime', raceData.startTime),
+          Query.orderDesc('startTime'),
+          Query.limit(1)
+        ]
+      ),
+      databases.listDocuments(
+        'raceday-db',
+        'races',
+        [
+          Query.greaterThan('startTime', raceData.startTime),
+          Query.orderAsc('startTime'),
+          Query.limit(1)
+        ]
+      ),
+      databases.listDocuments(
+        'raceday-db',
+        'races',
+        [
+          Query.greaterThan('startTime', now.toISOString()),
+          Query.orderAsc('startTime'),
+          Query.limit(1)
+        ]
+      )
+    ]);
+
+    // Basic entrant mapping without history data for speed
+    const entrants: Entrant[] = entrantsQuery.documents.map((doc) => ({
+      $id: doc.$id,
+      $createdAt: doc.$createdAt,
+      $updatedAt: doc.$updatedAt,
+      entrantId: doc.entrantId,
+      name: doc.name,
+      runnerNumber: doc.runnerNumber,
+      jockey: doc.jockey,
+      trainerName: doc.trainerName,
+      weight: doc.weight,
+      silkUrl: doc.silkUrl,
+      isScratched: doc.isScratched,
+      race: doc.race,
+      winOdds: doc.poolWinOdds || doc.fixedWinOdds,
+      placeOdds: doc.poolPlaceOdds || doc.fixedPlaceOdds,
+      // Set basic defaults for UI - real-time updates will populate these
+      oddsHistory: [],
+      holdPercentage: 0,
+      moneyFlowTrend: 'neutral'
+    }));
+    
+    // Navigation data processing (same as comprehensive)
+    const navigationData: RaceNavigationData = {
+      previousRace: previousRaceQuery.documents.length > 0 ? {
+        raceId: previousRaceQuery.documents[0].raceId,
+        name: previousRaceQuery.documents[0].name,
+        startTime: previousRaceQuery.documents[0].startTime,
+        meetingName: previousRaceQuery.documents[0].meeting?.meetingName || 'Unknown Meeting'
+      } : null,
+      nextRace: nextRaceQuery.documents.length > 0 ? {
+        raceId: nextRaceQuery.documents[0].raceId,
+        name: nextRaceQuery.documents[0].name,
+        startTime: nextRaceQuery.documents[0].startTime,
+        meetingName: nextRaceQuery.documents[0].meeting?.meetingName || 'Unknown Meeting'
+      } : null,
+      nextScheduledRace: nextScheduledRaceQuery.documents.length > 0 ? {
+        raceId: nextScheduledRaceQuery.documents[0].raceId,
+        name: nextScheduledRaceQuery.documents[0].name,
+        startTime: nextScheduledRaceQuery.documents[0].startTime,
+        meetingName: nextScheduledRaceQuery.documents[0].meeting?.meetingName || 'Unknown Meeting'
+      } : null
+    };
+
+    const dataFreshness = {
+      lastUpdated: now.toISOString(),
+      entrantsDataAge,
+      oddsHistoryCount: 0, // No history data in navigation mode
+      moneyFlowHistoryCount: 0 // No history data in navigation mode
+    };
+
+    return { 
+      race, 
+      meeting, 
+      entrants, 
+      navigationData,
+      dataFreshness,
+    };
+  } catch (error) {
+    console.error('Error fetching navigation race data:', error);
+    return null;
+  }
 }

@@ -5,6 +5,7 @@ import { Race, Meeting, RaceNavigationData } from '@/types/meetings';
 import { useRealtimeRace } from '@/hooks/useRealtimeRace';
 import { formatDistance, formatRaceTime, formatCategory } from '@/utils/raceFormatters';
 import { RaceNavigation } from './RaceNavigation';
+import { useRace } from '@/contexts/RaceContext';
 
 interface RaceHeaderProps {
   initialRace: Race;
@@ -13,7 +14,14 @@ interface RaceHeaderProps {
 }
 
 export const RaceHeader = memo(function RaceHeader({ initialRace, meeting, navigationData }: RaceHeaderProps) {
-  const { race, isConnected } = useRealtimeRace({ initialRace });
+  const { raceData } = useRace();
+  
+  // Use context data if available, fallback to props for initial render
+  const currentRace = raceData?.race || initialRace;
+  const currentMeeting = raceData?.meeting || meeting;
+  const currentNavigationData = raceData?.navigationData || navigationData;
+  
+  const { race, isConnected } = useRealtimeRace({ initialRace: currentRace });
   const formattedTime = useMemo(() => formatRaceTime(race.startTime), [race.startTime]);
 
   const [timeToStart, setTimeToStart] = useState<string | null>(null);
@@ -100,7 +108,7 @@ export const RaceHeader = memo(function RaceHeader({ initialRace, meeting, navig
       {/* Race Navigation */}
       <div className="mb-4 pb-4 border-b border-gray-200">
         <RaceNavigation 
-          navigationData={navigationData}
+          navigationData={currentNavigationData}
           currentRaceId={race.raceId}
         />
       </div>
@@ -111,7 +119,7 @@ export const RaceHeader = memo(function RaceHeader({ initialRace, meeting, navig
         className="sr-only"
       >
         Race {race.raceNumber} {race.name} status: {race.status}
-        Race type: {meeting.raceType} Category: {formatCategory(meeting.category)}
+        Race type: {currentMeeting.raceType} Category: {formatCategory(currentMeeting.category)}
         {formattedDistance && ` Distance: ${formattedDistance}`}
         {race.trackCondition && ` Track condition: ${race.trackCondition}`}
         {timeToStart && ` Time to start: ${timeToStart}`}
@@ -132,9 +140,9 @@ export const RaceHeader = memo(function RaceHeader({ initialRace, meeting, navig
           </span>
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-          <span>{meeting.country}</span>
+          <span>{currentMeeting.country}</span>
           <span>•</span>
-          <span>{meeting.meetingName}</span>
+          <span>{currentMeeting.meetingName}</span>
           <span>•</span>
           <time dateTime={race.startTime}>
             {formattedTime}
@@ -167,12 +175,12 @@ export const RaceHeader = memo(function RaceHeader({ initialRace, meeting, navig
             
             <div className="flex items-center">
               <span className="text-sm text-gray-500">Type:</span>
-              <span className="ml-2 text-sm font-semibold text-gray-800">{meeting.raceType}</span>
+              <span className="ml-2 text-sm font-semibold text-gray-800">{currentMeeting.raceType}</span>
             </div>
             
             <div className="flex items-center">
               <span className="text-sm text-gray-500">Category:</span>
-              <span className="ml-2 text-sm font-semibold text-gray-800">{formatCategory(meeting.category)}</span>
+              <span className="ml-2 text-sm font-semibold text-gray-800">{formatCategory(currentMeeting.category)}</span>
             </div>
           </div>
           
