@@ -1,4 +1,7 @@
 import type { SUPPORTED_RACE_TYPE_CODES } from '@/constants/raceTypes';
+import type { MoneyFlowDataPoint, EntrantMoneyFlowTimeline } from './moneyFlow';
+import type { RacePoolData, PoolType } from './racePools';
+import type { JockeySilk } from './jockeySilks';
 
 type SupportedRaceTypeCode = typeof SUPPORTED_RACE_TYPE_CODES[number];
 
@@ -133,4 +136,13 @@ export interface Entrant {
   moneyFlowHistory?: string[];  // MoneyFlowHistory collection relationship
   oddsHistory?: OddsHistoryData[];  // Array of odds history data for sparkline
   oddsHistoryRelationship?: string[];  // OddsHistory collection relationship
+  // Enhanced v4.7 data
+  moneyFlowTimeline?: EntrantMoneyFlowTimeline;  // Timeline visualization data
+  silk?: JockeySilk;  // Jockey silk visual data
+  poolMoney?: {
+    win: number;
+    place: number;
+    total: number;
+    percentage: number;
+  };
 }
