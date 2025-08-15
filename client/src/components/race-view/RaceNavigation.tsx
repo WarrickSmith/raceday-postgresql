@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { RaceNavigationData, NavigationButtonState } from '@/types/meetings';
 import { useRace } from '@/contexts/RaceContext';
 import { screenReader, AriaLabels, KeyboardHandler } from '@/utils/accessibility';
+import { raceCache } from '@/lib/cache';
 
 interface RaceNavigationProps {
   navigationData: RaceNavigationData;
@@ -50,11 +51,24 @@ export const RaceNavigation = memo(function RaceNavigation({
 
   // Navigation handler with error handling and accessibility announcements
   const handleNavigation = useCallback(async (direction: 'previous' | 'next' | 'nextScheduled' | 'backToMeetings') => {
-    if (isNavigating) return;
+    if (isNavigating) {
+      console.log('🚫 Navigation blocked - already navigating');
+      return;
+    }
+
+    console.log('🎯 Navigation button clicked:', direction, 'Available navigation data:', {
+      previous: navigationData.previousRace?.raceId,
+      next: navigationData.nextRace?.raceId,
+      nextScheduled: navigationData.nextScheduledRace?.raceId
+    });
 
     switch (direction) {
       case 'previous':
-        if (!navigationData.previousRace) return;
+        if (!navigationData.previousRace) {
+          console.log('❌ No previous race available');
+          return;
+        }
+        console.log('⬅️ Navigating to previous race:', navigationData.previousRace.raceId);
         await navigateToRace(navigationData.previousRace.raceId);
         // Announce navigation for screen readers
         screenReader?.announceRaceNavigation(
@@ -63,7 +77,11 @@ export const RaceNavigation = memo(function RaceNavigation({
         );
         break;
       case 'next':
-        if (!navigationData.nextRace) return;
+        if (!navigationData.nextRace) {
+          console.log('❌ No next race available');
+          return;
+        }
+        console.log('➡️ Navigating to next race:', navigationData.nextRace.raceId);
         await navigateToRace(navigationData.nextRace.raceId);
         screenReader?.announceRaceNavigation(
           navigationData.nextRace.name,
@@ -71,7 +89,11 @@ export const RaceNavigation = memo(function RaceNavigation({
         );
         break;
       case 'nextScheduled':
-        if (!navigationData.nextScheduledRace) return;
+        if (!navigationData.nextScheduledRace) {
+          console.log('❌ No next scheduled race available');
+          return;
+        }
+        console.log('⏰ Navigating to next scheduled race:', navigationData.nextScheduledRace.raceId);
         await navigateToRace(navigationData.nextScheduledRace.raceId);
         screenReader?.announceRaceNavigation(
           navigationData.nextScheduledRace.name,
@@ -79,11 +101,13 @@ export const RaceNavigation = memo(function RaceNavigation({
         );
         break;
       case 'backToMeetings':
+        console.log('🏠 Navigating back to meetings');
         // For meetings, still use router navigation as it's a different page structure
         router.push('/');
         screenReader?.announce('Navigated back to meetings list', 'assertive');
         break;
       default:
+        console.log('❓ Unknown navigation direction:', direction);
         return;
     }
   }, [navigationData, router, isNavigating, navigateToRace]);
@@ -103,6 +127,55 @@ export const RaceNavigation = memo(function RaceNavigation({
   const handleBackToMeetingsClick = useCallback(() => {
     handleNavigation('backToMeetings');
   }, [handleNavigation]);
+
+  // Pre-cache adjacent race data for instant navigation
+  useEffect(() => {
+    const preCacheAdjacentRaces = async () => {
+      const promises = [];
+      
+      // Pre-cache previous race if available
+      if (navigationData.previousRace) {
+        promises.push(
+          raceCache.get(
+            `race:${navigationData.previousRace.raceId}:navigation`,
+            () => fetch(`/api/race/${navigationData.previousRace.raceId}?nav=true`).then(r => r.json()),
+            15000
+          ).catch(error => console.warn('Failed to pre-cache previous race:', error))
+        );
+      }
+
+      // Pre-cache next race if available  
+      if (navigationData.nextRace) {
+        promises.push(
+          raceCache.get(
+            `race:${navigationData.nextRace.raceId}:navigation`,
+            () => fetch(`/api/race/${navigationData.nextRace.raceId}?nav=true`).then(r => r.json()),
+            15000
+          ).catch(error => console.warn('Failed to pre-cache next race:', error))
+        );
+      }
+
+      // Pre-cache next scheduled race if available
+      if (navigationData.nextScheduledRace) {
+        promises.push(
+          raceCache.get(
+            `race:${navigationData.nextScheduledRace.raceId}:navigation`,
+            () => fetch(`/api/race/${navigationData.nextScheduledRace.raceId}?nav=true`).then(r => r.json()),
+            15000
+          ).catch(error => console.warn('Failed to pre-cache next scheduled race:', error))
+        );
+      }
+
+      // Execute pre-caching in background
+      if (promises.length > 0) {
+        Promise.all(promises).then(() => {
+          console.log('✅ Pre-cached', promises.length, 'adjacent races for instant navigation');
+        });
+      }
+    };
+
+    preCacheAdjacentRaces();
+  }, [navigationData]);
 
   // Keyboard navigation handler for the navigation container
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
