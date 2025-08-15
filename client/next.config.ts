@@ -4,17 +4,18 @@ const nextConfig: NextConfig = {
   // Bundle optimization for performance
   experimental: {
     optimizePackageImports: ['@/components', '@/hooks', '@/utils'],
-    turbo: {
-      // Enable Turbopack optimizations for development
-      rules: {
-        '*.svg': {
-          loaders: ['@svgr/webpack'],
-          as: '*.js',
-        },
-      },
-    },
     serverActions: {
       bodySizeLimit: '15mb',
+    },
+  },
+  
+  turbopack: {
+    // Enable Turbopack optimizations for development
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
+      },
     },
   },
   
