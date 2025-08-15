@@ -6,6 +6,7 @@ import { MeetingCard } from './MeetingCard';
 import { MeetingsListSkeleton } from '../skeletons/MeetingCardSkeleton';
 import { useRealtimeMeetings } from '@/hooks/useRealtimeMeetings';
 import { Meeting } from '@/types/meetings';
+import { racePrefetchService } from '@/services/racePrefetchService';
 
 interface MeetingsListClientProps {
   initialData: Meeting[];
@@ -23,8 +24,19 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
     setTimeout(() => setError(null), 5000);
   }, []);
 
-  // Handle race click navigation
-  const handleRaceClick = useCallback((raceId: string) => {
+  // Enhanced race click handler with pre-fetching for immediate rendering
+  const handleRaceClick = useCallback(async (raceId: string) => {
+    console.log('🎯 Race click - pre-fetching basic data for:', raceId);
+    
+    try {
+      // Pre-fetch basic race data for immediate rendering
+      await racePrefetchService.prefetchForNavigation(raceId);
+      console.log('✅ Pre-fetch completed, navigating to:', raceId);
+    } catch (error) {
+      console.warn('⚠️ Pre-fetch failed, proceeding with navigation:', error);
+    }
+    
+    // Navigate to race page - will use cached data if available
     router.push(`/race/${raceId}`);
   }, [router]);
 

@@ -4,6 +4,7 @@ import React, { memo, useEffect } from 'react';
 import { RaceCard } from './RaceCard';
 import { RaceCardListSkeleton } from '@/components/skeletons/RaceCardSkeleton';
 import { useRacesForMeeting } from '@/hooks/useRacesForMeeting';
+import { racePrefetchService } from '@/services/racePrefetchService';
 
 interface RacesListProps {
   meetingId: string;
@@ -33,6 +34,23 @@ function RacesListComponent({
       onRacesLoaded(races);
     }
   }, [races, onRacesLoaded]);
+
+  // Background pre-fetching of race data when races are displayed
+  useEffect(() => {
+    if (races.length > 0) {
+      const raceIds = races.map(race => race.raceId);
+      console.log('📋 Starting background pre-fetch for', raceIds.length, 'races in meeting:', meetingId);
+      
+      // Pre-fetch race data in background with low priority
+      racePrefetchService.prefetchMultipleRaces(raceIds, { priority: 'low' })
+        .then(() => {
+          console.log('✅ Background pre-fetch completed for meeting:', meetingId);
+        })
+        .catch(error => {
+          console.warn('⚠️ Background pre-fetch failed for meeting:', meetingId, error);
+        });
+    }
+  }, [races, meetingId]);
   
   if (process.env.NODE_ENV === 'development') {
     console.log('📝 RacesList hook result:', { racesCount: races.length, isLoading, error });

@@ -31,7 +31,22 @@ export async function GET(
       return NextResponse.json({ error: 'Race not found' }, { status: 404 });
     }
 
-    return NextResponse.json(raceData);
+    // Set cache headers based on mode
+    const response = NextResponse.json(raceData);
+    
+    if (isNavigation) {
+      // Navigation mode: shorter cache for live data but still allow stale-while-revalidate
+      response.headers.set('Cache-Control', 'public, max-age=15, stale-while-revalidate=60');
+    } else {
+      // Comprehensive mode: balanced cache for full data
+      response.headers.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
+    }
+    
+    // Add performance headers
+    response.headers.set('X-Race-Data-Mode', isNavigation ? 'navigation' : 'comprehensive');
+    response.headers.set('X-Race-ID', raceId);
+    
+    return response;
   } catch (error) {
     console.error('API Error fetching race data:', error);
     return NextResponse.json(
