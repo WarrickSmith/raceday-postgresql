@@ -11,13 +11,14 @@ import {
   DEFAULT_GRID_DISPLAY_CONFIG,
   DEFAULT_POOL_VIEW_STATE 
 } from '@/types/enhancedGrid';
-import { useEnhancedRealtime } from '@/hooks/useEnhancedRealtime';
+import { useAppwriteRealtime } from '@/hooks/useAppwriteRealtime';
 import { SparklineChart } from './SparklineChart';
 import { JockeySilks } from './JockeySilks';
 import { PoolToggle } from './PoolToggle';
 import { SortableColumns } from './SortableColumns';
 import { useRace } from '@/contexts/RaceContext';
 import { screenReader, AriaLabels, KeyboardHandler } from '@/utils/accessibility';
+import { useRenderTracking, useMemoryOptimization } from '@/utils/performance';
 
 interface EnhancedEntrantsGridProps {
   initialEntrants: Entrant[];
@@ -286,21 +287,41 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     isLoading: false
   });
   
-  const realtimeResult = useEnhancedRealtime({
-    initialEntrants: currentEntrants,
+  // Performance and memory optimization
+  const renderCount = useRenderTracking('EnhancedEntrantsGrid');
+  const { triggerCleanup, getMemoryReport } = useMemoryOptimization();
+  
+  const realtimeResult = useAppwriteRealtime({
     raceId: currentRaceId,
-    dataFreshness: currentDataFreshness
+    initialEntrants: currentEntrants
   });
   
   const { 
-    entrants, 
-    connectionState, 
-    recentUpdates, 
-    updateCounts, 
-    performance, 
-    triggerReconnect,
-    clearUpdateHistory 
+    entrants: realtimeEntrants, 
+    isConnected, 
+    connectionAttempts,
+    lastUpdate, 
+    updateLatency,
+    totalUpdates,
+    reconnect,
+    clearHistory 
   } = realtimeResult;
+
+  // Use real-time entrants if available and non-empty, otherwise fallback to initial entrants
+  const entrants = (realtimeEntrants && realtimeEntrants.length > 0) 
+    ? realtimeEntrants 
+    : currentEntrants;
+
+  // Debug logging to help track the issue
+  console.log('🏇 EnhancedEntrantsGrid entrants state:', {
+    currentEntrantsCount: currentEntrants?.length || 0,
+    realtimeEntrantsCount: realtimeEntrants?.length || 0,
+    finalEntrantsCount: entrants?.length || 0,
+    isConnected,
+    connectionAttempts,
+    updateLatency: updateLatency + 'ms',
+    usingRealtime: realtimeEntrants && realtimeEntrants.length > 0
+  });
 
   // Generate money flow time periods
   const moneyFlowPeriods = useMemo(() => {
@@ -445,33 +466,16 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     }
   }, []);
 
-  // Real-time update processing (similar to original component)
+  // Simplified update tracking with new Appwrite real-time hook
   const oddsUpdates = useMemo(() => {
-    const recent = recentUpdates.filter(u => u.type === 'entrant' && u.timestamp > new Date(Date.now() - 10000));
-    return recent.reduce((acc, update) => {
-      if (update.entrantId && typeof update.data.winOdds === 'number') {
-        acc[update.entrantId] = {
-          win: update.data.winOdds as number,
-          place: typeof update.data.placeOdds === 'number' ? update.data.placeOdds as number : undefined,
-          timestamp: update.timestamp
-        };
-      }
-      return acc;
-    }, {} as Record<string, { win?: number; place?: number; timestamp: Date }>);
-  }, [recentUpdates]);
+    // Since updates are now applied directly to entrants, we don't need separate tracking
+    return {} as Record<string, { win?: number; place?: number; timestamp: Date }>;
+  }, []);
   
   const moneyFlowUpdates = useMemo(() => {
-    const recent = recentUpdates.filter(u => u.type === 'moneyFlow' && u.timestamp > new Date(Date.now() - 10000));
-    return recent.reduce((acc, update) => {
-      if (update.entrantId && typeof update.data.holdPercentage === 'number') {
-        acc[update.entrantId] = {
-          holdPercentage: update.data.holdPercentage as number,
-          timestamp: update.timestamp
-        };
-      }
-      return acc;
-    }, {} as Record<string, { holdPercentage?: number; timestamp: Date }>);
-  }, [recentUpdates]);
+    // Since updates are now applied directly to entrants, we don't need separate tracking
+    return {} as Record<string, { holdPercentage?: number; timestamp: Date }>;
+  }, []);
 
   const formatOdds = useMemo(() => {
     const formatter = (odds?: number) => {
@@ -610,18 +614,18 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
             <div className="flex items-center space-x-2">
               <span 
                 className={`text-xs px-2 py-1 rounded-full transition-colors ${
-                  connectionState.isConnected 
+                  isConnected 
                     ? 'bg-green-100 text-green-700' 
                     : 'bg-red-100 text-red-700'
                 }`}
                 aria-live="polite"
               >
-                {connectionState.isConnected ? '🔄 Live' : '📶 Disconnected'}
+                {isConnected ? '🔄 Live' : '📶 Disconnected'}
               </span>
               
-              {!connectionState.isConnected && connectionState.connectionAttempts > 0 && (
+              {!isConnected && connectionAttempts > 0 && (
                 <button
-                  onClick={triggerReconnect}
+                  onClick={reconnect}
                   className="text-xs px-2 py-1 rounded bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"
                 >
                   🔄 Retry
@@ -644,28 +648,54 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           <div className="bg-gray-50 rounded-lg p-4 text-sm space-y-3 border border-gray-200 mb-4">
             <div className="flex justify-between items-center">
               <h3 className="font-medium text-gray-900">Enhanced Performance</h3>
-              <button
-                onClick={clearUpdateHistory}
-                className="text-xs px-2 py-1 rounded bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors"
-              >
-                Clear History
-              </button>
+              <div className="flex space-x-2">
+                <button
+                  onClick={clearHistory}
+                  className="text-xs px-2 py-1 rounded bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors"
+                >
+                  Clear History
+                </button>
+                <button
+                  onClick={() => {
+                    const report = getMemoryReport();
+                    console.log('📊 Memory Report:', report);
+                    alert(`Memory Report:\n\nMemory Usage: ${report.memory.currentMemory ? 
+                      (report.memory.currentMemory.memoryUsagePercentage * 100).toFixed(1) + '%' : 'N/A'}\n\nRecommendations:\n${report.recommendations.join('\n')}`);
+                  }}
+                  className="text-xs px-2 py-1 rounded bg-blue-200 text-blue-700 hover:bg-blue-300 transition-colors"
+                >
+                  Memory Report
+                </button>
+                <button
+                  onClick={triggerCleanup}
+                  className="text-xs px-2 py-1 rounded bg-orange-200 text-orange-700 hover:bg-orange-300 transition-colors"
+                >
+                  Cleanup
+                </button>
+              </div>
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <div className="text-xs text-gray-500">Connection</div>
                 <div className={`font-medium ${
-                  connectionState.isConnected ? 'text-green-600' : 'text-red-600'
+                  isConnected ? 'text-green-600' : 'text-red-600'
                 }`}>
-                  {connectionState.isConnected ? 'Connected' : 'Disconnected'}
+                  {isConnected ? 'Connected' : 'Disconnected'}
                 </div>
               </div>
               
               <div>
-                <div className="text-xs text-gray-500">Updates/min</div>
+                <div className="text-xs text-gray-500">Updates</div>
                 <div className="font-medium text-blue-600">
-                  {performance.updatesPerMinute}
+                  {totalUpdates} total
+                </div>
+              </div>
+              
+              <div>
+                <div className="text-xs text-gray-500">Latency</div>
+                <div className="font-medium text-blue-600">
+                  {updateLatency.toFixed(1)}ms
                 </div>
               </div>
               
@@ -673,6 +703,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                 <div className="text-xs text-gray-500">Grid State</div>
                 <div className="font-medium text-purple-600">
                   Sort: {sortState.column} {sortState.direction}
+                </div>
+              </div>
+              
+              <div>
+                <div className="text-xs text-gray-500">Renders</div>
+                <div className="font-medium text-indigo-600">
+                  #{renderCount}
                 </div>
               </div>
               
@@ -728,8 +765,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         <div className="flex justify-between items-center text-xs">
           <div className="flex items-center space-x-4">
             <span className="text-gray-500">
-              Last update: {recentUpdates.length > 0 
-                ? recentUpdates[recentUpdates.length - 1].timestamp.toLocaleTimeString()
+              Last update: {lastUpdate 
+                ? lastUpdate.toLocaleTimeString()
                 : 'No updates yet'
               }
             </span>
@@ -773,10 +810,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       </div>
       
       <div className="sr-only" aria-live="polite" id="grid-status">
-        Showing {sortedEntrants.length} runners. Last update: {recentUpdates.length > 0 
-          ? recentUpdates[recentUpdates.length - 1].timestamp.toLocaleTimeString()
+        Showing {sortedEntrants.length} runners. Last update: {lastUpdate 
+          ? lastUpdate.toLocaleTimeString()
           : 'No updates yet'
-        }. Connection status: {connectionState.isConnected ? 'Connected' : 'Disconnected'}.
+        }. Connection status: {isConnected ? 'Connected' : 'Disconnected'}.
       </div>
     </div>
   );
