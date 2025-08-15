@@ -1,10 +1,12 @@
 /**
  * Performance optimization utilities for the RaceDay application
  * Includes virtualization, memoization, and monitoring utilities
+ * Enhanced for Story 4.8 with memory management integration
  */
 
 import React, { useCallback, useRef, useEffect, useMemo, useState } from 'react';
 import { Entrant } from '@/types/meetings';
+import { memoryManager } from './memoryManager';
 
 // Performance monitoring
 export class PerformanceMonitor {
@@ -73,6 +75,48 @@ export class PerformanceMonitor {
 
   public clearMetrics(): void {
     this.metrics.clear();
+  }
+
+  /**
+   * Enhanced performance report with memory integration
+   */
+  public getPerformanceReport(): {
+    timing: Record<string, { avg: number; min: number; max: number; count: number }>;
+    memory: any;
+    recommendations: string[];
+  } {
+    const timing = this.getMetrics();
+    const memoryReport = memoryManager.getPerformanceReport();
+    
+    const recommendations: string[] = [...memoryReport.recommendations];
+    
+    // Add timing-based recommendations
+    Object.entries(timing).forEach(([name, stats]) => {
+      if (stats.avg > 100) {
+        recommendations.push(`Consider optimizing ${name} - average time ${stats.avg.toFixed(2)}ms`);
+      }
+    });
+
+    return {
+      timing,
+      memory: memoryReport,
+      recommendations
+    };
+  }
+
+  /**
+   * Register cleanup for performance data
+   */
+  public registerMemoryCleanup(): () => void {
+    return memoryManager.registerCleanupCallback(() => {
+      // Keep only recent metrics during cleanup
+      this.metrics.forEach((values, name) => {
+        if (values.length > 10) {
+          this.metrics.set(name, values.slice(-10));
+        }
+      });
+      console.log('🧹 Cleaned performance metrics');
+    });
   }
 }
 
@@ -309,3 +353,68 @@ export function withSuspense<P extends object>(
 
 // Export singleton instance
 export const performanceMonitor = PerformanceMonitor.getInstance();
+
+/**
+ * Hook for component memory management
+ */
+export function useMemoryOptimization() {
+  const cleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    // Register cleanup with memory manager
+    cleanupRef.current = memoryManager.registerCleanupCallback(() => {
+      // Component-specific cleanup logic
+      console.log('🧹 Component memory cleanup triggered');
+    });
+
+    // Register performance cleanup
+    const performanceCleanup = performanceMonitor.registerMemoryCleanup();
+
+    return () => {
+      cleanupRef.current?.();
+      performanceCleanup();
+    };
+  }, []);
+
+  const triggerCleanup = useCallback(() => {
+    memoryManager.triggerCleanup();
+  }, []);
+
+  const getMemoryReport = useCallback(() => {
+    return performanceMonitor.getPerformanceReport();
+  }, []);
+
+  return {
+    triggerCleanup,
+    getMemoryReport
+  };
+}
+
+/**
+ * Hook for tracking component render performance with memory awareness
+ */
+export function useRenderTracking(componentName: string) {
+  const renderCount = useRef(0);
+
+  useEffect(() => {
+    renderCount.current++;
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔄 ${componentName} render #${renderCount.current}`);
+      
+      // Track excessive re-renders
+      if (renderCount.current > 10) {
+        console.warn(`⚠️ ${componentName} has rendered ${renderCount.current} times - check for optimization opportunities`);
+      }
+    }
+  });
+
+  // Memory cleanup for render tracking
+  useEffect(() => {
+    return memoryManager.registerCleanupCallback(() => {
+      renderCount.current = 0;
+    });
+  }, []);
+
+  return renderCount.current;
+}
