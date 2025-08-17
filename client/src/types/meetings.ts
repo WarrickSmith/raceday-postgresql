@@ -27,6 +27,7 @@ export interface Race {
   name: string;  // Race name field from database
   raceName?: string;  // Optional legacy field
   startTime: string;
+  actualStart?: string;  // Actual race start time from NZTAB API (actual_start_string)
   meeting: string;
   status: string;
   distance?: number;  // Race distance in metres

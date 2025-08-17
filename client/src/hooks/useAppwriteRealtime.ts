@@ -60,6 +60,16 @@ export function useAppwriteRealtime({
     totalUpdates: 0
   });
 
+  // Update entrants when initialEntrants changes (e.g., from context updates)
+  useEffect(() => {
+    if (initialEntrants && initialEntrants.length > 0) {
+      setState(prev => ({
+        ...prev,
+        entrants: initialEntrants
+      }));
+    }
+  }, [initialEntrants]);
+
   // Track update performance
   const updateStartTime = useRef<number>(0);
   const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -70,7 +80,7 @@ export function useAppwriteRealtime({
     updateStartTime.current = performance.now();
     
     try {
-      const { events, channels, payload } = message;
+      const { channels, payload } = message;
       
       // Determine what type of update this is based on channels
       const updateType = determineUpdateType(channels);
