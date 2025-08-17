@@ -54,6 +54,7 @@ async function getNavigationData(raceId: string): Promise<{
     const now = new Date();
     
     // Fetch navigation data - previous, next, and next scheduled races
+    // Exclude abandoned races from all navigation queries
     const [previousRaceQuery, nextRaceQuery, nextScheduledRaceQuery] = await Promise.all([
       // Previous scheduled race query
       databases.listDocuments(
@@ -61,6 +62,7 @@ async function getNavigationData(raceId: string): Promise<{
         'races',
         [
           Query.lessThan('startTime', raceData.startTime),
+          Query.notEqual('status', 'Abandoned'),
           Query.orderDesc('startTime'),
           Query.limit(1)
         ]
@@ -71,6 +73,7 @@ async function getNavigationData(raceId: string): Promise<{
         'races',
         [
           Query.greaterThan('startTime', raceData.startTime),
+          Query.notEqual('status', 'Abandoned'),
           Query.orderAsc('startTime'),
           Query.limit(1)
         ]
@@ -81,6 +84,7 @@ async function getNavigationData(raceId: string): Promise<{
         'races',
         [
           Query.greaterThan('startTime', now.toISOString()),
+          Query.notEqual('status', 'Abandoned'),
           Query.orderAsc('startTime'),
           Query.limit(1)
         ]

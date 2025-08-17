@@ -141,6 +141,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
     const entrantIds = entrantsQuery.documents.map(doc => doc.$id);
     
     // Fetch navigation data - previous, next, and next scheduled races
+    // Exclude abandoned races from all navigation queries
     const [previousRaceQuery, nextRaceQuery, nextScheduledRaceQuery] = await Promise.all([
       // Previous scheduled race query
       databases.listDocuments(
@@ -148,6 +149,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
         'races',
         [
           Query.lessThan('startTime', raceData.startTime),
+          Query.notEqual('status', 'Abandoned'),
           Query.orderDesc('startTime'),
           Query.limit(1)
         ]
@@ -158,6 +160,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
         'races',
         [
           Query.greaterThan('startTime', raceData.startTime),
+          Query.notEqual('status', 'Abandoned'),
           Query.orderAsc('startTime'),
           Query.limit(1)
         ]
@@ -168,6 +171,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
         'races',
         [
           Query.greaterThan('startTime', now.toISOString()),
+          Query.notEqual('status', 'Abandoned'),
           Query.orderAsc('startTime'),
           Query.limit(1)
         ]

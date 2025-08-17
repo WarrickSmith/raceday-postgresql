@@ -7,11 +7,13 @@ export async function GET() {
     const now = new Date();
     
     // Find the next scheduled race irrespective of current race context
+    // Exclude abandoned races from next race navigation
     const nextScheduledRaceQuery = await databases.listDocuments(
       'raceday-db',
       'races',
       [
         Query.greaterThan('startTime', now.toISOString()),
+        Query.notEqual('status', 'Abandoned'),
         Query.orderAsc('startTime'),
         Query.limit(1)
       ]
