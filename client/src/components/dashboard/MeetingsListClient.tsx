@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { MeetingCard } from './MeetingCard';
 import { MeetingsListSkeleton } from '../skeletons/MeetingCardSkeleton';
+import { NextScheduledRaceButton } from './NextScheduledRaceButton';
 import { useRealtimeMeetings } from '@/hooks/useRealtimeMeetings';
 import { Meeting } from '@/types/meetings';
 import { racePrefetchService } from '@/services/racePrefetchService';
@@ -63,11 +64,14 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
 
   return (
     <div className="space-y-4">
-      {/* Connection status indicator */}
+      {/* Header with connection status and next race button */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-900">
-          Today&apos;s Race Meetings
-        </h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Today&apos;s Race Meetings
+          </h2>
+          <NextScheduledRaceButton meetings={meetings} />
+        </div>
         
         {/* Real-time connection status */}
         <div className="flex items-center space-x-2">
