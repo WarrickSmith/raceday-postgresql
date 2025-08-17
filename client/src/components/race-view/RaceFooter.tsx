@@ -11,6 +11,7 @@ import type {
 } from '@/types/racePools';
 import { useRace } from '@/contexts/RaceContext';
 import { useRealtimeRace } from '@/hooks/useRealtimeRace';
+import { useRacePoolData } from '@/hooks/useRacePoolData';
 import { screenReader, KeyboardHandler } from '@/utils/accessibility';
 
 interface RaceFooterProps {
@@ -434,6 +435,11 @@ export const RaceFooter = memo(function RaceFooter({
     }
   });
   
+  // Get real-time pool data for synchronization with header and entrants
+  const { poolData: livePoolData, isLoading: poolLoading, error: poolError } = useRacePoolData(
+    liveRace?.raceId || raceId
+  );
+  
   // Use live race data (same as header)
   const currentRaceId = liveRace?.raceId || raceId;
   const currentRaceStartTime = liveRace?.startTime || raceStartTime;
@@ -445,6 +451,9 @@ export const RaceFooter = memo(function RaceFooter({
     liveRaceStatus && validStatuses.includes(liveRaceStatus as RaceStatus)
       ? liveRaceStatus as RaceStatus
       : raceStatus;
+  
+  // Use live pool data with fallback to prop for compatibility
+  const currentPoolData = livePoolData || poolData;
   
   // Debug logging for race status changes in footer
   useEffect(() => {
@@ -463,6 +472,31 @@ export const RaceFooter = memo(function RaceFooter({
       } : null
     });
   }, [currentRaceId, raceStatus, liveRaceStatus, currentRaceStatus, isConnected, liveRace]);
+
+  // Debug logging for pool data changes in footer
+  useEffect(() => {
+    console.log('🦶 RaceFooter pool data update:', {
+      raceId: currentRaceId,
+      propPoolData: poolData ? {
+        totalPool: poolData.totalRacePool,
+        currency: poolData.currency,
+        lastUpdated: poolData.lastUpdated
+      } : null,
+      livePoolData: livePoolData ? {
+        totalPool: livePoolData.totalRacePool,
+        currency: livePoolData.currency,
+        lastUpdated: livePoolData.lastUpdated,
+        isLive: livePoolData.isLive
+      } : null,
+      currentPoolData: currentPoolData ? {
+        totalPool: currentPoolData.totalRacePool,
+        currency: currentPoolData.currency,
+        lastUpdated: currentPoolData.lastUpdated
+      } : null,
+      poolLoading,
+      poolError
+    });
+  }, [currentRaceId, poolData, livePoolData, currentPoolData, poolLoading, poolError]);
   const [activeTab, setActiveTab] = useState<'pools' | 'results'>('pools');
 
   // Determine which tab should be shown by default and announce status changes
@@ -474,10 +508,10 @@ export const RaceFooter = memo(function RaceFooter({
         `Race results are now available with ${resultsData.results.length} positions`,
         'assertive'
       );
-    } else if (poolData && showPoolBreakdown) {
+    } else if (currentPoolData && showPoolBreakdown) {
       setActiveTab('pools');
     }
-  }, [resultsData, poolData, showResults, showPoolBreakdown]);
+  }, [resultsData, currentPoolData, showResults, showPoolBreakdown]);
 
   // Announce race status changes
   useEffect(() => {
@@ -489,9 +523,9 @@ export const RaceFooter = memo(function RaceFooter({
 
   const shouldShowTabs = useMemo(() => {
     const hasResults = resultsData && resultsData.results.length > 0 && showResults;
-    const hasPools = poolData && showPoolBreakdown;
+    const hasPools = currentPoolData && showPoolBreakdown;
     return hasResults && hasPools;
-  }, [resultsData, poolData, showResults, showPoolBreakdown]);
+  }, [resultsData, currentPoolData, showResults, showPoolBreakdown]);
 
   // Enhanced tab navigation with keyboard support
   const handleTabClick = useCallback((tab: 'pools' | 'results') => {
@@ -523,14 +557,14 @@ export const RaceFooter = memo(function RaceFooter({
       <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-300">
         <div className="flex justify-between items-center">
           {/* Pool Summary on Left - Big and Bold */}
-          {poolData && (
+          {currentPoolData && (
             <div className="flex items-center space-x-8">
               <div className="text-center">
                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                   Total Pool
                 </div>
                 <div className="text-3xl font-bold text-gray-900">
-                  {poolData.currency}{poolData.totalRacePool.toLocaleString()}
+                  {currentPoolData.currency}{currentPoolData.totalRacePool.toLocaleString()}
                 </div>
               </div>
               <div className="text-center">
@@ -614,7 +648,7 @@ export const RaceFooter = memo(function RaceFooter({
                 aria-labelledby="pools-tab"
                 tabIndex={0}
               >
-                <PoolSummary poolData={poolData} showBreakdown={showPoolBreakdown} />
+                <PoolSummary poolData={currentPoolData} showBreakdown={showPoolBreakdown} />
               </div>
             )}
             {activeTab === 'results' && (
@@ -631,13 +665,13 @@ export const RaceFooter = memo(function RaceFooter({
         ) : (
           // Single content area
           <>
-            {poolData && showPoolBreakdown && (
-              <PoolSummary poolData={poolData} showBreakdown={showPoolBreakdown} />
+            {currentPoolData && showPoolBreakdown && (
+              <PoolSummary poolData={currentPoolData} showBreakdown={showPoolBreakdown} />
             )}
             {resultsData && resultsData.results.length > 0 && showResults && (
               <RaceResults resultsData={resultsData} />
             )}
-            {!poolData && !resultsData && (
+            {!currentPoolData && !resultsData && (
               <div className="text-center text-gray-500 py-8">
                 <p>Race information will be displayed here when available</p>
               </div>
@@ -649,7 +683,7 @@ export const RaceFooter = memo(function RaceFooter({
       {/* Accessibility announcements */}
       <div className="sr-only" aria-live="polite">
         Race status: {STATUS_CONFIG[currentRaceStatus]?.description}.
-        {poolData && ` Total pool: ${poolData.currency}${poolData.totalRacePool.toLocaleString()}.`}
+        {currentPoolData && ` Total pool: ${currentPoolData.currency}${currentPoolData.totalRacePool.toLocaleString()}.`}
         {resultsData && resultsData.results.length > 0 && ` Results available with ${resultsData.results.length} positions.`}
       </div>
     </div>
