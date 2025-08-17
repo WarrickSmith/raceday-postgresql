@@ -444,12 +444,12 @@ export const RaceFooter = memo(function RaceFooter({
   const currentRaceId = liveRace?.raceId || raceId;
   const currentRaceStartTime = liveRace?.startTime || raceStartTime;
   
-  // Use live race status with proper type validation
+  // Use live race status with proper type validation (case-insensitive)
   const validStatuses: RaceStatus[] = ['open', 'closed', 'interim', 'final', 'abandoned', 'postponed'];
   const liveRaceStatus = liveRace?.status;
   const currentRaceStatus: RaceStatus = 
-    liveRaceStatus && validStatuses.includes(liveRaceStatus as RaceStatus)
-      ? liveRaceStatus as RaceStatus
+    liveRaceStatus && validStatuses.includes(liveRaceStatus.toLowerCase() as RaceStatus)
+      ? liveRaceStatus.toLowerCase() as RaceStatus
       : raceStatus;
   
   // Use live pool data with fallback to prop for compatibility
