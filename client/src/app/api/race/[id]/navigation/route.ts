@@ -54,31 +54,29 @@ async function getNavigationData(raceId: string): Promise<{
     const now = new Date();
     
     // Fetch navigation data - previous, next, and next scheduled races
-    // Exclude abandoned races from all navigation queries
+    // Only exclude abandoned races from Next Scheduled query, not Previous/Next chronological navigation
     const [previousRaceQuery, nextRaceQuery, nextScheduledRaceQuery] = await Promise.all([
-      // Previous scheduled race query
+      // Previous race query - chronological navigation, includes all races
       databases.listDocuments(
         'raceday-db',
         'races',
         [
           Query.lessThan('startTime', raceData.startTime),
-          Query.notEqual('status', 'Abandoned'),
           Query.orderDesc('startTime'),
           Query.limit(1)
         ]
       ),
-      // Next scheduled race query  
+      // Next race query - chronological navigation, includes all races
       databases.listDocuments(
         'raceday-db',
         'races',
         [
           Query.greaterThan('startTime', raceData.startTime),
-          Query.notEqual('status', 'Abandoned'),
           Query.orderAsc('startTime'),
           Query.limit(1)
         ]
       ),
-      // Next scheduled race query - find race nearest to current time irrespective of current race
+      // Next scheduled race query - exclude abandoned races (for "Next Scheduled" button)
       databases.listDocuments(
         'raceday-db',
         'races',
