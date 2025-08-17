@@ -74,59 +74,83 @@ export function useAppwriteRealtime({
   const updateStartTime = useRef<number>(0);
   const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
   const unsubscribeFunctions = useRef<Array<() => void>>([]);
+  
+  // Throttling for performance optimization
+  const pendingUpdates = useRef<any[]>([]);
+  const updateThrottleTimer = useRef<NodeJS.Timeout | null>(null);
+  const THROTTLE_DELAY = 250; // 250ms throttle for batching
 
-  // Process incoming Appwrite real-time messages
-  const processRealtimeMessage = useCallback((message: AppwriteRealtimeMessage) => {
-    updateStartTime.current = performance.now();
+  // Apply throttled updates to state
+  const applyPendingUpdates = useCallback(() => {
+    if (pendingUpdates.current.length === 0) return;
     
-    try {
-      const { channels, payload } = message;
+    const updates = [...pendingUpdates.current];
+    pendingUpdates.current = [];
+    
+    setState(prevState => {
+      let newState = { ...prevState };
       
-      // Determine what type of update this is based on channels
-      const updateType = determineUpdateType(channels);
-      
-      setState(prevState => {
-        let newState = { ...prevState };
+      // Process all pending updates in batch
+      for (const message of updates) {
+        const { channels, payload } = message;
+        const updateType = determineUpdateType(channels);
         
         switch (updateType) {
           case 'race':
             if (payload && payload.$id === raceId) {
-              newState.race = payload.race ? { ...prevState.race, ...payload } : payload;
+              newState.race = payload.race ? { ...newState.race, ...payload } : payload;
             }
             break;
             
           case 'entrant':
             if (payload && payload.race === raceId) {
-              newState.entrants = updateEntrantInList(prevState.entrants, payload);
+              newState.entrants = updateEntrantInList(newState.entrants, payload);
             }
             break;
             
           case 'moneyFlow':
             if (payload && payload.entrant) {
-              newState.entrants = updateEntrantMoneyFlow(prevState.entrants, payload);
+              newState.entrants = updateEntrantMoneyFlow(newState.entrants, payload);
             }
             break;
             
           case 'oddsHistory':
             if (payload && payload.entrant) {
-              newState.entrants = updateEntrantOddsHistory(prevState.entrants, payload);
+              newState.entrants = updateEntrantOddsHistory(newState.entrants, payload);
             }
             break;
         }
-        
-        // Update connection metrics
-        const latency = performance.now() - updateStartTime.current;
-        newState.lastUpdate = new Date();
-        newState.updateLatency = latency;
-        newState.totalUpdates = prevState.totalUpdates + 1;
-        
-        return newState;
-      });
+      }
+      
+      // Update connection metrics based on the most recent update
+      const latency = performance.now() - updateStartTime.current;
+      newState.lastUpdate = new Date();
+      newState.updateLatency = latency;
+      newState.totalUpdates = prevState.totalUpdates + updates.length;
+      
+      return newState;
+    });
+  }, [raceId]);
+
+  // Process incoming Appwrite real-time messages with throttling
+  const processRealtimeMessage = useCallback((message: AppwriteRealtimeMessage) => {
+    updateStartTime.current = performance.now();
+    
+    try {
+      // Add to pending updates
+      pendingUpdates.current.push(message);
+      
+      // Clear existing timer and set new one for throttling
+      if (updateThrottleTimer.current) {
+        clearTimeout(updateThrottleTimer.current);
+      }
+      
+      updateThrottleTimer.current = setTimeout(applyPendingUpdates, THROTTLE_DELAY);
       
     } catch (error) {
       console.error('Error processing Appwrite real-time message:', error);
     }
-  }, [raceId]);
+  }, [applyPendingUpdates]);
 
   // Setup Appwrite real-time subscriptions
   useEffect(() => {
@@ -235,6 +259,10 @@ export function useAppwriteRealtime({
     return () => {
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
+      }
+      
+      if (updateThrottleTimer.current) {
+        clearTimeout(updateThrottleTimer.current);
       }
       
       unsubscribeFunctions.current.forEach(unsubscribe => {
