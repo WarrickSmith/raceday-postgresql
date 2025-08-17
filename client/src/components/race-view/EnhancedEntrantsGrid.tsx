@@ -789,11 +789,11 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
               <thead className="bg-gray-50 sticky top-0 z-20">
                 <tr style={{ height: '60px' }}>
                   {/* Left Fixed Headers - Sticky */}
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 sticky left-0 bg-gray-50 z-30">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 sticky left-0 top-0 bg-gray-50 z-30">
                     Runner
                   </th>
                   <th
-                    className={`px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 border-r border-gray-200 sticky left-[200px] bg-gray-50 z-30 ${
+                    className={`px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 border-r border-gray-200 sticky left-[200px] top-0 bg-gray-50 z-30 ${
                       sortState?.column === 'winOdds' ? 'bg-blue-50' : ''
                     }`}
                     onClick={() => handleSort('winOdds')}
@@ -808,7 +808,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                       )}
                     </div>
                   </th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r-2 border-gray-300 sticky left-[280px] bg-gray-50 z-30">
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r-2 border-gray-300 sticky left-[280px] top-0 bg-gray-50 z-30">
                     Place
                   </th>
 
@@ -845,10 +845,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                   ))}
 
                   {/* Right Fixed Headers - Sticky */}
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-l-2 border-gray-300 border-r border-gray-200 sticky right-[80px] bg-gray-50 z-30">
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-l-2 border-gray-300 border-r border-gray-200 sticky right-[80px] top-0 bg-gray-50 z-30">
                     Pool
                   </th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider sticky right-0 bg-gray-50 z-30">
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider sticky right-0 top-0 bg-gray-50 z-30">
                     Pool %
                   </th>
                 </tr>
