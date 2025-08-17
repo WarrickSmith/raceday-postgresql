@@ -11,6 +11,7 @@ import {
   DEFAULT_POOL_VIEW_STATE,
 } from '@/types/enhancedGrid'
 import { useAppwriteRealtime } from '@/hooks/useAppwriteRealtime'
+import { useRealtimeRace } from '@/hooks/useRealtimeRace'
 import { PoolToggle } from './PoolToggle'
 import { useRace } from '@/contexts/RaceContext'
 import { screenReader, AriaLabels } from '@/utils/accessibility'
@@ -57,10 +58,27 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 }: EnhancedEntrantsGridProps) {
   const { raceData } = useRace()
 
+  // Use live race data for status synchronization (same as header and footer)
+  const { race: liveRace, isConnected: raceConnected } = useRealtimeRace({ 
+    initialRace: raceData?.race || {
+      $id: raceId || 'fallback',
+      raceId: raceId || 'fallback', 
+      startTime: raceStartTime,
+      status: 'open',
+      name: '',
+      raceNumber: 0,
+      meeting: '',
+      distance: undefined,
+      trackCondition: undefined,
+      $createdAt: '',
+      $updatedAt: ''
+    }
+  })
+
   // Use context data if available, fallback to props for initial render
   const currentEntrants = raceData?.entrants || initialEntrants
   const currentRaceId = raceData?.race.$id || raceId
-  const currentRaceStartTime = raceData?.race.startTime || raceStartTime
+  const currentRaceStartTime = liveRace?.startTime || raceData?.race.startTime || raceStartTime
   const currentDataFreshness = raceData?.dataFreshness || dataFreshness
 
   // Debug logging for entrants updates (can be removed in production)
@@ -287,7 +305,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     }, updateInterval)
 
     return () => clearInterval(timer)
-  }, [currentRaceStartTime, raceData?.race?.status])
+  }, [currentRaceStartTime, liveRace?.status])
 
   // Generate timeline columns based on current time and race status
   const timelineColumns = useMemo(() => {
@@ -295,7 +313,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     const current = currentTime
     const timeToRaceMs = raceStart.getTime() - current.getTime()
     const timeToRaceMinutes = Math.floor(timeToRaceMs / (1000 * 60))
-    const raceStatus = raceData?.race?.status || 'Open'
+    const raceStatus = liveRace?.status || 'Open'
     
     // Race status sync verified - using real-time race status
 
@@ -756,7 +774,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
             >
               {autoScroll ? '🔄 Auto' : '⏸️ Manual'}
             </button>
-            <span className="text-xs text-gray-500">Status: {raceData?.race?.status || 'Open'}</span>
+            <span className="text-xs text-gray-500">Status: {liveRace?.status || 'Open'}</span>
           </div>
         </div>
 
@@ -786,7 +804,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
               </colgroup>
 
               {/* Unified Header */}
-              <thead className="bg-gray-50 sticky top-0 z-20">
+              <thead className="bg-gray-50">
                 <tr style={{ height: '60px' }}>
                   {/* Left Fixed Headers - Sticky */}
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 sticky left-0 top-0 bg-gray-50 z-30">
@@ -816,7 +834,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                   {timelineColumns.map((column) => (
                     <th
                       key={`header_${column.interval}`}
-                      className={`px-2 py-2 text-xs font-medium text-gray-700 text-center border-r border-gray-200 ${
+                      className={`px-2 py-2 text-xs font-medium text-gray-700 text-center border-r border-gray-200 sticky top-0 z-20 ${
                         column.isScheduledStart
                           ? 'bg-blue-100 border-blue-300'
                           : column.isDynamic

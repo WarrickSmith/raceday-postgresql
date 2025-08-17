@@ -85,10 +85,8 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
     }
   }, [nextScheduledRace, isLoading, router]);
 
-  // Don't show button if no next race is available
-  if (!nextScheduledRace) {
-    return null;
-  }
+  // Show button always, but disable when no next race is available
+  const isDisabled = !nextScheduledRace || isLoading;
 
   const formatTime = (timeString: string) => {
     return new Date(timeString).toLocaleTimeString('en-US', {
@@ -101,17 +99,29 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
   return (
     <button
       onClick={handleNavigateToNextRace}
-      disabled={isLoading}
-      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 ease-in-out"
-      aria-label={`Jump to next scheduled race: ${nextScheduledRace.name} at ${nextScheduledRace.meetingName} starting at ${formatTime(nextScheduledRace.startTime)}`}
+      disabled={isDisabled}
+      className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200 ease-in-out ${
+        isDisabled
+          ? 'text-gray-400 bg-gray-50 border border-gray-200 cursor-not-allowed'
+          : 'text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 focus:ring-blue-500'
+      }`}
+      aria-label={
+        nextScheduledRace
+          ? `Jump to next scheduled race: ${nextScheduledRace.name} at ${nextScheduledRace.meetingName} starting at ${formatTime(nextScheduledRace.startTime)}`
+          : 'No upcoming races available'
+      }
     >
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
       <span>Next Race</span>
-      <span className="text-xs text-blue-600">
-        {formatTime(nextScheduledRace.startTime)}
-      </span>
+      {nextScheduledRace ? (
+        <span className={`text-xs ${isDisabled ? 'text-gray-400' : 'text-blue-600'}`}>
+          {formatTime(nextScheduledRace.startTime)}
+        </span>
+      ) : (
+        <span className="text-xs text-gray-400">No races</span>
+      )}
       {isLoading && (
         <svg className="animate-spin w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" aria-hidden="true">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
