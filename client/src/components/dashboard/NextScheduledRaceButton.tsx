@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Meeting, Race } from '@/types/meetings';
 
@@ -19,39 +19,32 @@ interface NextScheduledRace {
 export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [nextScheduledRace, setNextScheduledRace] = useState<NextScheduledRace | null>(null);
 
-  // Find the next scheduled race from all meetings data
-  const nextScheduledRace = useMemo((): NextScheduledRace | null => {
-    const now = new Date();
-    let nextRace: NextScheduledRace | null = null;
-    let earliestTime = Number.MAX_SAFE_INTEGER;
-
-    // We need to fetch races for each meeting - for now use a simplified approach
-    // In a real implementation, we'd need to either:
-    // 1. Have races included in the meetings data
-    // 2. Create a separate API endpoint to find the next race
-    // 3. Use the existing navigation API logic
-    
-    // For now, let's use a simpler approach by estimating from firstRaceTime
-    meetings.forEach(meeting => {
-      if (meeting.firstRaceTime) {
-        const raceTime = new Date(meeting.firstRaceTime).getTime();
-        if (raceTime > now.getTime() && raceTime < earliestTime) {
-          earliestTime = raceTime;
-          nextRace = {
-            // We'll need to make an API call to get the actual race details
-            raceId: '', // Will be populated by API call
-            name: 'Race 1', // Assumption - first race of meeting
-            startTime: meeting.firstRaceTime,
-            meetingName: meeting.meetingName,
-            raceNumber: 1
-          };
+  // Fetch the next scheduled race from the API
+  useEffect(() => {
+    const fetchNextScheduledRace = async () => {
+      try {
+        const response = await fetch('/api/next-scheduled-race');
+        if (response.ok) {
+          const data = await response.json();
+          setNextScheduledRace(data.nextScheduledRace);
+        } else {
+          setNextScheduledRace(null);
         }
+      } catch (error) {
+        console.error('Failed to fetch next scheduled race:', error);
+        setNextScheduledRace(null);
       }
-    });
+    };
 
-    return nextRace;
-  }, [meetings]);
+    fetchNextScheduledRace();
+    
+    // Refresh every minute to keep the data current
+    const interval = setInterval(fetchNextScheduledRace, 60000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // Handle navigation to next scheduled race
   const handleNavigateToNextRace = useCallback(async () => {
@@ -60,26 +53,10 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
     setIsLoading(true);
     
     try {
-      // Get the next scheduled race details from the API
-      const response = await fetch('/api/next-scheduled-race');
-      if (!response.ok) {
-        throw new Error('Failed to fetch next scheduled race');
-      }
-      
-      const data = await response.json();
-      if (data.nextScheduledRace?.raceId) {
-        console.log('🎯 Navigating to next scheduled race:', data.nextScheduledRace.raceId);
-        router.push(`/race/${data.nextScheduledRace.raceId}`);
-      } else {
-        console.log('❌ No next scheduled race available');
-      }
+      console.log('🎯 Navigating to next scheduled race:', nextScheduledRace.raceId);
+      router.push(`/race/${nextScheduledRace.raceId}`);
     } catch (error) {
       console.error('❌ Failed to navigate to next scheduled race:', error);
-      // Fallback: if API fails, still try to navigate to first meeting's first race
-      if (nextScheduledRace.startTime) {
-        // This is a simplified fallback - in production we'd handle this better
-        console.log('🔄 Using fallback navigation approach');
-      }
     } finally {
       setIsLoading(false);
     }

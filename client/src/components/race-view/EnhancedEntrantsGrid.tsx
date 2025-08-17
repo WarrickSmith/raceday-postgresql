@@ -348,8 +348,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
     // Add post-scheduled columns:
     // 1. For Open races: Add dynamic columns in real-time
-    // 2. For closed races (Final/Interim/Closed): Add static columns up to actual start time
-    const allowDynamicColumns = raceStatus === 'Open' && timeToRaceMinutes < 0
+    // 2. For closed/interim/final races: Persist columns that were previously shown
+    // 3. Never remove columns once they've been added (timeline should only grow)
+    const allowDynamicColumns = (raceStatus === 'Open' || raceStatus === 'Closed') && timeToRaceMinutes < 0
     const shouldShowPostStartColumns =
       allowDynamicColumns ||
       (raceData?.race?.actualStart && ['Final', 'Interim', 'Closed'].includes(raceStatus))
