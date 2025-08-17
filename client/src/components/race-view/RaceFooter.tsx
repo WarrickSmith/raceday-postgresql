@@ -80,9 +80,11 @@ const STATUS_CONFIG: Record<RaceStatus, {
 // Countdown timer component
 const CountdownTimer = memo(function CountdownTimer({
   targetTime,
+  raceStatus,
   onTimeExpired
 }: {
   targetTime: string;
+  raceStatus?: RaceStatus;
   onTimeExpired?: () => void;
 }) {
   const [timeRemaining, setTimeRemaining] = useState<{
@@ -139,8 +141,14 @@ const CountdownTimer = memo(function CountdownTimer({
     return 'text-gray-700';
   }, [timeRemaining]);
 
+  // Show race status instead of "Race Started" when time expires
   if (timeRemaining.total <= 0) {
-    return <span className="text-red-600 font-bold">Race Started</span>;
+    const statusConfig = STATUS_CONFIG[raceStatus || 'open'];
+    return (
+      <span className={`font-bold ${statusConfig.color}`}>
+        {statusConfig.label}
+      </span>
+    );
   }
 
   return (
@@ -385,7 +393,8 @@ const RaceStatusDisplay = memo(function RaceStatusDisplay({
           </div>
           <div className="text-4xl font-bold text-gray-900">
             <CountdownTimer 
-              targetTime={raceStartTime} 
+              targetTime={raceStartTime}
+              raceStatus={status}
               onTimeExpired={handleTimeExpired}
             />
           </div>
@@ -418,8 +427,8 @@ export const RaceFooter = memo(function RaceFooter({
       name: '',
       raceNumber: 0,
       meeting: '',
-      distance: '',
-      trackCondition: '',
+      distance: undefined,
+      trackCondition: undefined,
       $createdAt: '',
       $updatedAt: ''
     }
@@ -530,7 +539,8 @@ export const RaceFooter = memo(function RaceFooter({
                 </div>
                 <div className="text-xl font-bold text-blue-600">
                   <CountdownTimer 
-                    targetTime={currentRaceStartTime} 
+                    targetTime={currentRaceStartTime}
+                    raceStatus={currentRaceStatus}
                     onTimeExpired={() => {}}
                   />
                 </div>
