@@ -97,6 +97,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [maxPostStartMinutes, setMaxPostStartMinutes] = useState(0) // Track max columns shown
+  const [hasShownPostStartColumns, setHasShownPostStartColumns] = useState(false) // Track if we've ever shown post-start columns
 
   // Enhanced grid state
   const [displayConfig] = useState({
@@ -347,31 +349,39 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     })
 
     // Add post-scheduled columns:
-    // 1. For Open races: Add dynamic columns in real-time
-    // 2. For closed/interim/final races: Persist columns that were previously shown
-    // 3. Never remove columns once they've been added (timeline should only grow)
-    const allowDynamicColumns = (raceStatus === 'Open' || raceStatus === 'Closed') && timeToRaceMinutes < 0
+    // 1. For Open races: Add dynamic columns in real-time as time progresses
+    // 2. For closed/interim/final races: Show static columns up to actual race end, but don't add new ones
+    // 3. Columns persist once added (timeline doesn't shrink)
+    const allowDynamicColumns = raceStatus === 'Open' && timeToRaceMinutes < 0
     const shouldShowPostStartColumns =
       allowDynamicColumns ||
-      (raceData?.race?.actualStart && ['Final', 'Interim', 'Closed'].includes(raceStatus))
+      (raceData?.race?.actualStart && ['Final', 'Interim', 'Closed'].includes(raceStatus)) ||
+      (hasShownPostStartColumns && ['Final', 'Interim', 'Closed'].includes(raceStatus)) // Persist columns for closed races
 
     if (shouldShowPostStartColumns) {
       let postStartMinutes: number
 
       if (allowDynamicColumns) {
-        // For open races, use current time relative to scheduled start
+        // For open races, use current time relative to scheduled start and update max
         postStartMinutes = Math.abs(timeToRaceMinutes)
-      } else if (raceData?.race?.actualStart) {
-        // For closed races, use actual start time relative to scheduled start
-        const actualStartTime = new Date(raceData.race.actualStart)
-        const scheduledStartTime = new Date(currentRaceStartTime)
-        postStartMinutes = Math.max(
-          0,
-          (actualStartTime.getTime() - scheduledStartTime.getTime()) /
-            (1000 * 60)
-        )
+        setMaxPostStartMinutes(prev => Math.max(prev, postStartMinutes))
+        setHasShownPostStartColumns(true) // Mark that we've shown post-start columns
       } else {
-        postStartMinutes = 0
+        // For closed races, use the maximum that was previously shown to persist columns
+        if (raceData?.race?.actualStart) {
+          const actualStartTime = new Date(raceData.race.actualStart)
+          const scheduledStartTime = new Date(currentRaceStartTime)
+          const actualPostStartMinutes = Math.max(
+            0,
+            (actualStartTime.getTime() - scheduledStartTime.getTime()) /
+              (1000 * 60)
+          )
+          // Use the maximum of actual time or previously shown columns
+          postStartMinutes = Math.max(maxPostStartMinutes, actualPostStartMinutes)
+        } else {
+          // If no actualStart, just use the max we've shown so far
+          postStartMinutes = maxPostStartMinutes
+        }
       }
 
       // Add 30-second intervals for first 2 minutes, then minute intervals
