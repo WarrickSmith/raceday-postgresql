@@ -17,6 +17,7 @@ import { useRace } from '@/contexts/RaceContext'
 import { screenReader, AriaLabels } from '@/utils/accessibility'
 import { useRenderTracking, useMemoryOptimization } from '@/utils/performance'
 import { JockeySilks } from './JockeySilks'
+import { getStatusConfig, getStatusBadgeClasses } from '@/utils/raceStatusConfig'
 
 interface TimelineColumn {
   label: string
@@ -785,7 +786,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
             >
               {autoScroll ? '🔄 Auto' : '⏸️ Manual'}
             </button>
-            <span className="text-xs text-gray-500">Status: {liveRace?.status || 'Open'}</span>
+            <span className={getStatusBadgeClasses(liveRace?.status, 'small')}>
+              {getStatusConfig(liveRace?.status).label}
+            </span>
           </div>
         </div>
 
