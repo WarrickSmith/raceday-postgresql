@@ -5,6 +5,7 @@ import { Race, Meeting } from '@/types/meetings';
 import { useRealtimeRace } from '@/hooks/useRealtimeRace';
 import { formatDistance, formatRaceTime, formatCategory } from '@/utils/raceFormatters';
 import { useRace } from '@/contexts/RaceContext';
+import { getStatusConfig, getStatusBadgeClasses } from '@/utils/raceStatusConfig';
 
 interface RaceDataHeaderProps {
   // No props needed - will get all data from context
@@ -38,6 +39,13 @@ export const RaceDataHeader = memo(function RaceDataHeader({}: RaceDataHeaderPro
 
     const updateCountdown = () => {
       try {
+        // Don't show countdown for abandoned races
+        const status = liveRace.status?.toLowerCase();
+        if (status === 'abandoned') {
+          setTimeToStart(null);
+          return;
+        }
+        
         const now = new Date();
         const raceTime = new Date(liveRace.startTime);
         if (isNaN(raceTime.getTime())) {
@@ -150,10 +158,8 @@ export const RaceDataHeader = memo(function RaceDataHeader({}: RaceDataHeaderPro
           </h1>
           
           <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
-            <span className={`px-2 py-1 rounded text-xs font-medium ${
-              liveRace.status === 'Open' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-            }`}>
-              {liveRace.status}
+            <span className={getStatusBadgeClasses(liveRace.status, 'small')}>
+              {getStatusConfig(liveRace.status).label}
             </span>
             {formattedDistance && <span>{formattedDistance}</span>}
             {liveRace.trackCondition && <span>{liveRace.trackCondition}</span>}

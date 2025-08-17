@@ -13,6 +13,7 @@ import { useRace } from '@/contexts/RaceContext';
 import { useRealtimeRace } from '@/hooks/useRealtimeRace';
 import { useRacePoolData } from '@/hooks/useRacePoolData';
 import { screenReader, KeyboardHandler } from '@/utils/accessibility';
+import { STATUS_CONFIG, getStatusConfig } from '@/utils/raceStatusConfig';
 
 interface RaceFooterProps {
   raceId: string;
@@ -26,57 +27,6 @@ interface RaceFooterProps {
   showResults?: boolean;
 }
 
-// Status configuration
-const STATUS_CONFIG: Record<RaceStatus, {
-  label: string;
-  color: string;
-  bgColor: string;
-  icon: string;
-  description: string;
-}> = {
-  open: {
-    label: 'Open',
-    color: 'text-green-700',
-    bgColor: 'bg-green-100',
-    icon: '🟢',
-    description: 'Betting is open'
-  },
-  closed: {
-    label: 'Closed',
-    color: 'text-yellow-700',
-    bgColor: 'bg-yellow-100',
-    icon: '🟡',
-    description: 'Betting has closed'
-  },
-  interim: {
-    label: 'Interim',
-    color: 'text-blue-700',
-    bgColor: 'bg-blue-100',
-    icon: '🔵',
-    description: 'Interim results available'
-  },
-  final: {
-    label: 'Final',
-    color: 'text-purple-700',
-    bgColor: 'bg-purple-100',
-    icon: '🏁',
-    description: 'Final results confirmed'
-  },
-  abandoned: {
-    label: 'Abandoned',
-    color: 'text-red-700',
-    bgColor: 'bg-red-100',
-    icon: '🔴',
-    description: 'Race has been abandoned'
-  },
-  postponed: {
-    label: 'Postponed',
-    color: 'text-orange-700',
-    bgColor: 'bg-orange-100',
-    icon: '⏸️',
-    description: 'Race has been postponed'
-  }
-};
 
 // Countdown timer component
 const CountdownTimer = memo(function CountdownTimer({
@@ -144,7 +94,7 @@ const CountdownTimer = memo(function CountdownTimer({
 
   // Show race status instead of "Race Started" when time expires
   if (timeRemaining.total <= 0) {
-    const statusConfig = STATUS_CONFIG[raceStatus || 'open'];
+    const statusConfig = getStatusConfig(raceStatus);
     return (
       <span className={`font-bold ${statusConfig.color}`}>
         {statusConfig.label}
@@ -361,12 +311,12 @@ const RaceStatusDisplay = memo(function RaceStatusDisplay({
   raceStartTime: string;
   showCountdown?: boolean;
 }) {
-  // Fallback to 'open' if status is not found in our config
-  const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG['open'];
+  // Get status configuration with fallback
+  const statusConfig = getStatusConfig(status);
   const [timeExpired, setTimeExpired] = useState(false);
   
-  // Log unknown status for debugging
-  if (!STATUS_CONFIG[status]) {
+  // Log unknown status for debugging  
+  if (!status || !STATUS_CONFIG[status.toLowerCase() as RaceStatus]) {
     console.warn(`Unknown race status: "${status}". Using fallback 'open' status.`);
   }
 
@@ -375,6 +325,7 @@ const RaceStatusDisplay = memo(function RaceStatusDisplay({
   }, []);
 
   const shouldShowCountdown = useMemo(() => {
+    // Only show countdown for open races that haven't expired, and exclude abandoned/postponed races
     return showCountdown && status === 'open' && !timeExpired;
   }, [showCountdown, status, timeExpired]);
 
@@ -515,7 +466,7 @@ export const RaceFooter = memo(function RaceFooter({
 
   // Announce race status changes
   useEffect(() => {
-    const statusConfig = STATUS_CONFIG[currentRaceStatus];
+    const statusConfig = getStatusConfig(currentRaceStatus);
     if (statusConfig) {
       screenReader?.announceRaceStatusChange(statusConfig.description);
     }
@@ -567,18 +518,21 @@ export const RaceFooter = memo(function RaceFooter({
                   {currentPoolData.currency}{currentPoolData.totalRacePool.toLocaleString()}
                 </div>
               </div>
-              <div className="text-center">
-                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                  Race Starts
+              {/* Only show countdown for non-abandoned races */}
+              {currentRaceStatus?.toLowerCase() !== 'abandoned' && currentRaceStatus?.toLowerCase() !== 'postponed' && (
+                <div className="text-center">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                    Race Starts
+                  </div>
+                  <div className="text-xl font-bold text-blue-600">
+                    <CountdownTimer 
+                      targetTime={currentRaceStartTime}
+                      raceStatus={currentRaceStatus}
+                      onTimeExpired={() => {}}
+                    />
+                  </div>
                 </div>
-                <div className="text-xl font-bold text-blue-600">
-                  <CountdownTimer 
-                    targetTime={currentRaceStartTime}
-                    raceStatus={currentRaceStatus}
-                    onTimeExpired={() => {}}
-                  />
-                </div>
-              </div>
+              )}
             </div>
           )}
           

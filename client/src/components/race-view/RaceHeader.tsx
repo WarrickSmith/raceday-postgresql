@@ -30,6 +30,13 @@ export const RaceHeader = memo(function RaceHeader({ initialRace, meeting, navig
   useEffect(() => {
     const updateCountdown = () => {
       try {
+        // Don't show countdown for abandoned races
+        const status = race.status?.toLowerCase();
+        if (status === 'abandoned') {
+          setTimeToStart(null);
+          return;
+        }
+        
         const now = new Date();
         const raceTime = new Date(race.startTime);
         if (isNaN(raceTime.getTime())) {
