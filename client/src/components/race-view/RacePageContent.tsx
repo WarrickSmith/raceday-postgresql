@@ -19,8 +19,8 @@ export function RacePageContent() {
 
   if (!raceData) {
     return (
-      <main className="container mx-auto px-4 py-8" role="main">
-        <div className="max-w-4xl mx-auto">
+      <main className="w-full px-4 py-8" role="main">
+        <div className="w-full">
           <div className="text-center py-8">
             <p className="text-gray-600">Loading race data...</p>
           </div>
@@ -55,8 +55,8 @@ export function RacePageContent() {
   }
 
   return (
-    <main className="container mx-auto px-4 py-8" role="main">
-      <div className={useEnhancedInterface ? "max-w-7xl mx-auto" : "max-w-4xl mx-auto"}>
+    <main className="w-full px-4 py-8" role="main">
+      <div className={useEnhancedInterface ? "w-full" : "max-w-4xl mx-auto"}>
         
         {/* Loading Overlay */}
         {isLoading && (

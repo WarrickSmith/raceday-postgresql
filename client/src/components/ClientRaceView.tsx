@@ -57,7 +57,7 @@ export function ClientRaceView({ raceId }: ClientRaceViewProps) {
   // Handle errors
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="w-full px-4 py-8">
         <div className="max-w-4xl mx-auto text-center">
           <div className="bg-red-50 border border-red-200 rounded-md p-4">
             <h2 className="text-lg font-medium text-red-800 mb-2">Error Loading Race</h2>
