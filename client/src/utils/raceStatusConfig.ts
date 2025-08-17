@@ -33,8 +33,8 @@ export const STATUS_CONFIG: Record<RaceStatus, RaceStatusConfig> = {
   },
   final: {
     label: 'Final',
-    color: 'text-purple-700',
-    bgColor: 'bg-purple-100',
+    color: 'text-white',
+    bgColor: 'bg-purple-600',
     icon: '🏁',
     description: 'Final results confirmed'
   },
@@ -60,10 +60,27 @@ export const STATUS_CONFIG: Record<RaceStatus, RaceStatusConfig> = {
 export function getStatusConfig(status: string | undefined): RaceStatusConfig {
   if (!status) return STATUS_CONFIG.open;
   
-  // Handle case variations
-  const normalizedStatus = status.toLowerCase() as RaceStatus;
+  // Handle case variations and status mapping
+  const normalizedStatus = status.toLowerCase();
   
-  return STATUS_CONFIG[normalizedStatus] || STATUS_CONFIG.open;
+  // Map common status variations to our standard keys
+  const statusMapping: Record<string, RaceStatus> = {
+    'open': 'open',
+    'closed': 'closed', 
+    'interim': 'interim',
+    'final': 'final',
+    'finalized': 'final',  // Map finalized to final
+    'finished': 'final',   // Map finished to final
+    'complete': 'final',   // Map complete to final
+    'completed': 'final',  // Map completed to final
+    'abandoned': 'abandoned',
+    'postponed': 'postponed',
+    'started': 'closed',   // Map started to closed (race is running)
+    'running': 'closed'    // Map running to closed
+  };
+  
+  const mappedStatus = statusMapping[normalizedStatus] || 'open';
+  return STATUS_CONFIG[mappedStatus];
 }
 
 /**
