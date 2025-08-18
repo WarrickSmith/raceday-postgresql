@@ -36,7 +36,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({}: RaceDataHeaderPro
       startTime: '',
       meeting: '',
       status: 'open' as const,
-      distance: '',
+      distance: 0,
       trackCondition: ''
     } 
   });
@@ -53,9 +53,9 @@ export const RaceDataHeader = memo(function RaceDataHeader({}: RaceDataHeaderPro
 
     const updateCountdown = () => {
       try {
-        // Don't show countdown for abandoned races
+        // Don't show countdown for abandoned or finalized races
         const status = liveRace.status?.toLowerCase();
-        if (status === 'abandoned') {
+        if (status === 'abandoned' || status === 'final' || status === 'finalized') {
           setTimeToStart(null);
           return;
         }
