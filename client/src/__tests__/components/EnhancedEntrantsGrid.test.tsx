@@ -3,12 +3,22 @@
  * Tests accessibility, performance, and functionality
  */
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EnhancedEntrantsGrid } from '../../components/race-view/EnhancedEntrantsGrid';
 import { RaceProvider } from '../../contexts/RaceContext';
 import { Entrant, Race, Meeting, RaceNavigationData } from '../../types/meetings';
 import { performanceMonitor } from '../../utils/performance';
+import { screenReader, KeyboardHandler } from '../../utils/accessibility';
+
+// Mock Next.js navigation
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(() => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+  })),
+}));
 
 // Mock data
 const mockRace: Race = {
@@ -237,7 +247,7 @@ describe('EnhancedEntrantsGrid', () => {
     });
 
     it('announces odds changes for screen readers', async () => {
-      const { screenReader } = require('../../utils/accessibility');
+      // screenReader is now imported at the top
       
       renderWithProvider(
         <EnhancedEntrantsGrid
@@ -433,7 +443,7 @@ describe('EnhancedEntrantsGrid', () => {
 
   describe('Keyboard Navigation', () => {
     it('handles arrow key navigation', () => {
-      const { KeyboardHandler } = require('../../utils/accessibility');
+      // KeyboardHandler is now imported at the top
       
       renderWithProvider(
         <EnhancedEntrantsGrid
@@ -464,7 +474,7 @@ describe('EnhancedEntrantsGrid', () => {
       await user.type(row, '{enter}');
 
       // Should announce selection
-      const { screenReader } = require('../../utils/accessibility');
+      // screenReader is now imported at the top
       expect(screenReader.announce).toHaveBeenCalledWith(
         'Selected Test Horse 1, runner number 1',
         'polite'
