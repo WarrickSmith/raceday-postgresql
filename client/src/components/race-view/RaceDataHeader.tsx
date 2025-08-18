@@ -25,7 +25,21 @@ export const RaceDataHeader = memo(function RaceDataHeader({}: RaceDataHeaderPro
   // });
   
   // Initialize hooks before conditional returns
-  const { race: liveRace, isConnected } = useRealtimeRace({ initialRace: raceData?.race });
+  const { race: liveRace, isConnected } = useRealtimeRace({ 
+    initialRace: raceData?.race || {
+      $id: '',
+      $createdAt: '',
+      $updatedAt: '',
+      raceId: '',
+      raceNumber: 0,
+      name: '',
+      startTime: '',
+      meeting: '',
+      status: 'open' as const,
+      distance: '',
+      trackCondition: ''
+    } 
+  });
   const formattedTime = useMemo(() => 
     liveRace ? formatRaceTime(liveRace.startTime) : '', 
     [liveRace?.startTime]

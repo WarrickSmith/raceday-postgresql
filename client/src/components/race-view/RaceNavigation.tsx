@@ -137,8 +137,8 @@ export const RaceNavigation = memo(function RaceNavigation({
       if (navigationData.previousRace) {
         promises.push(
           raceCache.get(
-            `race:${navigationData.previousRace.raceId}:navigation`,
-            () => fetch(`/api/race/${navigationData.previousRace.raceId}?nav=true`).then(r => r.json()),
+            `race:${navigationData.previousRace!.raceId}:navigation`,
+            () => fetch(`/api/race/${navigationData.previousRace!.raceId}?nav=true`).then(r => r.json()),
             15000
           ).catch(error => console.warn('Failed to pre-cache previous race:', error))
         );
@@ -148,8 +148,8 @@ export const RaceNavigation = memo(function RaceNavigation({
       if (navigationData.nextRace) {
         promises.push(
           raceCache.get(
-            `race:${navigationData.nextRace.raceId}:navigation`,
-            () => fetch(`/api/race/${navigationData.nextRace.raceId}?nav=true`).then(r => r.json()),
+            `race:${navigationData.nextRace!.raceId}:navigation`,
+            () => fetch(`/api/race/${navigationData.nextRace!.raceId}?nav=true`).then(r => r.json()),
             15000
           ).catch(error => console.warn('Failed to pre-cache next race:', error))
         );
@@ -159,8 +159,8 @@ export const RaceNavigation = memo(function RaceNavigation({
       if (navigationData.nextScheduledRace) {
         promises.push(
           raceCache.get(
-            `race:${navigationData.nextScheduledRace.raceId}:navigation`,
-            () => fetch(`/api/race/${navigationData.nextScheduledRace.raceId}?nav=true`).then(r => r.json()),
+            `race:${navigationData.nextScheduledRace!.raceId}:navigation`,
+            () => fetch(`/api/race/${navigationData.nextScheduledRace!.raceId}?nav=true`).then(r => r.json()),
             15000
           ).catch(error => console.warn('Failed to pre-cache next scheduled race:', error))
         );

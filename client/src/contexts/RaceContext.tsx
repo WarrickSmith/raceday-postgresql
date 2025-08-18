@@ -96,7 +96,11 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
         // Create minimal race data for immediate rendering
         const immediateRaceData = {
           race: cachedBasicData.race,
-          meeting: cachedBasicData.meeting,
+          meeting: {
+            ...cachedBasicData.meeting,
+            $createdAt: '',
+            $updatedAt: ''
+          },
           entrants: [], // Will be populated by background fetch
           navigationData: {
             previousRace: null,

@@ -111,7 +111,6 @@ export function RacePageContent() {
               dataFreshness={dataFreshness}
               enableMoneyFlowTimeline={true}
               enableJockeySilks={true}
-              stickyHeader={true}
               className="mb-6"
             />
             
@@ -120,7 +119,7 @@ export function RacePageContent() {
               raceId={currentRace.raceId}
               raceStartTime={currentRace.startTime}
               raceStatus={raceStatus}
-              poolData={poolData}
+              poolData={poolData || undefined}
               showCountdown={true}
               showPoolBreakdown={true}
               showResults={false}

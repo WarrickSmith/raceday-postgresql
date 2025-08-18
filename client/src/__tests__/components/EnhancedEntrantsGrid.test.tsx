@@ -43,7 +43,7 @@ const mockMeeting: Meeting = {
   meetingName: 'Test Track',
   country: 'AUS',
   raceType: 'Thoroughbred',
-  category: 'Metropolitan',
+  category: 'H',
   date: '2023-01-01'
 };
 
@@ -258,7 +258,7 @@ describe('EnhancedEntrantsGrid', () => {
       );
 
       // This would be triggered by real-time updates in actual usage
-      expect(screenReader.announceOddsUpdate).toHaveBeenCalledWith(
+      expect(screenReader?.announceOddsUpdate).toHaveBeenCalledWith(
         'Test Horse 1',
         '2.50',
         'up'
@@ -475,7 +475,7 @@ describe('EnhancedEntrantsGrid', () => {
 
       // Should announce selection
       // screenReader is now imported at the top
-      expect(screenReader.announce).toHaveBeenCalledWith(
+      expect(screenReader?.announce).toHaveBeenCalledWith(
         'Selected Test Horse 1, runner number 1',
         'polite'
       );
