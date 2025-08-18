@@ -6,15 +6,21 @@ import { RaceDataHeader } from '@/components/race-view/RaceDataHeader';
 import { EntrantsGrid } from '@/components/race-view/EntrantsGrid';
 import { EnhancedEntrantsGrid } from '@/components/race-view/EnhancedEntrantsGrid';
 import { RaceFooter } from '@/components/race-view/RaceFooter';
+import { useRacePoolData } from '@/hooks/useRacePoolData';
 import type { RaceStatus } from '@/types/racePools';
 
 export function RacePageContent() {
   const { raceData, isLoading, error } = useRace();
+  
+  // Get real-time pool data
+  const { poolData, isLoading: poolLoading, error: poolError } = useRacePoolData(
+    raceData?.race?.raceId || ''
+  );
 
   if (!raceData) {
     return (
-      <main className="container mx-auto px-4 py-8" role="main">
-        <div className="max-w-4xl mx-auto">
+      <main className="w-full px-4 py-8" role="main">
+        <div className="w-full">
           <div className="text-center py-8">
             <p className="text-gray-600">Loading race data...</p>
           </div>
@@ -28,39 +34,30 @@ export function RacePageContent() {
   // Feature flag for enhanced interface (can be controlled via env var or user preference)
   const useEnhancedInterface = process.env.NEXT_PUBLIC_USE_ENHANCED_INTERFACE === 'true' || true; // Default to true for demo
   
+  // Use latest race data from context - this ensures real-time updates
+  const currentRace = raceData.race;
+  
   // Mock race status and pool data for enhanced components
-  // Safely cast race status with fallback
+  // Safely cast race status with fallback - case insensitive
   const validStatuses: RaceStatus[] = ['open', 'closed', 'interim', 'final', 'abandoned', 'postponed'];
-  const raceStatus: RaceStatus = validStatuses.includes(race.status as RaceStatus) 
-    ? race.status as RaceStatus 
+  const normalizedStatus = currentRace.status?.toLowerCase() as RaceStatus;
+  const raceStatus: RaceStatus = validStatuses.includes(normalizedStatus) 
+    ? normalizedStatus 
     : 'open';
   
   // Debug logging for race status
-  if (!validStatuses.includes(race.status as RaceStatus)) {
-    console.log(`Race ${race.raceId} has status: "${race.status}". Using fallback: "open"`);
+  if (!validStatuses.includes(normalizedStatus)) {
+    console.log(`Race ${currentRace.raceId} has status: "${currentRace.status}". Using fallback: "open"`);
   }
   
-  // Mock pool data (in real implementation, this would come from the database)
-  const mockPoolData = {
-    $id: race.$id,
-    $createdAt: race.$createdAt,
-    $updatedAt: race.$updatedAt,
-    raceId: race.raceId,
-    winPoolTotal: 45000,
-    placePoolTotal: 23000,
-    quinellaPoolTotal: 9000,
-    trifectaPoolTotal: 15000,
-    exactaPoolTotal: 7000,
-    first4PoolTotal: 3000,
-    totalRacePool: 102000,
-    currency: '$',
-    lastUpdated: new Date().toISOString(),
-    isLive: true
-  };
+  // Pool data error handling
+  if (poolError) {
+    console.warn('Pool data error:', poolError);
+  }
 
   return (
-    <main className="container mx-auto px-4 py-8" role="main">
-      <div className={useEnhancedInterface ? "max-w-7xl mx-auto" : "max-w-4xl mx-auto"}>
+    <main className="w-full px-4 py-8" role="main">
+      <div className={useEnhancedInterface ? "w-full" : "max-w-4xl mx-auto"}>
         
         {/* Loading Overlay */}
         {isLoading && (
@@ -99,7 +96,7 @@ export function RacePageContent() {
         {/* Navigation Header - Sticky, doesn't change */}
         <NavigationHeader 
           navigationData={navigationData}
-          currentRaceId={race.raceId}
+          currentRaceId={currentRace.raceId}
         />
 
         {/* Race Data Header - Updates from context */}
@@ -110,21 +107,20 @@ export function RacePageContent() {
           <>
             <EnhancedEntrantsGrid 
               initialEntrants={entrants} 
-              raceId={race.$id}
-              raceStartTime={race.startTime}
+              raceId={currentRace.$id}
+              raceStartTime={currentRace.startTime}
               dataFreshness={dataFreshness}
               enableMoneyFlowTimeline={true}
               enableJockeySilks={true}
-              stickyHeader={true}
               className="mb-6"
             />
             
             {/* Enhanced Race Footer */}
             <RaceFooter 
-              raceId={race.raceId}
-              raceStartTime={race.startTime}
+              raceId={currentRace.raceId}
+              raceStartTime={currentRace.startTime}
               raceStatus={raceStatus}
-              poolData={mockPoolData}
+              poolData={poolData || undefined}
               showCountdown={true}
               showPoolBreakdown={true}
               showResults={false}

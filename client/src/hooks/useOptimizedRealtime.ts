@@ -191,9 +191,9 @@ export function useOptimizedRealtime({
               type: Math.random() > 0.7 ? 'moneyFlow' : 'entrant',
               entrantId: randomEntrant.$id,
               data: {
-                winOdds: Math.max(1.1, randomEntrant.winOdds + (Math.random() - 0.5) * 0.2),
-                placeOdds: Math.max(1.05, randomEntrant.placeOdds + (Math.random() - 0.5) * 0.1),
-                holdPercentage: Math.max(0, Math.min(100, randomEntrant.holdPercentage + (Math.random() - 0.5) * 2)),
+                winOdds: Math.max(1.1, (randomEntrant.winOdds || 2.0) + (Math.random() - 0.5) * 0.2),
+                placeOdds: Math.max(1.05, (randomEntrant.placeOdds || 1.5) + (Math.random() - 0.5) * 0.1),
+                holdPercentage: Math.max(0, Math.min(100, (randomEntrant.holdPercentage || 5.0) + (Math.random() - 0.5) * 2)),
                 moneyFlowTrend: Math.random() > 0.5 ? 'up' : 'down'
               },
               timestamp: new Date()

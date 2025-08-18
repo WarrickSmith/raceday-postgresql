@@ -5,46 +5,55 @@
 
 // Import the polling interval function (we'll extract it for testing)
 function getPollingInterval(timeToStartMinutes, raceStatus) {
-  // Post-start polling based on status
-  if (timeToStartMinutes <= 0) {
-    if (raceStatus === 'Closed') {
-      return 0.5; // 30 seconds - Closed to Interim
-    } else if (raceStatus === 'Interim') {
-      return 5; // 5 minutes - Interim to Final
+  // STATUS-DRIVEN POLLING: Primary logic based on race status, not time
+  
+  // Open status: Keep polling until race actually closes
+  if (raceStatus === 'Open') {
+    if (timeToStartMinutes <= 1) {
+      return 0.5 // 30 seconds - aggressive polling until actually closed (-1m to start)
+    } else if (timeToStartMinutes <= 5) {
+      return 1 // 1 minute - frequent polling as race approaches (-5m to -1m)
+    } else if (timeToStartMinutes <= 20) {
+      return 5 // 5 minutes - moderate polling (-20m to -5m)
     } else {
-      return 5; // Default 5 minutes for other post-start statuses
+      return 5 // 5 minutes - standard polling for distant races
     }
   }
   
-  // Pre-start polling based on time to start
-  if (timeToStartMinutes > 60) {
-    return 5; // T-60m+: Poll every 5 minutes
-  } else if (timeToStartMinutes > 20) {
-    return 5; // T-60m to T-20m: Poll every 5 minutes
-  } else if (timeToStartMinutes > 10) {
-    return 2; // T-20m to T-10m: Poll every 2 minutes
-  } else if (timeToStartMinutes > 5) {
-    return 1; // T-10m to T-5m: Poll every 1 minute
+  // Post-open status polling (race has actually started transitioning)
+  if (raceStatus === 'Closed') {
+    return 0.5 // 30 seconds - closed to running transition
+  } else if (raceStatus === 'Running') {
+    return 0.5 // 30 seconds - running to interim transition  
+  } else if (raceStatus === 'Interim') {
+    return 5 // 5 minutes - interim to final transition
+  } else if (raceStatus === 'Final' || raceStatus === 'Finalized' || raceStatus === 'Abandoned') {
+    return null // Stop polling - race is final
   } else {
-    return 0.25; // T-5m to Start: Poll every 15 seconds
+    // Fallback for unknown statuses - treat as active
+    return timeToStartMinutes <= 1 ? 0.5 : 5
   }
 }
 
 // Test cases for polling interval calculation
 const testCases = [
-  // Pre-start scenarios
-  { timeToStart: 120, status: 'Open', expected: 5, description: 'T-120m: 5 minute interval' },
-  { timeToStart: 60, status: 'Open', expected: 5, description: 'T-60m: 5 minute interval' },
-  { timeToStart: 30, status: 'Open', expected: 5, description: 'T-30m: 5 minute interval' },
-  { timeToStart: 15, status: 'Open', expected: 2, description: 'T-15m: 2 minute interval' },
-  { timeToStart: 8, status: 'Open', expected: 1, description: 'T-8m: 1 minute interval' },
-  { timeToStart: 3, status: 'Open', expected: 0.25, description: 'T-3m: 15 second interval' },
-  { timeToStart: 1, status: 'Open', expected: 0.25, description: 'T-1m: 15 second interval' },
+  // Pre-start scenarios (Open status)
+  { timeToStart: 120, status: 'Open', expected: 5, description: 'T-120m Open: 5 minute interval' },
+  { timeToStart: 60, status: 'Open', expected: 5, description: 'T-60m Open: 5 minute interval' },
+  { timeToStart: 30, status: 'Open', expected: 5, description: 'T-30m Open: 5 minute interval' },
+  { timeToStart: 15, status: 'Open', expected: 5, description: 'T-15m Open: 5 minute interval' },
+  { timeToStart: 8, status: 'Open', expected: 5, description: 'T-8m Open: 5 minute interval' },
+  { timeToStart: 3, status: 'Open', expected: 1, description: 'T-3m Open: 1 minute interval' },
+  { timeToStart: 1, status: 'Open', expected: 0.5, description: 'T-1m Open: 30 second interval' },
+  { timeToStart: 0.5, status: 'Open', expected: 0.5, description: 'T-30s Open: 30 second interval' },
   
   // Post-start scenarios
   { timeToStart: -5, status: 'Closed', expected: 0.5, description: 'Post-start Closed: 30 second interval' },
+  { timeToStart: -5, status: 'Running', expected: 0.5, description: 'Post-start Running: 30 second interval' },
   { timeToStart: -10, status: 'Interim', expected: 5, description: 'Post-start Interim: 5 minute interval' },
-  { timeToStart: -15, status: 'Final', expected: 5, description: 'Post-start Final: 5 minute interval' },
+  { timeToStart: -15, status: 'Final', expected: null, description: 'Post-start Final: Stop polling' },
+  { timeToStart: -15, status: 'Finalized', expected: null, description: 'Post-start Finalized: Stop polling' },
+  { timeToStart: -15, status: 'Abandoned', expected: null, description: 'Post-start Abandoned: Stop polling' },
 ];
 
 console.log('🧪 Testing Master Race Scheduler Polling Logic\n');

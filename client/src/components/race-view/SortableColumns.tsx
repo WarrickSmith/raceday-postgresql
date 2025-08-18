@@ -2,6 +2,7 @@
 
 import { memo, useCallback, useMemo, useState } from 'react';
 import type { SortableColumn, SortDirection, GridSortState } from '@/types/enhancedGrid';
+import type { Entrant } from '@/types/meetings';
 
 interface SortableColumnHeaderProps {
   column: SortableColumn;
@@ -297,12 +298,12 @@ export function useSortableColumns(initialColumn: SortableColumn = 'runnerNumber
     }, 100);
   }, []);
 
-  const sortEntrants = useCallback((entrants: any[], sortState: GridSortState) => {
+  const sortEntrants = useCallback((entrants: Entrant[], sortState: GridSortState) => {
     const { column, direction } = sortState;
     
     return [...entrants].sort((a, b) => {
-      let valueA: any;
-      let valueB: any;
+      let valueA: string | number | undefined;
+      let valueB: string | number | undefined;
 
       switch (column) {
         case 'runnerNumber':

@@ -16,8 +16,13 @@ export const NavigationHeader = memo(function NavigationHeader({
 }: NavigationHeaderProps) {
   const { raceData } = useRace();
   
-  // Use context navigation data if available, fallback to props for initial render
-  const currentNavigationData = raceData?.navigationData || navigationData;
+  // Use context navigation data if available and has content, fallback to props for initial render
+  const hasValidContextNavigation = raceData?.navigationData && (
+    raceData.navigationData.previousRace || 
+    raceData.navigationData.nextRace || 
+    raceData.navigationData.nextScheduledRace
+  );
+  const currentNavigationData = hasValidContextNavigation ? raceData.navigationData : navigationData;
   const currentRaceIdFromContext = raceData?.race.raceId || currentRaceId;
 
   return (

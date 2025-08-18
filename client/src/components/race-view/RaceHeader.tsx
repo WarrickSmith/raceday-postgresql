@@ -6,6 +6,7 @@ import { useRealtimeRace } from '@/hooks/useRealtimeRace';
 import { formatDistance, formatRaceTime, formatCategory } from '@/utils/raceFormatters';
 import { RaceNavigation } from './RaceNavigation';
 import { useRace } from '@/contexts/RaceContext';
+import { getStatusConfig } from '@/utils/raceStatusConfig';
 
 interface RaceHeaderProps {
   initialRace: Race;
@@ -30,6 +31,13 @@ export const RaceHeader = memo(function RaceHeader({ initialRace, meeting, navig
   useEffect(() => {
     const updateCountdown = () => {
       try {
+        // Don't show countdown for abandoned races or finalized races
+        const status = race.status?.toLowerCase();
+        if (status === 'abandoned' || status === 'final' || status === 'finalized') {
+          setTimeToStart(null);
+          return;
+        }
+        
         const now = new Date();
         const raceTime = new Date(race.startTime);
         if (isNaN(raceTime.getTime())) {
@@ -87,19 +95,13 @@ export const RaceHeader = memo(function RaceHeader({ initialRace, meeting, navig
     return () => clearInterval(interval);
   }, [race.startTime, race.status]);
 
-  const statusColor = useMemo(() => {
-    const status = race.status?.toLowerCase();
-    
-    if (status === 'open') {
-      return 'bg-green-100 text-green-800';
-    } else if (status === 'closed' || status === 'soon') {
-      return 'bg-yellow-100 text-yellow-800';
-    } else if (status === 'running' || status === 'finalized') {
-      return 'bg-red-100 text-red-800';
-    } else {
-      return 'bg-gray-100 text-gray-600';
-    }
+  const statusConfig = useMemo(() => {
+    return getStatusConfig(race.status);
   }, [race.status]);
+
+  const statusClasses = useMemo(() => {
+    return `${statusConfig.color} ${statusConfig.bgColor}`;
+  }, [statusConfig]);
 
   const formattedDistance = useMemo(() => formatDistance(race.distance), [race.distance]);
 
@@ -188,11 +190,11 @@ export const RaceHeader = memo(function RaceHeader({ initialRace, meeting, navig
             <div className="flex items-center">
               <span className="text-sm text-gray-500">Status:</span>
               <span 
-                className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${statusColor}`}
+                className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${statusClasses}`}
                 role="status"
-                aria-label={`Race status: ${race.status}`}
+                aria-label={`Race status: ${statusConfig.label}`}
               >
-                {race.status}
+                {statusConfig.icon} {statusConfig.label}
               </span>
             </div>
 

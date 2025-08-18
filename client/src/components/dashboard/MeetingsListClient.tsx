@@ -4,8 +4,10 @@ import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { MeetingCard } from './MeetingCard';
 import { MeetingsListSkeleton } from '../skeletons/MeetingCardSkeleton';
+import { NextScheduledRaceButton } from './NextScheduledRaceButton';
 import { useRealtimeMeetings } from '@/hooks/useRealtimeMeetings';
 import { Meeting } from '@/types/meetings';
+import { racePrefetchService } from '@/services/racePrefetchService';
 
 interface MeetingsListClientProps {
   initialData: Meeting[];
@@ -23,8 +25,19 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
     setTimeout(() => setError(null), 5000);
   }, []);
 
-  // Handle race click navigation
-  const handleRaceClick = useCallback((raceId: string) => {
+  // Enhanced race click handler with pre-fetching for immediate rendering
+  const handleRaceClick = useCallback(async (raceId: string) => {
+    console.log('🎯 Race click - pre-fetching basic data for:', raceId);
+    
+    try {
+      // Pre-fetch basic race data for immediate rendering
+      await racePrefetchService.prefetchForNavigation(raceId);
+      console.log('✅ Pre-fetch completed, navigating to:', raceId);
+    } catch (error) {
+      console.warn('⚠️ Pre-fetch failed, proceeding with navigation:', error);
+    }
+    
+    // Navigate to race page - will use cached data if available
     router.push(`/race/${raceId}`);
   }, [router]);
 
@@ -51,11 +64,14 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
 
   return (
     <div className="space-y-4">
-      {/* Connection status indicator */}
+      {/* Header with connection status and next race button */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-900">
-          Today&apos;s Race Meetings
-        </h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Today&apos;s Race Meetings
+          </h2>
+          <NextScheduledRaceButton meetings={meetings} />
+        </div>
         
         {/* Real-time connection status */}
         <div className="flex items-center space-x-2">

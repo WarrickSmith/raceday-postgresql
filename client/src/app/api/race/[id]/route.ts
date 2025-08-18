@@ -31,7 +31,22 @@ export async function GET(
       return NextResponse.json({ error: 'Race not found' }, { status: 404 });
     }
 
-    return NextResponse.json(raceData);
+    // Set cache headers based on mode
+    const response = NextResponse.json(raceData);
+    
+    if (isNavigation) {
+      // Navigation mode: shorter cache for live data but still allow stale-while-revalidate
+      response.headers.set('Cache-Control', 'public, max-age=15, stale-while-revalidate=60');
+    } else {
+      // Comprehensive mode: balanced cache for full data
+      response.headers.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
+    }
+    
+    // Add performance headers
+    response.headers.set('X-Race-Data-Mode', isNavigation ? 'navigation' : 'comprehensive');
+    response.headers.set('X-Race-ID', raceId);
+    
+    return response;
   } catch (error) {
     console.error('API Error fetching race data:', error);
     return NextResponse.json(
@@ -126,8 +141,9 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
     const entrantIds = entrantsQuery.documents.map(doc => doc.$id);
     
     // Fetch navigation data - previous, next, and next scheduled races
+    // Only exclude abandoned races from Next Scheduled query, not Previous/Next chronological navigation
     const [previousRaceQuery, nextRaceQuery, nextScheduledRaceQuery] = await Promise.all([
-      // Previous scheduled race query
+      // Previous race query - chronological navigation, includes all races
       databases.listDocuments(
         'raceday-db',
         'races',
@@ -137,7 +153,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
           Query.limit(1)
         ]
       ),
-      // Next scheduled race query  
+      // Next race query - chronological navigation, includes all races
       databases.listDocuments(
         'raceday-db',
         'races',
@@ -147,12 +163,13 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
           Query.limit(1)
         ]
       ),
-      // Next scheduled race query - find race nearest to current time irrespective of current race
+      // Next scheduled race query - exclude abandoned races (for "Next Scheduled" button)
       databases.listDocuments(
         'raceday-db',
         'races',
         [
           Query.greaterThan('startTime', now.toISOString()),
+          Query.notEqual('status', 'Abandoned'),
           Query.orderAsc('startTime'),
           Query.limit(1)
         ]
@@ -271,8 +288,8 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
         silkUrl: doc.silkUrl,
         isScratched: doc.isScratched,
         race: doc.race,
-        winOdds: doc.poolWinOdds || doc.fixedWinOdds,
-        placeOdds: doc.poolPlaceOdds || doc.fixedPlaceOdds,
+        winOdds: doc.fixedWinOdds || doc.poolWinOdds,
+        placeOdds: doc.fixedPlaceOdds || doc.poolPlaceOdds,
         oddsHistory: oddsHistory, // Add odds history data for sparkline
         ...moneyFlowData
       };
@@ -445,8 +462,8 @@ async function getNavigationRaceData(raceId: string): Promise<{
       silkUrl: doc.silkUrl,
       isScratched: doc.isScratched,
       race: doc.race,
-      winOdds: doc.poolWinOdds || doc.fixedWinOdds,
-      placeOdds: doc.poolPlaceOdds || doc.fixedPlaceOdds,
+      winOdds: doc.fixedWinOdds || doc.poolWinOdds,
+      placeOdds: doc.fixedPlaceOdds || doc.poolPlaceOdds,
       // Set basic defaults for UI - real-time updates will populate these
       oddsHistory: [],
       holdPercentage: 0,

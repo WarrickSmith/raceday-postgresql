@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Entrant } from '@/types/meetings';
-import { useWebSocket, WebSocketMessage } from '@/services/websocket';
+import { useAppwriteRealtime, AppwriteRealtimeMessage } from '@/services/appwrite-realtime';
 import { performanceMonitor, useDebouncedValue } from '@/utils/performance';
 import { screenReader } from '@/utils/accessibility';
 
@@ -55,8 +55,8 @@ export function useEnhancedRealtime({
   updateThrottleMs = 50,
   maxHistorySize = 100
 }: EnhancedRealtimeConfig) {
-  // WebSocket connection
-  const { connectionState: wsConnectionState, messages, reconnect, isConnected } = useWebSocket(raceId);
+  // Appwrite real-time connection
+  const { connectionState: appwriteConnectionState, messages, reconnect, isConnected } = useAppwriteRealtime(raceId);
 
   // State management
   const [entrants, setEntrants] = useState<Entrant[]>(initialEntrants);
@@ -83,35 +83,39 @@ export function useEnhancedRealtime({
   // Debounced entrants to prevent excessive re-renders
   const optimizedEntrants = useDebouncedValue(entrants, updateThrottleMs);
 
-  // Update connection state from WebSocket
+  // Update connection state from Appwrite
   useEffect(() => {
     setConnectionState(prev => ({
       ...prev,
-      isConnected: wsConnectionState.isConnected,
-      connectionAttempts: wsConnectionState.reconnectAttempts,
-      messagesPerSecond: wsConnectionState.messagesPerSecond,
-      averageLatency: wsConnectionState.latency
+      isConnected: appwriteConnectionState.isConnected,
+      connectionAttempts: appwriteConnectionState.reconnectAttempts,
+      messagesPerSecond: appwriteConnectionState.messagesPerSecond,
+      averageLatency: appwriteConnectionState.latency
     }));
-  }, [wsConnectionState]);
+  }, [appwriteConnectionState]);
 
-  // Process incoming WebSocket messages
+  // Process incoming Appwrite messages
   useEffect(() => {
     const latestMessages = messages.slice(-5); // Process last 5 messages
     
     latestMessages.forEach(message => {
-      processWebSocketMessage(message);
+      processAppwriteMessage(message);
     });
   }, [messages]);
 
-  const processWebSocketMessage = useCallback((message: WebSocketMessage) => {
+  const processAppwriteMessage = useCallback((message: AppwriteRealtimeMessage) => {
     performanceMonitor.startMeasure('message-processing');
 
     try {
+      // Determine update type from Appwrite events and channels
+      const updateType = mapAppwriteEventToUpdateType(message.events, message.channels);
+      const entrantId = extractEntrantIdFromPayload(message.payload);
+
       const update: RealtimeUpdate = {
-        id: message.messageId,
-        type: mapMessageTypeToUpdateType(message.type),
-        entrantId: message.entrantId,
-        data: message.data,
+        id: `${message.timestamp}_${Math.random().toString(36).substr(2, 9)}`,
+        type: updateType,
+        entrantId,
+        data: message.payload,
         timestamp: new Date(message.timestamp)
       };
 
@@ -145,7 +149,7 @@ export function useEnhancedRealtime({
       announceUpdateForAccessibility(update);
 
     } catch (error) {
-      console.error('Error processing WebSocket message:', error);
+      console.error('Error processing Appwrite message:', error);
     } finally {
       const processingTime = performanceMonitor.endMeasure('message-processing');
       updatePerformanceMetrics(processingTime);
@@ -164,7 +168,7 @@ export function useEnhancedRealtime({
         };
 
         // Announce odds changes
-        if (update.data.winOdds && update.data.winOdds !== entrant.winOdds) {
+        if (update.data.winOdds && entrant.winOdds && update.data.winOdds !== entrant.winOdds) {
           const direction = update.data.winOdds > entrant.winOdds ? 'up' : 'down';
           screenReader?.announceOddsUpdate(
             entrant.name,
@@ -219,18 +223,53 @@ export function useEnhancedRealtime({
     }));
   }, [connectionState.messagesPerSecond, isConnected]);
 
-  // Helper function to map WebSocket message types to update types
-  const mapMessageTypeToUpdateType = (wsType: string): 'entrant' | 'moneyFlow' | 'raceStatus' => {
-    switch (wsType) {
-      case 'entrant_update':
+  // Helper function to map Appwrite events to update types
+  const mapAppwriteEventToUpdateType = (events: string[], channels: string[]): 'entrant' | 'moneyFlow' | 'raceStatus' => {
+    // Check channels to determine the type of update
+    for (const channel of channels) {
+      if (channel.includes('collections.entrants.documents')) {
         return 'entrant';
-      case 'money_flow':
+      }
+      if (channel.includes('collections.money-flow-history.documents')) {
         return 'moneyFlow';
-      case 'race_status':
+      }
+      if (channel.includes('collections.races.documents')) {
         return 'raceStatus';
-      default:
-        return 'entrant';
+      }
+      if (channel.includes('collections.odds-history.documents')) {
+        return 'entrant'; // Treat odds updates as entrant updates
+      }
     }
+    
+    // Fallback to checking events
+    for (const event of events) {
+      if (event.includes('entrants') || event.includes('odds-history')) {
+        return 'entrant';
+      }
+      if (event.includes('money-flow-history')) {
+        return 'moneyFlow';
+      }
+      if (event.includes('races')) {
+        return 'raceStatus';
+      }
+    }
+    
+    return 'entrant'; // Default fallback
+  };
+
+  // Helper function to extract entrant ID from Appwrite payload
+  const extractEntrantIdFromPayload = (payload: any): string | undefined => {
+    // For entrant documents, the payload itself contains the entrant data
+    if (payload && payload.$id && payload.entrantId) {
+      return payload.$id;
+    }
+    
+    // For odds/money flow history, look for entrant field
+    if (payload && payload.entrant) {
+      return payload.entrant;
+    }
+    
+    return undefined;
   };
 
   // Manual reconnection function

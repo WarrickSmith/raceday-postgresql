@@ -17,6 +17,13 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
   useEffect(() => {
     // Subscribe only to this specific race to minimize network overhead
     const channel = `databases.raceday-db.collections.races.documents.${initialRace.$id}`;
+    
+    console.log('🏁 useRealtimeRace setup for:', {
+      raceId: initialRace.raceId,
+      documentId: initialRace.$id,
+      channel,
+      initialStatus: initialRace.status
+    });
 
     let unsubscribe: (() => void) | null = null;
     let retryTimeout: NodeJS.Timeout | null = null;
@@ -24,6 +31,14 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
     const setupSubscription = async () => {
       try {
         unsubscribe = client.subscribe(channel, (response: { payload?: Partial<Race> }) => {
+          console.log('🔄 useRealtimeRace received update:', {
+            channel,
+            payload: response.payload,
+            expectedId: initialRace.$id,
+            payloadId: response.payload?.$id,
+            matches: response.payload?.$id === initialRace.$id
+          });
+          
           // Only update if this is our specific race and has meaningful changes
           if (response.payload && response.payload.$id === initialRace.$id) {
             const changes = response.payload;
@@ -38,6 +53,12 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
               );
               
               if (hasSignificantChange) {
+                console.log('🏁 useRealtimeRace applying changes:', {
+                  raceId: currentRace.raceId,
+                  oldStatus: currentRace.status,
+                  newStatus: changes.status,
+                  changes
+                });
                 setLastUpdate(new Date());
                 return { ...currentRace, ...changes };
               }

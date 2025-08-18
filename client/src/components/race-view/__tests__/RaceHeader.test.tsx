@@ -4,7 +4,8 @@
 
 import { render, screen } from '@testing-library/react';
 import { RaceHeader } from '../RaceHeader';
-import { Race, Meeting, RaceNavigationData } from '@/types/meetings';
+import { RaceProvider } from '@/contexts/RaceContext';
+import { Race, Meeting, RaceNavigationData, Entrant } from '@/types/meetings';
 
 // Mock the real-time hook
 jest.mock('@/hooks/useRealtimeRace', () => ({
@@ -71,6 +72,29 @@ const mockNavigationData: RaceNavigationData = {
   }
 };
 
+// Mock race context data
+const mockRaceData = {
+  race: mockRace,
+  meeting: mockMeeting,
+  entrants: [] as Entrant[],
+  navigationData: mockNavigationData,
+  dataFreshness: {
+    lastUpdated: new Date().toISOString(),
+    entrantsDataAge: 0,
+    oddsHistoryCount: 0,
+    moneyFlowHistoryCount: 0
+  }
+};
+
+// Helper function to render with RaceProvider
+const renderWithProvider = (component: React.ReactElement) => {
+  return render(
+    <RaceProvider initialData={mockRaceData}>
+      {component}
+    </RaceProvider>
+  );
+};
+
 describe('RaceHeader', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -82,7 +106,7 @@ describe('RaceHeader', () => {
   });
 
   it('renders race information correctly', () => {
-    render(<RaceHeader initialRace={mockRace} meeting={mockMeeting} navigationData={mockNavigationData} />);
+    renderWithProvider(<RaceHeader initialRace={mockRace} meeting={mockMeeting} navigationData={mockNavigationData} />);
 
     // Check race title
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Race 1: Maiden Plate');
@@ -94,7 +118,7 @@ describe('RaceHeader', () => {
     // Check race metadata
     expect(screen.getByText('2.2km')).toBeInTheDocument(); // Distance formatted
     expect(screen.getByText('Good 3')).toBeInTheDocument(); // Track condition
-    expect(screen.getByText('Open')).toBeInTheDocument(); // Status
+    expect(screen.getByText('🟢 Open')).toBeInTheDocument(); // Status with icon
     expect(screen.getByText('Thoroughbred Horse Racing')).toBeInTheDocument(); // Race type
     expect(screen.getByText('Thoroughbred')).toBeInTheDocument(); // Category formatted
   });
@@ -111,7 +135,7 @@ describe('RaceHeader', () => {
       lastUpdate: new Date(),
     });
     
-    render(<RaceHeader initialRace={raceWithShortDistance} meeting={mockMeeting} navigationData={mockNavigationData} />);
+    renderWithProvider(<RaceHeader initialRace={raceWithShortDistance} meeting={mockMeeting} navigationData={mockNavigationData} />);
     expect(screen.getByText('800m')).toBeInTheDocument();
   });
 
@@ -128,11 +152,11 @@ describe('RaceHeader', () => {
       lastUpdate: new Date(),
     });
     
-    render(<RaceHeader initialRace={raceWithoutOptionalFields} meeting={mockMeeting} navigationData={mockNavigationData} />);
+    renderWithProvider(<RaceHeader initialRace={raceWithoutOptionalFields} meeting={mockMeeting} navigationData={mockNavigationData} />);
     
     // Should still render without distance and track condition
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Race 1: Maiden Plate');
-    expect(screen.getByText('Open')).toBeInTheDocument();
+    expect(screen.getByText('🟢 Open')).toBeInTheDocument();
     
     // Should not show distance or track condition labels
     expect(screen.queryByText('Distance:')).not.toBeInTheDocument();
@@ -140,7 +164,7 @@ describe('RaceHeader', () => {
   });
 
   it('shows connection status indicator', () => {
-    render(<RaceHeader initialRace={mockRace} meeting={mockMeeting} navigationData={mockNavigationData} />);
+    renderWithProvider(<RaceHeader initialRace={mockRace} meeting={mockMeeting} navigationData={mockNavigationData} />);
     
     const liveIndicator = screen.getByText('🔄 Live');
     expect(liveIndicator).toBeInTheDocument();
@@ -148,7 +172,7 @@ describe('RaceHeader', () => {
   });
 
   it('displays time information correctly', () => {
-    render(<RaceHeader initialRace={mockRace} meeting={mockMeeting} navigationData={mockNavigationData} />);
+    renderWithProvider(<RaceHeader initialRace={mockRace} meeting={mockMeeting} navigationData={mockNavigationData} />);
     
     // Should show formatted time
     const timeElement = screen.getByRole('time');
@@ -157,7 +181,7 @@ describe('RaceHeader', () => {
   });
 
   it('has proper accessibility attributes', () => {
-    render(<RaceHeader initialRace={mockRace} meeting={mockMeeting} navigationData={mockNavigationData} />);
+    renderWithProvider(<RaceHeader initialRace={mockRace} meeting={mockMeeting} navigationData={mockNavigationData} />);
     
     // Check main heading has proper accessibility attributes
     const heading = screen.getByRole('heading', { level: 1 });
@@ -181,7 +205,7 @@ describe('RaceHeader', () => {
       lastUpdate: new Date(),
     });
     
-    render(<RaceHeader initialRace={raceWithInvalidTime} meeting={mockMeeting} navigationData={mockNavigationData} />);
+    renderWithProvider(<RaceHeader initialRace={raceWithInvalidTime} meeting={mockMeeting} navigationData={mockNavigationData} />);
     
     // Should show 'TBA' for invalid time
     expect(screen.getByText('TBA')).toBeInTheDocument();

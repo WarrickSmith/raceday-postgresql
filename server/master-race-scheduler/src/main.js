@@ -4,16 +4,23 @@ import { Client, Databases, Functions, Query } from 'node-appwrite'
  * Master Race Scheduler - Autonomous polling coordination for horse race data
  * 
  * This function serves as the central coordinator for all race polling activities.
- * When triggered by cron (every minute), runs 3 cycles at 15-second intervals (0s, 15s, 30s).
- * The 45s execution comes from the next cron cycle, achieving true 15s polling.
+ * When triggered by cron (every minute), runs 2 cycles at 30-second intervals (0s, 30s).
  * When triggered manually, runs a single cycle for testing.
  * 
+ * Updated polling strategy:
+ * - Minimum polling interval is now 30 seconds (was 15 seconds)
+ * - -20m to -5m: 5 minute polling (was 2 minutes for -20m to -10m)
+ * - -5m to -1m: 1 minute polling (was 1 minute for -10m to -5m)
+ * - -1m until Interim status: 30 seconds (was 15 seconds for -5m to start)
+ * - After Interim status confirmed: 5 minutes until Final, then stop
+ * 
  * Architecture:
- * - Analyzes all active races for polling requirements every 15 seconds
- * - Calculates dynamic polling intervals based on race timing
+ * - Analyzes all active races for polling requirements every 30 seconds
+ * - Calculates dynamic polling intervals based on race timing and status
  * - Intelligently selects batch vs individual polling functions
  * - Tracks last poll times to prevent redundant polling
  * - Dynamically active from 1 hour before first NZ/AUS race until all races finalized
+ * - Stops polling when race status becomes 'Final'
  */
 export default async function main(context) {
   const startTime = Date.now()
@@ -25,23 +32,23 @@ export default async function main(context) {
 
   // Check if this is a scheduled run (cron) vs manual run
   if (context.req.headers['x-appwrite-task']) {
-    // Run the polling logic 3 times at 15s intervals for cron-triggered executions
-    // This gives us executions at 0s, 15s, 30s, 45s (next cron cycle handles 60s)
-    context.log('Scheduled execution: Running 3 cycles at 15s intervals within 1-minute window')
+    // Run the polling logic 2 times at 30s intervals for cron-triggered executions
+    // This gives us executions at 0s, 30s (next cron cycle handles 60s)
+    context.log('Scheduled execution: Running 2 cycles at 30s intervals within 1-minute window')
     
-    for (let i = 0; i < 3; i++) {
-      context.log(`Starting polling cycle ${i + 1}/3 at ${(i * 15)}s offset`)
+    for (let i = 0; i < 2; i++) {
+      context.log(`Starting polling cycle ${i + 1}/2 at ${(i * 30)}s offset`)
       await runSchedulerLogic(context)
       
-      if (i < 2) {
-        context.log(`Waiting 15 seconds before cycle ${i + 2}/3`)
-        await new Promise(res => setTimeout(res, 15000)) // wait 15s
+      if (i < 1) {
+        context.log(`Waiting 30 seconds before cycle ${i + 2}/2`)
+        await new Promise(res => setTimeout(res, 30000)) // wait 30s
       }
     }
     
     return context.res.json({ 
       success: true, 
-      message: 'Scheduler completed 3 cycles at 15s intervals (0s, 15s, 30s, 45s via next cron)',
+      message: 'Scheduler completed 2 cycles at 30s intervals (0s, 30s)',
       totalExecutionTime: Date.now() - startTime
     })
   } else {
@@ -226,6 +233,12 @@ async function runSchedulerLogic(context) {
 
       // Get required polling interval based on race lifecycle
       const requiredInterval = getPollingInterval(timeToStartMinutes, race.status)
+      
+      // Skip races where polling should stop (Final status)
+      if (requiredInterval === null) {
+        analysisResults.skippedFinalized++
+        continue
+      }
       
       // Skip races that are too far in the future (more than 1 hour away) 
       // or too far in the past (more than 1 hour ago)
@@ -448,10 +461,12 @@ async function runSchedulerLogic(context) {
 /**
  * Calculate required polling interval using STATUS-DRIVEN logic
  * 
- * Primary logic: Poll aggressively while status='Open' regardless of scheduled time
- * Secondary logic: Use time-based intervals only within status categories
- * 
- * This ensures 'Closed' status is never missed due to race delays
+ * Updated polling strategy:
+ * - Minimum polling interval is now 30 seconds (was 15 seconds)
+ * - -20m to -5m: 5 minute polling (was 2 minutes for -20m to -10m)
+ * - -5m to -1m: 1 minute polling (was 1 minute for -10m to -5m)
+ * - -1m until Interim status: 30 seconds (was 15 seconds for -5m to start)
+ * - After Interim status confirmed: 5 minutes until Final, then stop
  * 
  * @param {number} timeToStartMinutes - Minutes until race start (negative if race has started)  
  * @param {string} raceStatus - Current race status (primary determinant)
@@ -460,14 +475,14 @@ async function runSchedulerLogic(context) {
 function getPollingInterval(timeToStartMinutes, raceStatus) {
   // STATUS-DRIVEN POLLING: Primary logic based on race status, not time
   
-  // Open status: Keep aggressive polling until race actually closes
+  // Open status: Keep polling until race actually closes
   if (raceStatus === 'Open') {
-    if (timeToStartMinutes <= 5) {
-      return 0.25 // 15 seconds - aggressive polling until actually closed
-    } else if (timeToStartMinutes <= 10) {
-      return 1 // 1 minute - frequent polling as race approaches
+    if (timeToStartMinutes <= 1) {
+      return 0.5 // 30 seconds - aggressive polling until actually closed (-1m to start)
+    } else if (timeToStartMinutes <= 5) {
+      return 1 // 1 minute - frequent polling as race approaches (-5m to -1m)
     } else if (timeToStartMinutes <= 20) {
-      return 2 // 2 minutes - moderate polling
+      return 5 // 5 minutes - moderate polling (-20m to -5m)
     } else {
       return 5 // 5 minutes - standard polling for distant races
     }
@@ -480,10 +495,10 @@ function getPollingInterval(timeToStartMinutes, raceStatus) {
     return 0.5 // 30 seconds - running to interim transition  
   } else if (raceStatus === 'Interim') {
     return 5 // 5 minutes - interim to final transition
-  } else if (raceStatus === 'Finalized' || raceStatus === 'Abandoned') {
-    return 30 // 30 minutes - race completed, very low frequency
+  } else if (raceStatus === 'Final' || raceStatus === 'Finalized' || raceStatus === 'Abandoned') {
+    return null // Stop polling - race is final
   } else {
     // Fallback for unknown statuses - treat as active
-    return timeToStartMinutes <= 5 ? 0.25 : 2
+    return timeToStartMinutes <= 1 ? 0.5 : 5
   }
 }

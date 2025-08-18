@@ -10,7 +10,10 @@ import type {
   RaceStatusDisplay 
 } from '@/types/racePools';
 import { useRace } from '@/contexts/RaceContext';
+import { useRealtimeRace } from '@/hooks/useRealtimeRace';
+import { useRacePoolData } from '@/hooks/useRacePoolData';
 import { screenReader, KeyboardHandler } from '@/utils/accessibility';
+import { STATUS_CONFIG, getStatusConfig } from '@/utils/raceStatusConfig';
 
 interface RaceFooterProps {
   raceId: string;
@@ -24,64 +27,15 @@ interface RaceFooterProps {
   showResults?: boolean;
 }
 
-// Status configuration
-const STATUS_CONFIG: Record<RaceStatus, {
-  label: string;
-  color: string;
-  bgColor: string;
-  icon: string;
-  description: string;
-}> = {
-  open: {
-    label: 'Open',
-    color: 'text-green-700',
-    bgColor: 'bg-green-100',
-    icon: '🟢',
-    description: 'Betting is open'
-  },
-  closed: {
-    label: 'Closed',
-    color: 'text-yellow-700',
-    bgColor: 'bg-yellow-100',
-    icon: '🟡',
-    description: 'Betting has closed'
-  },
-  interim: {
-    label: 'Interim',
-    color: 'text-blue-700',
-    bgColor: 'bg-blue-100',
-    icon: '🔵',
-    description: 'Interim results available'
-  },
-  final: {
-    label: 'Final',
-    color: 'text-purple-700',
-    bgColor: 'bg-purple-100',
-    icon: '🏁',
-    description: 'Final results confirmed'
-  },
-  abandoned: {
-    label: 'Abandoned',
-    color: 'text-red-700',
-    bgColor: 'bg-red-100',
-    icon: '🔴',
-    description: 'Race has been abandoned'
-  },
-  postponed: {
-    label: 'Postponed',
-    color: 'text-orange-700',
-    bgColor: 'bg-orange-100',
-    icon: '⏸️',
-    description: 'Race has been postponed'
-  }
-};
 
 // Countdown timer component
 const CountdownTimer = memo(function CountdownTimer({
   targetTime,
+  raceStatus,
   onTimeExpired
 }: {
   targetTime: string;
+  raceStatus?: RaceStatus;
   onTimeExpired?: () => void;
 }) {
   const [timeRemaining, setTimeRemaining] = useState<{
@@ -138,8 +92,14 @@ const CountdownTimer = memo(function CountdownTimer({
     return 'text-gray-700';
   }, [timeRemaining]);
 
+  // Show race status instead of "Race Started" when time expires
   if (timeRemaining.total <= 0) {
-    return <span className="text-red-600 font-bold">Race Started</span>;
+    const statusConfig = getStatusConfig(raceStatus);
+    return (
+      <span className={`font-bold ${statusConfig.color}`}>
+        {statusConfig.label}
+      </span>
+    );
   }
 
   return (
@@ -351,12 +311,12 @@ const RaceStatusDisplay = memo(function RaceStatusDisplay({
   raceStartTime: string;
   showCountdown?: boolean;
 }) {
-  // Fallback to 'open' if status is not found in our config
-  const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG['open'];
+  // Get status configuration with fallback
+  const statusConfig = getStatusConfig(status);
   const [timeExpired, setTimeExpired] = useState(false);
   
-  // Log unknown status for debugging
-  if (!STATUS_CONFIG[status]) {
+  // Log unknown status for debugging  
+  if (!status || !STATUS_CONFIG[status.toLowerCase() as RaceStatus]) {
     console.warn(`Unknown race status: "${status}". Using fallback 'open' status.`);
   }
 
@@ -365,6 +325,7 @@ const RaceStatusDisplay = memo(function RaceStatusDisplay({
   }, []);
 
   const shouldShowCountdown = useMemo(() => {
+    // Only show countdown for open races that haven't expired, and exclude abandoned/postponed races
     return showCountdown && status === 'open' && !timeExpired;
   }, [showCountdown, status, timeExpired]);
 
@@ -380,11 +341,12 @@ const RaceStatusDisplay = memo(function RaceStatusDisplay({
       {shouldShowCountdown && (
         <div className="text-center">
           <div className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Race Closed
+            Time to Start
           </div>
           <div className="text-4xl font-bold text-gray-900">
             <CountdownTimer 
-              targetTime={raceStartTime} 
+              targetTime={raceStartTime}
+              raceStatus={status}
               onTimeExpired={handleTimeExpired}
             />
           </div>
@@ -407,9 +369,85 @@ export const RaceFooter = memo(function RaceFooter({
 }: RaceFooterProps) {
   const { raceData } = useRace();
   
-  // Use context data if available, fallback to props for initial render
-  const currentRaceId = raceData?.race.raceId || raceId;
-  const currentRaceStartTime = raceData?.race.startTime || raceStartTime;
+  // Use the same approach as RaceDataHeader - useRealtimeRace with proper fallback
+  const { race: liveRace, isConnected } = useRealtimeRace({ 
+    initialRace: raceData?.race || {
+      $id: raceId || 'fallback',
+      raceId: raceId || 'fallback', 
+      startTime: raceStartTime,
+      status: raceStatus,
+      name: '',
+      raceNumber: 0,
+      meeting: '',
+      distance: undefined,
+      trackCondition: undefined,
+      $createdAt: '',
+      $updatedAt: ''
+    }
+  });
+  
+  // Get real-time pool data for synchronization with header and entrants
+  const { poolData: livePoolData, isLoading: poolLoading, error: poolError } = useRacePoolData(
+    liveRace?.raceId || raceId
+  );
+  
+  // Use live race data (same as header)
+  const currentRaceId = liveRace?.raceId || raceId;
+  const currentRaceStartTime = liveRace?.startTime || raceStartTime;
+  
+  // Use live race status with proper type validation (case-insensitive)
+  const validStatuses: RaceStatus[] = ['open', 'closed', 'interim', 'final', 'abandoned', 'postponed'];
+  const liveRaceStatus = liveRace?.status;
+  const currentRaceStatus: RaceStatus = 
+    liveRaceStatus && validStatuses.includes(liveRaceStatus.toLowerCase() as RaceStatus)
+      ? liveRaceStatus.toLowerCase() as RaceStatus
+      : raceStatus;
+  
+  // Use live pool data with fallback to prop for compatibility
+  const currentPoolData = livePoolData || poolData;
+  
+  // Debug logging for race status changes in footer
+  useEffect(() => {
+    console.log('🦶 RaceFooter status update:', {
+      raceId: currentRaceId,
+      propStatus: raceStatus,
+      liveStatus: liveRaceStatus,
+      currentStatus: currentRaceStatus,
+      isConnected,
+      liveRaceExists: !!liveRace,
+      liveRaceData: liveRace ? {
+        $id: liveRace.$id,
+        raceId: liveRace.raceId,
+        status: liveRace.status,
+        startTime: liveRace.startTime
+      } : null
+    });
+  }, [currentRaceId, raceStatus, liveRaceStatus, currentRaceStatus, isConnected, liveRace]);
+
+  // Debug logging for pool data changes in footer
+  useEffect(() => {
+    console.log('🦶 RaceFooter pool data update:', {
+      raceId: currentRaceId,
+      propPoolData: poolData ? {
+        totalPool: poolData.totalRacePool,
+        currency: poolData.currency,
+        lastUpdated: poolData.lastUpdated
+      } : null,
+      livePoolData: livePoolData ? {
+        totalPool: livePoolData.totalRacePool,
+        currency: livePoolData.currency,
+        lastUpdated: livePoolData.lastUpdated,
+        isLive: livePoolData.isLive
+      } : null,
+      currentPoolData: currentPoolData ? {
+        totalPool: currentPoolData.totalRacePool,
+        currency: currentPoolData.currency,
+        lastUpdated: currentPoolData.lastUpdated
+      } : null,
+      poolLoading,
+      poolError
+    });
+  }, [currentRaceId, poolData, livePoolData, currentPoolData, poolLoading, poolError]);
   const [activeTab, setActiveTab] = useState<'pools' | 'results'>('pools');
 
   // Determine which tab should be shown by default and announce status changes
@@ -421,24 +459,24 @@ export const RaceFooter = memo(function RaceFooter({
         `Race results are now available with ${resultsData.results.length} positions`,
         'assertive'
       );
-    } else if (poolData && showPoolBreakdown) {
+    } else if (currentPoolData && showPoolBreakdown) {
       setActiveTab('pools');
     }
-  }, [resultsData, poolData, showResults, showPoolBreakdown]);
+  }, [resultsData, currentPoolData, showResults, showPoolBreakdown]);
 
   // Announce race status changes
   useEffect(() => {
-    const statusConfig = STATUS_CONFIG[raceStatus];
+    const statusConfig = getStatusConfig(currentRaceStatus);
     if (statusConfig) {
       screenReader?.announceRaceStatusChange(statusConfig.description);
     }
-  }, [raceStatus]);
+  }, [currentRaceStatus]);
 
   const shouldShowTabs = useMemo(() => {
     const hasResults = resultsData && resultsData.results.length > 0 && showResults;
-    const hasPools = poolData && showPoolBreakdown;
+    const hasPools = currentPoolData && showPoolBreakdown;
     return hasResults && hasPools;
-  }, [resultsData, poolData, showResults, showPoolBreakdown]);
+  }, [resultsData, currentPoolData, showResults, showPoolBreakdown]);
 
   // Enhanced tab navigation with keyboard support
   const handleTabClick = useCallback((tab: 'pools' | 'results') => {
@@ -470,31 +508,38 @@ export const RaceFooter = memo(function RaceFooter({
       <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-300">
         <div className="flex justify-between items-center">
           {/* Pool Summary on Left - Big and Bold */}
-          {poolData && (
+          {currentPoolData && (
             <div className="flex items-center space-x-8">
               <div className="text-center">
                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                   Total Pool
                 </div>
                 <div className="text-3xl font-bold text-gray-900">
-                  {poolData.currency}{poolData.totalRacePool.toLocaleString()}
+                  {currentPoolData.currency}{currentPoolData.totalRacePool.toLocaleString()}
                 </div>
               </div>
-              <div className="text-center">
-                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                  PAYING
+              {/* Only show countdown for non-abandoned races */}
+              {currentRaceStatus?.toLowerCase() !== 'abandoned' && currentRaceStatus?.toLowerCase() !== 'postponed' && (
+                <div className="text-center">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                    Race Starts
+                  </div>
+                  <div className="text-xl font-bold text-blue-600">
+                    <CountdownTimer 
+                      targetTime={currentRaceStartTime}
+                      raceStatus={currentRaceStatus}
+                      onTimeExpired={() => {}}
+                    />
+                  </div>
                 </div>
-                <div className="text-2xl font-bold text-green-600">
-                  00:00
-                </div>
-              </div>
+              )}
             </div>
           )}
           
           {/* Race Status on Right - Big and Bold */}
           <div className="text-right">
             <RaceStatusDisplay
-              status={raceStatus}
+              status={currentRaceStatus}
               raceStartTime={currentRaceStartTime}
               showCountdown={showCountdown}
             />
@@ -557,7 +602,7 @@ export const RaceFooter = memo(function RaceFooter({
                 aria-labelledby="pools-tab"
                 tabIndex={0}
               >
-                <PoolSummary poolData={poolData} showBreakdown={showPoolBreakdown} />
+                <PoolSummary poolData={currentPoolData} showBreakdown={showPoolBreakdown} />
               </div>
             )}
             {activeTab === 'results' && (
@@ -574,13 +619,13 @@ export const RaceFooter = memo(function RaceFooter({
         ) : (
           // Single content area
           <>
-            {poolData && showPoolBreakdown && (
-              <PoolSummary poolData={poolData} showBreakdown={showPoolBreakdown} />
+            {currentPoolData && showPoolBreakdown && (
+              <PoolSummary poolData={currentPoolData} showBreakdown={showPoolBreakdown} />
             )}
             {resultsData && resultsData.results.length > 0 && showResults && (
               <RaceResults resultsData={resultsData} />
             )}
-            {!poolData && !resultsData && (
+            {!currentPoolData && !resultsData && (
               <div className="text-center text-gray-500 py-8">
                 <p>Race information will be displayed here when available</p>
               </div>
@@ -591,8 +636,8 @@ export const RaceFooter = memo(function RaceFooter({
 
       {/* Accessibility announcements */}
       <div className="sr-only" aria-live="polite">
-        Race status: {STATUS_CONFIG[raceStatus]?.description}.
-        {poolData && ` Total pool: ${poolData.currency}${poolData.totalRacePool.toLocaleString()}.`}
+        Race status: {STATUS_CONFIG[currentRaceStatus]?.description}.
+        {currentPoolData && ` Total pool: ${currentPoolData.currency}${currentPoolData.totalRacePool.toLocaleString()}.`}
         {resultsData && resultsData.results.length > 0 && ` Results available with ${resultsData.results.length} positions.`}
       </div>
     </div>
