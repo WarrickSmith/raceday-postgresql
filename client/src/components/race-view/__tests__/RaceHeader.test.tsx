@@ -118,7 +118,7 @@ describe('RaceHeader', () => {
     // Check race metadata
     expect(screen.getByText('2.2km')).toBeInTheDocument(); // Distance formatted
     expect(screen.getByText('Good 3')).toBeInTheDocument(); // Track condition
-    expect(screen.getByText('Open')).toBeInTheDocument(); // Status
+    expect(screen.getByText('🟢 Open')).toBeInTheDocument(); // Status with icon
     expect(screen.getByText('Thoroughbred Horse Racing')).toBeInTheDocument(); // Race type
     expect(screen.getByText('Thoroughbred')).toBeInTheDocument(); // Category formatted
   });
@@ -156,7 +156,7 @@ describe('RaceHeader', () => {
     
     // Should still render without distance and track condition
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Race 1: Maiden Plate');
-    expect(screen.getByText('Open')).toBeInTheDocument();
+    expect(screen.getByText('🟢 Open')).toBeInTheDocument();
     
     // Should not show distance or track condition labels
     expect(screen.queryByText('Distance:')).not.toBeInTheDocument();
