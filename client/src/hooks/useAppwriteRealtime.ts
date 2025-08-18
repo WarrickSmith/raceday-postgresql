@@ -88,7 +88,7 @@ export function useAppwriteRealtime({
     pendingUpdates.current = [];
     
     setState(prevState => {
-      let newState = { ...prevState };
+      const newState = { ...prevState };
       
       // Process all pending updates in batch
       for (const message of updates) {

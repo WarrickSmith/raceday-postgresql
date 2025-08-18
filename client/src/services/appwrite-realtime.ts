@@ -324,7 +324,7 @@ export function useAppwriteRealtime(raceId?: string | null): {
   });
 
   const [messages, setMessages] = React.useState<AppwriteRealtimeMessage[]>([]);
-  const realtimeService = React.useRef<AppwriteRealtimeService>();
+  const realtimeService = React.useRef<AppwriteRealtimeService | null>(null);
 
   React.useEffect(() => {
     // Skip connection if raceId is null or undefined

@@ -390,7 +390,7 @@ export function useWebSocket(raceId?: string) {
   });
 
   const [messages, setMessages] = React.useState<WebSocketMessage[]>([]);
-  const wsService = React.useRef<EnhancedWebSocketService>();
+  const wsService = React.useRef<EnhancedWebSocketService | null>(null);
 
   React.useEffect(() => {
     // Skip WebSocket connection if raceId is null (disabled)
