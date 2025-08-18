@@ -97,9 +97,12 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
         const immediateRaceData = {
           race: cachedBasicData.race,
           meeting: {
-            ...cachedBasicData.meeting,
             $createdAt: '',
-            $updatedAt: ''
+            $updatedAt: '',
+            ...cachedBasicData.meeting,
+            category: (cachedBasicData.meeting.category === 'H' || cachedBasicData.meeting.category === 'T') 
+              ? (cachedBasicData.meeting.category as 'H' | 'T')
+              : 'T' as const
           },
           entrants: [], // Will be populated by background fetch
           navigationData: {

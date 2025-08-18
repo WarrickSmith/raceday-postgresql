@@ -282,8 +282,8 @@ class MemoryManager {
     if (memoryTrend === 'increasing') {
       recommendations.push('Memory usage is trending upward - monitor closely');
     }
-    if (currentMemory && currentMemory.componentCount > 1000) {
-      recommendations.push('High component count detected - consider virtualization');
+    if (currentMemory && currentMemory.memoryUsagePercentage > 80) {
+      recommendations.push('High memory usage detected - consider component optimization');
     }
 
     return {
