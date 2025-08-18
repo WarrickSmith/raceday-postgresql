@@ -288,8 +288,8 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
         silkUrl: doc.silkUrl,
         isScratched: doc.isScratched,
         race: doc.race,
-        winOdds: doc.poolWinOdds || doc.fixedWinOdds,
-        placeOdds: doc.poolPlaceOdds || doc.fixedPlaceOdds,
+        winOdds: doc.fixedWinOdds || doc.poolWinOdds,
+        placeOdds: doc.fixedPlaceOdds || doc.poolPlaceOdds,
         oddsHistory: oddsHistory, // Add odds history data for sparkline
         ...moneyFlowData
       };
@@ -462,8 +462,8 @@ async function getNavigationRaceData(raceId: string): Promise<{
       silkUrl: doc.silkUrl,
       isScratched: doc.isScratched,
       race: doc.race,
-      winOdds: doc.poolWinOdds || doc.fixedWinOdds,
-      placeOdds: doc.poolPlaceOdds || doc.fixedPlaceOdds,
+      winOdds: doc.fixedWinOdds || doc.poolWinOdds,
+      placeOdds: doc.fixedPlaceOdds || doc.poolPlaceOdds,
       // Set basic defaults for UI - real-time updates will populate these
       oddsHistory: [],
       holdPercentage: 0,
