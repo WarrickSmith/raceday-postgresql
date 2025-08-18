@@ -323,11 +323,27 @@ function determineUpdateType(channels: string[]): 'race' | 'entrant' | 'moneyFlo
 }
 
 function updateEntrantInList(entrants: Entrant[], updatedEntrant: Partial<Entrant> & { $id: string }): Entrant[] {
-  return entrants.map(entrant =>
-    entrant.$id === updatedEntrant.$id
-      ? { ...entrant, ...updatedEntrant, $updatedAt: new Date().toISOString() }
-      : entrant
-  );
+  return entrants.map(entrant => {
+    if (entrant.$id === updatedEntrant.$id) {
+      // Map server field names to client field names for consistency with API
+      const mappedEntrant = { ...updatedEntrant };
+      
+      // Map server odds fields to client fields (prioritize fixed odds over pool odds)
+      if ('poolWinOdds' in mappedEntrant || 'fixedWinOdds' in mappedEntrant) {
+        mappedEntrant.winOdds = (mappedEntrant as any).fixedWinOdds || (mappedEntrant as any).poolWinOdds;
+      }
+      if ('poolPlaceOdds' in mappedEntrant || 'fixedPlaceOdds' in mappedEntrant) {
+        mappedEntrant.placeOdds = (mappedEntrant as any).fixedPlaceOdds || (mappedEntrant as any).poolPlaceOdds;
+      }
+      
+      return { 
+        ...entrant, 
+        ...mappedEntrant, 
+        $updatedAt: new Date().toISOString() 
+      };
+    }
+    return entrant;
+  });
 }
 
 function updateEntrantMoneyFlow(entrants: Entrant[], moneyFlowData: any): Entrant[] {
@@ -357,11 +373,28 @@ function updateEntrantOddsHistory(entrants: Entrant[], oddsData: any): Entrant[]
         .sort((a, b) => new Date(a.$createdAt).getTime() - new Date(b.$createdAt).getTime())
         .slice(-50); // Keep last 50 entries for memory optimization
 
-      return {
+      // 🔥 FIX: Update current odds based on the latest odds data
+      const updatedEntrant = {
         ...entrant,
         oddsHistory: updatedOddsHistory,
         $updatedAt: new Date().toISOString()
       };
+
+      // Update current winOdds and placeOdds based on odds type
+      // Prioritize fixed odds over pool odds (to display fixed odds in UI)
+      if (oddsData.type === 'fixed_win' && typeof oddsData.odds === 'number') {
+        updatedEntrant.winOdds = oddsData.odds;
+      } else if (oddsData.type === 'pool_win' && typeof oddsData.odds === 'number' && !updatedEntrant.winOdds) {
+        // Only use pool odds if no fixed odds exist
+        updatedEntrant.winOdds = oddsData.odds;
+      } else if (oddsData.type === 'fixed_place' && typeof oddsData.odds === 'number') {
+        updatedEntrant.placeOdds = oddsData.odds;
+      } else if (oddsData.type === 'pool_place' && typeof oddsData.odds === 'number' && !updatedEntrant.placeOdds) {
+        // Only use pool odds if no fixed odds exist
+        updatedEntrant.placeOdds = oddsData.odds;
+      }
+
+      return updatedEntrant;
     }
     return entrant;
   });
