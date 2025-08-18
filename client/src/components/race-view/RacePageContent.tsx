@@ -38,14 +38,15 @@ export function RacePageContent() {
   const currentRace = raceData.race;
   
   // Mock race status and pool data for enhanced components
-  // Safely cast race status with fallback
+  // Safely cast race status with fallback - case insensitive
   const validStatuses: RaceStatus[] = ['open', 'closed', 'interim', 'final', 'abandoned', 'postponed'];
-  const raceStatus: RaceStatus = validStatuses.includes(currentRace.status as RaceStatus) 
-    ? currentRace.status as RaceStatus 
+  const normalizedStatus = currentRace.status?.toLowerCase() as RaceStatus;
+  const raceStatus: RaceStatus = validStatuses.includes(normalizedStatus) 
+    ? normalizedStatus 
     : 'open';
   
   // Debug logging for race status
-  if (!validStatuses.includes(currentRace.status as RaceStatus)) {
+  if (!validStatuses.includes(normalizedStatus)) {
     console.log(`Race ${currentRace.raceId} has status: "${currentRace.status}". Using fallback: "open"`);
   }
   

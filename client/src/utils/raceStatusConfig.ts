@@ -34,7 +34,7 @@ export const STATUS_CONFIG: Record<RaceStatus, RaceStatusConfig> = {
   final: {
     label: 'Final',
     color: 'text-white',
-    bgColor: 'bg-purple-600',
+    bgColor: 'bg-purple-500',
     icon: '🏁',
     description: 'Final results confirmed'
   },
