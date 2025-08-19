@@ -13,6 +13,7 @@ import {
 import { useAppwriteRealtime } from '@/hooks/useAppwriteRealtime'
 import { useRealtimeRace } from '@/hooks/useRealtimeRace'
 import { useRacePoolData } from '@/hooks/useRacePoolData'
+import { useMoneyFlowTimeline } from '@/hooks/useMoneyFlowTimeline'
 import { PoolToggle } from './PoolToggle'
 import { useRace } from '@/contexts/RaceContext'
 import { screenReader, AriaLabels } from '@/utils/accessibility'
@@ -153,6 +154,15 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       : currentEntrants && currentEntrants.length > 0
       ? currentEntrants
       : initialEntrants
+
+  // Money flow timeline data for accurate timeline grid display - Story 4.9
+  const entrantIds = useMemo(() => entrants.map(e => e.$id), [entrants])
+  const { 
+    timelineData: moneyFlowTimelineData, 
+    getEntrantDataForInterval,
+    isLoading: moneyFlowLoading,
+    error: moneyFlowError 
+  } = useMoneyFlowTimeline(currentRaceId, entrantIds, poolViewState.activePool)
 
   // Calculate pool money for each entrant using actual pool data and hold percentages
   const entrantsWithPoolData = useMemo(() => {
@@ -449,6 +459,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   }, [timelineColumns, currentRaceStartTime, autoScroll, currentTime])
 
   // Get data for specific timeline point - shows incremental money amounts since previous time point
+  // Story 4.9: Now uses real money flow timeline data instead of mock calculations
   const getTimelineData = useCallback((entrantId: string, interval: number): string => {
     const entrant = sortedEntrants.find((e) => e.$id === entrantId)
     if (!entrant || entrant.isScratched) return '—'
@@ -456,7 +467,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     // Check if this is a future time column (no data exists yet)
     const raceStart = new Date(currentRaceStartTime)
     const currentTimestamp = currentTime.getTime()
-    const intervalTimestamp = raceStart.getTime() + (interval * 60 * 1000)
     const currentIntervalMinutes = (currentTimestamp - raceStart.getTime()) / (1000 * 60)
     
     // If this interval is in the future (more than current time), show placeholder
@@ -464,75 +474,19 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       return '—'
     }
 
-    // Check if we have timeline data available
-    if (entrant.moneyFlowTimeline?.dataPoints && entrant.moneyFlowTimeline.dataPoints.length > 0) {
-      // Sort data points by timestamp for proper incremental calculation
-      const sortedDataPoints = [...entrant.moneyFlowTimeline.dataPoints].sort((a, b) => 
-        new Date(a.pollingTimestamp).getTime() - new Date(b.pollingTimestamp).getTime()
-      )
-      
-      // Find the data point closest to this interval
-      const targetTime = intervalTimestamp
-      let closestDataPoint = null
-      let closestTimeDiff = Infinity
-      
-      for (const point of sortedDataPoints) {
-        const pointTime = new Date(point.pollingTimestamp).getTime()
-        const timeDiff = Math.abs(pointTime - targetTime)
-        if (timeDiff < closestTimeDiff) {
-          closestTimeDiff = timeDiff
-          closestDataPoint = point
-        }
-      }
-      
-      if (closestDataPoint) {
-        // Find the previous data point for incremental calculation
-        const currentIndex = sortedDataPoints.findIndex(p => p.$id === closestDataPoint.$id)
-        const previousDataPoint = currentIndex > 0 ? sortedDataPoints[currentIndex - 1] : null
-        
-        if (previousDataPoint) {
-          // Calculate incremental amount since previous time point
-          const incrementalAmount = closestDataPoint.totalPoolAmount - previousDataPoint.totalPoolAmount
-          if (incrementalAmount > 0) {
-            return `+$${incrementalAmount.toLocaleString()}`
-          } else if (incrementalAmount < 0) {
-            return `-$${Math.abs(incrementalAmount).toLocaleString()}`
-          } else {
-            return '$0'
-          }
-        } else {
-          // First data point - show the total as initial amount
-          return `$${closestDataPoint.totalPoolAmount.toLocaleString()}`
-        }
-      }
+    // Use the real money flow timeline data from the new hook
+    // Only use supported pool types, fallback to 'win' for unsupported types
+    const supportedPoolType = poolViewState.activePool === 'place' ? 'place' : 'win'
+    const timelineResult = getEntrantDataForInterval(entrantId, interval, supportedPoolType)
+    
+    // If we have real data, return it
+    if (timelineResult !== '—') {
+      return timelineResult
     }
 
-    // Fallback: For intervals in the past where we should have data but don't, show dash
-    // For current time, use mock incremental data based on hold percentage changes
-    if (Math.abs(interval - currentIntervalMinutes) < 0.5) { // Within 30 seconds of current time
-      // Use current vs previous hold percentage to estimate incremental change
-      const currentPercentage = entrant.holdPercentage || entrant.poolMoney?.percentage || 5
-      const previousPercentage = entrant.previousHoldPercentage || currentPercentage
-      const percentageChange = currentPercentage - previousPercentage
-      
-      if (Math.abs(percentageChange) > 0.1) { // Significant change
-        // Estimate incremental money based on percentage change
-        // Assuming average pool size for demonstration
-        const estimatedPoolSize = 50000 // $50k average pool
-        const incrementalAmount = (percentageChange / 100) * estimatedPoolSize
-        
-        if (incrementalAmount > 0) {
-          return `+$${Math.round(incrementalAmount).toLocaleString()}`
-        } else {
-          return `-$${Math.round(Math.abs(incrementalAmount)).toLocaleString()}`
-        }
-      }
-      return '$0'
-    }
-
-    // For past intervals where no data exists, show dash
+    // Fallback: Show placeholder for intervals without data
     return '—'
-  }, [sortedEntrants, currentRaceStartTime, currentTime])
+  }, [sortedEntrants, currentRaceStartTime, currentTime, getEntrantDataForInterval, poolViewState.activePool])
 
   // Determine if column should be highlighted (current time)
   const isCurrentTimeColumn = useCallback((interval: number): boolean => {
