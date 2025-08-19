@@ -19,17 +19,19 @@ export function RacePageContent() {
 
   if (!raceData) {
     return (
-      <main className="w-full px-4 py-8" role="main">
-        <div className="w-full">
-          <div className="text-center py-8">
-            <p className="text-gray-600">Loading race data...</p>
+      <div className="min-h-screen flex flex-col">
+        <main className="flex-1 px-4 py-8" role="main">
+          <div className="w-full">
+            <div className="text-center py-8">
+              <p className="text-gray-600">Loading race data...</p>
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     );
   }
 
-  const { race, meeting, entrants, navigationData, dataFreshness } = raceData;
+  const { race, entrants, navigationData, dataFreshness } = raceData;
 
   // Feature flag for enhanced interface (can be controlled via env var or user preference)
   const useEnhancedInterface = process.env.NEXT_PUBLIC_USE_ENHANCED_INTERFACE === 'true' || true; // Default to true for demo
@@ -56,25 +58,42 @@ export function RacePageContent() {
   }
 
   return (
-    <main className="w-full px-4 py-8" role="main">
-      <div className={useEnhancedInterface ? "w-full" : "max-w-4xl mx-auto"}>
-        
-        {/* Loading Overlay */}
-        {isLoading && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 flex items-center space-x-3">
-              <svg className="animate-spin w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
-              <span className="text-gray-700 font-medium">Loading race data...</span>
-            </div>
+    <div className="min-h-screen flex flex-col overflow-hidden">
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 flex items-center space-x-3">
+            <svg className="animate-spin w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <span className="text-gray-700 font-medium">Loading race data...</span>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Error Message */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+      {/* Sticky Header Section - Transparent background to match dark theme */}
+      <div className="sticky top-0 z-30" style={{ backgroundColor: 'transparent' }}>
+        <div className="pt-4 pb-2">
+          {/* Navigation Header - With left/right margins like footer */}
+          <div className="mb-4 mx-4">
+            <NavigationHeader 
+              navigationData={navigationData}
+              currentRaceId={currentRace.raceId}
+            />
+          </div>
+
+          {/* Race Data Header - With left/right margins like footer */}
+          <div className="mb-4 mx-4">
+            <RaceDataHeader />
+          </div>
+        </div>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="px-4 mb-4">
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -91,49 +110,47 @@ export function RacePageContent() {
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Navigation Header - Sticky, doesn't change */}
-        <NavigationHeader 
-          navigationData={navigationData}
-          currentRaceId={currentRace.raceId}
-        />
-
-        {/* Race Data Header - Updates from context */}
-        <RaceDataHeader />
-
-        {/* Enhanced or Original Entrants Grid */}
-        {useEnhancedInterface ? (
-          <>
-            <EnhancedEntrantsGrid 
+      {/* Main Content Area - Expandable with proper height calculation */}
+      <main className="flex-1 px-4 pb-4" role="main" style={{ paddingBottom: '140px' }}>
+        <div className="h-full flex flex-col" style={{ minHeight: 'calc(100vh - 320px)' }}>
+          {/* Enhanced or Original Entrants Grid */}
+          {useEnhancedInterface ? (
+            <div className="flex-1 mb-4">
+              <EnhancedEntrantsGrid 
+                initialEntrants={entrants} 
+                raceId={currentRace.$id}
+                raceStartTime={currentRace.startTime}
+                dataFreshness={dataFreshness}
+                enableMoneyFlowTimeline={true}
+                enableJockeySilks={true}
+                className="h-full auto-height"
+              />
+            </div>
+          ) : (
+            <EntrantsGrid 
               initialEntrants={entrants} 
-              raceId={currentRace.$id}
-              raceStartTime={currentRace.startTime}
+              raceId={race.$id}
               dataFreshness={dataFreshness}
-              enableMoneyFlowTimeline={true}
-              enableJockeySilks={true}
-              className="mb-6"
             />
-            
-            {/* Enhanced Race Footer */}
-            <RaceFooter 
-              raceId={currentRace.raceId}
-              raceStartTime={currentRace.startTime}
-              raceStatus={raceStatus}
-              poolData={poolData || undefined}
-              showCountdown={true}
-              showPoolBreakdown={true}
-              showResults={false}
-            />
-          </>
-        ) : (
-          <EntrantsGrid 
-            initialEntrants={entrants} 
-            raceId={race.$id}
-            dataFreshness={dataFreshness}
-          />
-        )}
-      </div>
-    </main>
+          )}
+        </div>
+      </main>
+
+      {/* Enhanced Race Footer - Fixed with margins */}
+      {useEnhancedInterface && (
+        <RaceFooter 
+          raceId={currentRace.raceId}
+          raceStartTime={currentRace.startTime}
+          raceStatus={raceStatus}
+          poolData={poolData || undefined}
+          showCountdown={true}
+          showPoolBreakdown={true}
+          showResults={false}
+        />
+      )}
+    </div>
   );
 }
