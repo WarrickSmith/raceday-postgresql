@@ -151,15 +151,17 @@ async function saveOddsHistory(databases, databaseId, entrantId, newOdds, curren
 }
 
 /**
- * Save money flow history data from money_tracker API response
+ * Save money flow history data from money_tracker API response with timeline support
  * @param {Object} databases - Appwrite Databases instance
  * @param {string} databaseId - Database ID  
  * @param {string} entrantId - Entrant ID
  * @param {Object} moneyData - Money tracker data from API (hold_percentage, bet_percentage)
  * @param {Object} context - Appwrite function context for logging
+ * @param {string} raceId - Race ID for timeline calculation
+ * @param {Object} racePoolData - Race pool totals for win/place calculations
  * @returns {boolean} Success status
  */
-async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData, context) {
+async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData, context, raceId = null, racePoolData = null) {
     if (!moneyData || (typeof moneyData.hold_percentage === 'undefined' && typeof moneyData.bet_percentage === 'undefined')) {
         return false;
     }
@@ -167,43 +169,79 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
     try {
         const timestamp = new Date().toISOString();
         
+        // Calculate timeline fields if race info is available
+        let timeToStart = null;
+        let pollingTimestamp = timestamp;
+        
+        if (raceId) {
+            try {
+                const race = await databases.getDocument(databaseId, 'races', raceId);
+                if (race.startTime) {
+                    const raceStartTime = new Date(race.startTime);
+                    const currentTime = new Date();
+                    timeToStart = Math.round((raceStartTime.getTime() - currentTime.getTime()) / (1000 * 60)); // Minutes to start
+                }
+            } catch (error) {
+                context.warn('Could not calculate timeToStart for money flow history', { raceId, entrantId });
+            }
+        }
+        
         // Store both hold_percentage and bet_percentage as separate records for comprehensive tracking
         let recordsCreated = 0;
         
-        // Save hold percentage (money held on this entrant)
+        // Save hold percentage (money held on this entrant) with pool amount calculations
         if (typeof moneyData.hold_percentage !== 'undefined') {
-            await databases.createDocument(databaseId, 'money-flow-history', ID.unique(), {
+            const holdDoc = {
                 entrant: entrantId,
                 holdPercentage: moneyData.hold_percentage,
                 betPercentage: null, // Explicitly null for hold_percentage records
                 type: 'hold_percentage',
-                eventTimestamp: timestamp
-            });
+                eventTimestamp: timestamp,
+                pollingTimestamp: pollingTimestamp,
+                timeToStart: timeToStart,
+                poolType: 'hold' // For legacy hold percentage data
+            };
+            
+            // Calculate pool amounts if race pool data is available
+            if (racePoolData) {
+                const holdPercent = moneyData.hold_percentage / 100;
+                holdDoc.winPoolAmount = Math.round((racePoolData.winPoolTotal || 0) * holdPercent);
+                holdDoc.placePoolAmount = Math.round((racePoolData.placePoolTotal || 0) * holdPercent);
+            }
+            
+            await databases.createDocument(databaseId, 'money-flow-history', ID.unique(), holdDoc);
             recordsCreated++;
         }
         
         // Save bet percentage (percentage of total bets on this entrant) 
         if (typeof moneyData.bet_percentage !== 'undefined') {
-            await databases.createDocument(databaseId, 'money-flow-history', ID.unique(), {
+            const betDoc = {
                 entrant: entrantId,
                 holdPercentage: null, // Explicitly null for bet_percentage records
                 betPercentage: moneyData.bet_percentage,
                 type: 'bet_percentage',
-                eventTimestamp: timestamp
-            });
+                eventTimestamp: timestamp,
+                pollingTimestamp: pollingTimestamp,
+                timeToStart: timeToStart,
+                poolType: 'bet' // For bet percentage data
+            };
+            
+            // Calculate pool amounts if race pool data is available
+            if (racePoolData) {
+                const betPercent = moneyData.bet_percentage / 100;
+                betDoc.winPoolAmount = Math.round((racePoolData.winPoolTotal || 0) * betPercent);
+                betDoc.placePoolAmount = Math.round((racePoolData.placePoolTotal || 0) * betPercent);
+            }
+            
+            await databases.createDocument(databaseId, 'money-flow-history', ID.unique(), betDoc);
             recordsCreated++;
         }
 
-        context.log('Saved money flow history', { 
-            entrantId, 
-            holdPercentageValue: moneyData.hold_percentage,
-            betPercentageValue: moneyData.bet_percentage,
-            recordsCreated
-        });
         return recordsCreated > 0;
     } catch (error) {
         context.error('Failed to save money flow history', {
             entrantId,
+            raceId,
             holdPercentageValue: moneyData.hold_percentage,
             betPercentageValue: moneyData.bet_percentage,
             error: error instanceof Error ? error.message : 'Unknown error'
@@ -267,16 +305,18 @@ export async function processToteTrendsData(databases, databaseId, raceId, toteT
 }
 
 /**
- * Process money tracker data from API response
+ * Process money tracker data from API response with timeline support
  * @param {Object} databases - Appwrite Databases instance
  * @param {string} databaseId - Database ID
  * @param {Object} moneyTrackerData - Money tracker data from API response
  * @param {Object} context - Appwrite function context for logging
+ * @param {string} raceId - Race ID for timeline calculation
+ * @param {Object} racePoolData - Optional race pool data for amount calculations
  * @returns {number} Number of entrants processed for money flow
  */
-export async function processMoneyTrackerData(databases, databaseId, moneyTrackerData, context) {
+export async function processMoneyTrackerData(databases, databaseId, moneyTrackerData, context, raceId = 'unknown', racePoolData = null) {
     if (!moneyTrackerData || !moneyTrackerData.entrants || !Array.isArray(moneyTrackerData.entrants)) {
-        context.log('No money tracker entrants data available');
+        context.log('No money tracker entrants data available', { raceId });
         return 0;
     }
 
@@ -297,16 +337,18 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
     
     // Save money flow history for each entrant
     for (const [entrantId, moneyData] of Object.entries(entrantMoneyData)) {
-        const success = await saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData, context);
+        const success = await saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData, context, raceId, racePoolData);
         if (success) {
             entrantsProcessed++;
         }
     }
     
-    context.log('Processed money tracker data', {
+    context.log('Processed money tracker data with timeline support', {
+        raceId,
         totalEntries: moneyTrackerData.entrants.length,
         uniqueEntrants: Object.keys(entrantMoneyData).length,
-        entrantsProcessed
+        entrantsProcessed,
+        racePoolDataAvailable: !!racePoolData
     });
     
     return entrantsProcessed;
@@ -498,7 +540,7 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
             if (entrant.trainer_name) entrantDoc.trainerName = entrant.trainer_name;
             if (entrant.trainer_location) entrantDoc.trainerLocation = entrant.trainer_location;
             if (entrant.apprentice_indicator) entrantDoc.apprenticeIndicator = entrant.apprentice_indicator;
-            if (entrant.gear) entrantDoc.gear = entrant.gear;
+            if (entrant.gear) entrantDoc.gear = safeStringField(entrant.gear, 200);
             
             // Weight information
             if (entrant.weight?.allocated) entrantDoc.allocatedWeight = entrant.weight.allocated;
