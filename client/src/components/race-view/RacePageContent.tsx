@@ -178,7 +178,7 @@ export function RacePageContent() {
 
         .race-layout-content {
           grid-area: content;
-          min-height: 0;
+          min-height: 300px;
           overflow: hidden;
           display: flex;
           flex-direction: column;
@@ -227,6 +227,11 @@ export function RacePageContent() {
         }
 
         @media (max-height: 600px) {
+          .race-page-layout {
+            gap: 0.5rem;
+            padding: 0.5rem;
+          }
+          
           .race-layout-navigation {
             min-height: 50px;
             max-height: 80px;
@@ -237,9 +242,39 @@ export function RacePageContent() {
             max-height: 120px;
           }
           
+          .race-layout-content {
+            min-height: 200px;
+          }
+          
           .race-layout-footer {
-            min-height: 120px;
-            max-height: 160px;
+            min-height: 100px;
+            max-height: 140px;
+          }
+        }
+
+        @media (max-height: 500px) {
+          .race-page-layout {
+            gap: 0.25rem;
+            padding: 0.25rem;
+          }
+          
+          .race-layout-navigation {
+            min-height: 40px;
+            max-height: 60px;
+          }
+          
+          .race-layout-header {
+            min-height: 60px;
+            max-height: 100px;
+          }
+          
+          .race-layout-content {
+            min-height: 150px;
+          }
+          
+          .race-layout-footer {
+            min-height: 80px;
+            max-height: 120px;
           }
         }
       `}</style>
