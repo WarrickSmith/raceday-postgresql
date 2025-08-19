@@ -114,11 +114,11 @@ export function RacePageContent() {
       )}
 
       {/* Main Content Area - Expandable with proper height calculation */}
-      <main className="flex-1 px-4 pb-4 overflow-hidden" role="main" style={{ paddingBottom: '140px' }}>
+      <main className="flex-1 px-4 overflow-hidden" role="main" style={{ paddingBottom: '160px' }}>
         <div className="h-full flex flex-col overflow-hidden">
           {/* Enhanced or Original Entrants Grid */}
           {useEnhancedInterface ? (
-            <div className="flex-1 mb-4">
+            <div className="flex-1 overflow-hidden">
               <EnhancedEntrantsGrid 
                 initialEntrants={entrants} 
                 raceId={currentRace.$id}

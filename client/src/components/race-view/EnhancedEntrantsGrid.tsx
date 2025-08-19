@@ -860,7 +860,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       </div>
 
       {/* Enhanced Single-Table Grid Architecture with Perfect Row Alignment */}
-      <div className="overflow-hidden bg-white border border-gray-200 rounded-lg">
+      <div className={`bg-white border border-gray-200 rounded-lg ${className?.includes('h-full') ? 'h-full flex flex-col overflow-hidden' : 'overflow-hidden'}`}>
         {/* Timeline Controls */}
         <div className="flex items-center justify-between p-2 bg-gray-50 border-b border-gray-200">
           <h3 className="text-sm font-medium text-gray-900">
@@ -885,13 +885,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         </div>
 
         {/* Single Table with Combined Horizontal and Vertical Scrolling */}
-        <div className="relative">
+        <div className={`relative ${className?.includes('h-full') ? 'flex-1 overflow-hidden' : ''}`}>
           <div 
             ref={scrollContainerRef}
             className="overflow-auto"
             style={{ 
-              maxHeight: className?.includes('auto-height') 
-                ? 'calc(100vh - 420px)' 
+              height: className?.includes('auto-height') 
+                ? '100%' // Use full container height when auto-height is enabled
                 : '500px',
               minHeight: '300px'
             }}
