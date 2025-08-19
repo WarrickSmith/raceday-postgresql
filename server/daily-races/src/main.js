@@ -146,7 +146,7 @@ export default async function main(context) {
             }
         }
         
-        context.log('Daily races function completed (consolidated)', {
+        context.log('Daily races function completed', {
             timestamp: new Date().toISOString(),
             racesFound: racesResult.documents.length,
             racesProcessed,
