@@ -19,7 +19,7 @@ export function RacePageContent() {
 
   if (!raceData) {
     return (
-      <div className="min-h-screen flex flex-col">
+      <div className="h-screen flex flex-col overflow-hidden">
         <main className="flex-1 px-4 py-8" role="main">
           <div className="w-full">
             <div className="text-center py-8">
@@ -58,7 +58,7 @@ export function RacePageContent() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden">
       {/* Loading Overlay */}
       {isLoading && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -114,8 +114,8 @@ export function RacePageContent() {
       )}
 
       {/* Main Content Area - Expandable with proper height calculation */}
-      <main className="flex-1 px-4 pb-4" role="main" style={{ paddingBottom: '140px' }}>
-        <div className="h-full flex flex-col" style={{ minHeight: 'calc(100vh - 320px)' }}>
+      <main className="flex-1 px-4 pb-4 overflow-hidden" role="main" style={{ paddingBottom: '140px' }}>
+        <div className="h-full flex flex-col overflow-hidden">
           {/* Enhanced or Original Entrants Grid */}
           {useEnhancedInterface ? (
             <div className="flex-1 mb-4">
