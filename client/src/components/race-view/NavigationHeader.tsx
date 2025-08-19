@@ -26,7 +26,7 @@ export const NavigationHeader = memo(function NavigationHeader({
   const currentRaceIdFromContext = raceData?.race.raceId || currentRaceId;
 
   return (
-    <header className="bg-white rounded-lg shadow-md p-6 mb-6" role="banner">
+    <header className="bg-white rounded-lg shadow-md p-6" role="banner">
       {/* Race Navigation - Updates navigation options based on current race */}
       <div className="pb-4 border-b border-gray-200">
         <RaceNavigation 
