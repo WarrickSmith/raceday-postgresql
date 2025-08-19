@@ -1,6 +1,6 @@
 import { Client, Databases } from 'node-appwrite'
 import { fetchRaceEventData } from './api-client.js'
-import { processEntrants, processMoneyTrackerData } from './database-utils.js'
+import { processEntrants, processMoneyTrackerData, processToteTrendsData } from './database-utils.js'
 import {
   validateEnvironmentVariables,
   executeApiCallWithTimeout,
@@ -169,6 +169,13 @@ export default async function main(context) {
             processingPromises.push(
               processMoneyTrackerData(databases, databaseId, raceEventData.money_tracker, context)
                 .then(count => { moneyFlowProcessed = count })
+            )
+          }
+          
+          // Process tote trends data for pool totals if available
+          if (raceEventData.tote_trends) {
+            processingPromises.push(
+              processToteTrendsData(databases, databaseId, raceId, raceEventData.tote_trends, context)
             )
           }
           
