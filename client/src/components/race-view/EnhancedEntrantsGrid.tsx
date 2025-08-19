@@ -710,7 +710,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
   return (
     <div
-      className={`enhanced-entrants-grid bg-white rounded-lg shadow-md ${className}`}
+      className={`enhanced-entrants-grid bg-white rounded-lg shadow-md h-full flex flex-col ${className}`}
     >
       {/* Enhanced Header with Pool Toggle */}
       <div className="p-6 border-b border-gray-200">
@@ -861,9 +861,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       </div>
 
       {/* Enhanced Single-Table Grid Architecture with Perfect Row Alignment */}
-      <div className="overflow-hidden bg-white border border-gray-200 rounded-lg">
+      <div className="flex-1 overflow-hidden bg-white border border-gray-200 rounded-lg flex flex-col">
         {/* Timeline Controls */}
-        <div className="flex items-center justify-between p-2 bg-gray-50 border-b border-gray-200">
+        <div className="flex items-center justify-between p-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
           <h3 className="text-sm font-medium text-gray-900">
             Money Flow Timeline ({timelineColumns.length} points)
           </h3>
@@ -886,14 +886,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         </div>
 
         {/* Single Table with Combined Horizontal and Vertical Scrolling */}
-        <div className="relative">
+        <div className="flex-1 relative min-h-0">
           <div 
             ref={scrollContainerRef}
-            className="overflow-auto"
-            style={{ 
-              height: '100%',
-              minHeight: '300px'
-            }}
+            className="absolute inset-0 overflow-auto"
           >
             <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
               {/* Column Groups for Layout Control */}
@@ -1135,7 +1131,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         </div>
 
         {/* Timeline Footer */}
-        <div className="p-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-600">
+        <div className="p-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-600 flex-shrink-0">
           <div className="flex justify-between items-center">
             <span>
               Scroll to see full timeline • Blue: Scheduled start • Yellow: Live data • Green: Current time
@@ -1148,7 +1144,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       </div>
 
       {/* Enhanced Footer */}
-      <div className="p-3 border-t border-gray-100 bg-gray-50">
+      <div className="p-3 border-t border-gray-100 bg-gray-50 flex-shrink-0">
         <div className="flex justify-between items-center text-xs">
           <div className="flex items-center space-x-4">
             <span className="text-gray-500">
