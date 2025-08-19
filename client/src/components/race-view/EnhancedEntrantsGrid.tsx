@@ -12,6 +12,7 @@ import {
 } from '@/types/enhancedGrid'
 import { useAppwriteRealtime } from '@/hooks/useAppwriteRealtime'
 import { useRealtimeRace } from '@/hooks/useRealtimeRace'
+import { useRacePoolData } from '@/hooks/useRacePoolData'
 import { PoolToggle } from './PoolToggle'
 import { useRace } from '@/contexts/RaceContext'
 import { screenReader, AriaLabels } from '@/utils/accessibility'
@@ -82,6 +83,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const currentRaceStartTime = liveRace?.startTime || raceData?.race.startTime || raceStartTime
   const currentDataFreshness = raceData?.dataFreshness || dataFreshness
 
+  // Get actual race pool data 
+  const { poolData: racePoolData } = useRacePoolData(currentRaceId)
+
   // Debug logging for entrants updates (can be removed in production)
   // console.log('🏃 EnhancedEntrantsGrid render:', {
   //   raceDataExists: !!raceData,
@@ -150,18 +154,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       ? currentEntrants
       : initialEntrants
 
-  // Calculate pool money for each entrant based on their hold percentage
+  // Calculate pool money for each entrant using actual pool data and hold percentages
   const entrantsWithPoolData = useMemo(() => {
     if (!entrants || entrants.length === 0) return []
-    
-    // Try to get pool data from race footer component props or race context
-    // For now, we'll use mock pool data based on the footer display values
-    // TODO: Connect to actual race pool data when available
-    const mockRacePoolData = {
-      winPoolTotal: 36399,      // $36,399 from footer
-      placePoolTotal: 18604,    // $18,604 from footer  
-      totalRacePool: 82503      // $82,503 from footer
-    }
     
     console.log('🔍 Pool calculation debug:', {
       entrantsCount: entrants.length,
@@ -202,8 +197,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       
       // Calculate individual pool contributions based on pool percentage
       const holdPercentageDecimal = poolPercentage / 100 // Convert to decimal
-      const winPoolContribution = mockRacePoolData.winPoolTotal * holdPercentageDecimal
-      const placePoolContribution = mockRacePoolData.placePoolTotal * holdPercentageDecimal
+      const winPoolContribution = (racePoolData?.winPoolTotal || 0) * holdPercentageDecimal
+      const placePoolContribution = (racePoolData?.placePoolTotal || 0) * holdPercentageDecimal
       const totalPoolContribution = winPoolContribution + placePoolContribution
       
       console.log(`💰 Pool calculation for ${entrant.name} (${entrant.runnerNumber}):`, {
@@ -224,7 +219,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         }
       }
     })
-  }, [entrants])
+  }, [entrants, racePoolData])
 
   // Debug logging removed - entrants data structure verified
 
@@ -453,37 +448,91 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     }
   }, [timelineColumns, currentRaceStartTime, autoScroll, currentTime])
 
-  // Get data for specific timeline point - use real money flow data if available
+  // Get data for specific timeline point - shows incremental money amounts since previous time point
   const getTimelineData = useCallback((entrantId: string, interval: number): string => {
     const entrant = sortedEntrants.find((e) => e.$id === entrantId)
     if (!entrant || entrant.isScratched) return '—'
 
+    // Check if this is a future time column (no data exists yet)
+    const raceStart = new Date(currentRaceStartTime)
+    const currentTimestamp = currentTime.getTime()
+    const intervalTimestamp = raceStart.getTime() + (interval * 60 * 1000)
+    const currentIntervalMinutes = (currentTimestamp - raceStart.getTime()) / (1000 * 60)
+    
+    // If this interval is in the future (more than current time), show placeholder
+    if (interval > currentIntervalMinutes) {
+      return '—'
+    }
+
     // Check if we have timeline data available
     if (entrant.moneyFlowTimeline?.dataPoints && entrant.moneyFlowTimeline.dataPoints.length > 0) {
-      // Find the closest data point to this interval
-      const targetTime = new Date(currentRaceStartTime).getTime() + (interval * 60 * 1000)
-      const closestDataPoint = entrant.moneyFlowTimeline.dataPoints.reduce((closest, point) => {
-        const pointTime = new Date(point.pollingTimestamp).getTime()
-        const closestTime = new Date(closest.pollingTimestamp).getTime()
-        return Math.abs(pointTime - targetTime) < Math.abs(closestTime - targetTime) ? point : closest
-      })
+      // Sort data points by timestamp for proper incremental calculation
+      const sortedDataPoints = [...entrant.moneyFlowTimeline.dataPoints].sort((a, b) => 
+        new Date(a.pollingTimestamp).getTime() - new Date(b.pollingTimestamp).getTime()
+      )
       
-      return closestDataPoint.poolPercentage.toFixed(1)
+      // Find the data point closest to this interval
+      const targetTime = intervalTimestamp
+      let closestDataPoint = null
+      let closestTimeDiff = Infinity
+      
+      for (const point of sortedDataPoints) {
+        const pointTime = new Date(point.pollingTimestamp).getTime()
+        const timeDiff = Math.abs(pointTime - targetTime)
+        if (timeDiff < closestTimeDiff) {
+          closestTimeDiff = timeDiff
+          closestDataPoint = point
+        }
+      }
+      
+      if (closestDataPoint) {
+        // Find the previous data point for incremental calculation
+        const currentIndex = sortedDataPoints.findIndex(p => p.$id === closestDataPoint.$id)
+        const previousDataPoint = currentIndex > 0 ? sortedDataPoints[currentIndex - 1] : null
+        
+        if (previousDataPoint) {
+          // Calculate incremental amount since previous time point
+          const incrementalAmount = closestDataPoint.totalPoolAmount - previousDataPoint.totalPoolAmount
+          if (incrementalAmount > 0) {
+            return `+$${incrementalAmount.toLocaleString()}`
+          } else if (incrementalAmount < 0) {
+            return `-$${Math.abs(incrementalAmount).toLocaleString()}`
+          } else {
+            return '$0'
+          }
+        } else {
+          // First data point - show the total as initial amount
+          return `$${closestDataPoint.totalPoolAmount.toLocaleString()}`
+        }
+      }
     }
 
-    // Use current hold percentage for all timeline points as fallback (real-time data will update this)
-    if (entrant.holdPercentage !== undefined && entrant.holdPercentage !== null) {
-      return entrant.holdPercentage.toFixed(1)
+    // Fallback: For intervals in the past where we should have data but don't, show dash
+    // For current time, use mock incremental data based on hold percentage changes
+    if (Math.abs(interval - currentIntervalMinutes) < 0.5) { // Within 30 seconds of current time
+      // Use current vs previous hold percentage to estimate incremental change
+      const currentPercentage = entrant.holdPercentage || entrant.poolMoney?.percentage || 5
+      const previousPercentage = entrant.previousHoldPercentage || currentPercentage
+      const percentageChange = currentPercentage - previousPercentage
+      
+      if (Math.abs(percentageChange) > 0.1) { // Significant change
+        // Estimate incremental money based on percentage change
+        // Assuming average pool size for demonstration
+        const estimatedPoolSize = 50000 // $50k average pool
+        const incrementalAmount = (percentageChange / 100) * estimatedPoolSize
+        
+        if (incrementalAmount > 0) {
+          return `+$${Math.round(incrementalAmount).toLocaleString()}`
+        } else {
+          return `-$${Math.round(Math.abs(incrementalAmount)).toLocaleString()}`
+        }
+      }
+      return '$0'
     }
 
-    // Use poolMoney percentage if available
-    if (entrant.poolMoney?.percentage !== undefined && entrant.poolMoney?.percentage !== null) {
-      return entrant.poolMoney.percentage.toFixed(1)
-    }
-
-    // Last resort: return dash
+    // For past intervals where no data exists, show dash
     return '—'
-  }, [sortedEntrants, currentRaceStartTime])
+  }, [sortedEntrants, currentRaceStartTime, currentTime])
 
   // Determine if column should be highlighted (current time)
   const isCurrentTimeColumn = useCallback((interval: number): boolean => {
@@ -510,6 +559,49 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     if (percentage === undefined || percentage === null) return '—'
     return `${percentage.toFixed(2)}%`
   }, [])
+
+  // Get pool amount for the currently selected pool type
+  const getPoolAmount = useCallback((entrant: Entrant): number => {
+    if (!entrant.poolMoney) return 0
+    
+    switch (poolViewState.activePool) {
+      case 'win':
+        return entrant.poolMoney.win || 0
+      case 'place':
+        return entrant.poolMoney.place || 0
+      default:
+        return entrant.poolMoney.total || 0
+    }
+  }, [poolViewState.activePool])
+
+  // Get pool percentage for the currently selected pool type
+  const getPoolPercentage = useCallback((entrant: Entrant): number => {
+    if (entrant.isScratched) return 0
+    
+    // Calculate percentage based on selected pool type
+    if (entrant.poolMoney) {
+      switch (poolViewState.activePool) {
+        case 'win':
+          // Calculate percentage of win pool
+          const totalWinPool = entrantsWithPoolData.reduce((sum, e) => 
+            !e.isScratched ? sum + (e.poolMoney?.win || 0) : sum, 0)
+          return totalWinPool > 0 ? ((entrant.poolMoney.win || 0) / totalWinPool) * 100 : 0
+        
+        case 'place':
+          // Calculate percentage of place pool
+          const totalPlacePool = entrantsWithPoolData.reduce((sum, e) => 
+            !e.isScratched ? sum + (e.poolMoney?.place || 0) : sum, 0)
+          return totalPlacePool > 0 ? ((entrant.poolMoney.place || 0) / totalPlacePool) * 100 : 0
+        
+        default:
+          // Default to existing percentage calculation
+          return entrant.poolMoney.percentage || entrant.holdPercentage || 0
+      }
+    }
+    
+    // Fallback to hold percentage
+    return entrant.holdPercentage || 0
+  }, [poolViewState.activePool, entrantsWithPoolData])
 
   // Trend indicators (simplified for now)
   const getTrendIndicator = useCallback(
@@ -792,12 +884,17 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           </div>
         </div>
 
-        {/* Single Table with Fixed Left/Right and Scrollable Center */}
+        {/* Single Table with Combined Horizontal and Vertical Scrolling */}
         <div className="relative">
           <div 
             ref={scrollContainerRef}
-            className="overflow-x-auto"
-            style={{ maxHeight: '600px' }}
+            className="overflow-auto"
+            style={{ 
+              maxHeight: className?.includes('auto-height') 
+                ? 'calc(100vh - 420px)' 
+                : '500px',
+              minHeight: '300px'
+            }}
           >
             <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
               {/* Column Groups for Layout Control */}
@@ -821,13 +918,14 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
               <thead className="bg-gray-50">
                 <tr style={{ height: '60px' }}>
                   {/* Left Fixed Headers - Sticky */}
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 sticky left-0 top-0 bg-gray-50 z-30">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 sticky left-0 top-0 z-30" style={{ backgroundColor: '#f9fafb' }}>
                     Runner
                   </th>
                   <th
-                    className={`px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 border-r border-gray-200 sticky left-[200px] top-0 bg-gray-50 z-30 ${
+                    className={`px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 border-r border-gray-200 sticky left-[200px] top-0 z-30 ${
                       sortState?.column === 'winOdds' ? 'bg-blue-50' : ''
                     }`}
+                    style={{ backgroundColor: sortState?.column === 'winOdds' ? '#eff6ff' : '#f9fafb' }}
                     onClick={() => handleSort('winOdds')}
                     title="Click to sort by Win odds"
                   >
@@ -840,7 +938,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                       )}
                     </div>
                   </th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r-2 border-gray-300 sticky left-[280px] top-0 bg-gray-50 z-30">
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r-2 border-gray-300 sticky left-[280px] top-0 z-30" style={{ backgroundColor: '#f9fafb' }}>
                     Place
                   </th>
 
@@ -849,16 +947,21 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     <th
                       key={`header_${column.interval}`}
                       className={`px-2 py-2 text-xs font-medium text-gray-700 text-center border-r border-gray-200 sticky top-0 z-20 ${
-                        column.isScheduledStart
-                          ? 'bg-blue-100 border-blue-300'
-                          : column.isDynamic
-                          ? 'bg-yellow-50'
-                          : 'bg-gray-50'
-                      } ${
                         isCurrentTimeColumn(column.interval)
-                          ? 'bg-green-100 border-green-300 shadow-sm'
+                          ? 'border-green-300 shadow-sm'
+                          : column.isScheduledStart
+                          ? 'border-blue-300'
                           : ''
                       }`}
+                      style={{
+                        backgroundColor: isCurrentTimeColumn(column.interval)
+                          ? '#dcfce7'
+                          : column.isScheduledStart
+                          ? '#dbeafe'
+                          : column.isDynamic
+                          ? '#fefce8'
+                          : '#f9fafb'
+                      }}
                       title={`${column.label} - ${new Date(column.timestamp).toLocaleTimeString()}`}
                     >
                       <div className="flex flex-col items-center justify-center" style={{ height: '60px' }}>
@@ -877,10 +980,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                   ))}
 
                   {/* Right Fixed Headers - Sticky */}
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-l-2 border-gray-300 border-r border-gray-200 sticky right-[80px] top-0 bg-gray-50 z-30">
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-l-2 border-gray-300 border-r border-gray-200 sticky right-[80px] top-0 z-30" style={{ backgroundColor: '#f9fafb' }}>
                     Pool
                   </th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider sticky right-0 top-0 bg-gray-50 z-30">
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider sticky right-0 top-0 z-30" style={{ backgroundColor: '#f9fafb' }}>
                     Pool %
                   </th>
                 </tr>
@@ -996,7 +1099,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     <td className="px-3 py-3 whitespace-nowrap text-right border-l-2 border-gray-300 border-r border-gray-200 sticky right-[80px] bg-white z-20" style={{ verticalAlign: 'middle', height: '60px' }}>
                       <div className="flex items-center justify-end h-full">
                         <span className="text-sm font-medium text-gray-900">
-                          {formatMoney(entrant.poolMoney?.total)}
+                          {entrant.isScratched ? '—' : formatMoney(getPoolAmount(entrant))}
                         </span>
                       </div>
                     </td>
@@ -1004,11 +1107,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     <td className="px-3 py-3 whitespace-nowrap text-right sticky right-0 bg-white z-20" style={{ verticalAlign: 'middle', height: '60px' }}>
                       <div className="flex items-center justify-end h-full">
                         <span className="text-sm font-medium text-gray-900">
-                          {entrant.isScratched 
-                            ? '—' 
-                            : entrant.poolMoney?.percentage
-                            ? formatPercentage(entrant.poolMoney.percentage)
-                            : formatPercentage(entrant.holdPercentage)}
+                          {entrant.isScratched ? '—' : formatPercentage(getPoolPercentage(entrant))}
                         </span>
                         {!entrant.isScratched && (
                           <span
