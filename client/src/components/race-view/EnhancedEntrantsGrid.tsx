@@ -13,6 +13,7 @@ import {
 import { useAppwriteRealtime } from '@/hooks/useAppwriteRealtime'
 import { useRealtimeRace } from '@/hooks/useRealtimeRace'
 import { useRacePoolData } from '@/hooks/useRacePoolData'
+import { useMoneyFlowTimeline } from '@/hooks/useMoneyFlowTimeline'
 import { PoolToggle } from './PoolToggle'
 import { useRace } from '@/contexts/RaceContext'
 import { screenReader, AriaLabels } from '@/utils/accessibility'
