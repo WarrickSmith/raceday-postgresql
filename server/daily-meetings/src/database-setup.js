@@ -12,6 +12,7 @@ const collections = {
     entrants: 'entrants',
     oddsHistory: 'odds-history',
     moneyFlowHistory: 'money-flow-history',
+    racePools: 'race-pools',
     userAlertConfigs: 'user-alert-configs',
     notifications: 'notifications',
 };
@@ -180,6 +181,7 @@ export async function ensureDatabaseSetup(config, context) {
         
         await ensureOddsHistoryCollection(databases, config, context);
         await ensureMoneyFlowHistoryCollection(databases, config, context);
+        await ensureRacePoolsCollection(databases, config, context);
         await ensureUserAlertConfigsCollection(databases, config, context);
         await ensureNotificationsCollection(databases, config, context);
         
@@ -674,6 +676,49 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
     // 2. For cross-entrant queries, use the entrant relationship field directly and filter results in code.
     // 3. If performance becomes an issue, consider denormalizing data or creating additional collections
     //    to store pre-aggregated or indexed data for specific query patterns.
+}
+async function ensureRacePoolsCollection(databases, config, context) {
+    const collectionId = collections.racePools;
+    const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
+    if (!exists) {
+        context.log('Creating race pools collection...');
+        await databases.createCollection(config.databaseId, collectionId, 'RacePools', [
+            Permission.read(Role.any()),
+            Permission.create(Role.users()),
+            Permission.update(Role.users()),
+            Permission.delete(Role.users()),
+        ]);
+    }
+    const requiredAttributes = [
+        { key: 'raceId', type: 'string', size: 50, required: true },
+        { key: 'winPoolTotal', type: 'integer', required: false, default: 0 },
+        { key: 'placePoolTotal', type: 'integer', required: false, default: 0 },
+        { key: 'quinellaPoolTotal', type: 'integer', required: false, default: 0 },
+        { key: 'trifectaPoolTotal', type: 'integer', required: false, default: 0 },
+        { key: 'exactaPoolTotal', type: 'integer', required: false, default: 0 },
+        { key: 'first4PoolTotal', type: 'integer', required: false, default: 0 },
+        { key: 'totalRacePool', type: 'integer', required: false, default: 0 },
+        { key: 'currency', type: 'string', size: 10, required: false, default: '$' },
+        { key: 'lastUpdated', type: 'datetime', required: false },
+    ];
+    // Create attributes in parallel for improved performance
+    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
+    const racePoolsCollection = await databases.getCollection(config.databaseId, collectionId);
+    if (!racePoolsCollection.indexes.some((idx) => idx.key === 'idx_race_id')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'raceId', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_race_id', IndexType.Unique, ['raceId']);
+                context.log('idx_race_id index created successfully for race pools');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_race_id index for race pools: ${error}`);
+            }
+        }
+        else {
+            context.log('raceId attribute is not available for index creation, skipping idx_race_id index');
+        }
+    }
 }
 async function ensureUserAlertConfigsCollection(databases, config, context) {
     const collectionId = collections.userAlertConfigs;

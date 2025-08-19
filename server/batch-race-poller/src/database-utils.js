@@ -188,6 +188,60 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
 }
 
 /**
+ * Process tote trends data and save race pool totals
+ * @param {Object} databases - Appwrite Databases instance
+ * @param {string} databaseId - Database ID
+ * @param {string} raceId - Race ID (document ID)
+ * @param {Object} toteTrendsData - Tote trends data from NZTAB API
+ * @param {Object} context - Appwrite function context for logging
+ * @returns {boolean} Success status
+ */
+export async function processToteTrendsData(databases, databaseId, raceId, toteTrendsData, context) {
+    if (!toteTrendsData) {
+        context.log('No tote trends data available for race:', raceId);
+        return false;
+    }
+
+    try {
+        const timestamp = new Date().toISOString();
+        
+        // Extract pool totals from tote trends data
+        const poolData = {
+            raceId: raceId,
+            winPoolTotal: toteTrendsData.pool_win || 0,
+            placePoolTotal: toteTrendsData.pool_place || 0,
+            quinellaPoolTotal: toteTrendsData.pool_quinella || 0,
+            trifectaPoolTotal: toteTrendsData.pool_trifecta || 0,
+            exactaPoolTotal: toteTrendsData.pool_exacta || 0,
+            first4PoolTotal: toteTrendsData.pool_first4 || 0,
+            totalRacePool: toteTrendsData.pool_total || 0,
+            currency: '$',
+            lastUpdated: timestamp
+        };
+
+        // Use race ID as document ID for the race-pools collection
+        const success = await performantUpsert(databases, databaseId, 'race-pools', raceId, poolData, context);
+        
+        if (success) {
+            context.log('Saved race pool data from tote trends', {
+                raceId,
+                totalPool: poolData.totalRacePool,
+                winPool: poolData.winPoolTotal,
+                placePool: poolData.placePoolTotal
+            });
+        }
+        
+        return success;
+    } catch (error) {
+        context.error('Failed to process tote trends data', {
+            raceId,
+            error: error instanceof Error ? error.message : 'Unknown error'
+        });
+        return false;
+    }
+}
+
+/**
  * Process money tracker data from API response
  * @param {Object} databases - Appwrite Databases instance
  * @param {string} databaseId - Database ID
@@ -455,7 +509,7 @@ export async function batchProcessRaces(databases, databaseId, raceResults, cont
                 }
             }
             
-            // Process both entrants and money flow in parallel
+            // Process entrants, money flow, and tote trends in parallel
             const processingPromises = [];
             
             // Update entrant data if available
@@ -478,6 +532,16 @@ export async function batchProcessRaces(databases, databaseId, raceResults, cont
                         .catch(error => {
                             collectBatchError(errors, error, raceResult.raceId, 'processMoneyTrackerData', context);
                             moneyFlowProcessed = 0;
+                        })
+                );
+            }
+            
+            // Process tote trends data for pool totals if available
+            if (raceResult.data.tote_trends) {
+                processingPromises.push(
+                    processToteTrendsData(databases, databaseId, raceResult.raceId, raceResult.data.tote_trends, context)
+                        .catch(error => {
+                            collectBatchError(errors, error, raceResult.raceId, 'processToteTrendsData', context);
                         })
                 );
             }
