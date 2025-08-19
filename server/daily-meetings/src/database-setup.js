@@ -643,6 +643,14 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
         { key: 'betPercentage', type: 'float', required: false },  // Optional - used for bet_percentage data
         { key: 'eventTimestamp', type: 'datetime', required: true },
         { key: 'type', type: 'string', size: 20, required: true }, // Enum: 'hold_percentage' or 'bet_percentage'
+        
+        // Timeline display fields - Story 4.9 implementation
+        { key: 'pollingTimestamp', type: 'datetime', required: false }, // When the polling occurred
+        { key: 'timeToStart', type: 'integer', required: false }, // Minutes to race start at polling time
+        { key: 'winPoolAmount', type: 'integer', required: false }, // Win pool amount for this entrant
+        { key: 'placePoolAmount', type: 'integer', required: false }, // Place pool amount for this entrant
+        { key: 'incrementalAmount', type: 'integer', required: false }, // Calculated incremental change
+        { key: 'poolType', type: 'string', size: 10, required: false }, // 'win' or 'place' for timeline specificity
     ];
     // Create attributes in parallel for improved performance
     await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
