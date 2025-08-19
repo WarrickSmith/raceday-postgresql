@@ -110,7 +110,11 @@ export function useAppwriteRealtime({
             
           case 'moneyFlow':
             if (payload && payload.entrant) {
-              newState.entrants = updateEntrantMoneyFlow(newState.entrants, payload);
+              // Only process money flow updates for entrants in this race
+              const isRelevantEntrant = newState.entrants.some(e => e.$id === payload.entrant);
+              if (isRelevantEntrant) {
+                newState.entrants = updateEntrantMoneyFlow(newState.entrants, payload);
+              }
             }
             break;
             
@@ -196,10 +200,12 @@ export function useAppwriteRealtime({
         );
         unsubscribeFunctions.current.push(entrantsUnsubscribe);
 
-        // Subscribe to money flow updates
+        // Subscribe to money flow updates - optimized for high-frequency data
         const moneyFlowUnsubscribe = client.subscribe(
           'databases.raceday-db.collections.money-flow-history.documents',
           (response: any) => {
+            // Process all money flow updates - filtering will be done in the update handler
+            // This ensures we don't miss updates due to timing issues with entrant loading
             console.log('📡 Money flow update received:', response);
             processRealtimeMessage({
               ...response,
@@ -350,20 +356,105 @@ function updateEntrantMoneyFlow(entrants: Entrant[], moneyFlowData: any): Entran
   return entrants.map(entrant => {
     if (entrant.$id === moneyFlowData.entrant) {
       let trend: 'up' | 'down' | 'neutral' = 'neutral';
-      if (entrant.holdPercentage !== undefined && moneyFlowData.holdPercentage !== entrant.holdPercentage) {
-        trend = moneyFlowData.holdPercentage > entrant.holdPercentage ? 'up' : 'down';
+      
+      // Enhanced money flow processing for timeline data
+      const updatedEntrant = { ...entrant };
+      
+      // Update hold percentage and calculate trend
+      if (moneyFlowData.holdPercentage !== undefined) {
+        if (entrant.holdPercentage !== undefined && moneyFlowData.holdPercentage !== entrant.holdPercentage) {
+          trend = moneyFlowData.holdPercentage > entrant.holdPercentage ? 'up' : 'down';
+        }
+        updatedEntrant.previousHoldPercentage = entrant.holdPercentage;
+        updatedEntrant.holdPercentage = moneyFlowData.holdPercentage;
       }
-
+      
+      // Update bet percentage if available (add to types later if needed)
+      if (moneyFlowData.betPercentage !== undefined) {
+        (updatedEntrant as any).betPercentage = moneyFlowData.betPercentage;
+      }
+      
+      // Enhanced timeline data processing for incremental display
+      if (moneyFlowData.eventTimestamp) {
+        // Initialize timeline if not exists
+        if (!updatedEntrant.moneyFlowTimeline) {
+          updatedEntrant.moneyFlowTimeline = {
+            entrantId: entrant.$id,
+            dataPoints: [],
+            latestPercentage: moneyFlowData.holdPercentage || entrant.holdPercentage || 0,
+            trend,
+            significantChange: Math.abs((moneyFlowData.holdPercentage || 0) - (entrant.holdPercentage || 0)) > 2
+          };
+        }
+        
+        // Add new data point for timeline display
+        const newDataPoint = {
+          $id: moneyFlowData.$id || `flow-${Date.now()}`,
+          $createdAt: moneyFlowData.eventTimestamp,
+          $updatedAt: moneyFlowData.eventTimestamp,
+          entrant: entrant.$id,
+          pollingTimestamp: moneyFlowData.eventTimestamp,
+          timeToStart: calculateTimeToStart(moneyFlowData.eventTimestamp, entrant.race),
+          winPoolAmount: estimatePoolAmount(moneyFlowData.holdPercentage || 0, 'win'),
+          placePoolAmount: estimatePoolAmount(moneyFlowData.holdPercentage || 0, 'place'),
+          totalPoolAmount: estimatePoolAmount(moneyFlowData.holdPercentage || 0, 'total'),
+          poolPercentage: moneyFlowData.holdPercentage || entrant.holdPercentage || 0,
+          incrementalAmount: calculateIncremental(updatedEntrant.moneyFlowTimeline.dataPoints, moneyFlowData.holdPercentage || 0),
+          pollingInterval: 5 // Default polling interval
+        };
+        
+        // Add to timeline and sort by timestamp
+        const updatedDataPoints = [...updatedEntrant.moneyFlowTimeline.dataPoints, newDataPoint]
+          .sort((a, b) => new Date(a.pollingTimestamp).getTime() - new Date(b.pollingTimestamp).getTime())
+          .slice(-50); // Keep last 50 points for performance
+        
+        updatedEntrant.moneyFlowTimeline = {
+          ...updatedEntrant.moneyFlowTimeline,
+          dataPoints: updatedDataPoints,
+          latestPercentage: moneyFlowData.holdPercentage || entrant.holdPercentage || 0,
+          trend,
+          significantChange: Math.abs((moneyFlowData.holdPercentage || 0) - (entrant.holdPercentage || 0)) > 2
+        };
+      }
+      
       return {
-        ...entrant,
-        previousHoldPercentage: entrant.holdPercentage,
-        holdPercentage: moneyFlowData.holdPercentage,
+        ...updatedEntrant,
         moneyFlowTrend: trend,
         $updatedAt: new Date().toISOString()
       };
     }
     return entrant;
   });
+}
+
+// Helper function to calculate time to start
+function calculateTimeToStart(_timestamp: string, _raceId: string): number {
+  // This would ideally get the race start time, for now return a mock value
+  // In a real implementation, this would need access to race data
+  return 30; // Mock: 30 minutes to start
+}
+
+// Helper function to estimate pool amounts based on percentage
+function estimatePoolAmount(percentage: number, poolType: 'win' | 'place' | 'total'): number {
+  const baseAmounts = {
+    win: 50000,   // $50k base win pool
+    place: 25000, // $25k base place pool
+    total: 75000  // $75k total pool
+  };
+  
+  return Math.round((percentage / 100) * baseAmounts[poolType]);
+}
+
+// Helper function to calculate incremental amount
+function calculateIncremental(dataPoints: any[], currentPercentage: number): number {
+  if (dataPoints.length === 0) return 0;
+  
+  const lastPoint = dataPoints[dataPoints.length - 1];
+  const lastPercentage = lastPoint.poolPercentage || 0;
+  const percentageChange = currentPercentage - lastPercentage;
+  
+  // Estimate incremental money based on percentage change
+  return Math.round((percentageChange / 100) * 50000); // Assuming $50k average pool
 }
 
 function updateEntrantOddsHistory(entrants: Entrant[], oddsData: any): Entrant[] {

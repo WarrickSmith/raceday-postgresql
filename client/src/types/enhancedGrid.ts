@@ -157,7 +157,7 @@ export const DEFAULT_GRID_DISPLAY_CONFIG: GridDisplayConfig = {
 export const DEFAULT_POOL_VIEW_STATE: PoolViewState = {
   activePool: 'win',
   displayMode: 'odds',
-  availablePools: ['win', 'place', 'quinella']
+  availablePools: ['win', 'place']
 };
 
 export const DEFAULT_GRID_ACCESSIBILITY_CONFIG: GridAccessibilityConfig = {
