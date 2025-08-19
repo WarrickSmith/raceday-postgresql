@@ -107,6 +107,36 @@ export default async function main(context) {
           }
         }
 
+        // Process tote trends data FIRST to get pool totals for money flow calculations
+        let racePoolData = null;
+        if (raceEventData.tote_pools || raceEventData.tote_trends) {
+          try {
+            // Use tote_pools (current API response) or tote_trends (legacy)
+            const poolData = raceEventData.tote_pools || raceEventData.tote_trends;
+            await processToteTrendsData(
+              databases,
+              databaseId,
+              race.raceId,
+              poolData,
+              context
+            );
+            // Extract pool data for money flow processing
+            racePoolData = {
+              winPoolTotal: poolData.pool_win || 0,
+              placePoolTotal: poolData.pool_place || 0,
+              totalRacePool: poolData.pool_total || 0
+            };
+            context.log(`Processed tote trends data for race ${race.raceId}`, {
+              racePoolData,
+            });
+          } catch (error) {
+            context.error('Failed to process tote trends data', {
+              raceId: race.raceId,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+          }
+        }
+
         // Update entrant data if available
         if (raceEventData.entrants && raceEventData.entrants.length > 0) {
           const entrantsUpdated = await processEntrants(
@@ -119,30 +149,19 @@ export default async function main(context) {
           updatesProcessed += entrantsUpdated
         }
 
-        // Process money tracker data if available
+        // Process money tracker data with pool data if available
         if (raceEventData.money_tracker) {
           const moneyFlowProcessed = await processMoneyTrackerData(
             databases,
             databaseId,
             raceEventData.money_tracker,
-            context
+            context,
+            race.raceId,
+            racePoolData
           )
           context.log(`Processed money tracker data for race ${race.raceId}`, {
             entrantsProcessed: moneyFlowProcessed,
-          })
-        }
-
-        // Process tote trends data for pool totals if available
-        if (raceEventData.tote_trends) {
-          const poolsProcessed = await processToteTrendsData(
-            databases,
-            databaseId,
-            race.raceId,
-            raceEventData.tote_trends,
-            context
-          )
-          context.log(`Processed tote trends data for race ${race.raceId}`, {
-            poolsProcessed,
+            racePoolDataAvailable: !!racePoolData
           })
         }
 

@@ -153,7 +153,28 @@ export default async function main(context) {
             }
           }
           
-          // Process both entrants and money flow in parallel
+          // Process tote trends data FIRST to get pool totals for money flow calculations
+          let racePoolData = null;
+          if (raceEventData.tote_pools || raceEventData.tote_trends) {
+            try {
+              // Use tote_pools (current API response) or tote_trends (legacy)
+              const poolData = raceEventData.tote_pools || raceEventData.tote_trends;
+              await processToteTrendsData(databases, databaseId, raceId, poolData, context);
+              // Extract pool data for money flow processing
+              racePoolData = {
+                winPoolTotal: poolData.pool_win || 0,
+                placePoolTotal: poolData.pool_place || 0,
+                totalRacePool: poolData.pool_total || 0
+              };
+            } catch (error) {
+              context.error('Failed to process tote trends data', {
+                raceId,
+                error: error instanceof Error ? error.message : 'Unknown error'
+              });
+            }
+          }
+          
+          // Process entrants and money flow with pool data in parallel
           const processingPromises = []
           
           // Update entrant data if available
@@ -164,18 +185,11 @@ export default async function main(context) {
             )
           }
           
-          // Process money tracker data if available
+          // Process money tracker data with pool data if available
           if (raceEventData.money_tracker) {
             processingPromises.push(
-              processMoneyTrackerData(databases, databaseId, raceEventData.money_tracker, context)
+              processMoneyTrackerData(databases, databaseId, raceEventData.money_tracker, context, raceId, racePoolData)
                 .then(count => { moneyFlowProcessed = count })
-            )
-          }
-          
-          // Process tote trends data for pool totals if available
-          if (raceEventData.tote_trends) {
-            processingPromises.push(
-              processToteTrendsData(databases, databaseId, raceId, raceEventData.tote_trends, context)
             )
           }
           
