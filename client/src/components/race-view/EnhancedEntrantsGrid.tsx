@@ -891,9 +891,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
             ref={scrollContainerRef}
             className="overflow-auto"
             style={{ 
-              maxHeight: className?.includes('auto-height') 
-                ? 'calc(100vh - 420px)' 
-                : '500px',
+              height: '100%',
               minHeight: '300px'
             }}
           >
