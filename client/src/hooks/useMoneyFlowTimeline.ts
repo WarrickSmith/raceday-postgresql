@@ -7,28 +7,23 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { client } from '@/lib/appwrite-client';
+import type { MoneyFlowDataPoint, EntrantMoneyFlowTimeline } from '@/types/moneyFlow';
 
-export interface MoneyFlowTimelinePoint {
+
+// Server response interface for raw database data
+interface ServerMoneyFlowPoint {
   $id: string;
   $createdAt: string;
   $updatedAt: string;
   entrant: string;
   eventTimestamp: string;
   pollingTimestamp?: string;
-  timeToStart?: number; // Minutes to race start
+  timeToStart?: number;
   holdPercentage?: number;
   betPercentage?: number;
   winPoolAmount?: number;
   placePoolAmount?: number;
-  incrementalAmount?: number;
-  poolType?: string; // 'win', 'place', 'hold', 'bet'
-  type: string; // 'hold_percentage' or 'bet_percentage'
-}
-
-export interface EntrantTimelineData {
-  entrantId: string;
-  dataPoints: MoneyFlowTimelinePoint[];
-  lastUpdated: Date | null;
+  type: string;
 }
 
 export interface TimelineGridData {
@@ -42,7 +37,7 @@ export interface TimelineGridData {
 }
 
 interface UseMoneyFlowTimelineResult {
-  timelineData: Map<string, EntrantTimelineData>; // entrantId -> timeline data
+  timelineData: Map<string, EntrantMoneyFlowTimeline>; // entrantId -> timeline data
   gridData: TimelineGridData; // interval -> entrantId -> data
   isLoading: boolean;
   error: string | null;
@@ -56,7 +51,7 @@ export function useMoneyFlowTimeline(
   entrantIds: string[],
   poolType: 'win' | 'place' | 'quinella' | 'trifecta' | 'exacta' | 'first4' = 'win'
 ): UseMoneyFlowTimelineResult {
-  const [timelineData, setTimelineData] = useState<Map<string, EntrantTimelineData>>(new Map());
+  const [timelineData, setTimelineData] = useState<Map<string, EntrantMoneyFlowTimeline>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -79,40 +74,65 @@ export function useMoneyFlowTimeline(
       const data = await response.json();
       const documents = data.documents || [];
 
-      // Group data points by entrant
-      const entrantDataMap = new Map<string, EntrantTimelineData>();
+      // Transform server data points to MoneyFlowDataPoint format
+      const transformedPoints: MoneyFlowDataPoint[] = documents.map((doc: ServerMoneyFlowPoint) => {
+        const totalPoolAmount = (doc.winPoolAmount || 0) + (doc.placePoolAmount || 0);
+        const poolPercentage = doc.holdPercentage || doc.betPercentage || 0;
+        
+        return {
+          $id: doc.$id,
+          $createdAt: doc.$createdAt,
+          $updatedAt: doc.$updatedAt,
+          entrant: doc.entrant,
+          pollingTimestamp: doc.pollingTimestamp || doc.eventTimestamp,
+          timeToStart: doc.timeToStart || 0,
+          winPoolAmount: doc.winPoolAmount || 0,
+          placePoolAmount: doc.placePoolAmount || 0,
+          totalPoolAmount,
+          poolPercentage,
+          incrementalAmount: 0, // Will be calculated below
+          pollingInterval: 5 // Default polling interval in minutes
+        };
+      });
+
+      // Group transformed data points by entrant
+      const entrantDataMap = new Map<string, EntrantMoneyFlowTimeline>();
       
       for (const entrantId of entrantIds) {
+        const entrantPoints = transformedPoints
+          .filter(point => point.entrant === entrantId)
+          .sort((a, b) => {
+            const timeA = new Date(a.pollingTimestamp).getTime();
+            const timeB = new Date(b.pollingTimestamp).getTime();
+            return timeA - timeB;
+          });
+
+        // Calculate incremental amounts
+        for (let i = 1; i < entrantPoints.length; i++) {
+          const current = entrantPoints[i];
+          const previous = entrantPoints[i - 1];
+          current.incrementalAmount = current.totalPoolAmount - previous.totalPoolAmount;
+        }
+
+        // Calculate trend and other metadata
+        const latestPoint = entrantPoints[entrantPoints.length - 1];
+        const secondLatestPoint = entrantPoints.length > 1 ? entrantPoints[entrantPoints.length - 2] : null;
+        
+        let trend: 'up' | 'down' | 'neutral' = 'neutral';
+        let significantChange = false;
+        
+        if (latestPoint && secondLatestPoint) {
+          const percentageChange = latestPoint.poolPercentage - secondLatestPoint.poolPercentage;
+          trend = percentageChange > 0 ? 'up' : percentageChange < 0 ? 'down' : 'neutral';
+          significantChange = Math.abs(percentageChange) >= 5; // 5% or more is significant
+        }
+
         entrantDataMap.set(entrantId, {
           entrantId,
-          dataPoints: [],
-          lastUpdated: null
-        });
-      }
-
-      // Process and group data points
-      for (const document of documents) {
-        const dataPoint = document as MoneyFlowTimelinePoint;
-        const entrantId = dataPoint.entrant;
-        
-        if (entrantDataMap.has(entrantId)) {
-          const entrantData = entrantDataMap.get(entrantId)!;
-          entrantData.dataPoints.push(dataPoint);
-          
-          // Update last updated timestamp
-          const pointTimestamp = new Date(dataPoint.pollingTimestamp || dataPoint.eventTimestamp);
-          if (!entrantData.lastUpdated || pointTimestamp > entrantData.lastUpdated) {
-            entrantData.lastUpdated = pointTimestamp;
-          }
-        }
-      }
-
-      // Sort data points by timestamp for each entrant (oldest first for incremental calculation)
-      for (const [entrantId, entrantData] of entrantDataMap) {
-        entrantData.dataPoints.sort((a, b) => {
-          const timeA = new Date(a.pollingTimestamp || a.eventTimestamp).getTime();
-          const timeB = new Date(b.pollingTimestamp || b.eventTimestamp).getTime();
-          return timeA - timeB;
+          dataPoints: entrantPoints,
+          latestPercentage: latestPoint?.poolPercentage || 0,
+          trend,
+          significantChange
         });
       }
 
