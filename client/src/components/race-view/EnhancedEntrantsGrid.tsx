@@ -246,9 +246,12 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       }
       
       // Calculate individual pool contributions based on pool percentage
+      // Note: Pool totals are stored as cents in database, so convert to dollars first (rounded)
       const holdPercentageDecimal = poolPercentage / 100 // Convert to decimal
-      const winPoolContribution = (racePoolData?.winPoolTotal || 0) * holdPercentageDecimal
-      const placePoolContribution = (racePoolData?.placePoolTotal || 0) * holdPercentageDecimal
+      const winPoolInDollars = Math.round((racePoolData?.winPoolTotal || 0) / 100) // Convert cents to dollars, rounded
+      const placePoolInDollars = Math.round((racePoolData?.placePoolTotal || 0) / 100) // Convert cents to dollars, rounded
+      const winPoolContribution = winPoolInDollars * holdPercentageDecimal
+      const placePoolContribution = placePoolInDollars * holdPercentageDecimal
       const totalPoolContribution = winPoolContribution + placePoolContribution
       
       console.log(`💰 Pool calculation for ${entrant.name} (${entrant.runnerNumber}):`, {
@@ -613,7 +616,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
   const formatMoney = useCallback((amount?: number) => {
     if (!amount) return '—'
-    return `$${amount.toLocaleString()}`
+    // Pool amounts are calculated from cents, so round to nearest dollar for display
+    const rounded = Math.round(amount)
+    return `$${rounded.toLocaleString()}`
   }, [])
 
   const formatPercentage = useCallback((percentage?: number) => {

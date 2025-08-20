@@ -14,6 +14,15 @@ import { useRacePoolData } from '@/hooks/useRacePoolData';
 import { screenReader } from '@/utils/accessibility';
 import { STATUS_CONFIG, getStatusConfig } from '@/utils/raceStatusConfig';
 
+// Utility function to convert cents to dollars for display (rounded to nearest dollar)
+const formatPoolAmount = (cents: number): string => {
+  const dollars = Math.round(cents / 100); // Round to nearest dollar
+  return dollars.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  });
+};
+
 interface RaceFooterProps {
   raceId: string;
   raceStartTime: string;
@@ -382,7 +391,7 @@ export const RaceFooter = memo(function RaceFooter({
                   Total Pool
                 </div>
                 <div className="text-3xl font-bold text-gray-900">
-                  {currentPoolData.currency}{currentPoolData.totalRacePool.toLocaleString()}
+                  {currentPoolData.currency}{formatPoolAmount(currentPoolData.totalRacePool)}
                 </div>
               </div>
               
@@ -396,7 +405,7 @@ export const RaceFooter = memo(function RaceFooter({
                         Win
                       </div>
                       <div className="text-lg font-bold text-gray-900">
-                        {currentPoolData.winPoolTotal.toLocaleString()}
+                        ${formatPoolAmount(currentPoolData.winPoolTotal)}
                       </div>
                     </div>
                   )}
@@ -408,7 +417,7 @@ export const RaceFooter = memo(function RaceFooter({
                         Place
                       </div>
                       <div className="text-lg font-bold text-gray-900">
-                        {currentPoolData.placePoolTotal.toLocaleString()}
+                        ${formatPoolAmount(currentPoolData.placePoolTotal)}
                       </div>
                     </div>
                   )}
@@ -420,7 +429,7 @@ export const RaceFooter = memo(function RaceFooter({
                         Quinella
                       </div>
                       <div className="text-lg font-bold text-gray-900">
-                        {currentPoolData.quinellaPoolTotal.toLocaleString()}
+                        ${formatPoolAmount(currentPoolData.quinellaPoolTotal)}
                       </div>
                     </div>
                   )}
@@ -432,7 +441,7 @@ export const RaceFooter = memo(function RaceFooter({
                         Trifecta
                       </div>
                       <div className="text-lg font-bold text-gray-900">
-                        {currentPoolData.trifectaPoolTotal.toLocaleString()}
+                        ${formatPoolAmount(currentPoolData.trifectaPoolTotal)}
                       </div>
                     </div>
                   )}
@@ -444,7 +453,7 @@ export const RaceFooter = memo(function RaceFooter({
                         Exacta
                       </div>
                       <div className="text-lg font-bold text-gray-900">
-                        {currentPoolData.exactaPoolTotal.toLocaleString()}
+                        ${formatPoolAmount(currentPoolData.exactaPoolTotal)}
                       </div>
                     </div>
                   )}
@@ -456,7 +465,7 @@ export const RaceFooter = memo(function RaceFooter({
                         First4
                       </div>
                       <div className="text-lg font-bold text-gray-900">
-                        {currentPoolData.first4PoolTotal.toLocaleString()}
+                        ${formatPoolAmount(currentPoolData.first4PoolTotal)}
                       </div>
                     </div>
                   )}
@@ -505,7 +514,7 @@ export const RaceFooter = memo(function RaceFooter({
       {/* Accessibility announcements */}
       <div className="sr-only" aria-live="polite">
         Race status: {STATUS_CONFIG[currentRaceStatus]?.description}.
-        {currentPoolData && ` Total pool: ${currentPoolData.currency}${currentPoolData.totalRacePool.toLocaleString()}.`}
+        {currentPoolData && ` Total pool: ${currentPoolData.currency}${formatPoolAmount(currentPoolData.totalRacePool)}.`}
         {resultsData && resultsData.results.length > 0 && ` Results available with ${resultsData.results.length} positions.`}
       </div>
     </div>
