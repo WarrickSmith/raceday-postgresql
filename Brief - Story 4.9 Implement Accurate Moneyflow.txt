@@ -1,0 +1,48 @@
+'Enhanced Race Entrants' component:
+
+Concept for the Datagrid Timeline: The datagrid timeline is intended to show actual data over time for each entrant (runner). 
+
+The time is the time shown in the column headers which is the amount of time before the scheduled start of a race, up to '0' (the scheduled race start time, and then columns are dynamically added after the scheduled race start time if the race hasn't actually started (Race status Closed, Interim or final). So if a race start was delayed by 2 minutes, I would expect to see the 'Start's in' countdown timer show 'Delayed - +2:00' for instance.
+
+The actual data should be the actual money bet on a runner since the last timeline update. So in the column -55m, for each runner, it should show the amount of money bet on the runner since the previous time point (-60m). These time points are designed to match when the backend Appwrite Server Functions are polling a race for data updates that are saved to the Appwrite database. There are collections for odds-history and money-flow-history. It is possible that the backend Appwrite functions may not be saving all the data points required to achieve the current money-flow display objective.
+
+The actual data to be displayed is further defined by the 'Pool' selection button. The default should be tat the 'Win' button is selected, but there is also a 'Place' and 'Quinella' button. Presently the 'Quenella' button is redundant and can be removed.
+
+By selecting a button, say the 'Win' button then the following should happen:
+
+1. The grid timeline columns should be displaying Win Pool money for each race entrant (runner) adding data to columns over time as the race start nears or displaying persistent retrospective data if the race is navigated to before, during or after the race has finalised.
+2. The 'Pool' and 'Pool %' column would show the total amount of Win pool money for an Entrant(runner) and the percentage of the total Race win pool that that amount represents for that runner. 
+
+If the Enhanced Race Entrants 'Place' button was clicked, then everything mentioned above would happen except is would display 'Place' and 'Place Pool' money for an Entrant (runner).
+
+
+Timeline grid behaviour:
+The data shown in the timeline grid should be displayed in real time. So, if the actual time was 30 minutes before a scheduled race stat time, then there would be data visible for each column -60m, -55m, -50m, -45m, -40m, -35m, -30m but the columns to the right would have no data (or a '-' placeholder).
+
+It is expected that the data shown in the whole Enhanced Race Entrants component is as near to real time as possible. So it should be subscribed to actual Appwrite DB data so that changes in the Apwrite DB data are instantly reflected in the component. Much of this architecture has already been implemented and referenced in the project architecture and user story documentation.
+
+As data needs to be retained for re-display, correct data fields (attributes) need to be being saved in the Appwrite DB and be relatable to individual runners in specific races. I do not believe this data structure is correctly implemented yet. It would be required to maintain history for Win/Place odds in addition to Win/Place money.
+
+As each time the race data source at the New Zealand TAB is fetched from the NZTAB api (documented in the NZAPI openapi spec in documents folder), it is likely to be receiving a total race pool amount for win and place. This needs to be further researched with the current implementation, however, several things may need to be checked. Does the Appwrite function actually receive money amounts for each runner or must the amount be calculated by applying a percentage of the total race money? If total amount is saved to the data at a point in time that is cumulative then the actual Enhanced Race Entrants component will need some smart logic to display the money flow correctly, something like initially reading all the records for an entrant for a race and then displaying data based on the time of each data record where the grid display a total of the amount of money summed since the last grid time column. For example, if the total win pool for a runner at -60m was $100, and at -55m the total was $110, then the difference of $10 is what would be displayed in the -55m column. If at -50m. the total for the runner was now $130, then $20 would be displayed in the -50m column.
+
+I expect data for the timeline grid would initially be 'fetched' at initial render, but would then subsequently update using subscriptions to get changes in the Win and Place pools and odds as the actual time progresses. Much of this real-time data updating has already been implemented. You should review the project to understand this. 
+
+The purpose of this story 4.9 is the review the current implementation of the Enhanced Race Entrants component and implement changes in the application, be they frontend client changes or backend Appwrite Server Functions changes, to ensure the function of the Enhanced Race Entrants component is as required.
+
+Known current issues for this story:
+Win and Place pool data does not switch in relevant components when respective buttons are selected.
+The timeline grid data is incorrect and updates incorrectly relative to the race schedule.
+The values in the 'Pool' and 'Pool %' columns do not reflect what I expect the actual values should be for each runner and each pool.
+
+
+Key points for a developer of this story:
+
+1. There is full NZTAB api documentation available at: /home/warrick/Dev/raceday/docs/nztab/openapi.json
+
+2. There is detailed information on the data polling strategy at: /home/warrick/Dev/raceday/docs/appwrite_race_polling_strategy.md and plenty more documentation at: /home/warrick/Dev/raceday/docs
+
+3. The current database collections and attributes schema is created and updated by an Appwrite function that is leveraged by the daily-meetings function and can be viewed at: /home/warrick/Dev/raceday/server/daily-meetings/src/database-setup.js
+
+4. Appwrite SDK capabilities should be researched using the Context7 MCP server if required for up to date implementation information especially real-time data updates and database interaction on the back end with Functions.
+
+5. Playwright or Puppeteer MCP servers should be used to verify UI issues or fixes.
