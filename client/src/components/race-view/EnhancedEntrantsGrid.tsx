@@ -135,6 +135,26 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
   // Get actual race pool data 
   const { poolData: racePoolData } = useRacePoolData(currentRaceId)
+  
+  // Pool view state - must be declared before money flow timeline hook
+  const [poolViewState, setPoolViewState] = useState<PoolViewState>(
+    DEFAULT_POOL_VIEW_STATE
+  )
+  
+  // Get money flow timeline data for all entrants
+  const entrantIds = useMemo(() => currentEntrants.map(e => e.$id), [currentEntrants])
+  const { timelineData, isLoading: timelineLoading, error: timelineError } = useMoneyFlowTimeline(
+    currentRaceId,
+    entrantIds,
+    poolViewState.activePool
+  )
+  
+  // Debug: Track pool toggle changes
+  console.log('🎯 Pool view state changed:', {
+    activePool: poolViewState.activePool,
+    timelineDataSize: timelineData?.size || 0,
+    entrantsCount: currentEntrants.length
+  })
 
   // Debug logging for entrants updates (can be removed in production)
   // console.log('🏃 EnhancedEntrantsGrid render:', {
@@ -161,10 +181,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     showJockeySilks: enableJockeySilks,
     showMoneyFlowColumns: enableMoneyFlowTimeline,
   })
-
-  const [poolViewState, setPoolViewState] = useState<PoolViewState>(
-    DEFAULT_POOL_VIEW_STATE
-  )
 
   const [sortState, setSortState] = useState<GridSortState>({
     column: 'winOdds',
@@ -195,22 +211,56 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     clearHistory,
   } = realtimeResult
 
-  // Use real-time entrants if available and non-empty, otherwise fallback to current entrants from context
-  // Prioritize context entrants when they exist to ensure data flows from background fetch
-  const entrants =
-    realtimeEntrants && realtimeEntrants.length > 0
-      ? realtimeEntrants
-      : currentEntrants && currentEntrants.length > 0
-      ? currentEntrants
-      : initialEntrants
+  // IMPORTANT: Use currentEntrants (from context) as base to preserve data flow
+  // Real-time entrants are used only for updating live fields (odds, scratch status) in calculations
+  // This prevents calculated pool data from being overwritten by real-time updates
+  const baseEntrants = currentEntrants && currentEntrants.length > 0 ? currentEntrants : initialEntrants
+  
+  // Merge real-time updates into base entrants for live odds data
+  const entrants = useMemo(() => {
+    if (!realtimeEntrants || realtimeEntrants.length === 0) {
+      console.log('📡 Using base entrants (no real-time data)')
+      return baseEntrants
+    }
+    
+    console.log('🔄 Merging real-time data:', {
+      baseEntrantsCount: baseEntrants.length,
+      realtimeEntrantsCount: realtimeEntrants.length,
+      totalUpdates
+    })
+    
+    // Create a map of real-time entrants for quick lookup
+    const realtimeMap = new Map(realtimeEntrants.map(e => [e.$id, e]))
+    
+    // Merge real-time data with base entrants, prioritizing live odds data
+    return baseEntrants.map(baseEntrant => {
+      const realtimeEntrant = realtimeMap.get(baseEntrant.$id)
+      if (realtimeEntrant) {
+        // Merge real-time fields while preserving base entrant structure
+        return {
+          ...baseEntrant,
+          winOdds: realtimeEntrant.winOdds ?? baseEntrant.winOdds,
+          placeOdds: realtimeEntrant.placeOdds ?? baseEntrant.placeOdds,
+          isScratched: realtimeEntrant.isScratched ?? baseEntrant.isScratched,
+          holdPercentage: realtimeEntrant.holdPercentage ?? baseEntrant.holdPercentage,
+          moneyFlowTrend: realtimeEntrant.moneyFlowTrend ?? baseEntrant.moneyFlowTrend,
+          // Preserve any calculated fields that might exist
+          poolMoney: baseEntrant.poolMoney,
+          moneyFlowTimeline: baseEntrant.moneyFlowTimeline
+        }
+      }
+      return baseEntrant
+    })
+  }, [baseEntrants, realtimeEntrants])
 
-  // Calculate pool money for each entrant using actual pool data and hold percentages
+  // Calculate pool money for each entrant using actual timeline data and pool data
   const entrantsWithPoolData = useMemo(() => {
     if (!entrants || entrants.length === 0) return []
     
     console.log('🔍 Pool calculation debug:', {
       entrantsCount: entrants.length,
-      entrantsWithHoldPercentage: entrants.filter(e => e.holdPercentage).length,
+      timelineDataAvailable: timelineData?.size > 0,
+      racePoolDataAvailable: !!racePoolData,
       sampleEntrant: entrants[0] ? {
         id: entrants[0].$id,
         name: entrants[0].name,
@@ -222,57 +272,64 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     return entrants.map(entrant => {
       if (entrant.isScratched) {
         console.log(`🐴 Scratched entrant ${entrant.name} (${entrant.runnerNumber}) - returning unchanged`)
-        return entrant // Return scratched entrants unchanged
+        return {
+          ...entrant,
+          moneyFlowTimeline: undefined // No timeline for scratched entrants
+        }
       }
       
-      // Calculate pool percentage using holdPercentage if available, otherwise estimate from odds
-      let poolPercentage: number
+      // Get timeline data for this entrant
+      const entrantTimeline = timelineData?.get(entrant.$id) || undefined
       
-      if (entrant.holdPercentage) {
+      // Use real timeline data for pool calculations - prioritize latest percentage from timeline
+      let poolPercentage: number = 0
+      let useRealTimelineData = false
+      
+      if (entrantTimeline && entrantTimeline.dataPoints.length > 0) {
+        // Use the latest percentage from the timeline data which is already calculated
+        poolPercentage = entrantTimeline.latestPercentage
+        useRealTimelineData = true
+        console.log(`💰 Using real timeline latestPercentage for ${entrant.name} (${entrant.runnerNumber}): ${poolPercentage}%`)
+      } else if (entrant.holdPercentage) {
+        // Fallback to entrant's current holdPercentage
         poolPercentage = entrant.holdPercentage
-        console.log(`💰 Using real holdPercentage for ${entrant.name} (${entrant.runnerNumber}): ${poolPercentage}%`)
-      } else if (entrant.winOdds) {
-        // Estimate pool percentage from win odds using implied probability
-        // Implied probability = 1 / decimal odds * 100
-        const impliedProbability = (1 / entrant.winOdds) * 100
-        // Pool percentage is roughly correlated to implied probability but not exactly
-        // Use a scaling factor to make it realistic for pool betting
-        poolPercentage = Math.max(1, Math.min(25, impliedProbability * 0.8))
-        console.log(`🔮 Estimated pool percentage for ${entrant.name} (${entrant.runnerNumber}) from odds ${entrant.winOdds}: ${poolPercentage.toFixed(1)}%`)
+        console.log(`📊 Using entrant holdPercentage for ${entrant.name} (${entrant.runnerNumber}): ${poolPercentage}%`)
       } else {
-        // Last resort: assign a small random percentage
-        poolPercentage = Math.random() * 5 + 1 // 1-6%
-        console.log(`🎲 Random pool percentage for ${entrant.name} (${entrant.runnerNumber}): ${poolPercentage.toFixed(1)}%`)
+        // Last resort: use a minimal fixed percentage (no random values)
+        poolPercentage = 1 // Minimal 1% for display purposes
+        console.log(`⚠️ No real data available for ${entrant.name} (${entrant.runnerNumber}), using minimal 1%`)
       }
       
       // Calculate individual pool contributions based on pool percentage
-      // Note: Pool totals are stored as cents in database, so convert to dollars first (rounded)
-      const holdPercentageDecimal = poolPercentage / 100 // Convert to decimal
-      const winPoolInDollars = Math.round((racePoolData?.winPoolTotal || 0) / 100) // Convert cents to dollars, rounded
-      const placePoolInDollars = Math.round((racePoolData?.placePoolTotal || 0) / 100) // Convert cents to dollars, rounded
+      const holdPercentageDecimal = poolPercentage / 100
+      const winPoolInDollars = Math.round((racePoolData?.winPoolTotal || 0) / 100) 
+      const placePoolInDollars = Math.round((racePoolData?.placePoolTotal || 0) / 100)
       const winPoolContribution = winPoolInDollars * holdPercentageDecimal
       const placePoolContribution = placePoolInDollars * holdPercentageDecimal
       const totalPoolContribution = winPoolContribution + placePoolContribution
       
       console.log(`💰 Pool calculation for ${entrant.name} (${entrant.runnerNumber}):`, {
         poolPercentage: poolPercentage,
-        holdPercentageDecimal: holdPercentageDecimal,
         winPoolContribution: winPoolContribution.toFixed(0),
         placePoolContribution: placePoolContribution.toFixed(0),
-        totalPoolContribution: totalPoolContribution.toFixed(0)
+        totalPoolContribution: totalPoolContribution.toFixed(0),
+        timelineDataPoints: entrantTimeline?.dataPoints.length || 0,
+        useRealTimelineData: useRealTimelineData,
+        timelineTrend: entrantTimeline?.trend || 'none'
       })
       
       return {
         ...entrant,
+        moneyFlowTimeline: entrantTimeline, // Add timeline data to entrant
         poolMoney: {
           win: winPoolContribution,
           place: placePoolContribution,
           total: totalPoolContribution,
-          percentage: poolPercentage // Use the calculated pool percentage for display
+          percentage: poolPercentage
         }
       }
     })
-  }, [entrants, racePoolData])
+  }, [entrants, racePoolData, timelineData, poolViewState.activePool])
 
   // Debug logging removed - entrants data structure verified
 
@@ -520,7 +577,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     // Check if this is a future time column (no data exists yet)
     const raceStart = new Date(currentRaceStartTime)
     const currentTimestamp = currentTime.getTime()
-    const intervalTimestamp = raceStart.getTime() + (interval * 60 * 1000)
     const currentIntervalMinutes = (currentTimestamp - raceStart.getTime()) / (1000 * 60)
     
     // If this interval is in the future (more than current time), show placeholder
@@ -528,75 +584,89 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       return '—'
     }
 
-    // Check if we have timeline data available
-    if (entrant.moneyFlowTimeline?.dataPoints && entrant.moneyFlowTimeline.dataPoints.length > 0) {
-      // Sort data points by timestamp for proper incremental calculation
-      const sortedDataPoints = [...entrant.moneyFlowTimeline.dataPoints].sort((a, b) => 
-        new Date(a.pollingTimestamp).getTime() - new Date(b.pollingTimestamp).getTime()
-      )
+    // Check if we have timeline data available from the money flow timeline
+    const entrantTimeline = timelineData?.get(entrant.$id)
+    if (entrantTimeline && entrantTimeline.dataPoints && entrantTimeline.dataPoints.length > 0) {
+      // Sort data points by timeToStart for proper chronological order
+      const sortedDataPoints = [...entrantTimeline.dataPoints].sort((a, b) => {
+        // Sort by timeToStart descending (closer to race start = lower timeToStart values)
+        const aTime = a.timeToStart !== undefined ? a.timeToStart : Infinity
+        const bTime = b.timeToStart !== undefined ? b.timeToStart : Infinity
+        return bTime - aTime // Descending order
+      })
       
-      // Find the data point closest to this interval
-      const targetTime = intervalTimestamp
-      let closestDataPoint = null
-      let closestTimeDiff = Infinity
+      // Find the data point that matches this timeline interval
+      // Look for timeToStart values that are close to the negative of our interval
+      // (interval is negative minutes before start, timeToStart is positive minutes before start)
+      const targetTimeToStart = Math.abs(interval)
+      let bestMatch = null
+      let bestTimeDiff = Infinity
       
       for (const point of sortedDataPoints) {
-        const pointTime = new Date(point.pollingTimestamp).getTime()
-        const timeDiff = Math.abs(pointTime - targetTime)
-        if (timeDiff < closestTimeDiff) {
-          closestTimeDiff = timeDiff
-          closestDataPoint = point
+        if (point.timeToStart !== undefined) {
+          const timeDiff = Math.abs(point.timeToStart - targetTimeToStart)
+          if (timeDiff < bestTimeDiff && timeDiff <= 5) { // Within 5 minutes tolerance
+            bestTimeDiff = timeDiff
+            bestMatch = point
+          }
         }
       }
       
-      if (closestDataPoint) {
-        // Find the previous data point for incremental calculation
-        const currentIndex = sortedDataPoints.findIndex(p => p.$id === closestDataPoint.$id)
-        const previousDataPoint = currentIndex > 0 ? sortedDataPoints[currentIndex - 1] : null
+      if (bestMatch) {
+        // Calculate pool amount based on current pool type selection
+        const poolType = poolViewState.activePool
+        let currentAmount = 0
         
-        if (previousDataPoint) {
-          // Calculate incremental amount since previous time point
-          const incrementalAmount = closestDataPoint.totalPoolAmount - previousDataPoint.totalPoolAmount
-          if (incrementalAmount > 0) {
-            return `+$${incrementalAmount.toLocaleString()}`
-          } else if (incrementalAmount < 0) {
-            return `-$${Math.abs(incrementalAmount).toLocaleString()}`
+        if (poolType === 'win' && bestMatch.winPoolAmount !== undefined) {
+          currentAmount = bestMatch.winPoolAmount
+        } else if (poolType === 'place' && bestMatch.placePoolAmount !== undefined) {
+          currentAmount = bestMatch.placePoolAmount
+        } else {
+          // Fallback: use win + place as total
+          const winAmount = bestMatch.winPoolAmount || 0
+          const placeAmount = bestMatch.placePoolAmount || 0
+          currentAmount = winAmount + placeAmount
+        }
+        
+        // Find the previous data point for incremental calculation
+        const currentIndex = sortedDataPoints.findIndex(p => p.$id === bestMatch.$id)
+        const previousPoint = currentIndex < sortedDataPoints.length - 1 ? sortedDataPoints[currentIndex + 1] : null
+        
+        if (previousPoint) {
+          // Calculate previous pool amount for comparison
+          let previousAmount = 0
+          if (poolType === 'win' && previousPoint.winPoolAmount !== undefined) {
+            previousAmount = previousPoint.winPoolAmount
+          } else if (poolType === 'place' && previousPoint.placePoolAmount !== undefined) {
+            previousAmount = previousPoint.placePoolAmount
           } else {
+            const winAmount = previousPoint.winPoolAmount || 0
+            const placeAmount = previousPoint.placePoolAmount || 0
+            previousAmount = winAmount + placeAmount
+          }
+          
+          // Calculate incremental change
+          const incrementalAmount = currentAmount - previousAmount
+          
+          if (Math.abs(incrementalAmount) < 1) { // Less than $1 difference
             return '$0'
+          } else if (incrementalAmount > 0) {
+            return `+$${Math.round(incrementalAmount).toLocaleString()}`
+          } else {
+            return `-$${Math.round(Math.abs(incrementalAmount)).toLocaleString()}`
           }
         } else {
-          // First data point - show the total as initial amount
-          return `$${closestDataPoint.totalPoolAmount.toLocaleString()}`
+          // First data point - show the total as initial amount if significant
+          if (currentAmount > 0) {
+            return `$${Math.round(currentAmount).toLocaleString()}`
+          }
         }
       }
     }
 
-    // Fallback: For intervals in the past where we should have data but don't, show dash
-    // For current time, use mock incremental data based on hold percentage changes
-    if (Math.abs(interval - currentIntervalMinutes) < 0.5) { // Within 30 seconds of current time
-      // Use current vs previous hold percentage to estimate incremental change
-      const currentPercentage = entrant.holdPercentage || entrant.poolMoney?.percentage || 5
-      const previousPercentage = entrant.previousHoldPercentage || currentPercentage
-      const percentageChange = currentPercentage - previousPercentage
-      
-      if (Math.abs(percentageChange) > 0.1) { // Significant change
-        // Estimate incremental money based on percentage change
-        // Assuming average pool size for demonstration
-        const estimatedPoolSize = 50000 // $50k average pool
-        const incrementalAmount = (percentageChange / 100) * estimatedPoolSize
-        
-        if (incrementalAmount > 0) {
-          return `+$${Math.round(incrementalAmount).toLocaleString()}`
-        } else {
-          return `-$${Math.round(Math.abs(incrementalAmount)).toLocaleString()}`
-        }
-      }
-      return '$0'
-    }
-
-    // For past intervals where no data exists, show dash
+    // For past intervals where no timeline data exists, show dash
     return '—'
-  }, [sortedEntrants, currentRaceStartTime, currentTime])
+  }, [sortedEntrants, currentRaceStartTime, currentTime, timelineData, poolViewState.activePool])
 
   // Determine if column should be highlighted (current time)
   const isCurrentTimeColumn = useCallback((interval: number): boolean => {
