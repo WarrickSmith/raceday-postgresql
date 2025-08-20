@@ -92,8 +92,8 @@ export function useRacePoolData(raceId: string): UseRacePoolDataResult {
       console.log('✅ Pool data real-time subscription established for race:', raceId);
     } catch (subscriptionError) {
       console.warn('Failed to establish pool data real-time subscription:', subscriptionError);
-      // Continue with periodic updates if real-time fails
-      const interval = setInterval(fetchPoolData, 10000); // Update every 10 seconds
+      // Continue with periodic updates if real-time fails - reduce frequency to prevent excessive re-renders
+      const interval = setInterval(fetchPoolData, 60000); // Update every 60 seconds as fallback
       
       return () => {
         clearInterval(interval);

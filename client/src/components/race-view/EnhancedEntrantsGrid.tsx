@@ -18,8 +18,57 @@ import { PoolToggle } from './PoolToggle'
 import { useRace } from '@/contexts/RaceContext'
 import { screenReader, AriaLabels } from '@/utils/accessibility'
 import { useRenderTracking, useMemoryOptimization } from '@/utils/performance'
+import { useValueFlash } from '@/hooks/useValueFlash'
 import { JockeySilks } from './JockeySilks'
 import { getStatusConfig, getStatusBadgeClasses } from '@/utils/raceStatusConfig'
+
+// Flash-enabled Win Odds Cell Component
+const WinOddsCell = memo(function WinOddsCell({ 
+  entrant, 
+  formatOdds 
+}: { 
+  entrant: Entrant; 
+  formatOdds: (odds?: number) => string;
+}) {
+  const { flashClasses } = useValueFlash(entrant.winOdds)
+  
+  return (
+    <td 
+      className={`px-3 py-3 whitespace-nowrap text-right border-r border-gray-200 sticky left-[200px] z-20 ${flashClasses}`} 
+      style={{ verticalAlign: 'middle', height: '60px', backgroundColor: flashClasses.includes('bg-') ? undefined : 'white' }}
+    >
+      <div className="flex items-center justify-end h-full">
+        <span className="text-sm font-medium text-gray-900">
+          {entrant.isScratched ? '—' : formatOdds(entrant.winOdds)}
+        </span>
+      </div>
+    </td>
+  )
+})
+
+// Flash-enabled Place Odds Cell Component  
+const PlaceOddsCell = memo(function PlaceOddsCell({ 
+  entrant, 
+  formatOdds 
+}: { 
+  entrant: Entrant; 
+  formatOdds: (odds?: number) => string;
+}) {
+  const { flashClasses } = useValueFlash(entrant.placeOdds)
+  
+  return (
+    <td 
+      className={`px-3 py-3 whitespace-nowrap text-right border-r-2 border-gray-300 sticky left-[280px] z-20 ${flashClasses}`} 
+      style={{ verticalAlign: 'middle', height: '60px', backgroundColor: flashClasses.includes('bg-') ? undefined : 'white' }}
+    >
+      <div className="flex items-center justify-end h-full">
+        <span className="text-sm font-medium text-gray-900">
+          {entrant.isScratched ? '—' : formatOdds(entrant.placeOdds)}
+        </span>
+      </div>
+    </td>
+  )
+})
 
 interface TimelineColumn {
   label: string
@@ -285,13 +334,24 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   }, [entrantsWithPoolData, sortState])
 
   // Update current time for dynamic timeline updates
-  // More frequent updates near race start time
+  // More frequent updates near race start time, but pause for final races
   useEffect(() => {
+    const raceStatus = liveRace?.status || 'Open'
+    
+    // Don't update time frequently for completed races
+    if (['Final', 'Closed'].includes(raceStatus)) {
+      const timer = setInterval(() => {
+        setCurrentTime(new Date())
+      }, 300000) // Update every 5 minutes for completed races
+      
+      return () => clearInterval(timer)
+    }
+
     const raceStart = new Date(currentRaceStartTime)
     const current = new Date()
     const timeToRace = (raceStart.getTime() - current.getTime()) / (1000 * 60) // minutes
 
-    // Determine update frequency based on proximity to race start
+    // Determine update frequency based on proximity to race start for active races
     let updateInterval = 60000 // Default: 1 minute
     if (timeToRace <= 5 && timeToRace >= -5) {
       updateInterval = 15000 // 15 seconds near race start
@@ -604,39 +664,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     return entrant.holdPercentage || 0
   }, [poolViewState.activePool, entrantsWithPoolData])
 
-  // Trend indicators (simplified for now)
-  const getTrendIndicator = useCallback(
-    (entrant: Entrant, oddsType: 'win' | 'place') => {
-      // TODO: Replace with actual trend calculation from historical data
-      if (entrant.isScratched) return null
-
-      // Mock trend - replace with real trend data
-      const mockTrend = Math.random()
-      if (mockTrend < 0.4) {
-        return (
-          <span
-            className="text-red-600 ml-1 text-xs"
-            aria-label={`${oddsType} odds shortened`}
-            role="img"
-          >
-            ↓
-          </span>
-        )
-      } else if (mockTrend > 0.6) {
-        return (
-          <span
-            className="text-blue-600 ml-1 text-xs"
-            aria-label={`${oddsType} odds lengthened`}
-            role="img"
-          >
-            ↑
-          </span>
-        )
-      }
-      return null
-    },
-    []
-  )
 
   // Handle pool toggle changes
   const handlePoolChange = useCallback(
@@ -1047,23 +1074,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                       </div>
                     </td>
 
-                    <td className="px-3 py-3 whitespace-nowrap text-right border-r border-gray-200 sticky left-[200px] bg-white z-20" style={{ verticalAlign: 'middle', height: '60px' }}>
-                      <div className="flex items-center justify-end h-full">
-                        <span className="text-sm font-medium text-gray-900">
-                          {entrant.isScratched ? '—' : formatOdds(entrant.winOdds)}
-                        </span>
-                        {!entrant.isScratched && getTrendIndicator(entrant, 'win')}
-                      </div>
-                    </td>
-
-                    <td className="px-3 py-3 whitespace-nowrap text-right border-r-2 border-gray-300 sticky left-[280px] bg-white z-20" style={{ verticalAlign: 'middle', height: '60px' }}>
-                      <div className="flex items-center justify-end h-full">
-                        <span className="text-sm font-medium text-gray-900">
-                          {entrant.isScratched ? '—' : formatOdds(entrant.placeOdds)}
-                        </span>
-                        {!entrant.isScratched && getTrendIndicator(entrant, 'place')}
-                      </div>
-                    </td>
+                    <WinOddsCell entrant={entrant} formatOdds={formatOdds} />
+                    <PlaceOddsCell entrant={entrant} formatOdds={formatOdds} />
 
                     {/* Timeline Columns */}
                     {timelineColumns.map((column) => (
