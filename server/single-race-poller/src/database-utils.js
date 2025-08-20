@@ -6,6 +6,71 @@
 import { ID } from 'node-appwrite';
 
 /**
+ * Extract pool totals from NZTAB API tote_pools array structure
+ * @param {Array} tote_pools - Array of pool objects from NZTAB API
+ * @param {Object} context - Appwrite function context for logging
+ * @returns {Object} Extracted pool totals with proper mapping
+ */
+function extractPoolTotals(tote_pools, context) {
+    const pools = {
+        winPoolTotal: 0,
+        placePoolTotal: 0,
+        quinellaPoolTotal: 0,
+        trifectaPoolTotal: 0,
+        exactaPoolTotal: 0,
+        first4PoolTotal: 0,
+        totalRacePool: 0
+    };
+
+    if (!tote_pools || !Array.isArray(tote_pools)) {
+        context.log('No tote_pools array found or invalid format');
+        return pools;
+    }
+
+    tote_pools.forEach(pool => {
+        const total = pool.total || 0;
+        pools.totalRacePool += total;
+
+        switch(pool.product_type) {
+            case "Win":
+                pools.winPoolTotal = total;
+                break;
+            case "Place":
+                pools.placePoolTotal = total;
+                break;
+            case "Quinella":
+                pools.quinellaPoolTotal = total;
+                break;
+            case "Trifecta":
+                pools.trifectaPoolTotal = total;
+                break;
+            case "Exacta":
+                pools.exactaPoolTotal = total;
+                break;
+            case "First 4":
+            case "First Four":
+                pools.first4PoolTotal = total;
+                break;
+            default:
+                context.log(`Unknown pool product_type: ${pool.product_type}`, {
+                    productType: pool.product_type,
+                    total: total
+                });
+        }
+    });
+
+    context.log('Extracted pool totals from tote_pools array', {
+        poolCount: tote_pools.length,
+        totalRacePool: pools.totalRacePool,
+        winPoolTotal: pools.winPoolTotal,
+        placePoolTotal: pools.placePoolTotal,
+        productTypes: tote_pools.map(p => p.product_type)
+    });
+
+    return pools;
+}
+
+/**
  * Safely convert and truncate a field to string with max length
  * @param {any} value - The value to process
  * @param {number} maxLength - Maximum allowed length
@@ -251,18 +316,29 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
 }
 
 /**
- * Process money tracker data from API response with timeline support
+ * Process money tracker data from API response with timeline support (Updated with race status filtering)
  * @param {Object} databases - Appwrite Databases instance
  * @param {string} databaseId - Database ID
  * @param {Object} moneyTrackerData - Money tracker data from API response
  * @param {Object} context - Appwrite function context for logging
  * @param {string} raceId - Race ID for timeline calculation
  * @param {Object} racePoolData - Optional race pool data for amount calculations
+ * @param {string} raceStatus - Race status for filtering (Optional)
  * @returns {number} Number of entrants processed for money flow
  */
-export async function processMoneyTrackerData(databases, databaseId, moneyTrackerData, context, raceId = 'unknown', racePoolData = null) {
+export async function processMoneyTrackerData(databases, databaseId, moneyTrackerData, context, raceId = 'unknown', racePoolData = null, raceStatus = null) {
     if (!moneyTrackerData || !moneyTrackerData.entrants || !Array.isArray(moneyTrackerData.entrants)) {
         context.log('No money tracker entrants data available', { raceId });
+        return 0;
+    }
+
+    // Skip processing money tracker data for finalized races (they will have 0% values)
+    if (raceStatus === 'Final' || raceStatus === 'Finalized' || raceStatus === 'Abandoned') {
+        context.log('Skipping money tracker processing for finalized race', { 
+            raceId, 
+            raceStatus,
+            reason: 'Finalized races have 0% values for hold/bet percentages'
+        });
         return 0;
     }
 
@@ -299,33 +375,36 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
 }
 
 /**
- * Process tote trends data and save race pool totals
+ * Process tote pools data and save race pool totals (Updated for NZTAB API structure)
  * @param {Object} databases - Appwrite Databases instance
  * @param {string} databaseId - Database ID
  * @param {string} raceId - Race ID (document ID)
- * @param {Object} toteTrendsData - Tote trends data from NZTAB API
+ * @param {Array} tote_pools - Array of tote pool objects from NZTAB API
  * @param {Object} context - Appwrite function context for logging
  * @returns {boolean} Success status
  */
-export async function processToteTrendsData(databases, databaseId, raceId, toteTrendsData, context) {
-    if (!toteTrendsData) {
-        context.log('No tote trends data available for race:', raceId);
+export async function processToteTrendsData(databases, databaseId, raceId, tote_pools, context) {
+    if (!tote_pools) {
+        context.log('No tote pools data available for race:', raceId);
         return false;
     }
 
     try {
         const timestamp = new Date().toISOString();
         
-        // Extract pool totals from tote trends data
+        // Extract pool totals from tote_pools array using new utility function
+        const extractedPools = extractPoolTotals(tote_pools, context);
+        
+        // Create race pool document with extracted data (convert to cents for integer storage)
         const poolData = {
             raceId: raceId,
-            winPoolTotal: toteTrendsData.pool_win || 0,
-            placePoolTotal: toteTrendsData.pool_place || 0,
-            quinellaPoolTotal: toteTrendsData.pool_quinella || 0,
-            trifectaPoolTotal: toteTrendsData.pool_trifecta || 0,
-            exactaPoolTotal: toteTrendsData.pool_exacta || 0,
-            first4PoolTotal: toteTrendsData.pool_first4 || 0,
-            totalRacePool: toteTrendsData.pool_total || 0,
+            winPoolTotal: Math.round(extractedPools.winPoolTotal * 100), // Convert to cents
+            placePoolTotal: Math.round(extractedPools.placePoolTotal * 100),
+            quinellaPoolTotal: Math.round(extractedPools.quinellaPoolTotal * 100),
+            trifectaPoolTotal: Math.round(extractedPools.trifectaPoolTotal * 100),
+            exactaPoolTotal: Math.round(extractedPools.exactaPoolTotal * 100),
+            first4PoolTotal: Math.round(extractedPools.first4PoolTotal * 100),
+            totalRacePool: Math.round(extractedPools.totalRacePool * 100),
             currency: '$',
             lastUpdated: timestamp
         };
@@ -334,17 +413,18 @@ export async function processToteTrendsData(databases, databaseId, raceId, toteT
         const success = await performantUpsert(databases, databaseId, 'race-pools', raceId, poolData, context);
         
         if (success) {
-            context.log('Saved race pool data from tote trends', {
+            context.log('Saved race pool data from tote_pools array', {
                 raceId,
                 totalPool: poolData.totalRacePool,
                 winPool: poolData.winPoolTotal,
-                placePool: poolData.placePoolTotal
+                placePool: poolData.placePoolTotal,
+                poolsProcessed: Array.isArray(tote_pools) ? tote_pools.length : 0
             });
         }
         
         return success;
     } catch (error) {
-        context.error('Failed to process tote trends data', {
+        context.error('Failed to process tote pools data', {
             raceId,
             error: error instanceof Error ? error.message : 'Unknown error'
         });

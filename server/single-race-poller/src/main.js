@@ -153,19 +153,34 @@ export default async function main(context) {
             }
           }
           
-          // Process tote trends data FIRST to get pool totals for money flow calculations
+          // Process tote pools data FIRST to get pool totals for money flow calculations
           let racePoolData = null;
-          if (raceEventData.tote_pools || raceEventData.tote_trends) {
+          if (raceEventData.tote_pools && Array.isArray(raceEventData.tote_pools)) {
             try {
-              // Use tote_pools (current API response) or tote_trends (legacy)
-              const poolData = raceEventData.tote_pools || raceEventData.tote_trends;
-              await processToteTrendsData(databases, databaseId, raceId, poolData, context);
-              // Extract pool data for money flow processing
-              racePoolData = {
-                winPoolTotal: poolData.pool_win || 0,
-                placePoolTotal: poolData.pool_place || 0,
-                totalRacePool: poolData.pool_total || 0
-              };
+              // Process the tote_pools array from NZTAB API
+              await processToteTrendsData(databases, databaseId, raceId, raceEventData.tote_pools, context);
+              
+              // Extract pool data for money flow processing using new structure
+              racePoolData = { winPoolTotal: 0, placePoolTotal: 0, totalRacePool: 0 };
+              
+              raceEventData.tote_pools.forEach(pool => {
+                const total = pool.total || 0;
+                racePoolData.totalRacePool += total;
+                
+                switch(pool.product_type) {
+                  case "Win":
+                    racePoolData.winPoolTotal = total;
+                    break;
+                  case "Place":
+                    racePoolData.placePoolTotal = total;
+                    break;
+                }
+              });
+              
+              context.log(`Processed tote pools data for race ${raceId}`, {
+                poolsCount: raceEventData.tote_pools.length,
+                racePoolData,
+              });
             } catch (error) {
               context.error('Failed to process tote trends data', {
                 raceId,
@@ -185,10 +200,11 @@ export default async function main(context) {
             )
           }
           
-          // Process money tracker data with pool data if available
+          // Process money tracker data with pool data if available (with race status filtering)
           if (raceEventData.money_tracker) {
+            const raceStatus = raceEventData.race && raceEventData.race.status ? raceEventData.race.status : null;
             processingPromises.push(
-              processMoneyTrackerData(databases, databaseId, raceEventData.money_tracker, context, raceId, racePoolData)
+              processMoneyTrackerData(databases, databaseId, raceEventData.money_tracker, context, raceId, racePoolData, raceStatus)
                 .then(count => { moneyFlowProcessed = count })
             )
           }
