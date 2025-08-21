@@ -253,6 +253,31 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     })
   }, [baseEntrants, realtimeEntrants])
 
+  // Validation function to check if timeline amounts sum to total pool
+  const validateTimelineSummation = useCallback((entrant: any) => {
+    if (!entrant.moneyFlowTimeline || !entrant.poolMoney) return true;
+    
+    const timeline = entrant.moneyFlowTimeline;
+    if (!timeline.dataPoints || timeline.dataPoints.length === 0) return true;
+    
+    // Sum all incremental amounts for this entrant
+    const timelineSum = timeline.dataPoints.reduce((sum: number, point: any) => {
+      return sum + (point.incrementalAmount || 0);
+    }, 0);
+    
+    // Compare with current pool total for this entrant
+    const poolTotal = entrant.poolMoney.total || 0;
+    const difference = Math.abs(timelineSum - poolTotal);
+    const tolerance = poolTotal * 0.05; // 5% tolerance
+    
+    if (difference > tolerance && poolTotal > 100) { // Only flag significant discrepancies
+      console.warn(`⚠️ Timeline summation mismatch for ${entrant.name}: timeline sum=${timelineSum}, pool total=${poolTotal}, difference=${difference}`);
+      return false;
+    }
+    
+    return true;
+  }, []);
+
   // Calculate pool money for each entrant using actual timeline data and pool data
   const entrantsWithPoolData = useMemo(() => {
     if (!entrants || entrants.length === 0) return []
@@ -290,14 +315,18 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         poolPercentage = entrantTimeline.latestPercentage
         useRealTimelineData = true
         console.log(`💰 Using real timeline latestPercentage for ${entrant.name} (${entrant.runnerNumber}): ${poolPercentage}%`)
-      } else if (entrant.holdPercentage) {
-        // Fallback to entrant's current holdPercentage
+      } else if (entrant.holdPercentage && entrant.holdPercentage > 0) {
+        // Fallback to entrant's current holdPercentage (must be > 0 to avoid navigation mode defaults)
         poolPercentage = entrant.holdPercentage
         console.log(`📊 Using entrant holdPercentage for ${entrant.name} (${entrant.runnerNumber}): ${poolPercentage}%`)
       } else {
-        // Last resort: use a minimal fixed percentage (no random values)
-        poolPercentage = 1 // Minimal 1% for display purposes
-        console.log(`⚠️ No real data available for ${entrant.name} (${entrant.runnerNumber}), using minimal 1%`)
+        // No real data available yet - don't show dummy values, skip this entrant for now
+        console.log(`⚠️ No real data available for ${entrant.name} (${entrant.runnerNumber}), skipping pool calculation until comprehensive data loads`)
+        return {
+          ...entrant,
+          moneyFlowTimeline: entrantTimeline,
+          poolMoney: undefined // Don't show dummy data
+        }
       }
       
       // Calculate individual pool contributions based on pool percentage
@@ -318,7 +347,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         timelineTrend: entrantTimeline?.trend || 'none'
       })
       
-      return {
+      const entrantWithPoolData = {
         ...entrant,
         moneyFlowTimeline: entrantTimeline, // Add timeline data to entrant
         poolMoney: {
@@ -327,9 +356,27 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           total: totalPoolContribution,
           percentage: poolPercentage
         }
+      };
+      
+      // Validate timeline summation for debugging
+      validateTimelineSummation(entrantWithPoolData);
+      
+      // Special debugging for "Wal" entrant
+      if (entrant.name.toLowerCase().includes('wal')) {
+        console.log(`🔍 DEBUG "Wal" entrant:`, {
+          name: entrant.name,
+          runnerNumber: entrant.runnerNumber,
+          poolPercentage,
+          poolMoney: entrantWithPoolData.poolMoney,
+          timelineDataPoints: entrantTimeline?.dataPoints?.length || 0,
+          sampleTimelinePoint: entrantTimeline?.dataPoints?.[0] || null,
+          timelineTrend: entrantTimeline?.trend || 'none'
+        });
       }
+      
+      return entrantWithPoolData;
     })
-  }, [entrants, racePoolData, timelineData, poolViewState.activePool])
+  }, [entrants, racePoolData, timelineData, poolViewState.activePool, validateTimelineSummation])
 
   // Debug logging removed - entrants data structure verified
 
@@ -590,6 +637,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     const entrantTimeline = timelineData?.get(entrant.$id)
     if (entrantTimeline && entrantTimeline.dataPoints && entrantTimeline.dataPoints.length > 0) {
       console.log(`📊 Processing timeline for entrant ${entrant.name}: ${entrantTimeline.dataPoints.length} data points, interval=${interval}`)
+      console.log(`📊 Sample data points:`, entrantTimeline.dataPoints.slice(0, 2).map(p => ({ timeToStart: p.timeToStart, winPoolAmount: p.winPoolAmount, placePoolAmount: p.placePoolAmount })))
+      
       // Sort data points by timeToStart for proper chronological order
       const sortedDataPoints = [...entrantTimeline.dataPoints].sort((a, b) => {
         // Sort by timeToStart descending (closer to race start = lower timeToStart values)
@@ -598,10 +647,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         return bTime - aTime // Descending order
       })
       
+      console.log(`📊 Sorted data points for ${entrant.name}:`, sortedDataPoints.slice(0, 3).map(p => ({ timeToStart: p.timeToStart, winPoolAmount: p.winPoolAmount })))
+      
       // Find the data point that matches this timeline interval
       // Look for timeToStart values that are close to the negative of our interval
       // (interval is negative minutes before start, timeToStart is positive minutes before start)
       const targetTimeToStart = Math.abs(interval)
+      console.log(`📊 Looking for timeline data at interval=${interval} (targetTimeToStart=${targetTimeToStart})`)
       let bestMatch = null
       let bestTimeDiff = Infinity
       
@@ -633,31 +685,56 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           currentAmount = winAmount + placeAmount
         }
         
-        // Find the previous data point for incremental calculation
-        const currentIndex = sortedDataPoints.findIndex(p => p.$id === bestMatch.$id)
-        const previousPoint = currentIndex < sortedDataPoints.length - 1 ? sortedDataPoints[currentIndex + 1] : null
+        // Find the chronologically previous data point (by timeToStart, not by index)
+        // Sort by timeToStart descending to find the point that occurred before this one chronologically
+        const chronologicallyPrevious = sortedDataPoints.find(point => 
+          point.timeToStart !== undefined && 
+          point.timeToStart > bestMatch.timeToStart && // Greater timeToStart = further from race start = chronologically earlier
+          point.$id !== bestMatch.$id
+        )
         
-        if (previousPoint) {
+        if (chronologicallyPrevious) {
           // Calculate previous pool amount for comparison
           let previousAmount = 0
-          if (poolType === 'win' && previousPoint.winPoolAmount !== undefined) {
-            previousAmount = previousPoint.winPoolAmount
-          } else if (poolType === 'place' && previousPoint.placePoolAmount !== undefined) {
-            previousAmount = previousPoint.placePoolAmount
+          if (poolType === 'win' && chronologicallyPrevious.winPoolAmount !== undefined) {
+            previousAmount = chronologicallyPrevious.winPoolAmount
+          } else if (poolType === 'place' && chronologicallyPrevious.placePoolAmount !== undefined) {
+            previousAmount = chronologicallyPrevious.placePoolAmount
           } else {
-            const winAmount = previousPoint.winPoolAmount || 0
-            const placeAmount = previousPoint.placePoolAmount || 0
+            const winAmount = chronologicallyPrevious.winPoolAmount || 0
+            const placeAmount = chronologicallyPrevious.placePoolAmount || 0
             previousAmount = winAmount + placeAmount
           }
           
-          // Calculate incremental change
+          // Calculate incremental change - ensure we're showing flow toward pool, not away
           const incrementalAmount = currentAmount - previousAmount
+          
+          // Validation: For timeline display, we should generally see positive incremental amounts
+          // as money flows into the pool. Negative amounts should be rare and significant
+          console.log(`💰 ${entrant.name} at ${interval}m: current=${currentAmount}, previous=${previousAmount}, incremental=${incrementalAmount}`)
+          
+          // Special logging for "Wal" entrant to debug specific issues
+          if (entrant.name.toLowerCase().includes('wal')) {
+            console.log(`🔍 WAL DEBUG at ${interval}m:`, {
+              name: entrant.name,
+              poolType: poolViewState.activePool,
+              currentAmount,
+              previousAmount,
+              incrementalAmount,
+              bestMatchTimeToStart: bestMatch.timeToStart,
+              chronologicallyPreviousTimeToStart: chronologicallyPrevious?.timeToStart
+            });
+          }
           
           if (Math.abs(incrementalAmount) < 1) { // Less than $1 difference
             return '$0'
           } else if (incrementalAmount > 0) {
             return `+$${Math.round(incrementalAmount).toLocaleString()}`
           } else {
+            // Negative values - show but mark as unusual for non-Wal debugging
+            if (entrant.name.toLowerCase().includes('wal')) {
+              console.warn(`⚠️ Negative value for ${entrant.name} at ${interval}m: ${incrementalAmount}`);
+            }
             return `-$${Math.round(Math.abs(incrementalAmount)).toLocaleString()}`
           }
         } else {
@@ -698,12 +775,12 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
   const formatPercentage = useCallback((percentage?: number) => {
     if (percentage === undefined || percentage === null) return '—'
-    return `${percentage.toFixed(2)}%`
+    return `${Math.round(percentage)}%`
   }, [])
 
   // Get pool amount for the currently selected pool type
-  const getPoolAmount = useCallback((entrant: Entrant): number => {
-    if (!entrant.poolMoney) return 0
+  const getPoolAmount = useCallback((entrant: Entrant): number | undefined => {
+    if (!entrant.poolMoney) return undefined // Return undefined when no real data yet
     
     switch (poolViewState.activePool) {
       case 'win':
@@ -716,32 +793,30 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   }, [poolViewState.activePool])
 
   // Get pool percentage for the currently selected pool type
-  const getPoolPercentage = useCallback((entrant: Entrant): number => {
+  const getPoolPercentage = useCallback((entrant: Entrant): number | undefined => {
     if (entrant.isScratched) return 0
     
-    // Calculate percentage based on selected pool type
-    if (entrant.poolMoney) {
-      switch (poolViewState.activePool) {
-        case 'win':
-          // Calculate percentage of win pool
-          const totalWinPool = entrantsWithPoolData.reduce((sum, e) => 
-            !e.isScratched ? sum + (e.poolMoney?.win || 0) : sum, 0)
-          return totalWinPool > 0 ? ((entrant.poolMoney.win || 0) / totalWinPool) * 100 : 0
-        
-        case 'place':
-          // Calculate percentage of place pool
-          const totalPlacePool = entrantsWithPoolData.reduce((sum, e) => 
-            !e.isScratched ? sum + (e.poolMoney?.place || 0) : sum, 0)
-          return totalPlacePool > 0 ? ((entrant.poolMoney.place || 0) / totalPlacePool) * 100 : 0
-        
-        default:
-          // Default to existing percentage calculation
-          return entrant.poolMoney.percentage || entrant.holdPercentage || 0
-      }
-    }
+    // Return undefined if no pool money data available yet (avoid showing dummy percentages)
+    if (!entrant.poolMoney) return undefined
     
-    // Fallback to hold percentage
-    return entrant.holdPercentage || 0
+    // Calculate percentage based on selected pool type
+    switch (poolViewState.activePool) {
+      case 'win':
+        // Calculate percentage of win pool
+        const totalWinPool = entrantsWithPoolData.reduce((sum, e) => 
+          !e.isScratched && e.poolMoney ? sum + (e.poolMoney.win || 0) : sum, 0)
+        return totalWinPool > 0 ? ((entrant.poolMoney.win || 0) / totalWinPool) * 100 : 0
+      
+      case 'place':
+        // Calculate percentage of place pool
+        const totalPlacePool = entrantsWithPoolData.reduce((sum, e) => 
+          !e.isScratched && e.poolMoney ? sum + (e.poolMoney.place || 0) : sum, 0)
+        return totalPlacePool > 0 ? ((entrant.poolMoney.place || 0) / totalPlacePool) * 100 : 0
+      
+      default:
+        // Default to existing percentage calculation
+        return entrant.poolMoney.percentage || 0
+    }
   }, [poolViewState.activePool, entrantsWithPoolData])
 
 
@@ -1186,7 +1261,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     <td className="px-3 py-3 whitespace-nowrap text-right border-l-2 border-gray-300 border-r border-gray-200 sticky right-[80px] bg-white z-20" style={{ verticalAlign: 'middle', height: '60px' }}>
                       <div className="flex items-center justify-end h-full">
                         <span className="text-sm font-medium text-gray-900">
-                          {entrant.isScratched ? '—' : formatMoney(getPoolAmount(entrant))}
+                          {entrant.isScratched ? '—' : (() => {
+                            const amount = getPoolAmount(entrant);
+                            return amount !== undefined ? formatMoney(amount) : '...';
+                          })()}
                         </span>
                       </div>
                     </td>
@@ -1194,9 +1272,12 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     <td className="px-3 py-3 whitespace-nowrap text-right sticky right-0 bg-white z-20" style={{ verticalAlign: 'middle', height: '60px' }}>
                       <div className="flex items-center justify-end h-full">
                         <span className="text-sm font-medium text-gray-900">
-                          {entrant.isScratched ? '—' : formatPercentage(getPoolPercentage(entrant))}
+                          {entrant.isScratched ? '—' : (() => {
+                            const percentage = getPoolPercentage(entrant);
+                            return percentage !== undefined ? formatPercentage(percentage) : '...';
+                          })()}
                         </span>
-                        {!entrant.isScratched && (
+                        {!entrant.isScratched && entrant.moneyFlowTrend && entrant.moneyFlowTrend !== 'neutral' && (
                           <span
                             className={`ml-1 text-xs ${
                               entrant.moneyFlowTrend === 'up'
@@ -1210,7 +1291,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                               ? '↑'
                               : entrant.moneyFlowTrend === 'down'
                               ? '↓'
-                              : '—'}
+                              : ''}
                           </span>
                         )}
                       </div>
