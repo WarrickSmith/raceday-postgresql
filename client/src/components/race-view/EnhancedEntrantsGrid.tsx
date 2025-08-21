@@ -579,14 +579,17 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     const currentTimestamp = currentTime.getTime()
     const currentIntervalMinutes = (currentTimestamp - raceStart.getTime()) / (1000 * 60)
     
-    // If this interval is in the future (more than current time), show placeholder
-    if (interval > currentIntervalMinutes) {
+    // For live races: If this interval is in the future (more than current time), show placeholder
+    // For completed races: Show all timeline data regardless of current time
+    console.log(`⏰ Timeline check: interval=${interval}, currentIntervalMinutes=${currentIntervalMinutes}, raceFinished=${currentIntervalMinutes > 0}`)
+    if (currentIntervalMinutes <= 0 && interval > currentIntervalMinutes) {
       return '—'
     }
 
     // Check if we have timeline data available from the money flow timeline
     const entrantTimeline = timelineData?.get(entrant.$id)
     if (entrantTimeline && entrantTimeline.dataPoints && entrantTimeline.dataPoints.length > 0) {
+      console.log(`📊 Processing timeline for entrant ${entrant.name}: ${entrantTimeline.dataPoints.length} data points, interval=${interval}`)
       // Sort data points by timeToStart for proper chronological order
       const sortedDataPoints = [...entrantTimeline.dataPoints].sort((a, b) => {
         // Sort by timeToStart descending (closer to race start = lower timeToStart values)
@@ -605,9 +608,11 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       for (const point of sortedDataPoints) {
         if (point.timeToStart !== undefined) {
           const timeDiff = Math.abs(point.timeToStart - targetTimeToStart)
-          if (timeDiff < bestTimeDiff && timeDiff <= 5) { // Within 5 minutes tolerance
+          // Increased tolerance to 10 minutes and added debug logging
+          if (timeDiff < bestTimeDiff && timeDiff <= 10) { 
             bestTimeDiff = timeDiff
             bestMatch = point
+            console.log(`🎯 Timeline match found: interval=${interval}, targetTimeToStart=${targetTimeToStart}, pointTimeToStart=${point.timeToStart}, timeDiff=${timeDiff}`)
           }
         }
       }
