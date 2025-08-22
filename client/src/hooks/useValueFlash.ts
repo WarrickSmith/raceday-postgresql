@@ -22,7 +22,7 @@ export function useValueFlash<T>(
     flashType: null,
   })
   const previousValueRef = useRef<T>(value)
-  const timeoutRef = useRef<NodeJS.Timeout>()
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
   useEffect(() => {
     const previousValue = previousValueRef.current
