@@ -651,6 +651,15 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
         { key: 'placePoolAmount', type: 'integer', required: false }, // Place pool amount for this entrant
         { key: 'incrementalAmount', type: 'integer', required: false }, // Calculated incremental change
         { key: 'poolType', type: 'string', size: 10, required: false }, // 'win' or 'place' for timeline specificity
+        
+        // NEW ATTRIBUTES for bucketed storage - Story 4.9 enhanced implementation
+        { key: 'timeInterval', type: 'integer', required: false }, // Minutes before race start (60, 55, 50, etc.)
+        { key: 'intervalType', type: 'string', size: 10, required: false }, // '5m', '1m', '30s'
+        { key: 'incrementalWinAmount', type: 'integer', required: false }, // Win pool increment
+        { key: 'incrementalPlaceAmount', type: 'integer', required: false }, // Place pool increment
+        { key: 'isConsolidated', type: 'boolean', required: false, default: false }, // Aggregated data flag
+        { key: 'bucketDocumentId', type: 'string', size: 100, required: false }, // For upserts
+        { key: 'rawPollingData', type: 'string', size: 2000, required: false }, // JSON debug data
     ];
     // Create attributes in parallel for improved performance
     await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
@@ -672,6 +681,46 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
         }
         else {
             context.log('eventTimestamp attribute is not available for index creation, skipping idx_timestamp index');
+        }
+    }
+    
+    // Add performance indexes for bucketed storage - Story 4.9
+    if (!moneyFlowCollection.indexes.some((idx) => idx.key === 'idx_time_interval')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'timeInterval', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_time_interval', IndexType.Key, ['timeInterval']);
+                context.log('idx_time_interval index created successfully for money flow history');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_time_interval index for money flow history: ${error}`);
+            }
+        }
+    }
+    
+    if (!moneyFlowCollection.indexes.some((idx) => idx.key === 'idx_interval_type')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'intervalType', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_interval_type', IndexType.Key, ['intervalType']);
+                context.log('idx_interval_type index created successfully for money flow history');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_interval_type index for money flow history: ${error}`);
+            }
+        }
+    }
+    
+    if (!moneyFlowCollection.indexes.some((idx) => idx.key === 'idx_polling_timestamp')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'pollingTimestamp', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_polling_timestamp', IndexType.Key, ['pollingTimestamp']);
+                context.log('idx_polling_timestamp index created successfully for money flow history');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_polling_timestamp index for money flow history: ${error}`);
+            }
         }
     }
     // Note: Appwrite does not support creating compound indexes that include relationship attributes.
