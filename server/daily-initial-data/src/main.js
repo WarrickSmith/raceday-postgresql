@@ -117,7 +117,7 @@ export default async function main(context) {
                 try {
                     executionResult = JSON.parse(execution.responseBody || '{}');
                 } catch (parseError) {
-                    context.warn('Could not parse batch execution response', {
+                    context.log('Could not parse batch execution response', {
                         batchIndex: batchIndex + 1,
                         executionId: execution.$id,
                         status: execution.status
