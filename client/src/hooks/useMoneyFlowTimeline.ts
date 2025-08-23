@@ -76,8 +76,26 @@ export function useMoneyFlowTimeline(
       const data = await response.json();
       const documents = data.documents || [];
 
-      // Transform server data points to MoneyFlowDataPoint format
+      // Check if server is providing bucketed data (optimized processing)
+      if (data.bucketedData) {
+        console.log('📊 Processing bucketed money flow data (server pre-processed)');
+        const entrantDataMap = processBucketedTimelineData(documents, entrantIds);
+        setTimelineData(entrantDataMap);
+        setLastUpdate(new Date());
+        
+        console.log('📊 Bucketed money flow timeline data processed:', {
+          raceId,
+          totalDocuments: documents.length,
+          entrantsRequested: entrantIds.length,
+          entrantsWithData: Array.from(entrantDataMap.values()).filter(d => d.dataPoints.length > 0).length,
+          optimizations: data.queryOptimizations || []
+        });
+        
+        return;
+      }
 
+      // Fallback: Legacy processing for non-bucketed data
+      console.log('📊 Processing legacy (non-bucketed) money flow data');
       const transformedPoints: MoneyFlowDataPoint[] = documents.map((doc: ServerMoneyFlowPoint) => {
         const totalPoolAmount = (doc.winPoolAmount || 0) + (doc.placePoolAmount || 0);
         const poolPercentage = doc.holdPercentage || doc.betPercentage || 0;
@@ -138,10 +156,10 @@ export function useMoneyFlowTimeline(
           let latestTimestamp = '';
           
           timePoints.forEach(point => {
-            // Sum pool amounts (they're already individual amounts per record)
-            totalWinPoolAmount = Math.max(totalWinPoolAmount, point.winPoolAmount || 0);
-            totalPlacePoolAmount = Math.max(totalPlacePoolAmount, point.placePoolAmount || 0);
-            consolidatedPercentage = Math.max(consolidatedPercentage, point.poolPercentage);
+            // CORRECT: Sum pool amounts (multiple bet transactions should be summed)
+            totalWinPoolAmount += (point.winPoolAmount || 0);
+            totalPlacePoolAmount += (point.placePoolAmount || 0);
+            consolidatedPercentage += (point.poolPercentage || 0);
             if (point.pollingTimestamp > latestTimestamp) {
               latestTimestamp = point.pollingTimestamp;
             }
@@ -264,7 +282,7 @@ export function useMoneyFlowTimeline(
     } finally {
       setIsLoading(false);
     }
-  }, [raceId, entrantIds]);
+  }, [raceId, entrantIds.join(','), poolType]);
 
   // Generate timeline grid data optimized for component display
   const gridData = useMemo(() => {
@@ -352,38 +370,52 @@ export function useMoneyFlowTimeline(
     // Initial fetch
     fetchTimelineData();
 
-    // Set up real-time subscription
+    // Set up real-time subscription with proper channel format
     let unsubscribe: (() => void) | null = null;
 
     try {
-      unsubscribe = client.subscribe(
-        'databases.raceday-db.collections.money-flow-history.documents',
-        (response: any) => {
-          // Check if this update is for one of our entrants
-          if (response.payload && entrantIds.includes(response.payload.entrant)) {
-            // Force immediate recalculation
-            setForceRefresh(prev => prev + 1);
-            
-            // Refetch timeline data to get latest
+      // Subscribe to the money-flow-history collection with proper channel format
+      const channels = [`databases.raceday-db.collections.money-flow-history.documents`];
+      
+      unsubscribe = client.subscribe(channels, (response: any) => {
+        console.log('💰 Money flow real-time update received:', response);
+        
+        // Check if this update affects our entrants
+        const updatedEntrant = response.payload?.entrant;
+        const isRelevantUpdate = updatedEntrant && (
+          typeof updatedEntrant === 'string' ? 
+            entrantIds.includes(updatedEntrant) : 
+            entrantIds.includes(updatedEntrant?.entrantId)
+        );
+        
+        if (isRelevantUpdate) {
+          console.log('📊 Relevant money flow update for entrant:', updatedEntrant);
+          
+          // Debounce rapid updates with a small delay
+          setTimeout(() => {
             fetchTimelineData();
-          }
+          }, 500);
         }
-      );
+      });
+
+      console.log('🔔 Money flow timeline subscription established for channels:', channels);
 
     } catch (subscriptionError) {
-      console.warn('Failed to establish money flow timeline subscription:', subscriptionError);
+      console.error('❌ Failed to establish money flow timeline subscription:', subscriptionError);
+      // Continue without real-time updates if subscription fails
     }
 
     return () => {
       if (unsubscribe) {
         try {
           unsubscribe();
+          console.log('🔕 Money flow timeline subscription closed');
         } catch (error) {
           console.warn('Error unsubscribing from money flow timeline updates:', error);
         }
       }
     };
-  }, [raceId, entrantIds, forceRefresh]);
+  }, [raceId, entrantIds.join(','), fetchTimelineData]); // Use entrantIds.join(',') to avoid array reference issues
 
   return {
     timelineData,
@@ -394,4 +426,65 @@ export function useMoneyFlowTimeline(
     refetch: fetchTimelineData,
     getEntrantDataForInterval
   };
+}
+
+/**
+ * Process bucketed timeline data (much simpler since server does the heavy lifting)
+ */
+function processBucketedTimelineData(documents: ServerMoneyFlowPoint[], entrantIds: string[]): Map<string, EntrantMoneyFlowTimeline> {
+  const entrantDataMap = new Map<string, EntrantMoneyFlowTimeline>();
+  
+  for (const entrantId of entrantIds) {
+    // Filter documents for this entrant
+    const entrantDocs = documents.filter(doc => {
+      const docEntrantId = typeof doc.entrant === 'string' ? doc.entrant : doc.entrant?.entrantId;
+      return docEntrantId === entrantId;
+    });
+    
+    // Sort by time interval (server should handle this but ensure correct order)
+    const sortedDocs = entrantDocs.sort((a, b) => ((b as any).timeInterval || 0) - ((a as any).timeInterval || 0));
+    
+    // Transform to timeline data points (server has pre-calculated incrementals)
+    const dataPoints: MoneyFlowDataPoint[] = sortedDocs.map(doc => ({
+      $id: doc.$id,
+      $createdAt: doc.$createdAt,
+      $updatedAt: doc.$updatedAt,
+      entrant: entrantId,
+      pollingTimestamp: doc.pollingTimestamp || doc.$createdAt,
+      timeToStart: doc.timeToStart || 0,
+      timeInterval: (doc as any).timeInterval || 0,
+      intervalType: (doc as any).intervalType || '5m',
+      winPoolAmount: doc.winPoolAmount || 0,
+      placePoolAmount: doc.placePoolAmount || 0,
+      totalPoolAmount: (doc.winPoolAmount || 0) + (doc.placePoolAmount || 0),
+      poolPercentage: doc.holdPercentage || 0,
+      incrementalAmount: (doc as any).incrementalAmount || 0, // Pre-calculated by server
+      incrementalWinAmount: (doc as any).incrementalWinAmount || 0,
+      incrementalPlaceAmount: (doc as any).incrementalPlaceAmount || 0,
+      pollingInterval: (doc as any).intervalType === '30s' ? 0.5 : (doc as any).intervalType === '1m' ? 1 : 5
+    }));
+    
+    // Calculate trend and metadata
+    const latestPoint = dataPoints[dataPoints.length - 1];
+    const secondLatestPoint = dataPoints.length > 1 ? dataPoints[dataPoints.length - 2] : null;
+    
+    let trend: 'up' | 'down' | 'neutral' = 'neutral';
+    let significantChange = false;
+    
+    if (latestPoint && secondLatestPoint) {
+      const percentageChange = latestPoint.poolPercentage - secondLatestPoint.poolPercentage;
+      trend = percentageChange > 0.5 ? 'up' : percentageChange < -0.5 ? 'down' : 'neutral';
+      significantChange = Math.abs(percentageChange) >= 5;
+    }
+
+    entrantDataMap.set(entrantId, {
+      entrantId,
+      dataPoints,
+      latestPercentage: latestPoint?.poolPercentage || 0,
+      trend,
+      significantChange
+    });
+  }
+  
+  return entrantDataMap;
 }

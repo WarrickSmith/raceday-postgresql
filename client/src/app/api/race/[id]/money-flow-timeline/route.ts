@@ -28,14 +28,16 @@ export async function GET(
     const { databases } = await createServerClient();
     const databaseId = 'raceday-db';
 
-    // Fetch money flow history for the specified entrants
+    // Fetch bucketed money flow history with optimized queries
     const response = await databases.listDocuments(
       databaseId,
       'money-flow-history',
       [
         Query.equal('entrant', entrantIds),
-        Query.orderDesc('pollingTimestamp'),
-        Query.limit(1000) // Reasonable limit for timeline data
+        Query.greaterThan('timeInterval', -60), // Only last hour of data
+        Query.lessThan('timeInterval', 60),     // Only next hour of data
+        Query.orderAsc('timeInterval'),         // Order by time interval
+        Query.limit(2000) // Enough for high-frequency data
       ]
     );
 
@@ -44,7 +46,13 @@ export async function GET(
       documents: response.documents,
       total: response.total,
       raceId,
-      entrantIds
+      entrantIds,
+      bucketedData: true,
+      queryOptimizations: [
+        'Time interval filtering',
+        'Bucketed storage',
+        'Pre-calculated incrementals'
+      ]
     });
 
   } catch (error) {
