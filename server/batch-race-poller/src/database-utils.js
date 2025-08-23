@@ -355,7 +355,7 @@ export async function processToteTrendsData(databases, databaseId, raceId, tote_
 }
 
 /**
- * Process money tracker data from API response with timeline support (Updated with race status filtering)
+ * Process money tracker data from API response with timeline support (Updated with CORRECT aggregation logic)
  * @param {Object} databases - Appwrite Databases instance
  * @param {string} databaseId - Database ID
  * @param {Object} moneyTrackerData - Money tracker data from API response
@@ -383,34 +383,135 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
 
     let entrantsProcessed = 0;
     
-    // Process and save money tracker entries in a single pass
-    const processedEntrants = new Set();
-    
+    // CORRECT AGGREGATION: Sum all entries per entrant_id (multiple bet transactions)
+    const entrantMoneyData = {};
     for (const entry of moneyTrackerData.entrants) {
-        if (entry.entrant_id && !processedEntrants.has(entry.entrant_id)) {
-            // Save the latest entry for each entrant (assuming they're in chronological order)
-            const moneyData = {
-                hold_percentage: entry.hold_percentage,
-                bet_percentage: entry.bet_percentage
-            };
-            
-            const success = await saveMoneyFlowHistory(databases, databaseId, entry.entrant_id, moneyData, context, raceId, racePoolData);
-            if (success) {
-                entrantsProcessed++;
-                processedEntrants.add(entry.entrant_id);
+        if (entry.entrant_id) {
+            if (!entrantMoneyData[entry.entrant_id]) {
+                entrantMoneyData[entry.entrant_id] = { 
+                    hold_percentage: 0, 
+                    bet_percentage: 0 
+                };
             }
+            // SUM all percentages for the entrant (multiple bet transactions)
+            entrantMoneyData[entry.entrant_id].hold_percentage += (entry.hold_percentage || 0);
+            entrantMoneyData[entry.entrant_id].bet_percentage += (entry.bet_percentage || 0);
+        }
+    }
+
+    // Validation: Check that total hold percentages sum to approximately 100%
+    const totalHoldPercentage = Object.values(entrantMoneyData).reduce((sum, data) => sum + data.hold_percentage, 0);
+    if (Math.abs(totalHoldPercentage - 100) > 5) {
+        context.warn('Hold percentages do not sum to ~100%', {
+            raceId,
+            totalHoldPercentage,
+            entrantCount: Object.keys(entrantMoneyData).length
+        });
+    }
+
+    // Save aggregated money flow data for each entrant
+    for (const [entrantId, moneyData] of Object.entries(entrantMoneyData)) {
+        const success = await saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData, context, raceId, racePoolData);
+        if (success) {
+            entrantsProcessed++;
         }
     }
     
-    context.log('Processed money tracker data with timeline support', {
+    context.log('Processed money tracker data with CORRECTED aggregation logic', {
         raceId,
         totalEntries: moneyTrackerData.entrants.length,
-        uniqueEntrants: processedEntrants.size,
+        uniqueEntrants: Object.keys(entrantMoneyData).size,
         entrantsProcessed,
+        totalHoldPercentage: totalHoldPercentage.toFixed(2) + '%',
         racePoolDataAvailable: !!racePoolData
     });
     
     return entrantsProcessed;
+}
+
+/**
+ * Save time-bucketed money flow history for dynamic column generation
+ * @param {Object} databases - Appwrite Databases instance
+ * @param {string} databaseId - Database ID
+ * @param {string} raceId - Race ID
+ * @param {Object} entrantMoneyData - Aggregated money data per entrant
+ * @param {Object} racePoolData - Race pool totals
+ * @param {Object} context - Appwrite function context for logging
+ * @returns {number} Number of bucketed records created
+ */
+async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, entrantMoneyData, racePoolData, context) {
+    let recordsCreated = 0;
+    const timestamp = new Date().toISOString();
+    
+    // Calculate time interval from race start
+    let timeInterval = null;
+    let intervalType = 'unknown';
+    
+    try {
+        const race = await databases.getDocument(databaseId, 'races', raceId);
+        if (race.startTime) {
+            const raceStartTime = new Date(race.startTime);
+            const currentTime = new Date();
+            timeInterval = Math.round((raceStartTime.getTime() - currentTime.getTime()) / (1000 * 60)); // Minutes to start
+            
+            // Determine interval type based on proximity to race
+            if (timeInterval > 30) {
+                intervalType = '5m'; // 5-minute intervals when far from race
+            } else if (timeInterval > 5) {
+                intervalType = '1m'; // 1-minute intervals close to race  
+            } else if (timeInterval > 0) {
+                intervalType = '30s'; // 30-second intervals very close to race
+            } else {
+                intervalType = 'live'; // Live updates during/after race
+            }
+        }
+    } catch (error) {
+        context.warn('Could not calculate timeInterval for bucketed storage', { raceId });
+    }
+
+    // Save bucketed data for each entrant
+    for (const [entrantId, moneyData] of Object.entries(entrantMoneyData)) {
+        try {
+            // Calculate pool amounts from aggregated percentages
+            const holdPercent = moneyData.hold_percentage / 100;
+            const winPoolAmount = Math.round((racePoolData?.winPoolTotal || 0) * holdPercent);
+            const placePoolAmount = Math.round((racePoolData?.placePoolTotal || 0) * holdPercent);
+            
+            const bucketedDoc = {
+                entrant: entrantId,
+                raceId: raceId,
+                timeInterval: timeInterval,
+                intervalType: intervalType,
+                holdPercentage: moneyData.hold_percentage,
+                betPercentage: moneyData.bet_percentage,
+                winPoolAmount: winPoolAmount,
+                placePoolAmount: placePoolAmount,
+                pollingTimestamp: timestamp,
+                eventTimestamp: timestamp,
+                type: 'bucketed_aggregation',
+                poolType: 'combined'
+            };
+            
+            await databases.createDocument(databaseId, 'money-flow-history', ID.unique(), bucketedDoc);
+            recordsCreated++;
+            
+        } catch (error) {
+            context.error('Failed to save bucketed money flow history', {
+                entrantId,
+                raceId,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            });
+        }
+    }
+    
+    context.log('Saved time-bucketed money flow history', {
+        raceId,
+        recordsCreated,
+        timeInterval,
+        intervalType
+    });
+    
+    return recordsCreated;
 }
 
 /**
@@ -688,7 +789,36 @@ export async function batchProcessRaces(databases, databaseId, raceResults, cont
                 const raceStatus = raceResult.data.race && raceResult.data.race.status ? raceResult.data.race.status : null;
                 processingPromises.push(
                     processMoneyTrackerData(databases, databaseId, raceResult.data.money_tracker, context, raceResult.raceId, racePoolData, raceStatus)
-                        .then(count => { moneyFlowProcessed = count; })
+                        .then(async (count) => { 
+                            moneyFlowProcessed = count;
+                            
+                            // Also save time-bucketed version for dynamic column generation
+                            if (count > 0 && racePoolData) {
+                                try {
+                                    // Extract aggregated entrant money data for bucketed storage
+                                    const entrantMoneyData = {};
+                                    for (const entry of raceResult.data.money_tracker.entrants) {
+                                        if (entry.entrant_id) {
+                                            if (!entrantMoneyData[entry.entrant_id]) {
+                                                entrantMoneyData[entry.entrant_id] = { 
+                                                    hold_percentage: 0, 
+                                                    bet_percentage: 0 
+                                                };
+                                            }
+                                            entrantMoneyData[entry.entrant_id].hold_percentage += (entry.hold_percentage || 0);
+                                            entrantMoneyData[entry.entrant_id].bet_percentage += (entry.bet_percentage || 0);
+                                        }
+                                    }
+                                    
+                                    await saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceResult.raceId, entrantMoneyData, racePoolData, context);
+                                } catch (error) {
+                                    context.warn('Failed to save time-bucketed money flow history', {
+                                        raceId: raceResult.raceId,
+                                        error: error instanceof Error ? error.message : 'Unknown error'
+                                    });
+                                }
+                            }
+                        })
                         .catch(error => {
                             collectBatchError(errors, error, raceResult.raceId, 'processMoneyTrackerData', context);
                             moneyFlowProcessed = 0;
