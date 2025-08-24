@@ -228,7 +228,7 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
                     timeToStart = Math.round((raceStartTime.getTime() - currentTime.getTime()) / (1000 * 60)); // Minutes to start
                 }
             } catch (error) {
-                context.warn('Could not calculate timeToStart for money flow history', { raceId, entrantId });
+                context.log('Could not calculate timeToStart for money flow history', { raceId, entrantId });
             }
         }
         
@@ -366,6 +366,14 @@ export async function processToteTrendsData(databases, databaseId, raceId, tote_
  * @returns {number} Number of entrants processed for money flow
  */
 export async function processMoneyTrackerData(databases, databaseId, moneyTrackerData, context, raceId = 'unknown', racePoolData = null, raceStatus = null) {
+    context.log('🔍 DEBUG: processMoneyTrackerData called', {
+        raceId,
+        raceStatus,
+        hasMoneyTrackerData: !!moneyTrackerData,
+        hasEntrants: !!(moneyTrackerData && moneyTrackerData.entrants),
+        entrantsLength: moneyTrackerData && moneyTrackerData.entrants ? moneyTrackerData.entrants.length : 0
+    });
+    
     if (!moneyTrackerData || !moneyTrackerData.entrants || !Array.isArray(moneyTrackerData.entrants)) {
         context.log('No money tracker entrants data available', { raceId });
         return 0;
@@ -380,6 +388,8 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
         });
         return 0;
     }
+    
+    context.log('🔍 DEBUG: Race status check passed', { raceId, raceStatus });
 
     let entrantsProcessed = 0;
     
@@ -398,11 +408,25 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
             entrantMoneyData[entry.entrant_id].bet_percentage += (entry.bet_percentage || 0);
         }
     }
+    
+    context.log('🔍 DEBUG: Aggregated entrant money data', {
+        raceId,
+        entrantCount: Object.keys(entrantMoneyData).length,
+        totalEntries: moneyTrackerData.entrants.length,
+        sampleEntrants: Object.keys(entrantMoneyData).slice(0, 3)
+    });
 
     // Validation: Check that total hold percentages sum to approximately 100%
     const totalHoldPercentage = Object.values(entrantMoneyData).reduce((sum, data) => sum + data.hold_percentage, 0);
+    context.log('🔍 DEBUG: Total hold percentage validation', {
+        raceId,
+        totalHoldPercentage: totalHoldPercentage.toFixed(2) + '%',
+        deviation: (totalHoldPercentage - 100).toFixed(2) + '%',
+        entrantCount: Object.keys(entrantMoneyData).length
+    });
+    
     if (Math.abs(totalHoldPercentage - 100) > 5) {
-        context.warn('Hold percentages do not sum to ~100%', {
+        context.log('⚠️ Hold percentages do not sum to ~100%', {
             raceId,
             totalHoldPercentage,
             entrantCount: Object.keys(entrantMoneyData).length
@@ -410,11 +434,30 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
     }
 
     // Save aggregated money flow data for each entrant
+    context.log('🔍 DEBUG: Starting to save money flow data', {
+        raceId,
+        entrantsToProcess: Object.keys(entrantMoneyData).length
+    });
+    
     for (const [entrantId, moneyData] of Object.entries(entrantMoneyData)) {
+        context.log('🔍 DEBUG: Processing entrant', {
+            raceId,
+            entrantId: entrantId.slice(0, 8) + '...',
+            holdPercentage: moneyData.hold_percentage,
+            betPercentage: moneyData.bet_percentage
+        });
+        
         const success = await saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData, context, raceId, racePoolData);
         if (success) {
             entrantsProcessed++;
         }
+        
+        context.log('🔍 DEBUG: Entrant processing result', {
+            raceId,
+            entrantId: entrantId.slice(0, 8) + '...',
+            success,
+            entrantsProcessed
+        });
     }
     
     context.log('Processed money tracker data with CORRECTED aggregation logic', {
@@ -466,7 +509,7 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
             }
         }
     } catch (error) {
-        context.warn('Could not calculate timeInterval for bucketed storage', { raceId });
+        context.log('Could not calculate timeInterval for bucketed storage', { raceId });
     }
 
     // Save bucketed data for each entrant
@@ -786,6 +829,11 @@ export async function batchProcessRaces(databases, databaseId, raceResults, cont
             
             // Process money tracker data with pool data if available (with race status filtering)
             if (raceResult.data.money_tracker) {
+                context.log('🔍 DEBUG: Found money_tracker data', {
+                    raceId: raceResult.raceId,
+                    entrantsCount: raceResult.data.money_tracker.entrants ? raceResult.data.money_tracker.entrants.length : 0,
+                    hasEntrants: !!raceResult.data.money_tracker.entrants
+                });
                 const raceStatus = raceResult.data.race && raceResult.data.race.status ? raceResult.data.race.status : null;
                 processingPromises.push(
                     processMoneyTrackerData(databases, databaseId, raceResult.data.money_tracker, context, raceResult.raceId, racePoolData, raceStatus)
@@ -812,7 +860,7 @@ export async function batchProcessRaces(databases, databaseId, raceResults, cont
                                     
                                     await saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceResult.raceId, entrantMoneyData, racePoolData, context);
                                 } catch (error) {
-                                    context.warn('Failed to save time-bucketed money flow history', {
+                                    context.log('⚠️ Failed to save time-bucketed money flow history', {
                                         raceId: raceResult.raceId,
                                         error: error instanceof Error ? error.message : 'Unknown error'
                                     });

@@ -247,7 +247,7 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
                     timeToStart = Math.round((raceStartTime.getTime() - currentTime.getTime()) / (1000 * 60)); // Minutes to start
                 }
             } catch (error) {
-                context.warn('Could not calculate timeToStart for money flow history', { raceId, entrantId });
+                context.log('Could not calculate timeToStart for money flow history', { raceId, entrantId });
             }
         }
         
@@ -363,7 +363,7 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
     // Validation: Check that total hold percentages sum to approximately 100%
     const totalHoldPercentage = Object.values(entrantMoneyData).reduce((sum, data) => sum + data.hold_percentage, 0);
     if (Math.abs(totalHoldPercentage - 100) > 5) {
-        context.warn('Hold percentages do not sum to ~100%', {
+        context.log('⚠️ Hold percentages do not sum to ~100%', {
             raceId,
             totalHoldPercentage,
             entrantCount: Object.keys(entrantMoneyData).length
@@ -383,7 +383,7 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
         try {
             await saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, entrantMoneyData, racePoolData, context);
         } catch (error) {
-            context.warn('Failed to save time-bucketed money flow history', {
+            context.log('⚠️ Failed to save time-bucketed money flow history', {
                 raceId,
                 error: error instanceof Error ? error.message : 'Unknown error'
             });
@@ -439,7 +439,7 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
             }
         }
     } catch (error) {
-        context.warn('Could not calculate timeInterval for bucketed storage', { raceId });
+        context.log('Could not calculate timeInterval for bucketed storage', { raceId });
     }
 
     // Save bucketed data for each entrant

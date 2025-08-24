@@ -247,7 +247,7 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
                     timeToStart = Math.round((raceStartTime.getTime() - currentTime.getTime()) / (1000 * 60)); // Minutes to start
                 }
             } catch (error) {
-                context.warn('Could not calculate timeToStart for money flow history', { raceId, entrantId });
+                context.log('Could not calculate timeToStart for money flow history', { raceId, entrantId });
             }
         }
         
@@ -363,7 +363,7 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, entrantId
                     }
                 }
             } catch (error) {
-                context.warn('Could not calculate timeToStart for money flow history', { raceId, entrantId });
+                context.log('Could not calculate timeToStart for money flow history', { raceId, entrantId });
             }
         }
         
@@ -585,7 +585,7 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
     });
     
     if (!isValidPercentage) {
-        context.warn('Hold percentages do not sum to ~100%', {
+        context.log('⚠️ Hold percentages do not sum to ~100%', {
             raceId,
             totalHoldPercentage,
             deviation: Math.abs(100 - totalHoldPercentage),
