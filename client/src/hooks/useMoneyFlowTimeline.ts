@@ -100,8 +100,20 @@ export function useMoneyFlowTimeline(
         const totalPoolAmount = (doc.winPoolAmount || 0) + (doc.placePoolAmount || 0);
         const poolPercentage = doc.holdPercentage || doc.betPercentage || 0;
         
-        // Extract entrant ID - server stores as nested object with entrantId field
-        const entrantId = typeof doc.entrant === 'string' ? doc.entrant : doc.entrant?.entrantId || 'unknown';
+        // Extract entrant ID - server returns complex nested object structure
+        let entrantId = 'unknown';
+        if (typeof doc.entrant === 'string') {
+          entrantId = doc.entrant;
+        } else if (doc.entrant && typeof doc.entrant === 'object') {
+          // Try multiple possible fields for entrant ID
+          entrantId = doc.entrant.entrantId || doc.entrant.$id || doc.entrant.id || 'unknown';
+        }
+        
+        console.log(`🔍 Processing document for entrant: ${entrantId}`, {
+          docEntrant: typeof doc.entrant === 'object' ? Object.keys(doc.entrant).slice(0, 5) : doc.entrant,
+          timeToStart: doc.timeToStart,
+          winPoolAmount: doc.winPoolAmount
+        });
         
         const transformed = {
           $id: doc.$id,
@@ -132,10 +144,13 @@ export function useMoneyFlowTimeline(
       for (const entrantId of entrantIds) {
         const entrantRawPoints = transformedPoints.filter(point => point.entrant === entrantId);
         
-        // Group points by timeToStart to handle multiple records (hold_percentage + bet_percentage) at same time
+        // Process ALL records for now to see what data we have
+        const allRecords = entrantRawPoints;
+        
+        // Group records by timeToStart
         const timePointMap = new Map<number, MoneyFlowDataPoint[]>();
         
-        entrantRawPoints.forEach(point => {
+        allRecords.forEach(point => {
           const timeKey = point.timeToStart ?? -999; // Use -999 for undefined timeToStart
           if (!timePointMap.has(timeKey)) {
             timePointMap.set(timeKey, []);
@@ -183,13 +198,16 @@ export function useMoneyFlowTimeline(
           consolidatedPoints.push(consolidatedPoint);
         }
         
-        // Sort by timeToStart descending (earlier times first: 60m, 55m, 50m, etc.)
+        // Sort by timeToStart descending for proper chronological order (earlier times first)
+        // CORRECTED: timeToStart format: 60, 50, 40... 2, 1, 0, -1, -2, -4... (positive=before, negative=after)
+        // Higher positive = earlier in time, lower negative = later after start
         consolidatedPoints.sort((a, b) => {
           return (b.timeToStart || -Infinity) - (a.timeToStart || -Infinity);
         });
         
-        // Calculate incremental amounts between unique time points
-        for (let i = 0; i < consolidatedPoints.length; i++) {
+        // Calculate incremental amounts between chronological time points
+        // CORRECTED: Iterate from latest to earliest, calculating increments properly
+        for (let i = consolidatedPoints.length - 1; i >= 0; i--) {
           const current = consolidatedPoints[i];
           
           const getCurrentPoolAmount = () => {
@@ -205,34 +223,32 @@ export function useMoneyFlowTimeline(
           
           const currentPoolAmount = getCurrentPoolAmount();
           
-          if (i === 0) {
-            // First chronological point (earliest time) - show absolute amount
+          if (i === consolidatedPoints.length - 1) {
+            // Latest chronological point (closest to race start) - show absolute amount as baseline
             current.incrementalAmount = currentPoolAmount;
           } else {
-            // Calculate increment from previous time point
-            const previous = consolidatedPoints[i - 1];
+            // Calculate increment from next chronological time point (which is later in time)
+            // Next point in array is later in time due to our sort order
+            const nextInTime = consolidatedPoints[i + 1];
             
-            const getPreviousPoolAmount = () => {
+            const getNextPoolAmount = () => {
               switch (poolType) {
                 case 'win':
-                  return previous.winPoolAmount;
+                  return nextInTime.winPoolAmount;
                 case 'place':
-                  return previous.placePoolAmount;
+                  return nextInTime.placePoolAmount;
                 default:
-                  return previous.totalPoolAmount;
+                  return nextInTime.totalPoolAmount;
               }
             };
             
-            const previousPoolAmount = getPreviousPoolAmount();
-            const increment = currentPoolAmount - previousPoolAmount;
+            const nextPoolAmount = getNextPoolAmount();
+            // Current amount minus next amount = increment that happened FROM this time TO next time
+            // This gives us the change that occurred in this time interval
+            const increment = nextPoolAmount - currentPoolAmount;
             
-            // Only show increment if there's actually a change
-            // If pool amount is the same as previous, show 0 instead of repeating the increment
-            if (increment > 0) {
-              current.incrementalAmount = increment;
-            } else {
-              current.incrementalAmount = 0; // No change = no increment to display
-            }
+            // Store the actual increment (can be positive, negative, or zero)
+            current.incrementalAmount = increment;
           }
         }
         
@@ -288,11 +304,20 @@ export function useMoneyFlowTimeline(
   const gridData = useMemo(() => {
     const grid: TimelineGridData = {};
     
+    console.log('🔍 Grid generation - starting with:', {
+      timelineDataSize: timelineData.size,
+      poolType,
+      sampleEntrantData: Array.from(timelineData.values())[0]
+    });
+    
     for (const [entrantId, entrantData] of timelineData) {
       // Skip if no data points
       if (entrantData.dataPoints.length === 0) {
+        console.log(`⚠️ No data points for entrant ${entrantId}`);
         continue;
       }
+      
+      console.log(`📊 Processing entrant ${entrantId}: ${entrantData.dataPoints.length} data points`);
       
       // Use the already calculated incremental amounts from dataPoints
       // The data points are already sorted chronologically and have incremental amounts calculated
@@ -301,6 +326,7 @@ export function useMoneyFlowTimeline(
         
         // Skip if no timeToStart data
         if (typeof dataPoint.timeToStart !== 'number') {
+          console.log(`⚠️ Skipping data point - no timeToStart:`, dataPoint);
           continue;
         }
         
@@ -313,6 +339,11 @@ export function useMoneyFlowTimeline(
                                  (poolType === 'place' && typeof dataPoint.placePoolAmount === 'number');
         
         if (!hasValidPoolData && !dataPoint.poolPercentage) {
+          console.log(`⚠️ Skipping data point - no valid pool data for ${poolType}:`, {
+            winPoolAmount: dataPoint.winPoolAmount,
+            placePoolAmount: dataPoint.placePoolAmount,
+            poolPercentage: dataPoint.poolPercentage
+          });
           continue;
         }
         
@@ -320,8 +351,9 @@ export function useMoneyFlowTimeline(
         // This preserves the granularity when polling frequency increases from 5m to 1m to 30s
         const interval = dataPoint.timeToStart;
         
-        // Add grid data for this interval
+        console.log(`✅ Adding grid data: entrant ${entrantId}, interval ${interval}, amount ${incrementalAmount}`);
         
+        // Add grid data for this interval
         if (!grid[interval]) {
           grid[interval] = {};
         }
@@ -334,7 +366,11 @@ export function useMoneyFlowTimeline(
       }
     }
     
-    // Timeline grid generation complete
+    console.log('🔍 Grid generation complete:', {
+      totalIntervals: Object.keys(grid).length,
+      intervals: Object.keys(grid).sort((a, b) => Number(b) - Number(a)).slice(0, 5),
+      sampleGridEntry: Object.values(grid)[0]
+    });
     
     return grid;
   }, [timelineData, poolType]);
@@ -354,12 +390,15 @@ export function useMoneyFlowTimeline(
     
     const amount = entrantData.incrementalAmount;
     
-    if (amount === 0) {
+    // Convert cents to dollars for display (NZ TAB stores amounts in cents)
+    const amountInDollars = Math.round(amount / 100);
+    
+    if (Math.abs(amountInDollars) < 1) {
       return '$0';
-    } else if (amount > 0) {
-      return `+$${amount.toLocaleString()}`;
+    } else if (amountInDollars > 0) {
+      return `+$${amountInDollars.toLocaleString()}`;
     } else {
-      return `-$${Math.abs(amount).toLocaleString()}`;
+      return `-$${Math.abs(amountInDollars).toLocaleString()}`;
     }
   }, [gridData]);
 
@@ -437,7 +476,12 @@ function processBucketedTimelineData(documents: ServerMoneyFlowPoint[], entrantI
   for (const entrantId of entrantIds) {
     // Filter documents for this entrant
     const entrantDocs = documents.filter(doc => {
-      const docEntrantId = typeof doc.entrant === 'string' ? doc.entrant : doc.entrant?.entrantId;
+      let docEntrantId = 'unknown';
+      if (typeof doc.entrant === 'string') {
+        docEntrantId = doc.entrant;
+      } else if (doc.entrant && typeof doc.entrant === 'object') {
+        docEntrantId = doc.entrant.entrantId || doc.entrant.$id || doc.entrant.id || 'unknown';
+      }
       return docEntrantId === entrantId;
     });
     
