@@ -53,3 +53,4 @@ next-env.d.ts
 /server/*/node_modules
 /server/*/.env
 /server/*/dist
+.playwright-mcp/
