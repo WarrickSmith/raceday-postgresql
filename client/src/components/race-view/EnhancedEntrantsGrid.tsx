@@ -143,17 +143,28 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   
   // Get money flow timeline data for all entrants
   const entrantIds = useMemo(() => currentEntrants.map(e => e.$id), [currentEntrants])
+  
+  // Debug: Log entrant IDs being passed to timeline hook
+  console.log('🔍 Timeline hook parameters:', {
+    raceId: currentRaceId,
+    entrantIds: entrantIds,
+    entrantCount: entrantIds.length,
+    activePool: poolViewState.activePool
+  })
+  
   const { timelineData, isLoading: timelineLoading, error: timelineError } = useMoneyFlowTimeline(
     currentRaceId,
     entrantIds,
     poolViewState.activePool
   )
   
-  // Debug: Track pool toggle changes
-  console.log('🎯 Pool view state changed:', {
+  // Debug: Track pool toggle changes and timeline data
+  console.log('🎯 Timeline data status:', {
     activePool: poolViewState.activePool,
     timelineDataSize: timelineData?.size || 0,
-    entrantsCount: currentEntrants.length
+    entrantsCount: currentEntrants.length,
+    timelineLoading,
+    timelineError: timelineError ? timelineError : null
   })
 
   // Debug logging for entrants updates (can be removed in production)
@@ -523,9 +534,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     // Use maximum of actual time or data-driven max for persistence
     const effectiveMaxPostStart = Math.max(actualPostStartMinutes, maxPostStartFromData)
     
-    // Pre-scheduled timeline milestones (unchanged)
+    // Pre-scheduled timeline milestones (CORRECTED: positive = before start, negative = after start)
+    // Backend uses: timeToStart: 60 = 60min before start, timeToStart: -2 = 2min after start
     const preScheduledMilestones = [
-      -60, -55, -50, -45, -40, -35, -30, -25, -20, -15, -10, -5, -4, -3, -2, -1, -0.5, 0
+      60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 4, 3, 2, 1, 0.5, 0
     ]
     
     const columns: TimelineColumn[] = []
@@ -533,16 +545,18 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     // Add pre-scheduled milestones, but only up to current time for live races
     preScheduledMilestones.forEach((interval) => {
       // For live races (Open status): Only show past and current intervals, not future ones
-      if (raceStatus === 'Open' && interval > timeToRaceMinutes) {
+      // Since positive intervals are BEFORE start, we show them if they're <= timeToRaceMinutes
+      if (raceStatus === 'Open' && interval > Math.abs(timeToRaceMinutes)) {
         return; // Skip future intervals for live races
       }
       
-      const timestamp = new Date(raceStart.getTime() + interval * 60 * 1000)
+      // CORRECTED: interval is now positive for before-start times
+      const timestamp = new Date(raceStart.getTime() - interval * 60 * 1000)
       let label: string
       if (interval === 0) {
         label = '0 (Start)'
-      } else if (interval === -0.5) {
-        label = '-30s'
+      } else if (interval === 0.5) {
+        label = '30s'
       } else {
         label = `${interval}m`
       }
@@ -580,20 +594,21 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         // For open races, generate dynamic columns based on actual time elapsed
         const postStartMinutes = actualPostStartMinutes
         
+        // CORRECTED: Use negative intervals for post-start (matches backend format)
         // 30-second intervals for first 2 minutes
         if (postStartMinutes <= 2) {
           const thirtySecondIntervals = Math.ceil(postStartMinutes * 2)
           for (let i = 1; i <= thirtySecondIntervals; i++) {
-            dynamicIntervals.push(i * 0.5)
+            dynamicIntervals.push(-i * 0.5) // Negative for post-start
           }
         }
         
         // Then minute intervals
         if (postStartMinutes > 2) {
-          dynamicIntervals.push(0.5, 1.0, 1.5, 2.0)
+          dynamicIntervals.push(-0.5, -1.0, -1.5, -2.0)
           const additionalMinutes = Math.floor(postStartMinutes) - 2
           for (let i = 1; i <= additionalMinutes && i <= 10; i++) {
-            dynamicIntervals.push(2 + i)
+            dynamicIntervals.push(-(2 + i)) // Negative for post-start
           }
         }
       } else {
@@ -608,13 +623,12 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                   // For closed races, show all timeline intervals (both pre and post-race)
                   const interval = point.timeToStart
                   
-                  // Only add post-race intervals to dynamic columns (negative timeToStart becomes positive interval)
+                  // Add post-race intervals to dynamic columns (keep negative timeToStart values)
                   if (interval < 0) {
-                    // Negative timeToStart means post-race start, convert to positive interval
-                    const postRaceInterval = Math.abs(interval)
-                    if (postRaceInterval > 0) {
+                    // Negative timeToStart means post-race start, keep as negative interval
+                    if (Math.abs(interval) > 0) {
                       // Round to nearest 0.5 minute for consistency
-                      const roundedInterval = Math.round(postRaceInterval * 2) / 2
+                      const roundedInterval = -Math.round(Math.abs(interval) * 2) / 2
                       dataIntervals.add(roundedInterval)
                     }
                   }
@@ -629,16 +643,18 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           dynamicIntervals.push(...Array.from(dataIntervals).sort((a, b) => a - b))
         } else {
           // Fallback: Show standard post-race intervals for completed races even without data
-          // This ensures race review capability is preserved
-          const standardPostRaceIntervals = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]
+          // This ensures race review capability is preserved (CORRECTED: negative for post-start)
+          const standardPostRaceIntervals = [-0.5, -1.0, -1.5, -2.0, -3.0, -4.0, -5.0]
           dynamicIntervals.push(...standardPostRaceIntervals)
         }
       }
       
-      // Add post-start columns
+      // Add post-start columns (CORRECTED: negative intervals are post-start)
       dynamicIntervals.forEach((interval) => {
-        const timestamp = new Date(raceStart.getTime() + interval * 60 * 1000)
-        const label = interval < 1 ? `+${(interval * 60).toFixed(0)}s` : `+${interval}m`
+        // For negative intervals (post-start), add the absolute time to get correct timestamp
+        const timestamp = new Date(raceStart.getTime() + Math.abs(interval) * 60 * 1000)
+        const absInterval = Math.abs(interval)
+        const label = absInterval < 1 ? `+${(absInterval * 60).toFixed(0)}s` : `+${absInterval}m`
         
         columns.push({
           label,
@@ -650,7 +666,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       })
     }
     
-    return columns.sort((a, b) => a.interval - b.interval)
+    // Sort columns chronologically: highest positive → 0 → lowest negative
+    // Example: 60m, 50m, 40m, ..., 2m, 1m, 0 (Start), +1m, +2m, +4m
+    return columns.sort((a, b) => b.interval - a.interval)
   }, [currentRaceStartTime, currentTime, liveRace?.status, timelineData])
 
   // Auto-scroll to show current time position
@@ -698,68 +716,123 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     // Check if we have timeline data available from the money flow timeline
     const entrantTimeline = timelineData?.get(entrant.$id)
     
-    // Debug: Log available timeline data for troubleshooting
-    if (entrant.runnerNumber === 7 && interval === 0) {
-      console.log('🔍 Timeline data available:', {
-        entrantId: entrant.$id,
-        entrantName: entrant.name,
-        timelineDataSize: timelineData?.size || 0,
-        hasEntrantTimeline: !!entrantTimeline,
-        dataPointsCount: entrantTimeline?.dataPoints?.length || 0,
-        availableTimeToStartValues: entrantTimeline?.dataPoints?.map(p => p.timeToStart) || []
-      });
-    }
-    
     if (entrantTimeline && entrantTimeline.dataPoints && entrantTimeline.dataPoints.length > 0) {
-      // Sort data points by timeToStart for proper chronological order
+      // Sort data points by timeToStart descending (60, 55, 50, ..., 2, 1, 0, -1, -2, ...)
       const sortedDataPoints = [...entrantTimeline.dataPoints].sort((a, b) => {
-        // Sort by timeToStart descending (closer to race start = lower timeToStart values)
-        const aTime = a.timeToStart !== undefined ? a.timeToStart : Infinity
-        const bTime = b.timeToStart !== undefined ? b.timeToStart : Infinity
-        return bTime - aTime // Descending order
+        const aTime = a.timeToStart !== undefined ? a.timeToStart : -Infinity
+        const bTime = b.timeToStart !== undefined ? b.timeToStart : -Infinity
+        return bTime - aTime // Descending order: 60, 55, 50, ..., 0, -1, -2
       })
       
-      // Find the data point that matches this timeline interval
-      // For pre-race intervals (negative): interval=-60 should match timeToStart=60 
-      // For post-race intervals (positive): interval=+5 should match timeToStart=-5
-      const targetTimeToStart = interval <= 0 ? Math.abs(interval) : -interval
+      // Find current data point for this interval
+      const targetTimeToStart = interval // interval 60 = timeToStart 60, interval -2 = timeToStart -2
+      let currentMatch = null
+      let currentTimeDiff = Infinity
       
-      // Find the closest matching data point within tolerance
-      let bestMatch = null
-      let bestTimeDiff = Infinity
-      
-      for (const point of sortedDataPoints) {
-        if (point.timeToStart !== undefined) {
-          const timeDiff = Math.abs(point.timeToStart - targetTimeToStart)
-          if (timeDiff < bestTimeDiff && timeDiff <= 10) { // 10 minute tolerance for matching
-            bestTimeDiff = timeDiff
-            bestMatch = point
+      // For the first column (60m), find the earliest available data point
+      if (interval >= 55) {
+        // Find the earliest data point (furthest from race start)
+        let maxTimeToStart = -Infinity
+        for (const point of sortedDataPoints) {
+          if (point.timeToStart !== undefined && point.timeToStart >= interval - 5) {
+            if (point.timeToStart > maxTimeToStart) {
+              maxTimeToStart = point.timeToStart
+              currentMatch = point
+              currentTimeDiff = 0 // Mark as found
+            }
+          }
+        }
+      } else {
+        // For other columns, find closest match
+        for (const point of sortedDataPoints) {
+          if (point.timeToStart !== undefined) {
+            const timeDiff = Math.abs(point.timeToStart - targetTimeToStart)
+            if (timeDiff < currentTimeDiff && timeDiff <= 5) { // Tight tolerance for exact matching
+              currentTimeDiff = timeDiff
+              currentMatch = point
+            }
           }
         }
       }
       
-      if (bestMatch && bestMatch.incrementalAmount !== undefined) {
-        // Use the pre-calculated incremental amount from the data processing
-        const incrementalAmount = bestMatch.incrementalAmount
+      if (currentMatch) {
+        // Get the pool amount for current time point
+        const currentPoolAmount = poolViewState.activePool === 'win' ? 
+          currentMatch.winPoolAmount || 0 : 
+          poolViewState.activePool === 'place' ? 
+            currentMatch.placePoolAmount || 0 : 
+            (currentMatch.winPoolAmount || 0) + (currentMatch.placePoolAmount || 0)
         
-        
-        // Log any unusual incremental amounts for debugging
-        if (Math.abs(incrementalAmount) > 50000) {
-          console.warn(`⚠️ Large incremental amount for ${entrant.name} at ${interval}m: $${incrementalAmount}`)
+        // Convert cents to dollars if needed
+        let currentAmount = currentPoolAmount
+        if (Math.abs(currentAmount) > 10000) { // Likely in cents
+          currentAmount = Math.round(currentAmount / 100)
         }
         
-        if (Math.abs(incrementalAmount) < 1) { // Less than $1 difference
-          return '$0'
-        } else if (incrementalAmount > 0) {
-          return `+$${Math.round(incrementalAmount).toLocaleString()}`
+        // For first column (60m or earliest), show total aggregate amount
+        if (interval >= 55) {
+          return currentAmount > 0 ? `$${currentAmount.toLocaleString()}` : '$0'
+        }
+        
+        // For all other columns, find the previous time point to calculate difference
+        let previousInterval
+        if (interval > 0) {
+          // Before race start: 60->55, 55->50, 50->45, etc.
+          if (interval >= 5) {
+            previousInterval = interval + 5
+          } else {
+            // For 4m, 3m, 2m, 1m: previous is +1 minute
+            previousInterval = interval + 1
+          }
         } else {
-          // Negative values can occur if money moves away from this entrant
-          return `-$${Math.round(Math.abs(incrementalAmount)).toLocaleString()}`
+          // After race start: 0->-1, -1->-2, etc.
+          previousInterval = interval + 1
+        }
+        
+        let previousMatch = null
+        let previousTimeDiff = Infinity
+        
+        for (const point of sortedDataPoints) {
+          if (point.timeToStart !== undefined) {
+            const timeDiff = Math.abs(point.timeToStart - previousInterval)
+            if (timeDiff < previousTimeDiff && timeDiff <= 5) {
+              previousTimeDiff = timeDiff
+              previousMatch = point
+            }
+          }
+        }
+        
+        if (previousMatch) {
+          // Get the pool amount for previous time point
+          const previousPoolAmount = poolViewState.activePool === 'win' ? 
+            previousMatch.winPoolAmount || 0 : 
+            poolViewState.activePool === 'place' ? 
+              previousMatch.placePoolAmount || 0 : 
+              (previousMatch.winPoolAmount || 0) + (previousMatch.placePoolAmount || 0)
+          
+          // Convert cents to dollars if needed
+          let previousAmount = previousPoolAmount
+          if (Math.abs(previousAmount) > 10000) { // Likely in cents
+            previousAmount = Math.round(previousAmount / 100)
+          }
+          
+          // Calculate the incremental difference
+          const incrementalDifference = currentAmount - previousAmount
+          
+          if (Math.abs(incrementalDifference) < 1) {
+            return '$0'
+          } else if (incrementalDifference > 0) {
+            return `+$${incrementalDifference.toLocaleString()}`
+          } else {
+            return `-$${Math.abs(incrementalDifference).toLocaleString()}`
+          }
+        } else {
+          // No previous point found, show current amount
+          return currentAmount > 0 ? `$${currentAmount.toLocaleString()}` : '$0'
         }
       }
     }
 
-    
     return '—'
   }, [sortedEntrants, currentRaceStartTime, currentTime, timelineData, poolViewState.activePool])
 
