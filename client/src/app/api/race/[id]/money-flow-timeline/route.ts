@@ -28,18 +28,65 @@ export async function GET(
     const { databases } = await createServerClient();
     const databaseId = 'raceday-db';
 
-    // Fetch bucketed money flow history with optimized queries
-    const response = await databases.listDocuments(
+    // Try bucketed data first (with timeInterval field)
+    let response = await databases.listDocuments(
       databaseId,
       'money-flow-history',
       [
         Query.equal('entrant', entrantIds),
-        Query.greaterThan('timeInterval', -60), // Only last hour of data
+        Query.equal('type', 'bucketed_aggregation'), // Only bucketed data
+        Query.greaterThan('timeInterval', -60), // Only last hour of data  
         Query.lessThan('timeInterval', 60),     // Only next hour of data
         Query.orderAsc('timeInterval'),         // Order by time interval
         Query.limit(2000) // Enough for high-frequency data
       ]
     );
+
+    // If no bucketed data found, fall back to legacy timeToStart data
+    if (response.documents.length === 0) {
+      console.log('📊 No bucketed data found, falling back to legacy timeToStart data');
+      
+      // Try a broader query first to see if any data exists at all
+      let broadResponse = await databases.listDocuments(
+        databaseId,
+        'money-flow-history',
+        [
+          Query.equal('entrant', entrantIds),
+          Query.limit(10) // Just get a few records to see what exists
+        ]
+      );
+      
+      console.log(`📊 Broad query found ${broadResponse.documents.length} total documents for entrants`);
+      if (broadResponse.documents.length > 0) {
+        console.log('📊 Sample document fields:', Object.keys(broadResponse.documents[0]).filter(k => !k.startsWith('$')));
+        console.log('📊 Sample document timeToStart values:', broadResponse.documents.map(d => d.timeToStart).slice(0, 5));
+      }
+      
+      response = await databases.listDocuments(
+        databaseId,
+        'money-flow-history',
+        [
+          Query.equal('entrant', entrantIds),
+          Query.greaterThan('timeToStart', -60), // Only last hour of data  
+          Query.lessThan('timeToStart', 60),     // Only next hour of data
+          Query.orderAsc('timeToStart'),         // Order by time to start
+          Query.limit(2000) // Enough for high-frequency data
+        ]
+      );
+      
+      return NextResponse.json({
+        success: true,
+        documents: response.documents,
+        total: response.total,
+        raceId,
+        entrantIds,
+        bucketedData: false, // Indicate this is legacy data
+        queryOptimizations: [
+          'Time interval filtering',
+          'Legacy timeToStart data'
+        ]
+      });
+    }
 
     return NextResponse.json({
       success: true,
