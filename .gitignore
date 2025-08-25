@@ -54,3 +54,6 @@ next-env.d.ts
 /server/*/.env
 /server/*/dist
 .playwright-mcp/
+
+# temp files
+/SAMPLE Race Data/*
