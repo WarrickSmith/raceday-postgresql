@@ -13,7 +13,7 @@ Task 1.
 
 - Currently much of the above tasks are implemented, except for an active race withint 60m of it's scheduled start time, te timeline columns up to the current actine column are disappearing and the active column is not correctly highlighted (background color change).
 
-For reference of the concept of how this should look, this file shows a scren shot of an old application with similar functionality except that this applicat displays moneyflow data from three different sources for each entrant (runner):
+For reference of the concept of how this should look, this file shows a screen shot of an old application with similar functionality except that this applicat displays moneyflow data from three different sources for each entrant (runner):
 /home/warrick/Dev/raceday/BT Main Screen2.jpg
 
 Note if using Playwright to view the client application allow plenty of time for page, race, entrant and data rendering and population.
@@ -46,4 +46,270 @@ Task 1 Summary of Dev actions Taken:
 
 Task 2: Display accurate wager (moneyflow) data in the appropriate row and column for each entrant (runner) for any given race timeline period, before, during and after a race.
 
-Do not break any of the UI and live column work achieved in Task 1 above.
+For reference of the concept of how this should look, this file shows a screen shot of an old application with similar functionality except that this applicat displays moneyflow data from three different sources for each entrant (runner):
+/home/warrick/Dev/raceday/BT Main Screen2.jpg
+
+You will see that at 60mi (60m) before the start of the scheduled race at 0s, there is an amount of money displayed which is the total current sum of wagers (money) bet on the entrant (runner) at the 60m time. Subsequently the amouns shown are the 'difference' in the amount in the previous column and the current timeline column. In my app the concept is the smae but my column timline intervals differ. Effectively as a user I want to monitor the amouns of additional money being wagered on each entrant over time to identify anomolies. My app also only has one data surce per entrant not three as shown in the example screen shot image.
+
+ISSUE: My application does not correctly display the wagers added over time which I call the moneyflow. The Money Flow Timeline component in the Enhanced Race Entrants component on the Race page is where this is displayed.
+
+I want you to investigate the best strategy to obtain the correct data from the NZTAB using the NZTAB api as defined in their openapi spec at:
+docs/nztab/openapi.json
+The data from the API should be saved In an Appwrite Database so that the correct wagers can be displayed in the client application component as they are received and updated over time. This means that if multiple amounts of wager details are received between 50m and 45m then these are aggregated and displayed in the 45m column as the current difference between the current total and the last total at 50m.
+
+You need to think about what data needs to be manipulated at the backend prior to saving in a database for subsequent dispay on the client front end. Calculations should be minimised on the front end.
+
+Appwrite functions will be scheduled to retrieve the data from the NZTAB API , manipulated it and save it to the DB. The client component will be scrobed to the Appwrite database to receive data updates when that happen and display the data accordingly. The saving of the data will also ensure that the data can continue to persist and be displayed in the front end componen before, during and after a race and when navigating between races, so it is likely the an initial client side rende wil fetch existing data, subscribe for updates and close doen subscription when navigating away from that race.
+
+Examine all the data available and what will need to be calculated to create usable data to achieve the front end display of wager (moneyflow) amount relative to the scheduled start time and beyond to the actual race start time.
+
+To help, here is some sample data fetched for a single race at some time intervals prior to the race start for you to analyse an undrsatnd the data you will be working with.
+SAMPLE Race Data/racedata1+70m.json
+SAMPLE Race Data/racedata2+35m.json SAMPLE Race Data/racedata3+30m.json SAMPLE Race Data/racedata4+20m.json SAMPLE Race Data/racedata5+15m.json SAMPLE Race Data/racedata6+10m.json SAMPLE Race Data/racedata7+5m.json SAMPLE Race Data/racedata8-2m.json 
+
+You will likely see aggregated totals in each subsequent data file update.
+
+I want you to detail a startegy to get the Data from the source NZTABAPI to the final display of that Data in the moneyflow grid on the client, utilising Appwrite functions and Appwrite database and realtime client subscriptions. Do this as a new exercise ignoring the existing code and document your strategy in this document below:
+
+Strategy:
+
+## Task 2 Implementation Strategy: Accurate Money Flow Data Pipeline
+
+### 1. Data Source Analysis (NZTAB API)
+
+Based on analysis of sample race data from `/SAMPLE Race Data/racedata2+35m.json`, the NZTAB API provides:
+
+#### Available Pool Data in API Response:
+- **Win Pool**: `product_type: "Win"` with `total` amount
+- **Place Pool**: `product_type: "Place"` with `total` amount  
+- **Tote Trends XML**: Contains runner-level investment amounts in `tote_trends_data`
+
+#### Key Data Structure in XML:
+```xml
+<bet_type type="WIN">
+  <pool_total>2181.43</pool_total>
+  <runners>
+    <runner runner_number="1">
+      <runner_investment>548.22</runner_investment>
+    </runner>
+  </runners>
+</bet_type>
+```
+
+### 2. Data Pipeline Architecture
+
+#### Phase 1: Data Collection (Appwrite Functions)
+- **Function**: `race-money-flow-poller`
+- **Schedule**: Variable frequency (5m → 1m → 30s as race approaches)
+- **Process**:
+  1. Fetch race data from NZTAB API
+  2. Parse tote_trends XML for runner-level investments
+  3. Extract Win/Place pool amounts per entrant
+  4. Calculate time-to-start for timeline positioning
+
+#### Phase 2: Data Processing (Backend Calculation)
+- **Function**: `money-flow-processor` 
+- **Processing Logic**:
+  1. **Aggregation**: Sum multiple polling records within same time interval
+  2. **Incremental Calculation**: Current amount - Previous interval amount = increment
+  3. **Timeline Bucketing**: Group data into standard intervals (60m, 55m, 50m...0s, -30s, -1m...)
+
+#### Phase 3: Database Storage (Optimized Schema)
+
+**Collection**: `money-flow-timeline`
+```typescript
+interface MoneyFlowTimelineRecord {
+  $id: string
+  raceId: string
+  entrantId: string
+  timeInterval: number        // -60, -55, -50... 0, 1, 2 (minutes to/from start)
+  intervalType: string        // "5m", "1m", "30s" 
+  pollingTimestamp: string    // Actual data collection time
+  
+  // Absolute amounts (total invested at this time)
+  winPoolAmount: number       // Total win pool for entrant (cents)
+  placePoolAmount: number     // Total place pool for entrant (cents)
+  
+  // Pre-calculated incremental amounts (difference from previous interval)
+  incrementalWinAmount: number    // Change in win pool since last interval
+  incrementalPlaceAmount: number  // Change in place pool since last interval
+  incrementalTotalAmount: number  // Total change for display
+  
+  // Metadata
+  poolPercentage: number      // Entrant's percentage of total pool
+  sourceApiTimestamp: string  // Original NZTAB API timestamp
+}
+```
+
+### 3. Real-Time Data Flow
+
+#### Appwrite Function Scheduler:
+```
+75m+ before race: Poll every 10 minutes (baseline collection)
+60m-30m before:   Poll every 5 minutes  
+30m-10m before:   Poll every 2 minutes  
+10m-0s:          Poll every 1 minute
+0s onwards:      Poll every 30 seconds (until race status changes from 'Open')
+
+STOP POLLING IF: Race status = 'Abandoned', 'Cancelled', or 'Postponed'
+```
+
+#### Backend Processing Pipeline:
+1. **Raw API Data** → Parse tote_trends XML + Check race status
+2. **Extract Pool Amounts** → Group by entrant + time interval
+3. **Calculate Increments** → Compare with previous interval data (ONLY positive increments)
+4. **Data Validation** → Ensure no negative values, handle no-change as null
+5. **Store Processed Data** → Save to `money-flow-timeline` collection with persistence
+6. **Trigger Real-time Event** → Notify client subscribers
+
+#### Race Status Handling:
+- **Active Races**: Continue polling based on schedule
+- **Abandoned/Cancelled**: Stop polling immediately, preserve existing data
+- **Completed**: Stop polling, maintain all data for historical viewing
+- **Delayed Start**: Continue polling beyond scheduled start time, create dynamic columns
+
+### 4. Client-Side Integration
+
+#### Modified Hook: `useMoneyFlowTimeline.ts`
+```typescript
+// Simplified client logic - server does heavy lifting
+const fetchTimelineData = async () => {
+  const response = await fetch(
+    `/api/race/${raceId}/money-flow-timeline?entrants=${entrantIds.join(',')}&poolType=${poolType}`
+  );
+  
+  const data = await response.json();
+  // Data already processed and bucketed by server
+  return processBucketedTimelineData(data.documents);
+};
+```
+
+#### Timeline Grid Display Logic:
+- **60m Column**: Show absolute pool amount (`$2,341`) - baseline from 75m+ polling
+- **Subsequent Columns**: Show incremental change (`+$344`) or `—` for no change
+- **NO NEGATIVE VALUES**: Money only flows IN - negative increments indicate data errors
+- **Real-time Updates**: Flash cells on value changes
+- **Post-Race Persistence**: All data remains accessible after race completion
+- **Dynamic Columns**: Preserve Task 1 functionality for delayed race starts (-30s, -1m, -1:30m, etc.)
+
+#### Display Rules:
+- **Positive increment**: `+$344`
+- **No change**: `—` (not `$0`)
+- **Missing data**: `—`
+- **Data error/negative**: `—` (log warning)
+
+### 5. Implementation Steps
+
+#### Step 1: Create Money Flow Polling Function
+- New Appwrite function: `server/money-flow-poller/`
+- Parse NZTAB tote_trends XML for runner investments
+- Extract Win/Place pool amounts per entrant
+- **Start polling at 75m+ before race** to establish baseline for 60m column
+- Monitor race status - stop polling if Abandoned/Cancelled
+- Store raw polling data with timestamps
+
+#### Step 2: Create Data Processing Function  
+- New Appwrite function: `server/money-flow-processor/`
+- Process raw polling data into timeline intervals
+- **Calculate ONLY positive incremental amounts** between time periods
+- Handle no-change scenarios (store as null, display as `—`)
+- **Validate no negative increments** - log errors for investigation
+- Handle aggregation for high-frequency updates
+- **Preserve data persistence** for post-race viewing
+
+#### Step 3: Update Database Schema
+- Create `money-flow-timeline` collection
+- Index on raceId, entrantId, timeInterval
+- Configure real-time subscriptions
+
+#### Step 4: Modify Client Components
+- Update `useMoneyFlowTimeline.ts` to use processed data
+- **PRESERVE Task 1 functionality**: Keep existing timeline column generation logic intact
+- **PRESERVE dynamic columns**: Maintain post-start column functionality (-30s, -1m, etc.)
+- Simplify timeline cell rendering to use server-processed increments
+- Add real-time subscription for live updates
+- **Ensure data persistence**: Historical viewing after race completion or navigation
+
+#### Step 5: Scheduler Integration
+- Integrate with existing `master-race-scheduler`
+- Dynamic polling frequency based on race proximity
+- Handle post-race data persistence
+
+### 6. Data Validation & Quality
+
+#### Backend Validation:
+- **No negative increments**: Money only flows IN to pools
+- **Baseline data collection**: Start polling 15m+ before first display column (75m+ for 60m baseline)
+- Timeline continuity validation (no missing intervals)
+- Cross-reference with race pool totals
+- **Race status monitoring**: Stop polling for abandoned races
+
+#### Client Display:
+- Show `—` for no change (not `$0`)
+- Show `—` for missing data intervals  
+- Show `—` for data errors/negative values (with console warning)
+- Flash cells for real-time updates
+- Validate timeline summation matches footer pool totals
+- **Preserve Task 1 UI behavior**: Timeline columns, active column highlighting, sticky columns
+
+### 7. Performance Optimizations
+
+#### Database:
+- Pre-calculated incremental amounts (no client-side math)
+- Bucketed data storage (one record per interval per entrant)
+- Efficient indexing on timeline queries
+
+#### Client:
+- Memoized timeline calculations
+- Debounced real-time updates
+- Lazy loading for historical race data
+
+### 8. Addressing Specific Requirements
+
+#### 1. Baseline Data Collection (65m+ Polling)
+**Problem**: Need existing data at 60m to calculate increments for 55m column
+**Solution**: Start polling at 75m+ (15 minutes before first display column)
+- Provides baseline data for 60m absolute amount display
+- Enables proper increment calculations for all subsequent columns
+
+#### 2. Abandoned Race Handling  
+**Implementation**: Race status monitoring in polling function
+```typescript
+if (raceStatus === 'Abandoned' || raceStatus === 'Cancelled' || raceStatus === 'Postponed') {
+  console.log(`Race ${raceId} is ${raceStatus} - stopping money flow polling`);
+  return; // Stop polling immediately
+}
+```
+
+#### 3. Task 1 Functionality Preservation
+**Critical Requirement**: Maintain all existing UI behavior from Task 1
+- ✅ Keep timeline column generation logic (60m, 55m... 0s, -30s, -1m, etc.)
+- ✅ Preserve active column highlighting (green background)  
+- ✅ Maintain sticky columns architecture
+- ✅ Keep dynamic post-start column generation for delayed races
+- ✅ Ensure data persistence for navigation and post-race viewing
+
+#### 4. No Negative Values Logic
+**Rule**: Money only flows INTO pools - never negative increments
+**Implementation**: 
+```typescript
+const increment = currentPoolAmount - previousPoolAmount;
+if (increment < 0) {
+  console.warn(`Negative increment detected: ${increment} - treating as no change`);
+  return null; // Will display as "—"
+}
+return increment > 0 ? increment : null; // null = no change = "—"
+```
+
+#### 5. No Change Display Logic
+**Requirement**: Show `—` not `$0` when no money flow change occurs
+**Implementation**:
+```typescript
+// Backend: Store null for no change
+incrementalAmount: increment > 0 ? increment : null
+
+// Client: Display logic
+const displayValue = incrementalAmount === null ? '—' : `+$${incrementalAmount}`;
+```
+
+This revised strategy addresses all concerns while preserving existing functionality and ensuring accurate money flow tracking.
