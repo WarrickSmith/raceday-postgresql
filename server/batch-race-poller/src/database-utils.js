@@ -215,8 +215,9 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
     try {
         const timestamp = new Date().toISOString();
         
-        // Calculate timeline fields if race info is available
+        // Calculate timeline fields if race info is available with FIXED bucketing
         let timeToStart = null;
+        let timeInterval = null;
         let pollingTimestamp = timestamp;
         
         if (raceId) {
@@ -226,6 +227,7 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
                     const raceStartTime = new Date(race.startTime);
                     const currentTime = new Date();
                     timeToStart = Math.round((raceStartTime.getTime() - currentTime.getTime()) / (1000 * 60)); // Minutes to start
+                    timeInterval = getTimelineInterval(timeToStart); // Use FIXED timeline interval mapping
                 }
             } catch (error) {
                 context.log('Could not calculate timeToStart for money flow history', { raceId, entrantId });
@@ -239,20 +241,22 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
         if (typeof moneyData.hold_percentage !== 'undefined') {
             const holdDoc = {
                 entrant: entrantId,
+                raceId: raceId, // Add raceId for proper queries
                 holdPercentage: moneyData.hold_percentage,
                 betPercentage: null, // Explicitly null for hold_percentage records
                 type: 'hold_percentage',
                 eventTimestamp: timestamp,
                 pollingTimestamp: pollingTimestamp,
                 timeToStart: timeToStart,
+                timeInterval: timeInterval, // Add timeline interval for bucketing
                 poolType: 'hold' // For legacy hold percentage data
             };
             
-            // Calculate pool amounts if race pool data is available
+            // Calculate pool amounts if race pool data is available (convert to cents)
             if (racePoolData) {
                 const holdPercent = moneyData.hold_percentage / 100;
-                holdDoc.winPoolAmount = Math.round((racePoolData.winPoolTotal || 0) * holdPercent);
-                holdDoc.placePoolAmount = Math.round((racePoolData.placePoolTotal || 0) * holdPercent);
+                holdDoc.winPoolAmount = Math.round((racePoolData.winPoolTotal || 0) * holdPercent * 100); // Convert to cents
+                holdDoc.placePoolAmount = Math.round((racePoolData.placePoolTotal || 0) * holdPercent * 100); // Convert to cents
             }
             
             await databases.createDocument(databaseId, 'money-flow-history', ID.unique(), holdDoc);
@@ -263,20 +267,22 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
         if (typeof moneyData.bet_percentage !== 'undefined') {
             const betDoc = {
                 entrant: entrantId,
+                raceId: raceId, // Add raceId for proper queries
                 holdPercentage: null, // Explicitly null for bet_percentage records
                 betPercentage: moneyData.bet_percentage,
                 type: 'bet_percentage',
                 eventTimestamp: timestamp,
                 pollingTimestamp: pollingTimestamp,
                 timeToStart: timeToStart,
+                timeInterval: timeInterval, // Add timeline interval for bucketing
                 poolType: 'bet' // For bet percentage data
             };
             
-            // Calculate pool amounts if race pool data is available
+            // Calculate pool amounts if race pool data is available (convert to cents)
             if (racePoolData) {
                 const betPercent = moneyData.bet_percentage / 100;
-                betDoc.winPoolAmount = Math.round((racePoolData.winPoolTotal || 0) * betPercent);
-                betDoc.placePoolAmount = Math.round((racePoolData.placePoolTotal || 0) * betPercent);
+                betDoc.winPoolAmount = Math.round((racePoolData.winPoolTotal || 0) * betPercent * 100); // Convert to cents
+                betDoc.placePoolAmount = Math.round((racePoolData.placePoolTotal || 0) * betPercent * 100); // Convert to cents
             }
             
             await databases.createDocument(databaseId, 'money-flow-history', ID.unique(), betDoc);
@@ -473,7 +479,34 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
 }
 
 /**
- * Save time-bucketed money flow history for dynamic column generation
+ * Get timeline interval bucket for given time to start
+ * @param {number} timeToStartMinutes - Minutes until race start (positive = before, negative = after)
+ * @returns {number} Timeline interval bucket
+ */
+function getTimelineInterval(timeToStartMinutes) {
+    if (timeToStartMinutes >= 60) return 60;
+    if (timeToStartMinutes >= 55) return 55;
+    if (timeToStartMinutes >= 50) return 50;
+    if (timeToStartMinutes >= 45) return 45;
+    if (timeToStartMinutes >= 40) return 40;
+    if (timeToStartMinutes >= 35) return 35;
+    if (timeToStartMinutes >= 30) return 30;
+    if (timeToStartMinutes >= 25) return 25;
+    if (timeToStartMinutes >= 20) return 20;
+    if (timeToStartMinutes >= 15) return 15;
+    if (timeToStartMinutes >= 10) return 10;
+    if (timeToStartMinutes >= 5) return 5;
+    if (timeToStartMinutes >= 4) return 4;
+    if (timeToStartMinutes >= 3) return 3;
+    if (timeToStartMinutes >= 2) return 2;
+    if (timeToStartMinutes >= 1) return 1;
+    if (timeToStartMinutes >= 0) return 0; // Race start
+    if (timeToStartMinutes >= -0.5) return -0.5; // -30s
+    return Math.ceil(timeToStartMinutes); // -1, -2, -3, etc. for delayed starts
+}
+
+/**
+ * Save time-bucketed money flow history for dynamic column generation with FIXED timeline intervals
  * @param {Object} databases - Appwrite Databases instance
  * @param {string} databaseId - Database ID
  * @param {string} raceId - Race ID
@@ -486,7 +519,8 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
     let recordsCreated = 0;
     const timestamp = new Date().toISOString();
     
-    // Calculate time interval from race start
+    // Calculate time interval from race start with FIXED bucketing logic
+    let timeToStart = null;
     let timeInterval = null;
     let intervalType = 'unknown';
     
@@ -495,14 +529,17 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
         if (race.startTime) {
             const raceStartTime = new Date(race.startTime);
             const currentTime = new Date();
-            timeInterval = Math.round((raceStartTime.getTime() - currentTime.getTime()) / (1000 * 60)); // Minutes to start
+            timeToStart = Math.round((raceStartTime.getTime() - currentTime.getTime()) / (1000 * 60)); // Minutes to start
             
-            // Determine interval type based on proximity to race
-            if (timeInterval > 30) {
+            // Use FIXED timeline interval mapping
+            timeInterval = getTimelineInterval(timeToStart);
+            
+            // Determine interval type based on proximity to race for polling frequency
+            if (timeToStart > 30) {
                 intervalType = '5m'; // 5-minute intervals when far from race
-            } else if (timeInterval > 5) {
+            } else if (timeToStart > 5) {
                 intervalType = '1m'; // 1-minute intervals close to race  
-            } else if (timeInterval > 0) {
+            } else if (timeToStart > 0) {
                 intervalType = '30s'; // 30-second intervals very close to race
             } else {
                 intervalType = 'live'; // Live updates during/after race
@@ -512,23 +549,67 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
         context.log('Could not calculate timeInterval for bucketed storage', { raceId });
     }
 
-    // Save bucketed data for each entrant
+    // Save bucketed data for each entrant with proper incremental calculation setup
     for (const [entrantId, moneyData] of Object.entries(entrantMoneyData)) {
         try {
-            // Calculate pool amounts from aggregated percentages
+            // Calculate pool amounts from aggregated percentages (convert to cents)
             const holdPercent = moneyData.hold_percentage / 100;
-            const winPoolAmount = Math.round((racePoolData?.winPoolTotal || 0) * holdPercent);
-            const placePoolAmount = Math.round((racePoolData?.placePoolTotal || 0) * holdPercent);
+            const winPoolAmount = Math.round((racePoolData?.winPoolTotal || 0) * holdPercent * 100); // Convert to cents
+            const placePoolAmount = Math.round((racePoolData?.placePoolTotal || 0) * holdPercent * 100); // Convert to cents
+            
+            // Get previous interval data for incremental calculation
+            let incrementalWinAmount = 0;
+            let incrementalPlaceAmount = 0;
+            
+            try {
+                // Query for previous interval data to calculate increment
+                const previousIntervals = await databases.listDocuments(databaseId, 'money-flow-history', [
+                    'equal("entrant", "' + entrantId + '")',
+                    'equal("raceId", "' + raceId + '")',
+                    'equal("type", "bucketed_aggregation")',
+                    'orderBy("timeInterval", "desc")',
+                    'limit(1)'
+                ]);
+                
+                if (previousIntervals.documents.length > 0) {
+                    const prevDoc = previousIntervals.documents[0];
+                    // Only calculate increment if this is a new interval (prevent duplicates)
+                    if (prevDoc.timeInterval !== timeInterval) {
+                        incrementalWinAmount = winPoolAmount - (prevDoc.winPoolAmount || 0);
+                        incrementalPlaceAmount = placePoolAmount - (prevDoc.placePoolAmount || 0);
+                        
+                        // Ensure positive increments only (money flows IN, not OUT)
+                        if (incrementalWinAmount < 0) incrementalWinAmount = 0;
+                        if (incrementalPlaceAmount < 0) incrementalPlaceAmount = 0;
+                    } else {
+                        // Skip duplicate interval
+                        context.log('Skipping duplicate interval', { entrantId: entrantId.slice(0, 8) + '...', timeInterval });
+                        continue;
+                    }
+                } else {
+                    // First record for this entrant - use absolute amounts as increments
+                    incrementalWinAmount = winPoolAmount;
+                    incrementalPlaceAmount = placePoolAmount;
+                }
+            } catch (queryError) {
+                // If query fails, use absolute amounts
+                incrementalWinAmount = winPoolAmount;
+                incrementalPlaceAmount = placePoolAmount;
+                context.log('Could not query previous intervals, using absolute amounts', { entrantId: entrantId.slice(0, 8) + '...' });
+            }
             
             const bucketedDoc = {
                 entrant: entrantId,
                 raceId: raceId,
+                timeToStart: timeToStart,
                 timeInterval: timeInterval,
                 intervalType: intervalType,
                 holdPercentage: moneyData.hold_percentage,
                 betPercentage: moneyData.bet_percentage,
-                winPoolAmount: winPoolAmount,
-                placePoolAmount: placePoolAmount,
+                winPoolAmount: winPoolAmount, // Absolute amount in cents
+                placePoolAmount: placePoolAmount, // Absolute amount in cents
+                incrementalWinAmount: incrementalWinAmount, // Pre-calculated increment in cents
+                incrementalPlaceAmount: incrementalPlaceAmount, // Pre-calculated increment in cents
                 pollingTimestamp: timestamp,
                 eventTimestamp: timestamp,
                 type: 'bucketed_aggregation',
@@ -537,6 +618,13 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
             
             await databases.createDocument(databaseId, 'money-flow-history', ID.unique(), bucketedDoc);
             recordsCreated++;
+            
+            context.log('Saved bucketed money flow with increments', {
+                entrantId: entrantId.slice(0, 8) + '...',
+                timeInterval,
+                winIncrement: incrementalWinAmount,
+                placeIncrement: incrementalPlaceAmount
+            });
             
         } catch (error) {
             context.error('Failed to save bucketed money flow history', {
@@ -547,9 +635,10 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
         }
     }
     
-    context.log('Saved time-bucketed money flow history', {
+    context.log('Saved time-bucketed money flow history with FIXED intervals', {
         raceId,
         recordsCreated,
+        timeToStart,
         timeInterval,
         intervalType
     });

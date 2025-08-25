@@ -403,7 +403,34 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
 }
 
 /**
- * Save time-bucketed money flow history for dynamic column generation
+ * Get timeline interval bucket for given time to start
+ * @param {number} timeToStartMinutes - Minutes until race start (positive = before, negative = after)
+ * @returns {number} Timeline interval bucket
+ */
+function getTimelineInterval(timeToStartMinutes) {
+    if (timeToStartMinutes >= 60) return 60;
+    if (timeToStartMinutes >= 55) return 55;
+    if (timeToStartMinutes >= 50) return 50;
+    if (timeToStartMinutes >= 45) return 45;
+    if (timeToStartMinutes >= 40) return 40;
+    if (timeToStartMinutes >= 35) return 35;
+    if (timeToStartMinutes >= 30) return 30;
+    if (timeToStartMinutes >= 25) return 25;
+    if (timeToStartMinutes >= 20) return 20;
+    if (timeToStartMinutes >= 15) return 15;
+    if (timeToStartMinutes >= 10) return 10;
+    if (timeToStartMinutes >= 5) return 5;
+    if (timeToStartMinutes >= 4) return 4;
+    if (timeToStartMinutes >= 3) return 3;
+    if (timeToStartMinutes >= 2) return 2;
+    if (timeToStartMinutes >= 1) return 1;
+    if (timeToStartMinutes >= 0) return 0; // Race start
+    if (timeToStartMinutes >= -0.5) return -0.5; // -30s
+    return Math.ceil(timeToStartMinutes); // -1, -2, -3, etc. for delayed starts
+}
+
+/**
+ * Save time-bucketed money flow history for dynamic column generation with FIXED timeline intervals
  * @param {Object} databases - Appwrite Databases instance
  * @param {string} databaseId - Database ID
  * @param {string} raceId - Race ID
@@ -416,7 +443,8 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
     let recordsCreated = 0;
     const timestamp = new Date().toISOString();
     
-    // Calculate time interval from race start
+    // Calculate time interval from race start with FIXED bucketing logic
+    let timeToStart = null;
     let timeInterval = null;
     let intervalType = 'unknown';
     
@@ -425,14 +453,17 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
         if (race.startTime) {
             const raceStartTime = new Date(race.startTime);
             const currentTime = new Date();
-            timeInterval = Math.round((raceStartTime.getTime() - currentTime.getTime()) / (1000 * 60)); // Minutes to start
+            timeToStart = Math.round((raceStartTime.getTime() - currentTime.getTime()) / (1000 * 60)); // Minutes to start
             
-            // Determine interval type based on proximity to race
-            if (timeInterval > 30) {
+            // Use FIXED timeline interval mapping
+            timeInterval = getTimelineInterval(timeToStart);
+            
+            // Determine interval type based on proximity to race for polling frequency
+            if (timeToStart > 30) {
                 intervalType = '5m'; // 5-minute intervals when far from race
-            } else if (timeInterval > 5) {
+            } else if (timeToStart > 5) {
                 intervalType = '1m'; // 1-minute intervals close to race  
-            } else if (timeInterval > 0) {
+            } else if (timeToStart > 0) {
                 intervalType = '30s'; // 30-second intervals very close to race
             } else {
                 intervalType = 'live'; // Live updates during/after race

@@ -6,6 +6,33 @@
 import { ID } from 'node-appwrite';
 
 /**
+ * Get timeline interval bucket for given time to start
+ * @param {number} timeToStartMinutes - Minutes until race start (positive = before, negative = after)
+ * @returns {number} Timeline interval bucket
+ */
+function getTimelineInterval(timeToStartMinutes) {
+    if (timeToStartMinutes >= 60) return 60;
+    if (timeToStartMinutes >= 55) return 55;
+    if (timeToStartMinutes >= 50) return 50;
+    if (timeToStartMinutes >= 45) return 45;
+    if (timeToStartMinutes >= 40) return 40;
+    if (timeToStartMinutes >= 35) return 35;
+    if (timeToStartMinutes >= 30) return 30;
+    if (timeToStartMinutes >= 25) return 25;
+    if (timeToStartMinutes >= 20) return 20;
+    if (timeToStartMinutes >= 15) return 15;
+    if (timeToStartMinutes >= 10) return 10;
+    if (timeToStartMinutes >= 5) return 5;
+    if (timeToStartMinutes >= 4) return 4;
+    if (timeToStartMinutes >= 3) return 3;
+    if (timeToStartMinutes >= 2) return 2;
+    if (timeToStartMinutes >= 1) return 1;
+    if (timeToStartMinutes >= 0) return 0; // Race start
+    if (timeToStartMinutes >= -0.5) return -0.5; // -30s
+    return Math.ceil(timeToStartMinutes); // -1, -2, -3, etc. for delayed starts
+}
+
+/**
  * Extract pool totals from NZTAB API tote_pools array structure
  * @param {Array} tote_pools - Array of pool objects from NZTAB API
  * @param {Object} context - Appwrite function context for logging
@@ -347,19 +374,18 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, entrantId
                     const currentTime = new Date();
                     timeToStart = Math.round((raceStartTime.getTime() - currentTime.getTime()) / (1000 * 60));
                     
-                    // Determine bucket type and interval based on proximity to race start
-                    if (timeToStart >= 5) {
-                        // Far from start: 5-minute buckets (60, 55, 50, 45, etc.)
-                        intervalType = '5m';
-                        timeInterval = Math.ceil(timeToStart / 5) * 5; // Round up to nearest 5
-                    } else if (timeToStart >= 1) {
-                        // Close to start: 1-minute buckets (4, 3, 2, 1)
-                        intervalType = '1m';
-                        timeInterval = Math.ceil(timeToStart);
+                    // Use FIXED timeline interval mapping
+                    timeInterval = getTimelineInterval(timeToStart);
+                    
+                    // Determine interval type based on proximity to race for polling frequency
+                    if (timeToStart > 30) {
+                        intervalType = '5m'; // 5-minute intervals when far from race
+                    } else if (timeToStart > 5) {
+                        intervalType = '1m'; // 1-minute intervals close to race  
+                    } else if (timeToStart > 0) {
+                        intervalType = '30s'; // 30-second intervals very close to race
                     } else {
-                        // Very close/started: 30-second buckets (-0.5, 0, 0.5, 1, etc.)
-                        intervalType = '30s';
-                        timeInterval = Math.round(timeToStart * 2) / 2; // Round to nearest 0.5
+                        intervalType = 'live'; // Live updates during/after race
                     }
                 }
             } catch (error) {
@@ -378,10 +404,10 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, entrantId
             if (error.code !== 404) throw error;
         }
         
-        // Calculate pool amounts using correct formula
+        // Calculate pool amounts using correct formula (convert to cents)
         const holdPercent = (moneyData.hold_percentage || 0) / 100;
-        const currentWinAmount = Math.round((racePoolData?.winPoolTotal || 0) * holdPercent);
-        const currentPlaceAmount = Math.round((racePoolData?.placePoolTotal || 0) * holdPercent);
+        const currentWinAmount = Math.round((racePoolData?.winPoolTotal || 0) * holdPercent * 100); // Convert to cents
+        const currentPlaceAmount = Math.round((racePoolData?.placePoolTotal || 0) * holdPercent * 100); // Convert to cents
         
         let incrementalWinAmount = currentWinAmount;
         let incrementalPlaceAmount = currentPlaceAmount;
@@ -394,6 +420,7 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, entrantId
         
         const bucketDoc = {
             entrant: entrantId,
+            raceId: raceId, // Add raceId for proper queries
             holdPercentage: moneyData.hold_percentage,
             betPercentage: moneyData.bet_percentage,
             type: 'hold_percentage',
