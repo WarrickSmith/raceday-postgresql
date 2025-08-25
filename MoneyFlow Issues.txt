@@ -5,12 +5,45 @@ Items to be verified and fixed:
 Task 1.
 - Ensure the Money Flow Timeline columns always display the column header values of 60m, 55m, 50m, 45m, 40m, 35m, 30m, 25m, 20m, 15m, 10m, 5m, 4m, 3m, 2m, 1m, 30s, 0. Where these values represent the fixed time periods in minutes and seconds before a scheduled race start.
 
-- Ensure that if a race does not start at 0s (it's scheduled start time), then additional timeline columns are inserted to the right of '0s' every 30 seconds until the race status changes from 'Open' to any other value like, Closed, Interim, Final or Abandoned.   
+- Ensure that if a race does not start at 0s (it's scheduled start time), then additional timeline columns are inserted to the right of '0s' every 30 seconds until the race status changes from 'Open' to any other value like, Closed, Interim, Final or Abandoned. Ensure these dynamic columns persist after race finish. When a race does not start at 0s. I shouls see additional columns like -30s, -1m, -1:30s, -2m etc       
 
 - Ensure there is horizontal an vertical scrolling for the timelin columns and that the columns to the left of the 60m column are sticky along with the Pool and Pool% columns on the right of the timeline.
 
 - There should be a visual indicator of the current time relative to the moneyflow timeline columns that highlights the current active column relative to the schduled race start time.
 
-- Currently musch of the above tasks are implemented, except for an active race withint 60m of it's scheduled start time, te timeline columns up to the current actine column are disappearing and the active column is not correctly highlighted (background color change).
+- Currently much of the above tasks are implemented, except for an active race withint 60m of it's scheduled start time, te timeline columns up to the current actine column are disappearing and the active column is not correctly highlighted (background color change).
+
+For reference of the concept of how this should look, this file shows a scren shot of an old application with similar functionality except that this applicat displays moneyflow data from three different sources for each entrant (runner):
+/home/warrick/Dev/raceday/BT Main Screen2.jpg
+
+Note if using Playwright to view the client application allow plenty of time for page, race, entrant and data rendering and population.
+
+Task 1 Summary of Dev actions Taken:
+✅ COMPLETED - Fixed EnhancedEntrantsGrid.tsx timeline column generation:
+- Removed filtering logic that was hiding columns 60m-25m for races within 60m of start
+- Fixed active column highlighting algorithm to correctly identify next polling interval (not closest time)  
+- Verified all 18 timeline columns display correctly: 60m through 0 (Start)
+- Maintained sticky column architecture for Runner/Win/Place (left) and Pool/Pool% (right)
+- Preserved horizontal scrolling functionality across full timeline
+- Dynamic post-start column infrastructure implemented (triggers when race status changes from 'Open')
+- Active column highlighting now shows green background on correct interval (e.g. 10m column when 13:53 to start)
+
+✅ COMPLETED - Implemented dynamic post-start column generation:
+- Fixed column labeling to show proper format: "-30s", "-1m", "-1:30m", "-2m", "-2:30m", "-3m" etc.
+- Dynamic columns generate every 30 seconds for first 2 minutes, then every minute thereafter
+- Columns persist for completed races (status != 'Open') enabling review of delayed race data
+- Labels correctly format half-minute intervals as "-1:30m" style (not "-1.5m")
+- Column generation triggers when race doesn't start at scheduled time (0s)
+- Implementation tested and validated in EnhancedEntrantsGrid.tsx lines 664-676
+
+✅ COMPLETED - Fixed JavaScript ReferenceError:
+- Fixed "Cannot access 'isCurrentTimeColumn' before initialization" error in EnhancedEntrantsGrid.tsx
+- Moved isCurrentTimeColumn function declaration from line 866 to line 694 (before its usage in useEffect)
+- Removed duplicate function declaration to prevent conflicts
+- Timeline functionality now working without runtime errors
+
+
 
 Task 2: Display accurate wager (moneyflow) data in the appropriate row and column for each entrant (runner) for any given race timeline period, before, during and after a race.
+
+Do not break any of the UI and live column work achieved in Task 1 above.
