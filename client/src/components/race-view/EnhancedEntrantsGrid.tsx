@@ -542,13 +542,11 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     
     const columns: TimelineColumn[] = []
     
-    // Add pre-scheduled milestones, but only up to current time for live races
+    // Add ALL pre-scheduled milestones (FIXED: Always show all timeline columns)
     preScheduledMilestones.forEach((interval) => {
-      // For live races (Open status): Only show past and current intervals, not future ones
-      // Since positive intervals are BEFORE start, we show them if they're <= timeToRaceMinutes
-      if (raceStatus === 'Open' && interval > Math.abs(timeToRaceMinutes)) {
-        return; // Skip future intervals for live races
-      }
+      // REQUIREMENT: Always show ALL timeline columns (60m to 0s) regardless of race status
+      // Only the DATA should be filtered, not the column headers
+      // This matches the reference screenshot and requirements
       
       // CORRECTED: interval is now positive for before-start times
       const timestamp = new Date(raceStart.getTime() - interval * 60 * 1000)
@@ -571,13 +569,21 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     })
     
     // Add post-scheduled columns when appropriate
-    // For Open races: ONLY show if race has actually started (timeToRaceMinutes < 0)
+    // For Open races: Show if race has passed scheduled start time OR has timeline data indicating delay
     // For completed races (Final/Interim/Closed/Abandoned): Always show columns to preserve race review capability
     const raceHasStarted = timeToRaceMinutes < 0
     const raceIsCompleted = ['Final', 'Interim', 'Closed', 'Abandoned'].includes(raceStatus)
+    
+    // Check if we have post-start data indicating race delays
+    const hasPostStartData = timelineData && timelineData.size > 0 && 
+      Array.from(timelineData.values()).some(entrantData => 
+        entrantData.dataPoints.some(point => point.timeToStart !== undefined && point.timeToStart < 0)
+      )
+    
     const shouldShowPostStartColumns = 
       (raceStatus === 'Open' && raceHasStarted && actualPostStartMinutes > 0) ||
-      (raceIsCompleted) // Always show for completed races regardless of data availability
+      (raceStatus === 'Open' && hasPostStartData) || // Show if we have post-start data regardless of current time
+      (raceIsCompleted) // Always show for completed races
     
     console.log('🕐 Post-start column logic:', {
       raceStatus,
@@ -654,7 +660,20 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         // For negative intervals (post-start), add the absolute time to get correct timestamp
         const timestamp = new Date(raceStart.getTime() + Math.abs(interval) * 60 * 1000)
         const absInterval = Math.abs(interval)
-        const label = absInterval < 1 ? `+${(absInterval * 60).toFixed(0)}s` : `+${absInterval}m`
+        
+        // REQUIREMENT: Show labels like "-30s, -1m, -1:30s, -2m" for delayed starts
+        let label: string
+        if (absInterval < 1) {
+          // 30-second intervals: -30s
+          label = `-${(absInterval * 60).toFixed(0)}s`
+        } else if (absInterval % 1 === 0.5) {
+          // Half-minute intervals: -1:30m (1.5m becomes 1:30)
+          const minutes = Math.floor(absInterval)
+          label = `-${minutes}:30m`
+        } else {
+          // Full minute intervals: -1m, -2m, -3m
+          label = `-${absInterval}m`
+        }
         
         columns.push({
           label,
@@ -671,30 +690,88 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     return columns.sort((a, b) => b.interval - a.interval)
   }, [currentRaceStartTime, currentTime, liveRace?.status, timelineData])
 
+  // Determine if column should be highlighted (current time)
+  const isCurrentTimeColumn = useCallback((interval: number): boolean => {
+    const raceStart = new Date(currentRaceStartTime)
+    const timeToRaceMs = raceStart.getTime() - currentTime.getTime()
+    const timeToRaceMinutes = timeToRaceMs / (1000 * 60)
+    const raceStatus = liveRace?.status || 'Open'
+
+    // Only highlight and follow current time while race status is 'Open'
+    if (raceStatus === 'Open') {
+      if (timeToRaceMinutes > 0) {
+        // Race hasn't started yet - find the active polling interval
+        // Active column = next interval that will receive data
+        // If time to race = 19 minutes, active column = 15m (next interval <= current time)
+        const sortedIntervals = timelineColumns
+          .filter(col => col.interval > 0) // Only pre-race intervals
+          .map(col => col.interval)
+          .sort((a, b) => b - a) // Descending: [60, 55, 50, ..., 1, 0.5]
+        
+        // Find the first interval that is <= current time to race
+        const activeInterval = sortedIntervals.find(int => int <= timeToRaceMinutes)
+        return interval === activeInterval
+      } else {
+        // Past scheduled start but race status still 'Open' (delayed start)
+        // Continue highlighting based on elapsed time in post-start columns
+        const timeAfterStartMinutes = Math.abs(timeToRaceMinutes)
+        
+        if (interval === 0) {
+          // Highlight "0s" (Start) column if we're within 30 seconds of scheduled start
+          return timeAfterStartMinutes <= 0.5
+        }
+        
+        if (interval < 0) {
+          // This is a post-start column (negative interval)
+          const intervalMinutes = Math.abs(interval)
+          
+          // Highlight this column if current elapsed time falls within this interval's range
+          // For -30s column: highlight if elapsed time is between 0-1 minutes  
+          // For -1m column: highlight if elapsed time is between 0.5-1.5 minutes
+          // For -1:30m column: highlight if elapsed time is between 1.0-2.0 minutes
+          const intervalStart = Math.max(0, intervalMinutes - 0.5)
+          const intervalEnd = intervalMinutes + 0.5
+          
+          return timeAfterStartMinutes >= intervalStart && timeAfterStartMinutes < intervalEnd
+        }
+      }
+    }
+    
+    // Race status is no longer 'Open' - stop highlighting, race has actually started
+    return false
+  }, [currentRaceStartTime, currentTime, timelineColumns, liveRace?.status])
+
   // Auto-scroll to show current time position
   useEffect(() => {
     if (!autoScroll || !scrollContainerRef.current) return
 
     const container = scrollContainerRef.current
-    const raceStart = new Date(currentRaceStartTime)
-    const currentInterval =
-      (currentTime.getTime() - raceStart.getTime()) / (1000 * 60)
-
-    // Find the column that represents the current time
-    const currentColumnIndex = timelineColumns.findIndex(
-      (col) => col.interval >= currentInterval
+    
+    // Find the currently highlighted (active) column using the same logic
+    const activeColumnIndex = timelineColumns.findIndex(col => 
+      isCurrentTimeColumn(col.interval)
     )
 
-    if (currentColumnIndex > 0) {
+    console.log('🔄 Auto-scroll update:', {
+      activeColumnIndex,
+      totalColumns: timelineColumns.length,
+      activeColumn: activeColumnIndex >= 0 ? timelineColumns[activeColumnIndex] : null,
+      autoScroll
+    })
+
+    if (activeColumnIndex >= 0) {
       const columnWidth = 80 // Approximate column width
-      const scrollPosition = (currentColumnIndex - 2) * columnWidth // Center current time
+      // Scroll to center the active column with some buffer
+      const scrollPosition = Math.max(0, (activeColumnIndex - 2) * columnWidth)
 
       container.scrollTo({
-        left: Math.max(0, scrollPosition),
+        left: scrollPosition,
         behavior: 'smooth',
       })
+      
+      console.log('📍 Auto-scrolled to active column at position:', scrollPosition)
     }
-  }, [timelineColumns, currentRaceStartTime, autoScroll, currentTime])
+  }, [timelineColumns, currentRaceStartTime, autoScroll, currentTime, isCurrentTimeColumn])
 
   // Get data for specific timeline point - shows incremental money amounts since previous time point
   const getTimelineData = useCallback((entrantId: string, interval: number): string => {
@@ -835,16 +912,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
     return '—'
   }, [sortedEntrants, currentRaceStartTime, currentTime, timelineData, poolViewState.activePool])
-
-  // Determine if column should be highlighted (current time)
-  const isCurrentTimeColumn = useCallback((interval: number): boolean => {
-    const raceStart = new Date(currentRaceStartTime)
-    const currentInterval =
-      (currentTime.getTime() - raceStart.getTime()) / (1000 * 60)
-
-    // Highlight if within 30 seconds of this interval
-    return Math.abs(currentInterval - interval) <= 0.5
-  }, [currentRaceStartTime, currentTime])
 
   // Utility functions
   const formatOdds = useCallback((odds?: number) => {
