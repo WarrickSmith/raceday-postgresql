@@ -76,6 +76,19 @@ export function useMoneyFlowTimeline(
       const data = await response.json();
       const documents = data.documents || [];
 
+      // Log the API response for debugging
+      if (data.message) {
+        console.log('📊 API Message:', data.message);
+      }
+
+      // Handle empty data gracefully
+      if (documents.length === 0) {
+        console.log('📊 No timeline data available - displaying empty state');
+        setTimelineData(new Map());
+        setLastUpdate(new Date());
+        return;
+      }
+
       // Check if server is providing bucketed data (optimized processing)
       if (data.bucketedData) {
         console.log('📊 Processing bucketed money flow data (server pre-processed)');
@@ -347,9 +360,9 @@ export function useMoneyFlowTimeline(
           continue;
         }
         
-        // Use exact timeToStart as the interval key (no rounding for high-frequency data)
-        // This preserves the granularity when polling frequency increases from 5m to 1m to 30s
-        const interval = dataPoint.timeToStart;
+        // Use timeInterval if available (bucketed data), otherwise timeToStart (legacy)
+        // This ensures compatibility with both data structures
+        const interval = (dataPoint as any).timeInterval ?? dataPoint.timeToStart;
         
         console.log(`✅ Adding grid data: entrant ${entrantId}, interval ${interval}, amount ${incrementalAmount}`);
         
@@ -377,6 +390,11 @@ export function useMoneyFlowTimeline(
 
   // Get formatted data for specific entrant and time interval
   const getEntrantDataForInterval = useCallback((entrantId: string, interval: number, requestedPoolType: 'win' | 'place') => {
+    // Handle empty data gracefully - no grid data available
+    if (!gridData || Object.keys(gridData).length === 0) {
+      return '—';
+    }
+    
     // Use exact interval for lookup (no rounding for high-frequency data)
     const intervalData = gridData[interval];
     if (!intervalData || !intervalData[entrantId]) {
@@ -393,12 +411,23 @@ export function useMoneyFlowTimeline(
     // Convert cents to dollars for display (NZ TAB stores amounts in cents)
     const amountInDollars = Math.round(amount / 100);
     
-    if (Math.abs(amountInDollars) < 1) {
-      return '$0';
-    } else if (amountInDollars > 0) {
-      return `+$${amountInDollars.toLocaleString()}`;
+    // For 60m column, show absolute amount without + sign (baseline)
+    // For other columns, show incremental change with + or —
+    if (interval === 60) {
+      // 60m column shows absolute baseline amount
+      if (amountInDollars <= 0) {
+        return '—';
+      }
+      return `$${amountInDollars.toLocaleString()}`;
     } else {
-      return `-$${Math.abs(amountInDollars).toLocaleString()}`;
+      // Other columns show incremental changes
+      if (Math.abs(amountInDollars) < 1) {
+        return '—'; // No change
+      } else if (amountInDollars > 0) {
+        return `+$${amountInDollars.toLocaleString()}`;
+      } else {
+        return `—`; // No negative money flow
+      }
     }
   }, [gridData]);
 
@@ -471,6 +500,18 @@ export function useMoneyFlowTimeline(
  * Process bucketed timeline data (much simpler since server does the heavy lifting)
  */
 function processBucketedTimelineData(documents: ServerMoneyFlowPoint[], entrantIds: string[]): Map<string, EntrantMoneyFlowTimeline> {
+  console.log('📊 Processing bucketed timeline data:', {
+    documentsCount: documents.length,
+    entrantIds: entrantIds.length,
+    sampleDoc: documents[0] ? {
+      entrant: documents[0].entrant,
+      timeInterval: (documents[0] as any).timeInterval,
+      timeToStart: documents[0].timeToStart,
+      winPoolAmount: documents[0].winPoolAmount,
+      incrementalWinAmount: (documents[0] as any).incrementalWinAmount
+    } : null
+  });
+  
   const entrantDataMap = new Map<string, EntrantMoneyFlowTimeline>();
   
   for (const entrantId of entrantIds) {
@@ -485,28 +526,52 @@ function processBucketedTimelineData(documents: ServerMoneyFlowPoint[], entrantI
       return docEntrantId === entrantId;
     });
     
-    // Sort by time interval (server should handle this but ensure correct order)
-    const sortedDocs = entrantDocs.sort((a, b) => ((b as any).timeInterval || 0) - ((a as any).timeInterval || 0));
+    console.log(`📊 Processing entrant ${entrantId}: ${entrantDocs.length} documents`);
+    
+    // Sort by time interval descending (60, 55, 50... 0, -0.5, -1)
+    const sortedDocs = entrantDocs.sort((a, b) => {
+      const aInterval = (a as any).timeInterval ?? a.timeToStart ?? 0;
+      const bInterval = (b as any).timeInterval ?? b.timeToStart ?? 0;
+      return bInterval - aInterval;
+    });
     
     // Transform to timeline data points (server has pre-calculated incrementals)
-    const dataPoints: MoneyFlowDataPoint[] = sortedDocs.map(doc => ({
-      $id: doc.$id,
-      $createdAt: doc.$createdAt,
-      $updatedAt: doc.$updatedAt,
-      entrant: entrantId,
-      pollingTimestamp: doc.pollingTimestamp || doc.$createdAt,
-      timeToStart: doc.timeToStart || 0,
-      timeInterval: (doc as any).timeInterval || 0,
-      intervalType: (doc as any).intervalType || '5m',
-      winPoolAmount: doc.winPoolAmount || 0,
-      placePoolAmount: doc.placePoolAmount || 0,
-      totalPoolAmount: (doc.winPoolAmount || 0) + (doc.placePoolAmount || 0),
-      poolPercentage: doc.holdPercentage || 0,
-      incrementalAmount: (doc as any).incrementalAmount || 0, // Pre-calculated by server
-      incrementalWinAmount: (doc as any).incrementalWinAmount || 0,
-      incrementalPlaceAmount: (doc as any).incrementalPlaceAmount || 0,
-      pollingInterval: (doc as any).intervalType === '30s' ? 0.5 : (doc as any).intervalType === '1m' ? 1 : 5
-    }));
+    const dataPoints: MoneyFlowDataPoint[] = sortedDocs.map(doc => {
+      const timeInterval = (doc as any).timeInterval;
+      const winAmount = doc.winPoolAmount || 0;
+      const placeAmount = doc.placePoolAmount || 0;
+      
+      // Use pre-calculated incremental amounts if available, otherwise use pool amounts
+      let incrementalAmount = 0;
+      if (timeInterval === 60) {
+        // 60m column shows absolute amount as baseline
+        incrementalAmount = winAmount; // Use win pool as default
+      } else {
+        // Other columns use server pre-calculated incremental amounts
+        incrementalAmount = (doc as any).incrementalWinAmount || (doc as any).incrementalAmount || 0;
+      }
+      
+      return {
+        $id: doc.$id,
+        $createdAt: doc.$createdAt,
+        $updatedAt: doc.$updatedAt,
+        entrant: entrantId,
+        pollingTimestamp: doc.pollingTimestamp || doc.$createdAt,
+        timeToStart: doc.timeToStart || 0,
+        timeInterval: timeInterval || 0,
+        intervalType: (doc as any).intervalType || '5m',
+        winPoolAmount: winAmount,
+        placePoolAmount: placeAmount,
+        totalPoolAmount: winAmount + placeAmount,
+        poolPercentage: doc.holdPercentage || doc.betPercentage || 0,
+        incrementalAmount,
+        incrementalWinAmount: (doc as any).incrementalWinAmount || 0,
+        incrementalPlaceAmount: (doc as any).incrementalPlaceAmount || 0,
+        pollingInterval: (doc as any).intervalType === '30s' ? 0.5 : (doc as any).intervalType === '1m' ? 1 : 5
+      };
+    });
+    
+    console.log(`📊 Processed ${dataPoints.length} data points for entrant ${entrantId}`);
     
     // Calculate trend and metadata
     const latestPoint = dataPoints[dataPoints.length - 1];
@@ -529,6 +594,18 @@ function processBucketedTimelineData(documents: ServerMoneyFlowPoint[], entrantI
       significantChange
     });
   }
+  
+  console.log('📊 Bucketed processing complete:', {
+    entrantsProcessed: entrantDataMap.size,
+    sampleEntrant: Array.from(entrantDataMap.values())[0] ? {
+      entrantId: Array.from(entrantDataMap.values())[0].entrantId,
+      dataPointsCount: Array.from(entrantDataMap.values())[0].dataPoints.length,
+      samplePoints: Array.from(entrantDataMap.values())[0].dataPoints.slice(0, 3).map(p => ({
+        timeInterval: (p as any).timeInterval,
+        incrementalAmount: p.incrementalAmount
+      }))
+    } : null
+  });
   
   return entrantDataMap;
 }
