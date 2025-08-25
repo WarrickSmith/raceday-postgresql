@@ -47,7 +47,7 @@ export async function GET(
       console.log('📊 No bucketed data found, falling back to legacy timeToStart data');
       
       // Try a broader query first to see if any data exists at all
-      let broadResponse = await databases.listDocuments(
+      const broadResponse = await databases.listDocuments(
         databaseId,
         'money-flow-history',
         [
