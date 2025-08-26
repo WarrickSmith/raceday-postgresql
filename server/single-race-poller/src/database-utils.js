@@ -483,7 +483,7 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
             
             const bucketedDoc = {
                 entrant: entrantId,
-                raceId: raceId,
+                // Note: race info accessible via entrant relationship, no separate raceId needed
                 timeInterval: timeInterval,
                 intervalType: intervalType,
                 holdPercentage: moneyData.hold_percentage,
@@ -593,6 +593,19 @@ export async function performantUpsert(databases, databaseId, collectionId, docu
     }
     catch (error) {
         try {
+            // For money-flow-history documents, verify entrant exists before creating relationship
+            if (collectionId === 'money-flow-history' && data.entrant) {
+                try {
+                    await databases.getDocument(databaseId, 'entrants', data.entrant);
+                } catch (entrantError) {
+                    context.error('Entrant document does not exist for relationship', {
+                        entrantId: data.entrant,
+                        entrantError: entrantError instanceof Error ? entrantError.message : 'Unknown error'
+                    });
+                    throw new Error(`Entrant ${data.entrant} does not exist - cannot create money flow relationship`);
+                }
+            }
+            
             await databases.createDocument(databaseId, collectionId, documentId, data);
             return true;
         }

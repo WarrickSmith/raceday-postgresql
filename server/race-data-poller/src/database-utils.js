@@ -284,7 +284,7 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
         // Save hold percentage (money held on this entrant) with pool amount calculations
         if (typeof moneyData.hold_percentage !== 'undefined') {
             const holdDoc = {
-                entrant: entrantId,
+                entrant: entrantId, // Appwrite relationship expects the document ID directly
                 holdPercentage: moneyData.hold_percentage,
                 betPercentage: null, // Explicitly null for hold_percentage records
                 type: 'hold_percentage',
@@ -308,7 +308,7 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
         // Save bet percentage (percentage of total bets on this entrant) 
         if (typeof moneyData.bet_percentage !== 'undefined') {
             const betDoc = {
-                entrant: entrantId,
+                entrant: entrantId, // Appwrite relationship expects the document ID directly
                 holdPercentage: null, // Explicitly null for bet_percentage records
                 betPercentage: moneyData.bet_percentage,
                 type: 'bet_percentage',
@@ -393,8 +393,9 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, entrantId
             }
         }
         
-        // Create bucket-based document ID for upsert operations
-        const bucketDocId = `${entrantId}_${timeInterval}_${intervalType}`;
+        // Create bucket-based document ID for upsert operations (max 36 chars, alphanumeric + underscore only)
+        // Remove hyphens from entrantId and create a valid Appwrite document ID
+        const bucketDocId = `bucket_${entrantId.replace(/-/g, '').slice(-24)}_${timeInterval}_${intervalType}`.slice(0, 36);
         
         // Check if bucket already exists for this interval
         let existingBucket = null;
@@ -419,8 +420,8 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, entrantId
         }
         
         const bucketDoc = {
-            entrant: entrantId,
-            raceId: raceId, // Add raceId for proper queries
+            entrant: entrantId, // Appwrite relationship expects the document ID directly
+            // Note: race info accessible via entrant relationship, no separate raceId needed
             holdPercentage: moneyData.hold_percentage,
             betPercentage: moneyData.bet_percentage,
             type: 'hold_percentage',
@@ -451,19 +452,27 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, entrantId
         };
         
         // Upsert the bucket document
-        await performantUpsert(databases, databaseId, 'money-flow-history', bucketDocId, bucketDoc, context);
+        const upsertSuccess = await performantUpsert(databases, databaseId, 'money-flow-history', bucketDocId, bucketDoc, context);
         
-        context.log('Saved time-bucketed money flow data', {
-            entrantId: entrantId.slice(-8),
-            timeInterval,
-            intervalType,
-            holdPercentage: moneyData.hold_percentage,
-            winAmount: currentWinAmount,
-            incrementalWin: incrementalWinAmount,
-            isUpdate: !!existingBucket
-        });
-        
-        return true;
+        if (upsertSuccess) {
+            context.log('Saved time-bucketed money flow data', {
+                entrantId: entrantId.slice(-8),
+                timeInterval,
+                intervalType,
+                holdPercentage: moneyData.hold_percentage,
+                winAmount: currentWinAmount,
+                incrementalWin: incrementalWinAmount,
+                isUpdate: !!existingBucket
+            });
+            return true;
+        } else {
+            context.error('Failed to save time-bucketed money flow data', {
+                entrantId,
+                bucketDocId,
+                error: 'performantUpsert returned false'
+            });
+            return false;
+        }
     } catch (error) {
         context.error('Failed to save time-bucketed money flow history', {
             entrantId,
@@ -640,17 +649,60 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
 export async function performantUpsert(databases, databaseId, collectionId, documentId, data, context) {
     try {
         await databases.updateDocument(databaseId, collectionId, documentId, data);
+        context.log(`Successfully updated ${collectionId} document`, { documentId: documentId.slice(-8) });
         return true;
     }
-    catch (error) {
+    catch (updateError) {
+        context.log(`Update failed, attempting create for ${collectionId}`, { 
+            documentId: documentId.slice(-8),
+            updateError: updateError instanceof Error ? updateError.message : 'Unknown error'
+        });
+        
         try {
-            await databases.createDocument(databaseId, collectionId, documentId, data);
+            context.log(`Attempting to create ${collectionId} document`, { 
+                documentId: documentId.slice(-8),
+                dataKeys: Object.keys(data).join(', '),
+                entrant: data.entrant ? data.entrant.slice(-8) : 'none'
+            });
+            
+            // For money-flow-history documents, verify entrant exists before creating relationship
+            if (collectionId === 'money-flow-history' && data.entrant) {
+                try {
+                    await databases.getDocument(databaseId, 'entrants', data.entrant);
+                    context.log('Entrant document exists for relationship', { 
+                        entrantId: data.entrant.slice(-8) 
+                    });
+                } catch (entrantError) {
+                    context.error('Entrant document does not exist for relationship', {
+                        entrantId: data.entrant,
+                        entrantError: entrantError instanceof Error ? entrantError.message : 'Unknown error'
+                    });
+                    throw new Error(`Entrant ${data.entrant} does not exist - cannot create money flow relationship`);
+                }
+            }
+            
+            const createResult = await databases.createDocument(databaseId, collectionId, documentId, data);
+            context.log(`Successfully created ${collectionId} document`, { 
+                documentId: documentId.slice(-8),
+                resultId: createResult.$id.slice(-8),
+                entrantRelationship: data.entrant ? data.entrant.slice(-8) : 'none'
+            });
             return true;
         }
         catch (createError) {
             context.error(`Failed to create ${collectionId} document`, {
                 documentId,
-                error: createError instanceof Error ? createError.message : 'Unknown error'
+                updateError: updateError instanceof Error ? updateError.message : 'Unknown error',
+                createError: createError instanceof Error ? createError.message : 'Unknown error',
+                createErrorCode: createError.code || 'no-code',
+                createErrorType: createError.type || 'no-type',
+                dataKeys: Object.keys(data),
+                entrantId: data.entrant ? data.entrant.slice(-8) : 'unknown',
+                dataPreview: {
+                    entrant: data.entrant,
+                    holdPercentage: data.holdPercentage,
+                    timeInterval: data.timeInterval
+                }
             });
             return false;
         }

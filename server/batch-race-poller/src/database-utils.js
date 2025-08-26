@@ -241,7 +241,7 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
         if (typeof moneyData.hold_percentage !== 'undefined') {
             const holdDoc = {
                 entrant: entrantId,
-                raceId: raceId, // Add raceId for proper queries
+                // Note: race info accessible via entrant relationship, no separate raceId needed
                 holdPercentage: moneyData.hold_percentage,
                 betPercentage: null, // Explicitly null for hold_percentage records
                 type: 'hold_percentage',
@@ -267,7 +267,7 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
         if (typeof moneyData.bet_percentage !== 'undefined') {
             const betDoc = {
                 entrant: entrantId,
-                raceId: raceId, // Add raceId for proper queries
+                // Note: race info accessible via entrant relationship, no separate raceId needed
                 holdPercentage: null, // Explicitly null for bet_percentage records
                 betPercentage: moneyData.bet_percentage,
                 type: 'bet_percentage',
@@ -663,6 +663,19 @@ export async function performantUpsert(databases, databaseId, collectionId, docu
     }
     catch (error) {
         try {
+            // For money-flow-history documents, verify entrant exists before creating relationship
+            if (collectionId === 'money-flow-history' && data.entrant) {
+                try {
+                    await databases.getDocument(databaseId, 'entrants', data.entrant);
+                } catch (entrantError) {
+                    context.error('Entrant document does not exist for relationship', {
+                        entrantId: data.entrant,
+                        entrantError: entrantError instanceof Error ? entrantError.message : 'Unknown error'
+                    });
+                    throw new Error(`Entrant ${data.entrant} does not exist - cannot create money flow relationship`);
+                }
+            }
+            
             await databases.createDocument(databaseId, collectionId, documentId, data);
             return true;
         }
