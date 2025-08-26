@@ -734,3 +734,105 @@ if (interval === 60) {
 5. **Display Logic**: Clear separation of baseline (60m) vs incremental (other columns) formatting
 
 **Status**: Implementation complete and ready for end-to-end testing with live race data.
+
+---
+
+## Bug Fix
+
+### Issue: Entrant Relationship Validation and Document ID Generation Issues
+
+**Date**: August 26, 2025
+**Files Modified**: 
+- `server/batch-race-poller/src/database-utils.js`
+- `server/race-data-poller/src/database-utils.js` 
+- `server/single-race-poller/src/database-utils.js`
+- `server/single-race-poller/src/main.js`
+
+**Problem Description:**
+
+During money flow timeline implementation, several critical issues were discovered in the database operations:
+
+1. **Invalid Document ID Generation**: The bucketed document IDs contained hyphens (`bucket_279dc587-bb6e-4a56-b7e5-70d78b942ddd_10_1m`) which violate Appwrite's alphanumeric + underscore only requirement, causing document creation failures.
+
+2. **Missing Entrant Relationship Validation**: When creating `money-flow-history` documents, the system would attempt to create relationships with non-existent entrant IDs, resulting in relationship constraint violations.
+
+3. **Insufficient Error Logging**: Database operation failures lacked detailed error information, making debugging difficult.
+
+4. **Incomplete RaceId Field Usage**: Some functions included unnecessary `raceId` fields in document structures when race information was already accessible through entrant relationships.
+
+**Root Cause:**
+- Document ID generation using raw UUID strings with hyphens
+- No pre-validation of entrant document existence before creating relationships
+- Limited error context in database operation failures
+- Inconsistent database field usage across polling functions
+
+**Fix Implementation:**
+
+1. **Fixed Document ID Generation**:
+   ```javascript
+   // Before: bucket_279dc587-bb6e-4a56-b7e5-70d78b942ddd_10_1m (invalid - contains hyphens)
+   // After: bucket_279dc587bb6e4a56b7e570d78b942ddd_10_1m (valid - hyphens removed, truncated)
+   const bucketDocId = `bucket_${entrantId.replace(/-/g, '').slice(-24)}_${timeInterval}_${intervalType}`.slice(0, 36);
+   ```
+
+2. **Added Entrant Relationship Validation**:
+   ```javascript
+   // Verify entrant exists before creating money-flow-history relationship
+   if (collectionId === 'money-flow-history' && data.entrant) {
+     try {
+       await databases.getDocument(databaseId, 'entrants', data.entrant);
+     } catch (entrantError) {
+       context.error('Entrant document does not exist for relationship', {
+         entrantId: data.entrant,
+         entrantError: entrantError instanceof Error ? entrantError.message : 'Unknown error'
+       });
+       throw new Error(`Entrant ${data.entrant} does not exist - cannot create money flow relationship`);
+     }
+   }
+   ```
+
+3. **Enhanced Error Logging**:
+   ```javascript
+   catch (createError) {
+     context.error(`Failed to create ${collectionId} document`, {
+       documentId,
+       updateError: updateError instanceof Error ? updateError.message : 'Unknown error',
+       createError: createError instanceof Error ? createError.message : 'Unknown error',
+       createErrorCode: createError.code || 'no-code',
+       createErrorType: createError.type || 'no-type',
+       dataKeys: Object.keys(data),
+       entrantId: data.entrant ? data.entrant.slice(-8) : 'unknown'
+     });
+     return false;
+   }
+   ```
+
+4. **Cleaned Up Database Field Usage**:
+   ```javascript
+   // Removed unnecessary raceId fields - race info accessible via entrant relationship
+   // Before: raceId: raceId, // Add raceId for proper queries
+   // After: // Note: race info accessible via entrant relationship, no separate raceId needed
+   ```
+
+5. **Added Money Tracker Processing Logging**:
+   ```javascript
+   context.log('Found money_tracker data in API response', {
+     raceId,
+     hasEntrants: !!(raceEventData.money_tracker.entrants),
+     entrantCount: raceEventData.money_tracker.entrants ? raceEventData.money_tracker.entrants.length : 0
+   });
+   ```
+
+**Testing Validation:**
+- Document IDs now conform to Appwrite requirements (alphanumeric + underscore only, max 36 chars)
+- Entrant relationship validation prevents orphaned money-flow-history records
+- Enhanced logging provides detailed context for debugging database failures
+- Database field usage is consistent and optimized across all polling functions
+
+**Impact:**
+- Eliminates document creation failures due to invalid IDs
+- Prevents database constraint violations from missing entrant relationships  
+- Improves debugging capabilities with comprehensive error logging
+- Ensures data consistency across all money flow polling operations
+
+**Status**: Bug fixes applied and tested across all polling functions. System now handles database operations robustly with proper validation and error handling.
