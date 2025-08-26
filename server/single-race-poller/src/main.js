@@ -202,11 +202,27 @@ export default async function main(context) {
           
           // Process money tracker data with pool data if available (with race status filtering)
           if (raceEventData.money_tracker) {
+            context.log('Found money_tracker data in API response', {
+              raceId,
+              hasEntrants: !!(raceEventData.money_tracker.entrants),
+              entrantCount: raceEventData.money_tracker.entrants ? raceEventData.money_tracker.entrants.length : 0
+            });
             const raceStatus = raceEventData.race && raceEventData.race.status ? raceEventData.race.status : null;
             processingPromises.push(
               processMoneyTrackerData(databases, databaseId, raceEventData.money_tracker, context, raceId, racePoolData, raceStatus)
-                .then(count => { moneyFlowProcessed = count })
+                .then(count => { 
+                  moneyFlowProcessed = count;
+                  context.log('Money tracker processing completed', { raceId, moneyFlowProcessed });
+                })
+                .catch(error => {
+                  context.error('Money tracker processing failed', {
+                    raceId,
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                  });
+                })
             )
+          } else {
+            context.log('No money_tracker data found in API response', { raceId });
           }
           
           // Wait for all processing to complete
