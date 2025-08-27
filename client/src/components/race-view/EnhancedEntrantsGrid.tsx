@@ -152,20 +152,11 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     activePool: poolViewState.activePool
   })
   
-  const { timelineData, isLoading: timelineLoading, error: timelineError } = useMoneyFlowTimeline(
+  const { timelineData, isLoading: timelineLoading, error: timelineError, getEntrantDataForInterval } = useMoneyFlowTimeline(
     currentRaceId,
     entrantIds,
     poolViewState.activePool
   )
-  
-  // Debug: Track pool toggle changes and timeline data
-  console.log('🎯 Timeline data status:', {
-    activePool: poolViewState.activePool,
-    timelineDataSize: timelineData?.size || 0,
-    entrantsCount: currentEntrants.length,
-    timelineLoading,
-    timelineError: timelineError ? timelineError : null
-  })
 
   // Debug logging for entrants updates (can be removed in production)
   // console.log('🏃 EnhancedEntrantsGrid render:', {
@@ -476,6 +467,21 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     return sorted
   }, [entrantsWithPoolData, sortState])
 
+  // Debug: Track pool toggle changes and timeline data
+  console.log('🎯 Timeline data status:', {
+    activePool: poolViewState.activePool,
+    timelineDataSize: timelineData?.size || 0,
+    entrantsCount: sortedEntrants.length,
+    timelineLoading,
+    timelineError: timelineError ? timelineError : null,
+    entrantIdsPreview: entrantIds.slice(0, 3),
+    sampleEntrantData: sortedEntrants.slice(0, 2).map(e => ({
+      id: e.$id,
+      name: e.name,
+      runnerNumber: e.runnerNumber
+    }))
+  })
+
   // Update current time for dynamic timeline updates
   // More frequent updates near race start time, but pause for final races
   useEffect(() => {
@@ -778,140 +784,28 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     const entrant = sortedEntrants.find((e) => e.$id === entrantId)
     if (!entrant || entrant.isScratched) return '—'
 
-    // Check if this is a future time column (no data exists yet)
-    const raceStart = new Date(currentRaceStartTime)
-    const currentTimestamp = currentTime.getTime()
-    const currentIntervalMinutes = (currentTimestamp - raceStart.getTime()) / (1000 * 60)
-    
-    // For live races: Only show data for intervals that have already occurred
-    // Block future intervals (intervals closer to race start than current time)
-    if (currentIntervalMinutes < interval) {
-      // This interval is in the future relative to current time - show placeholder
-      return '—'
-    }
-
-    // Check if we have timeline data available from the money flow timeline
-    const entrantTimeline = timelineData?.get(entrant.$id)
-    
-    if (entrantTimeline && entrantTimeline.dataPoints && entrantTimeline.dataPoints.length > 0) {
-      // Sort data points by timeToStart descending (60, 55, 50, ..., 2, 1, 0, -1, -2, ...)
-      const sortedDataPoints = [...entrantTimeline.dataPoints].sort((a, b) => {
-        const aTime = a.timeToStart !== undefined ? a.timeToStart : -Infinity
-        const bTime = b.timeToStart !== undefined ? b.timeToStart : -Infinity
-        return bTime - aTime // Descending order: 60, 55, 50, ..., 0, -1, -2
-      })
+    // Use the simplified getEntrantDataForInterval from the timeline hook 
+    // This eliminates the complex manual calculation logic
+    if (getEntrantDataForInterval) {
+      const result = getEntrantDataForInterval(entrant.$id, interval, poolViewState.activePool as 'win' | 'place');
       
-      // Find current data point for this interval
-      const targetTimeToStart = interval // interval 60 = timeToStart 60, interval -2 = timeToStart -2
-      let currentMatch = null
-      let currentTimeDiff = Infinity
-      
-      // For the first column (60m), find the earliest available data point
-      if (interval >= 55) {
-        // Find the earliest data point (furthest from race start)
-        let maxTimeToStart = -Infinity
-        for (const point of sortedDataPoints) {
-          if (point.timeToStart !== undefined && point.timeToStart >= interval - 5) {
-            if (point.timeToStart > maxTimeToStart) {
-              maxTimeToStart = point.timeToStart
-              currentMatch = point
-              currentTimeDiff = 0 // Mark as found
-            }
-          }
-        }
-      } else {
-        // For other columns, find closest match
-        for (const point of sortedDataPoints) {
-          if (point.timeToStart !== undefined) {
-            const timeDiff = Math.abs(point.timeToStart - targetTimeToStart)
-            if (timeDiff < currentTimeDiff && timeDiff <= 5) { // Tight tolerance for exact matching
-              currentTimeDiff = timeDiff
-              currentMatch = point
-            }
-          }
-        }
+      // Debug logging to help troubleshoot data issues
+      if (interval === 60) {
+        console.log(`📊 Timeline data for ${entrant.name || entrant.$id} at ${interval}m:`, {
+          entrantId: entrant.$id,
+          interval,
+          poolType: poolViewState.activePool,
+          result,
+          timelineDataSize: timelineData?.size || 0,
+          hasTimelineData: timelineData?.has(entrant.$id) || false
+        });
       }
       
-      if (currentMatch) {
-        // Get the pool amount for current time point
-        const currentPoolAmount = poolViewState.activePool === 'win' ? 
-          currentMatch.winPoolAmount || 0 : 
-          poolViewState.activePool === 'place' ? 
-            currentMatch.placePoolAmount || 0 : 
-            (currentMatch.winPoolAmount || 0) + (currentMatch.placePoolAmount || 0)
-        
-        // Convert cents to dollars if needed
-        let currentAmount = currentPoolAmount
-        if (Math.abs(currentAmount) > 10000) { // Likely in cents
-          currentAmount = Math.round(currentAmount / 100)
-        }
-        
-        // For first column (60m or earliest), show total aggregate amount
-        if (interval >= 55) {
-          return currentAmount > 0 ? `$${currentAmount.toLocaleString()}` : '$0'
-        }
-        
-        // For all other columns, find the previous time point to calculate difference
-        let previousInterval
-        if (interval > 0) {
-          // Before race start: 60->55, 55->50, 50->45, etc.
-          if (interval >= 5) {
-            previousInterval = interval + 5
-          } else {
-            // For 4m, 3m, 2m, 1m: previous is +1 minute
-            previousInterval = interval + 1
-          }
-        } else {
-          // After race start: 0->-1, -1->-2, etc.
-          previousInterval = interval + 1
-        }
-        
-        let previousMatch = null
-        let previousTimeDiff = Infinity
-        
-        for (const point of sortedDataPoints) {
-          if (point.timeToStart !== undefined) {
-            const timeDiff = Math.abs(point.timeToStart - previousInterval)
-            if (timeDiff < previousTimeDiff && timeDiff <= 5) {
-              previousTimeDiff = timeDiff
-              previousMatch = point
-            }
-          }
-        }
-        
-        if (previousMatch) {
-          // Get the pool amount for previous time point
-          const previousPoolAmount = poolViewState.activePool === 'win' ? 
-            previousMatch.winPoolAmount || 0 : 
-            poolViewState.activePool === 'place' ? 
-              previousMatch.placePoolAmount || 0 : 
-              (previousMatch.winPoolAmount || 0) + (previousMatch.placePoolAmount || 0)
-          
-          // Convert cents to dollars if needed
-          let previousAmount = previousPoolAmount
-          if (Math.abs(previousAmount) > 10000) { // Likely in cents
-            previousAmount = Math.round(previousAmount / 100)
-          }
-          
-          // Calculate the incremental difference
-          const incrementalDifference = currentAmount - previousAmount
-          
-          if (Math.abs(incrementalDifference) < 1) {
-            return '$0'
-          } else if (incrementalDifference > 0) {
-            return `+$${incrementalDifference.toLocaleString()}`
-          } else {
-            return `-$${Math.abs(incrementalDifference).toLocaleString()}`
-          }
-        } else {
-          // No previous point found, show current amount
-          return currentAmount > 0 ? `$${currentAmount.toLocaleString()}` : '$0'
-        }
-      }
+      return result;
     }
 
     return '—'
-  }, [sortedEntrants, currentRaceStartTime, currentTime, timelineData, poolViewState.activePool])
+  }, [sortedEntrants, timelineData, poolViewState.activePool, getEntrantDataForInterval])
 
   // Utility functions
   const formatOdds = useCallback((odds?: number) => {
