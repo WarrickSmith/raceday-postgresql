@@ -19,7 +19,7 @@ import { Client, Databases, Functions, Query } from 'node-appwrite'
  * - Calculates dynamic polling intervals based on race timing and status
  * - Intelligently selects batch vs individual polling functions
  * - Tracks last poll times to prevent redundant polling
- * - Dynamically active from 1 hour before first NZ/AUS race until all races finalized
+ * - Dynamically active from 65 minutes before first NZ/AUS race until all races finalized
  * - Stops polling when race status becomes 'Final'
  */
 export default async function main(context) {
@@ -93,7 +93,7 @@ async function runSchedulerLogic(context) {
     const databaseId = 'raceday-db'
 
     // Dynamic racing hours based on actual race schedule
-    // Active from 1 hour before first race until all NZ/AUS races are finalized
+    // Active from 65 minutes before first race until all NZ/AUS races are finalized
     const now = new Date()
     const nzTime = new Date(now.toLocaleString("en-US", {timeZone: "Pacific/Auckland"}))
     
@@ -150,7 +150,7 @@ async function runSchedulerLogic(context) {
     }
     
     const earliestStartTime = new Date(Math.min(...racesWithStartTime.map(r => new Date(r.startTime).getTime())))
-    const activePeriodStart = new Date(earliestStartTime.getTime() - (60 * 60 * 1000)) // 1 hour before
+    const activePeriodStart = new Date(earliestStartTime.getTime() - (65 * 60 * 1000)) // 65 minutes before
     
     // Check if all races are finalized
     const allFinalized = racesToday.every(race => race.status === 'Final')
@@ -240,9 +240,9 @@ async function runSchedulerLogic(context) {
         continue
       }
       
-      // Skip races that are too far in the future (more than 1 hour away) 
+      // Skip races that are too far in the future (more than 65 minutes away) 
       // or too far in the past (more than 1 hour ago)
-      if (timeToStartMinutes > 60 || timeToStartMinutes < -60) {
+      if (timeToStartMinutes > 65 || timeToStartMinutes < -60) {
         analysisResults.notDueYet++
         continue
       }
@@ -255,7 +255,7 @@ async function runSchedulerLogic(context) {
       // For races that have never been polled, use a more conservative approach
       const isFirstPoll = !race.last_poll_time
       const shouldPoll = isFirstPoll ? 
-        (timeToStartMinutes >= -60 && timeToStartMinutes <= 60) : // Only poll first time if within ±1 hour window
+        (timeToStartMinutes >= -60 && timeToStartMinutes <= 65) : // Only poll first time if within extended window for baseline capture
         (timeSinceLastPollMinutes >= requiredInterval)
 
       if (shouldPoll) {
@@ -483,6 +483,8 @@ function getPollingInterval(timeToStartMinutes, raceStatus) {
       return 1 // 1 minute - frequent polling as race approaches (-5m to -1m)
     } else if (timeToStartMinutes <= 20) {
       return 5 // 5 minutes - moderate polling (-20m to -5m)
+    } else if (timeToStartMinutes >= 65) {
+      return 5 // 5 minutes - baseline capture polling for very early races (65m+ before start)
     } else {
       return 5 // 5 minutes - standard polling for distant races
     }
