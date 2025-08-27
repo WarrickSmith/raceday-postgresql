@@ -39,7 +39,7 @@ export async function GET(
           // Query.equal('raceId', raceId), // Skip raceId filter if field doesn't exist yet
           Query.isNotNull('timeInterval'), // Only records with timeInterval (bucketed data)
           Query.greaterThan('timeInterval', -60), // Only last hour of data  
-          Query.lessThan('timeInterval', 60),     // Only next hour of data
+          Query.lessThan('timeInterval', 61), // Include 60m baseline data (using lessThan with 61)
           Query.orderAsc('timeInterval'),         // Order by time interval
           Query.limit(2000) // Enough for high-frequency data
         ]
@@ -78,7 +78,7 @@ export async function GET(
             // Query.equal('raceId', raceId), // Skip raceId filter if field doesn't exist yet
             Query.isNotNull('timeToStart'), // Only records with timeToStart
             Query.greaterThan('timeToStart', -60), // Only last hour of data  
-            Query.lessThan('timeToStart', 60),     // Only next hour of data
+            Query.lessThan('timeToStart', 61), // Include 60m baseline data (using lessThan with 61)
             Query.orderAsc('timeToStart'),         // Order by time to start
             Query.limit(2000) // Enough for high-frequency data
           ]
