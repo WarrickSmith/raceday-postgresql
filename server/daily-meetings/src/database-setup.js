@@ -649,6 +649,9 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
         { key: 'eventTimestamp', type: 'datetime', required: true },
         { key: 'type', type: 'string', size: 20, required: true }, // Enum: 'hold_percentage' or 'bet_percentage'
         
+        // CRITICAL MISSING FIELD - Required for proper race filtering
+        { key: 'raceId', type: 'string', size: 50, required: false }, // Race identifier for filtering
+        
         // Timeline display fields - Story 4.9 implementation
         { key: 'pollingTimestamp', type: 'datetime', required: false }, // When the polling occurred
         { key: 'timeToStart', type: 'integer', required: false }, // Minutes to race start at polling time
@@ -665,6 +668,10 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
         { key: 'isConsolidated', type: 'boolean', required: false, default: false }, // Aggregated data flag
         { key: 'bucketDocumentId', type: 'string', size: 100, required: false }, // For upserts
         { key: 'rawPollingData', type: 'string', size: 2000, required: false }, // JSON debug data
+        
+        // MISSING POOL-SPECIFIC PERCENTAGE FIELDS - Required for proper timeline calculations
+        { key: 'winPoolPercentage', type: 'float', required: false }, // Win-specific percentage (winPoolAmount / totalWinPool * 100)
+        { key: 'placePoolPercentage', type: 'float', required: false }, // Place-specific percentage (placePoolAmount / totalPlacePool * 100)
     ];
     // Create attributes in parallel for improved performance
     await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
@@ -725,6 +732,20 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
             }
             catch (error) {
                 context.error(`Failed to create idx_polling_timestamp index for money flow history: ${error}`);
+            }
+        }
+    }
+    
+    // CRITICAL INDEX for race filtering - Previously missing
+    if (!moneyFlowCollection.indexes.some((idx) => idx.key === 'idx_race_id')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'raceId', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_race_id', IndexType.Key, ['raceId']);
+                context.log('idx_race_id index created successfully for money flow history');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_race_id index for money flow history: ${error}`);
             }
         }
     }
