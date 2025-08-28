@@ -386,6 +386,11 @@ async function ensureRacesCollection(databases, config, context) {
         
         // Polling coordination (for master race scheduler)
         { key: 'last_poll_time', type: 'datetime', required: false }, // Tracks when race was last polled by master scheduler
+        
+        // Race status change tracking (added for proper timeline finalization)
+        { key: 'lastStatusChange', type: 'datetime', required: false }, // Timestamp of last status change
+        { key: 'finalizedAt', type: 'datetime', required: false }, // Timestamp when race status became Final/Finalized
+        { key: 'abandonedAt', type: 'datetime', required: false }, // Timestamp when race was abandoned
     ];
     // Create attributes in parallel for improved performance
     await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
