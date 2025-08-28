@@ -1,49 +1,9 @@
 /**
- * Database utilities for Appwrite operations
- * Provides performant upsert patterns and error handling
+ * Database utilities for single-race-poller function
+ * Self-contained copy for the single-race-poller function
  */
 
 import { ID } from 'node-appwrite';
-
-/**
- * Get timeline interval bucket for given time to start
- * @param {number} timeToStartMinutes - Minutes until race start (positive = before, negative = after)
- * @returns {number} Timeline interval bucket
- */
-function getTimelineInterval(timeToStartMinutes) {
-    // Pre-start intervals (standard 5-minute buckets, then 1-minute as race approaches)
-    if (timeToStartMinutes >= 60) return 60;
-    if (timeToStartMinutes >= 55) return 55;
-    if (timeToStartMinutes >= 50) return 50;
-    if (timeToStartMinutes >= 45) return 45;
-    if (timeToStartMinutes >= 40) return 40;
-    if (timeToStartMinutes >= 35) return 35;
-    if (timeToStartMinutes >= 30) return 30;
-    if (timeToStartMinutes >= 25) return 25;
-    if (timeToStartMinutes >= 20) return 20;
-    if (timeToStartMinutes >= 15) return 15;
-    if (timeToStartMinutes >= 10) return 10;
-    if (timeToStartMinutes >= 5) return 5;
-    if (timeToStartMinutes >= 4) return 4;
-    if (timeToStartMinutes >= 3) return 3;
-    if (timeToStartMinutes >= 2) return 2;
-    if (timeToStartMinutes >= 1) return 1;
-    if (timeToStartMinutes >= 0) return 0; // Race scheduled start
-    
-    // Post-start intervals (standard progression: -30s, -1m, -1:30s, -2m, -2:30s, etc.)
-    if (timeToStartMinutes >= -0.5) return -0.5;   // -30s
-    if (timeToStartMinutes >= -1) return -1;       // -1m  
-    if (timeToStartMinutes >= -1.5) return -1.5;   // -1:30s
-    if (timeToStartMinutes >= -2) return -2;       // -2m
-    if (timeToStartMinutes >= -2.5) return -2.5;   // -2:30s
-    if (timeToStartMinutes >= -3) return -3;       // -3m
-    if (timeToStartMinutes >= -3.5) return -3.5;   // -3:30s
-    if (timeToStartMinutes >= -4) return -4;       // -4m
-    if (timeToStartMinutes >= -4.5) return -4.5;   // -4:30s
-    
-    // For longer delays, continue at 1-minute intervals
-    return Math.ceil(timeToStartMinutes); // -5, -6, -7, etc.
-}
 
 /**
  * Extract pool totals from NZTAB API tote_pools array structure
@@ -294,46 +254,33 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
         // Store both hold_percentage and bet_percentage as separate records for comprehensive tracking
         let recordsCreated = 0;
         
-        // Calculate timeline interval for all records (not just bucketed)
-        let timeInterval = null;
-        let intervalType = 'unknown';
-        
-        if (timeToStart !== null) {
-            timeInterval = getTimelineInterval(timeToStart);
-            
-            // Determine interval type based on proximity to race for polling frequency
-            if (timeToStart > 30) {
-                intervalType = '5m'; // 5-minute intervals when far from race
-            } else if (timeToStart > 5) {
-                intervalType = '1m'; // 1-minute intervals close to race  
-            } else if (timeToStart > 0) {
-                intervalType = '30s'; // 30-second intervals very close to race
-            } else {
-                intervalType = 'live'; // Live updates during/after race
-            }
-        }
-
         // Save hold percentage (money held on this entrant) with pool amount calculations
         if (typeof moneyData.hold_percentage !== 'undefined') {
             const holdDoc = {
-                entrant: entrantId, // Appwrite relationship expects the document ID directly
-                raceId: raceId, // Include race ID for proper querying
+                entrant: entrantId,
+                raceId: raceId, // CRITICAL FIX: Add raceId field that was missing
                 holdPercentage: moneyData.hold_percentage,
                 betPercentage: null, // Explicitly null for hold_percentage records
                 type: 'hold_percentage',
                 eventTimestamp: timestamp,
                 pollingTimestamp: pollingTimestamp,
                 timeToStart: timeToStart,
-                timeInterval: timeInterval,
-                intervalType: intervalType,
                 poolType: 'hold' // For legacy hold percentage data
             };
             
-            // Calculate pool amounts if race pool data is available
+            // Calculate pool amounts and pool-specific percentages if race pool data is available
             if (racePoolData) {
                 const holdPercent = moneyData.hold_percentage / 100;
                 holdDoc.winPoolAmount = Math.round((racePoolData.winPoolTotal || 0) * holdPercent);
                 holdDoc.placePoolAmount = Math.round((racePoolData.placePoolTotal || 0) * holdPercent);
+                
+                // CRITICAL FIX: Calculate pool-specific percentages
+                if (racePoolData.winPoolTotal > 0) {
+                    holdDoc.winPoolPercentage = (holdDoc.winPoolAmount / (racePoolData.winPoolTotal * 100)) * 100; // Convert from cents
+                }
+                if (racePoolData.placePoolTotal > 0) {
+                    holdDoc.placePoolPercentage = (holdDoc.placePoolAmount / (racePoolData.placePoolTotal * 100)) * 100; // Convert from cents
+                }
             }
             
             await databases.createDocument(databaseId, 'money-flow-history', ID.unique(), holdDoc);
@@ -343,24 +290,30 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
         // Save bet percentage (percentage of total bets on this entrant) 
         if (typeof moneyData.bet_percentage !== 'undefined') {
             const betDoc = {
-                entrant: entrantId, // Appwrite relationship expects the document ID directly
-                raceId: raceId, // Include race ID for proper querying
+                entrant: entrantId,
+                raceId: raceId, // CRITICAL FIX: Add raceId field that was missing
                 holdPercentage: null, // Explicitly null for bet_percentage records
                 betPercentage: moneyData.bet_percentage,
                 type: 'bet_percentage',
                 eventTimestamp: timestamp,
                 pollingTimestamp: pollingTimestamp,
                 timeToStart: timeToStart,
-                timeInterval: timeInterval,
-                intervalType: intervalType,
                 poolType: 'bet' // For bet percentage data
             };
             
-            // Calculate pool amounts if race pool data is available
+            // Calculate pool amounts and pool-specific percentages if race pool data is available
             if (racePoolData) {
                 const betPercent = moneyData.bet_percentage / 100;
                 betDoc.winPoolAmount = Math.round((racePoolData.winPoolTotal || 0) * betPercent);
                 betDoc.placePoolAmount = Math.round((racePoolData.placePoolTotal || 0) * betPercent);
+                
+                // CRITICAL FIX: Calculate pool-specific percentages
+                if (racePoolData.winPoolTotal > 0) {
+                    betDoc.winPoolPercentage = (betDoc.winPoolAmount / (racePoolData.winPoolTotal * 100)) * 100; // Convert from cents
+                }
+                if (racePoolData.placePoolTotal > 0) {
+                    betDoc.placePoolPercentage = (betDoc.placePoolAmount / (racePoolData.placePoolTotal * 100)) * 100; // Convert from cents
+                }
             }
             
             await databases.createDocument(databaseId, 'money-flow-history', ID.unique(), betDoc);
@@ -381,247 +334,395 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
 }
 
 /**
- * Save money flow history with intelligent time bucketing for dynamic frequency display
+ * Process money tracker data from API response with timeline support (Updated with race status filtering)
  * @param {Object} databases - Appwrite Databases instance
- * @param {string} databaseId - Database ID  
- * @param {string} entrantId - Entrant ID
- * @param {Object} moneyData - Money tracker data from API (hold_percentage, bet_percentage)
+ * @param {string} databaseId - Database ID
+ * @param {Object} moneyTrackerData - Money tracker data from API response
  * @param {Object} context - Appwrite function context for logging
  * @param {string} raceId - Race ID for timeline calculation
- * @param {Object} racePoolData - Race pool totals for win/place calculations
- * @returns {boolean} Success status
+ * @param {Object} racePoolData - Optional race pool data for amount calculations
+ * @param {string} raceStatus - Race status for filtering (Optional)
+ * @returns {number} Number of entrants processed for money flow
  */
-async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, entrantId, moneyData, context, raceId = null, racePoolData = null) {
-    if (!moneyData || (typeof moneyData.hold_percentage === 'undefined' && typeof moneyData.bet_percentage === 'undefined')) {
-        return false;
+export async function processMoneyTrackerData(databases, databaseId, moneyTrackerData, context, raceId = 'unknown', racePoolData = null, raceStatus = null) {
+    if (!moneyTrackerData || !moneyTrackerData.entrants || !Array.isArray(moneyTrackerData.entrants)) {
+        context.log('No money tracker entrants data available', { raceId });
+        return 0;
     }
 
-    try {
-        const timestamp = new Date().toISOString();
-        
-        // Calculate time intervals and determine bucket type
-        let timeToStart = null;
-        let intervalType = '5m'; // default
-        let timeInterval = null;
-        
-        if (raceId) {
-            try {
-                const race = await databases.getDocument(databaseId, 'races', raceId);
-                if (race.startTime) {
-                    const raceStartTime = new Date(race.startTime);
-                    const currentTime = new Date();
-                    timeToStart = Math.round((raceStartTime.getTime() - currentTime.getTime()) / (1000 * 60));
-                    
-                    // Use FIXED timeline interval mapping
-                    timeInterval = getTimelineInterval(timeToStart);
-                    
-                    // Determine interval type based on proximity to race for polling frequency
-                    if (timeToStart > 30) {
-                        intervalType = '5m'; // 5-minute intervals when far from race
-                    } else if (timeToStart > 5) {
-                        intervalType = '1m'; // 1-minute intervals close to race  
-                    } else if (timeToStart > 0) {
-                        intervalType = '30s'; // 30-second intervals very close to race
-                    } else {
-                        intervalType = 'live'; // Live updates during/after race
-                    }
-                } else {
-                    context.error('Race document missing startTime field', { raceId, entrantId });
-                    return false; // Cannot create bucketed data without race start time
-                }
-            } catch (error) {
-                context.error('Could not fetch race document for bucketed storage', { 
-                    raceId, 
-                    entrantId: entrantId.slice(0, 8) + '...', 
-                    error: error.message 
-                });
-                return false; // Cannot create bucketed data without race information
-            }
-        }
-        
-        // Validate required time calculation succeeded (skip bucketed storage without proper time data)
-        if (timeInterval === null || intervalType === 'unknown') {
-            context.warn('Skipping bucketed storage due to missing time interval data', { 
-                raceId: raceId || 'unknown', 
-                entrantId: entrantId.slice(0, 8) + '...',
-                timeToStart,
-                timeInterval,
-                intervalType
-            });
-            return false; // Cannot create valid bucketed data without proper time intervals
-        }
-        
-        // Create bucket-based document ID for upsert operations (max 36 chars, alphanumeric + underscore only)
-        // Remove hyphens from entrantId and create a valid Appwrite document ID
-        const bucketDocId = `bucket_${entrantId.replace(/-/g, '').slice(-24)}_${timeInterval}_${intervalType}`.slice(0, 36);
-        
-        // Check if bucket already exists for this interval
-        let existingBucket = null;
+    // Only skip processing money tracker data for races abandoned from start (never had betting activity)
+    // Continue processing through Open → Closed → Interim → Final to preserve timeline data
+    if (raceStatus === 'Abandoned') {
+        // Check if we have any existing money flow data for this race
         try {
-            existingBucket = await databases.getDocument(databaseId, 'money-flow-history', bucketDocId);
-        } catch (error) {
-            if (error.code !== 404) throw error;
-        }
-        
-        // Calculate pool amounts using correct formula (convert to cents)
-        const holdPercent = (moneyData.hold_percentage || 0) / 100;
-        const currentWinAmount = Math.round((racePoolData?.winPoolTotal || 0) * holdPercent * 100); // Convert to cents
-        const currentPlaceAmount = Math.round((racePoolData?.placePoolTotal || 0) * holdPercent * 100); // Convert to cents
-        
-        let incrementalWinAmount = currentWinAmount;
-        let incrementalPlaceAmount = currentPlaceAmount;
-        
-        // FIXED: Calculate incremental amounts using chronological previous bucket (not same bucket updates)
-        try {
-            // Query for the chronologically PREVIOUS interval (next higher timeInterval value)
-            // Example: current = 45m bucket, need to find 50m bucket (not same bucket update)
-            const allPreviousIntervals = await databases.listDocuments(databaseId, 'money-flow-history', [
-                'equal("entrant", "' + entrantId + '")',
-                'equal("raceId", "' + raceId + '")',
-                'equal("type", "bucketed_aggregation")',
-                'greaterThan("timeInterval", ' + timeInterval + ')', // Find intervals > current interval
-                'orderBy("timeInterval", "asc")', // Order ascending to get the closest higher interval
-                'limit(1)' // Get the immediately previous chronological interval
+            const existingData = await databases.listDocuments(databaseId, 'money-flow-history', [
+                Query.equal('raceId', raceId),
+                Query.limit(1)
             ]);
             
-            if (allPreviousIntervals.documents.length > 0) {
-                const prevDoc = allPreviousIntervals.documents[0];
-                // Calculate increment: current bucket total - previous bucket total
-                incrementalWinAmount = currentWinAmount - (prevDoc.winPoolAmount || 0);
-                incrementalPlaceAmount = currentPlaceAmount - (prevDoc.placePoolAmount || 0);
-                
-                // Allow negative increments (money can flow out of entrants)
-                // but log unusual cases for debugging
-                if (incrementalWinAmount < 0) {
-                    context.log('Negative increment detected (money flowing OUT)', { 
-                        entrantId: entrantId.slice(0, 8) + '...', 
-                        timeInterval, 
-                        previousInterval: prevDoc.timeInterval,
-                        winDecrement: incrementalWinAmount
-                    });
-                }
-                
-                context.log('Calculated bucket increment', {
-                    entrantId: entrantId.slice(0, 8) + '...',
-                    currentInterval: timeInterval,
-                    previousInterval: prevDoc.timeInterval,
-                    currentTotal: currentWinAmount,
-                    previousTotal: prevDoc.winPoolAmount,
-                    increment: incrementalWinAmount
+            if (existingData.documents.length === 0) {
+                context.log('Skipping money tracker processing for abandoned race with no prior data', { 
+                    raceId, 
+                    raceStatus,
+                    reason: 'Abandoned race never had betting activity'
                 });
+                return 0;
             } else {
-                // No previous interval found - this must be the baseline (60m) or first record
-                if (timeInterval === 60) {
-                    // 60m bucket: show absolute baseline amount
-                    incrementalWinAmount = currentWinAmount;
-                    incrementalPlaceAmount = currentPlaceAmount;
-                    context.log('60m baseline bucket', { entrantId: entrantId.slice(0, 8) + '...', baselineAmount: currentWinAmount });
-                } else {
-                    // This should not happen in well-formed data - log as warning
-                    incrementalWinAmount = currentWinAmount;
-                    incrementalPlaceAmount = currentPlaceAmount;
-                    context.warn('No previous interval found for non-baseline bucket', { 
-                        entrantId: entrantId.slice(0, 8) + '...', 
-                        timeInterval,
-                        usingAbsoluteAmount: currentWinAmount
-                    });
-                }
+                context.log('Processing final data for abandoned race with existing timeline', { 
+                    raceId, 
+                    raceStatus,
+                    reason: 'Preserving timeline data for race that was abandoned mid-process'
+                });
             }
-        } catch (queryError) {
-            // If query fails, use absolute amounts  
-            incrementalWinAmount = currentWinAmount;
-            incrementalPlaceAmount = currentPlaceAmount;
-            context.log('Could not query previous intervals, using absolute amounts', { 
-                entrantId: entrantId.slice(0, 8) + '...', 
-                error: queryError.message,
-                currentWinAmount,
-                currentPlaceAmount
+        } catch (error) {
+            context.log('Could not check existing data, skipping abandoned race', { raceId, raceStatus });
+            return 0;
+        }
+    }
+    
+    // Continue processing for all other race statuses (Open, Closed, Interim, Final)
+    // This ensures complete timeline data is preserved for historical viewing
+
+    let entrantsProcessed = 0;
+    
+    // CORRECT AGGREGATION: Sum all entries per entrant_id (multiple bet transactions)
+    const entrantMoneyData = {};
+    for (const entry of moneyTrackerData.entrants) {
+        if (entry.entrant_id) {
+            if (!entrantMoneyData[entry.entrant_id]) {
+                entrantMoneyData[entry.entrant_id] = { 
+                    hold_percentage: 0, 
+                    bet_percentage: 0 
+                };
+            }
+            // SUM all percentages for the entrant (multiple bet transactions)
+            entrantMoneyData[entry.entrant_id].hold_percentage += (entry.hold_percentage || 0);
+            entrantMoneyData[entry.entrant_id].bet_percentage += (entry.bet_percentage || 0);
+        }
+    }
+
+    // Validation: Check that total hold percentages sum to approximately 100%
+    const totalHoldPercentage = Object.values(entrantMoneyData).reduce((sum, data) => sum + data.hold_percentage, 0);
+    if (Math.abs(totalHoldPercentage - 100) > 5) {
+        context.log('⚠️ Hold percentages do not sum to ~100%', {
+            raceId,
+            totalHoldPercentage,
+            entrantCount: Object.keys(entrantMoneyData).length
+        });
+    }
+
+    // Save aggregated money flow data for each entrant
+    for (const [entrantId, moneyData] of Object.entries(entrantMoneyData)) {
+        const success = await saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData, context, raceId, racePoolData);
+        if (success) {
+            entrantsProcessed++;
+        }
+    }
+    
+    // Also save time-bucketed version for dynamic column generation
+    if (entrantsProcessed > 0 && racePoolData) {
+        try {
+            await saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, entrantMoneyData, racePoolData, context);
+        } catch (error) {
+            context.log('⚠️ Failed to save time-bucketed money flow history', {
+                raceId,
+                error: error instanceof Error ? error.message : 'Unknown error'
             });
         }
-        
-        // Validate incremental amounts are never null/undefined
-        if (incrementalWinAmount === null || incrementalWinAmount === undefined) {
-            context.warn('Incremental win amount is null, using current amount as fallback', {
-                entrantId: entrantId.slice(0, 8) + '...',
-                incrementalWinAmount,
-                currentWinAmount
-            });
-            incrementalWinAmount = currentWinAmount || 0;
-        }
-        
-        if (incrementalPlaceAmount === null || incrementalPlaceAmount === undefined) {
-            context.warn('Incremental place amount is null, using current amount as fallback', {
-                entrantId: entrantId.slice(0, 8) + '...',
-                incrementalPlaceAmount,
-                currentPlaceAmount
-            });
-            incrementalPlaceAmount = currentPlaceAmount || 0;
-        }
-        
-        const bucketDoc = {
-            entrant: entrantId, // Appwrite relationship expects the document ID directly
-            raceId: raceId, // Add raceId for consistency with other functions
-            holdPercentage: moneyData.hold_percentage,
-            betPercentage: moneyData.bet_percentage,
-            type: 'bucketed_aggregation', // STANDARDIZED: Use same type as other functions
-            eventTimestamp: timestamp,
-            pollingTimestamp: timestamp,
-            timeToStart: timeToStart,
-            timeInterval: timeInterval,
-            intervalType: intervalType,
-            winPoolAmount: currentWinAmount, // Absolute amount in cents
-            placePoolAmount: currentPlaceAmount, // Absolute amount in cents
-            incrementalAmount: incrementalWinAmount, // Pre-calculated incremental for win pool (backwards compatibility)
-            incrementalWinAmount: incrementalWinAmount, // Pre-calculated increment in cents
-            incrementalPlaceAmount: incrementalPlaceAmount, // Pre-calculated increment in cents
-            poolType: 'combined', // STANDARDIZED: Use same poolType as other functions
-            isConsolidated: false,
-            bucketDocumentId: bucketDocId,
-            rawPollingData: JSON.stringify({
-                originalTimeToStart: timeToStart,
-                pollingTimestamp: timestamp,
-                holdPercentage: moneyData.hold_percentage,
-                betPercentage: moneyData.bet_percentage,
-                calculationDetails: {
-                    racePoolWinTotal: racePoolData?.winPoolTotal || 0,
-                    racePoolPlaceTotal: racePoolData?.placePoolTotal || 0,
-                    holdPercentDecimal: holdPercent
-                }
-            })
-        };
-        
-        // Upsert the bucket document
-        const upsertSuccess = await performantUpsert(databases, databaseId, 'money-flow-history', bucketDocId, bucketDoc, context);
-        
-        if (upsertSuccess) {
-            context.log('Saved time-bucketed money flow data', {
-                entrantId: entrantId.slice(-8),
-                timeInterval,
-                intervalType,
-                holdPercentage: moneyData.hold_percentage,
-                winAmount: currentWinAmount,
-                incrementalWin: incrementalWinAmount,
-                isUpdate: !!existingBucket
-            });
-            return true;
+    }
+    
+    context.log('Processed money tracker data with CORRECTED aggregation logic', {
+        raceId,
+        totalEntries: moneyTrackerData.entrants.length,
+        uniqueEntrants: Object.keys(entrantMoneyData).size,
+        entrantsProcessed,
+        totalHoldPercentage: totalHoldPercentage.toFixed(2) + '%',
+        racePoolDataAvailable: !!racePoolData
+    });
+    
+    return entrantsProcessed;
+}
+
+/**
+ * Get timeline interval bucket for given time to start
+ * @param {number} timeToStartMinutes - Minutes until race start (positive = before, negative = after)
+ * @returns {number} Timeline interval bucket
+ */
+function getTimelineInterval(timeToStartMinutes) {
+    // Pre-start intervals (standard 5-minute buckets, then 1-minute as race approaches)
+    if (timeToStartMinutes >= 60) return 60;
+    if (timeToStartMinutes >= 55) return 55;
+    if (timeToStartMinutes >= 50) return 50;
+    if (timeToStartMinutes >= 45) return 45;
+    if (timeToStartMinutes >= 40) return 40;
+    if (timeToStartMinutes >= 35) return 35;
+    if (timeToStartMinutes >= 30) return 30;
+    if (timeToStartMinutes >= 25) return 25;
+    if (timeToStartMinutes >= 20) return 20;
+    if (timeToStartMinutes >= 15) return 15;
+    if (timeToStartMinutes >= 10) return 10;
+    if (timeToStartMinutes >= 5) return 5;
+    if (timeToStartMinutes >= 4) return 4;
+    if (timeToStartMinutes >= 3) return 3;
+    if (timeToStartMinutes >= 2) return 2;
+    if (timeToStartMinutes >= 1) return 1;
+    if (timeToStartMinutes >= 0) return 0; // Race scheduled start
+    
+    // Post-start intervals (standard progression: -30s, -1m, -1:30s, -2m, -2:30s, etc.)
+    if (timeToStartMinutes >= -0.5) return -0.5;   // -30s
+    if (timeToStartMinutes >= -1) return -1;       // -1m  
+    if (timeToStartMinutes >= -1.5) return -1.5;   // -1:30s
+    if (timeToStartMinutes >= -2) return -2;       // -2m
+    if (timeToStartMinutes >= -2.5) return -2.5;   // -2:30s
+    if (timeToStartMinutes >= -3) return -3;       // -3m
+    if (timeToStartMinutes >= -3.5) return -3.5;   // -3:30s
+    if (timeToStartMinutes >= -4) return -4;       // -4m
+    if (timeToStartMinutes >= -4.5) return -4.5;   // -4:30s
+    
+    // For longer delays, continue at 1-minute intervals
+    return Math.ceil(timeToStartMinutes); // -5, -6, -7, etc.
+}
+
+/**
+ * Save time-bucketed money flow history for dynamic column generation with FIXED timeline intervals
+ * @param {Object} databases - Appwrite Databases instance
+ * @param {string} databaseId - Database ID
+ * @param {string} raceId - Race ID
+ * @param {Object} entrantMoneyData - Aggregated money data per entrant
+ * @param {Object} racePoolData - Race pool totals
+ * @param {Object} context - Appwrite function context for logging
+ * @returns {number} Number of bucketed records created
+ */
+async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, entrantMoneyData, racePoolData, context) {
+    let recordsCreated = 0;
+    const timestamp = new Date().toISOString();
+    
+    // Calculate time interval from race start with FIXED bucketing logic
+    let timeToStart = null;
+    let timeInterval = null;
+    let intervalType = 'unknown';
+    
+    try {
+        const race = await databases.getDocument(databaseId, 'races', raceId);
+        if (race.startTime) {
+            const raceStartTime = new Date(race.startTime);
+            const currentTime = new Date();
+            timeToStart = Math.round((raceStartTime.getTime() - currentTime.getTime()) / (1000 * 60)); // Minutes to start
+            
+            // Use FIXED timeline interval mapping
+            timeInterval = getTimelineInterval(timeToStart);
+            
+            // Determine interval type based on proximity to race for polling frequency
+            if (timeToStart > 30) {
+                intervalType = '5m'; // 5-minute intervals when far from race
+            } else if (timeToStart > 5) {
+                intervalType = '1m'; // 1-minute intervals close to race  
+            } else if (timeToStart > 0) {
+                intervalType = '30s'; // 30-second intervals very close to race
+            } else {
+                intervalType = 'live'; // Live updates during/after race
+            }
         } else {
-            context.error('Failed to save time-bucketed money flow data', {
-                entrantId,
-                bucketDocId,
-                error: 'performantUpsert returned false'
-            });
-            return false;
+            context.error('Race document missing startTime field', { raceId });
+            return 0; // Cannot create bucketed data without race start time
         }
     } catch (error) {
-        context.error('Failed to save time-bucketed money flow history', {
-            entrantId,
-            raceId,
-            holdPercentageValue: moneyData.hold_percentage,
-            betPercentageValue: moneyData.bet_percentage,
-            error: error instanceof Error ? error.message : 'Unknown error'
+        context.error('Could not fetch race document for bucketed storage', { 
+            raceId, 
+            error: error.message 
         });
-        return false;
+        return 0; // Cannot create bucketed data without race information
     }
+    
+    // Validate required time calculation succeeded
+    if (timeToStart === null || timeInterval === null) {
+        context.error('Failed to calculate time intervals for bucketed storage', { 
+            raceId, 
+            timeToStart, 
+            timeInterval 
+        });
+        return 0; // Cannot create bucketed data without proper time intervals
+    }
+
+    // Save bucketed data for each entrant with proper incremental calculation
+    for (const [entrantId, moneyData] of Object.entries(entrantMoneyData)) {
+        try {
+            // Calculate pool amounts from aggregated percentages (convert to cents)
+            const holdPercent = moneyData.hold_percentage / 100;
+            const winPoolAmount = Math.round((racePoolData?.winPoolTotal || 0) * holdPercent * 100); // Convert to cents
+            const placePoolAmount = Math.round((racePoolData?.placePoolTotal || 0) * holdPercent * 100); // Convert to cents
+            
+            // Get previous interval data for incremental calculation
+            let incrementalWinAmount = 0;
+            let incrementalPlaceAmount = 0;
+            
+            try {
+                // ROBUST PREVIOUS BUCKET SEARCH: Find the most recent previous bucket with pool data
+                // Step 1: Try immediate previous interval (next higher timeInterval value)
+                context.log('DEBUG: About to query for previous bucket', {
+                    entrantId: entrantId.slice(0, 8) + '...',
+                    currentTimeInterval: timeInterval,
+                    searchingForIntervalsGreaterThan: timeInterval,
+                    queryFilters: ['entrant=' + entrantId.slice(0, 8) + '...', 'raceId=' + raceId.slice(0, 8) + '...', 'type=bucketed_aggregation', 'timeInterval>' + timeInterval]
+                });
+                
+                let previousIntervalQuery = await databases.listDocuments(databaseId, 'money-flow-history', [
+                    Query.equal('entrant', entrantId),
+                    Query.equal('raceId', raceId),
+                    Query.equal('type', 'bucketed_aggregation'),
+                    Query.greaterThan('timeInterval', timeInterval), // Find intervals > current interval
+                    Query.orderAsc('timeInterval'), // Order ascending to get the closest higher interval
+                    Query.limit(1) // Get the immediately previous chronological interval
+                ]);
+                
+                let prevDoc = null;
+                
+                context.log('DEBUG: Previous bucket query result', {
+                    entrantId: entrantId.slice(0, 8) + '...',
+                    currentInterval: timeInterval,
+                    queryResultCount: previousIntervalQuery.documents.length,
+                    foundDocuments: previousIntervalQuery.documents.map(d => ({
+                        interval: d.timeInterval,
+                        winAmount: d.winPoolAmount,
+                        placeAmount: d.placePoolAmount
+                    }))
+                });
+                
+                if (previousIntervalQuery.documents.length > 0) {
+                    prevDoc = previousIntervalQuery.documents[0];
+                } else {
+                    // Step 2: No immediate previous found - search for ANY previous bucket with data
+                    const allPreviousBuckets = await databases.listDocuments(databaseId, 'money-flow-history', [
+                        Query.equal('entrant', entrantId),
+                        Query.equal('raceId', raceId),
+                        Query.equal('type', 'bucketed_aggregation'),
+                        Query.greaterThan('timeInterval', timeInterval), // Any interval > current
+                        Query.notEqual('winPoolAmount', 0), // Must have actual pool data
+                        Query.orderAsc('timeInterval'), // Get chronologically closest
+                        Query.limit(1)
+                    ]);
+                    
+                    if (allPreviousBuckets.documents.length > 0) {
+                        prevDoc = allPreviousBuckets.documents[0];
+                        context.log('Found gap-spanning previous bucket', {
+                            entrantId: entrantId.slice(0, 8) + '...',
+                            currentInterval: timeInterval,
+                            foundPreviousInterval: prevDoc.timeInterval,
+                            gap: prevDoc.timeInterval - timeInterval
+                        });
+                    }
+                }
+                
+                if (prevDoc) {
+                    // Calculate increment: current pool total - previous pool total
+                    const previousWinAmount = prevDoc.winPoolAmount || 0;
+                    const previousPlaceAmount = prevDoc.placePoolAmount || 0;
+                    
+                    incrementalWinAmount = winPoolAmount - previousWinAmount;
+                    incrementalPlaceAmount = placePoolAmount - previousPlaceAmount;
+                    
+                    // Handle same totals (no change)
+                    if (incrementalWinAmount === 0 && incrementalPlaceAmount === 0) {
+                        context.log('No change in pool amounts since previous bucket', {
+                            entrantId: entrantId.slice(0, 8) + '...',
+                            currentInterval: timeInterval,
+                            previousInterval: prevDoc.timeInterval,
+                            poolAmount: winPoolAmount
+                        });
+                    }
+                    
+                    // Log negative increments (money flowing out)
+                    if (incrementalWinAmount < 0 || incrementalPlaceAmount < 0) {
+                        context.log('Negative increment detected (money flowing OUT)', { 
+                            entrantId: entrantId.slice(0, 8) + '...', 
+                            timeInterval, 
+                            previousInterval: prevDoc.timeInterval,
+                            winChange: incrementalWinAmount,
+                            placeChange: incrementalPlaceAmount
+                        });
+                    }
+                    
+                    context.log('Calculated bucket increment from previous total', {
+                        entrantId: entrantId.slice(0, 8) + '...',
+                        currentInterval: timeInterval,
+                        previousInterval: prevDoc.timeInterval,
+                        currentTotal: winPoolAmount,
+                        previousTotal: previousWinAmount,
+                        increment: incrementalWinAmount
+                    });
+                } else {
+                    // No previous bucket found - this is the first/baseline record
+                    incrementalWinAmount = winPoolAmount;
+                    incrementalPlaceAmount = placePoolAmount;
+                    context.log('First bucket record - using pool total as baseline', { 
+                        entrantId: entrantId.slice(0, 8) + '...', 
+                        timeInterval,
+                        baselineAmount: winPoolAmount
+                    });
+                }
+            } catch (queryError) {
+                // Query failed - use pool total as increment (first record behavior)
+                incrementalWinAmount = winPoolAmount;
+                incrementalPlaceAmount = placePoolAmount;
+                context.log('Query failed, treating as first record', { 
+                    entrantId: entrantId.slice(0, 8) + '...', 
+                    timeInterval,
+                    error: queryError.message,
+                    usingPoolTotal: winPoolAmount
+                });
+            }
+            
+            const bucketedDoc = {
+                entrant: entrantId,
+                raceId: raceId, // CRITICAL FIX: Ensure raceId is included in bucketed documents
+                timeToStart: timeToStart,
+                timeInterval: timeInterval,
+                intervalType: intervalType,
+                holdPercentage: moneyData.hold_percentage,
+                betPercentage: moneyData.bet_percentage,
+                winPoolAmount: winPoolAmount, // Absolute amount in cents
+                placePoolAmount: placePoolAmount, // Absolute amount in cents
+                incrementalAmount: incrementalWinAmount, // Pre-calculated incremental for win pool (backwards compatibility)
+                incrementalWinAmount: incrementalWinAmount, // Pre-calculated increment in cents
+                incrementalPlaceAmount: incrementalPlaceAmount, // Pre-calculated increment in cents
+                pollingTimestamp: timestamp,
+                eventTimestamp: timestamp,
+                type: 'bucketed_aggregation',
+                poolType: 'combined',
+                // CRITICAL FIX: Add pool-specific percentages to bucketed documents
+                winPoolPercentage: racePoolData && racePoolData.winPoolTotal > 0 ? 
+                    (winPoolAmount / (racePoolData.winPoolTotal * 100)) * 100 : null,
+                placePoolPercentage: racePoolData && racePoolData.placePoolTotal > 0 ? 
+                    (placePoolAmount / (racePoolData.placePoolTotal * 100)) * 100 : null
+            };
+            
+            await databases.createDocument(databaseId, 'money-flow-history', ID.unique(), bucketedDoc);
+            recordsCreated++;
+            
+            context.log('Saved bucketed money flow with increments', {
+                entrantId: entrantId.slice(0, 8) + '...',
+                timeInterval,
+                winIncrement: incrementalWinAmount,
+                placeIncrement: incrementalPlaceAmount
+            });
+            
+        } catch (error) {
+            context.error('Failed to save bucketed money flow history', {
+                entrantId,
+                raceId,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            });
+        }
+    }
+    
+    context.log('Saved time-bucketed money flow history', {
+        raceId,
+        recordsCreated,
+        timeInterval,
+        intervalType
+    });
+    
+    return recordsCreated;
 }
 
 /**
@@ -683,122 +784,6 @@ export async function processToteTrendsData(databases, databaseId, raceId, tote_
 }
 
 /**
- * Process money tracker data from API response with timeline support (Updated with race status filtering)
- * @param {Object} databases - Appwrite Databases instance
- * @param {string} databaseId - Database ID
- * @param {Object} moneyTrackerData - Money tracker data from API response
- * @param {Object} context - Appwrite function context for logging
- * @param {string} raceId - Race ID for timeline calculation
- * @param {Object} racePoolData - Optional race pool data for amount calculations
- * @param {string} raceStatus - Race status for filtering (Optional)
- * @returns {number} Number of entrants processed for money flow
- */
-export async function processMoneyTrackerData(databases, databaseId, moneyTrackerData, context, raceId = 'unknown', racePoolData = null, raceStatus = null) {
-    if (!moneyTrackerData || !moneyTrackerData.entrants || !Array.isArray(moneyTrackerData.entrants)) {
-        context.log('No money tracker entrants data available', { raceId });
-        return 0;
-    }
-
-    // Only skip processing money tracker data for races abandoned from start (never had betting activity)
-    // Continue processing through Open → Closed → Interim → Final to preserve timeline data
-    if (raceStatus === 'Abandoned') {
-        // Check if we have any existing money flow data for this race
-        try {
-            const existingData = await databases.listDocuments(databaseId, 'money-flow-history', [
-                'equal("raceId", "' + raceId + '")',
-                'limit(1)'
-            ]);
-            
-            if (existingData.documents.length === 0) {
-                context.log('Skipping money tracker processing for abandoned race with no prior data', { 
-                    raceId, 
-                    raceStatus,
-                    reason: 'Abandoned race never had betting activity'
-                });
-                return 0;
-            } else {
-                context.log('Processing final data for abandoned race with existing timeline', { 
-                    raceId, 
-                    raceStatus,
-                    reason: 'Preserving timeline data for race that was abandoned mid-process'
-                });
-            }
-        } catch (error) {
-            context.log('Could not check existing data, skipping abandoned race', { raceId, raceStatus });
-            return 0;
-        }
-    }
-    
-    // Continue processing for all other race statuses (Open, Closed, Interim, Final)
-    // This ensures complete timeline data is preserved for historical viewing
-
-    let entrantsProcessed = 0;
-    
-    // CORRECT AGGREGATION: Sum all entries per entrant_id (multiple bet transactions)
-    const entrantMoneyData = {};
-    
-    for (const entry of moneyTrackerData.entrants) {
-        if (entry.entrant_id) {
-            if (!entrantMoneyData[entry.entrant_id]) {
-                entrantMoneyData[entry.entrant_id] = { 
-                    hold_percentage: 0, 
-                    bet_percentage: 0 
-                };
-            }
-            // SUM all percentages for the entrant (multiple bet transactions)
-            entrantMoneyData[entry.entrant_id].hold_percentage += (entry.hold_percentage || 0);
-            entrantMoneyData[entry.entrant_id].bet_percentage += (entry.bet_percentage || 0);
-        }
-    }
-    
-    // Save bucketed money flow history for each entrant
-    for (const [entrantId, moneyData] of Object.entries(entrantMoneyData)) {
-        const success = await saveTimeBucketedMoneyFlowHistory(databases, databaseId, entrantId, moneyData, context, raceId, racePoolData);
-        if (success) {
-            entrantsProcessed++;
-        }
-    }
-    
-    // Validate hold percentages sum to ~100%
-    const totalHoldPercentage = Object.values(entrantMoneyData)
-        .reduce((sum, data) => sum + (data.hold_percentage || 0), 0);
-    const isValidPercentage = totalHoldPercentage >= 97 && totalHoldPercentage <= 103;
-    
-    context.log('Processed money tracker data with correct aggregation', {
-        raceId,
-        totalEntries: moneyTrackerData.entrants.length,
-        uniqueEntrants: Object.keys(entrantMoneyData).length,
-        entrantsProcessed,
-        racePoolDataAvailable: !!racePoolData,
-        holdPercentageValidation: {
-            totalPercentage: totalHoldPercentage,
-            expectedRange: '97-103%',
-            isValid: isValidPercentage
-        },
-        sampleAggregation: Object.entries(entrantMoneyData).slice(0, 3).map(([id, data]) => ({
-            entrantId: id.slice(-8),
-            holdPercentage: data.hold_percentage,
-            betPercentage: data.bet_percentage
-        }))
-    });
-    
-    if (!isValidPercentage) {
-        context.log('⚠️ Hold percentages do not sum to ~100%', {
-            raceId,
-            totalHoldPercentage,
-            deviation: Math.abs(100 - totalHoldPercentage),
-            possibleCauses: [
-                'API rounding errors',
-                'Real-time data fluctuations',
-                'Incorrect aggregation logic'
-            ]
-        });
-    }
-    
-    return entrantsProcessed;
-}
-
-/**
  * Performant upsert operation: try update first, create on 404
  * @param {Object} databases - Appwrite Databases instance
  * @param {string} databaseId - Database ID
@@ -811,29 +796,14 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
 export async function performantUpsert(databases, databaseId, collectionId, documentId, data, context) {
     try {
         await databases.updateDocument(databaseId, collectionId, documentId, data);
-        context.log(`Successfully updated ${collectionId} document`, { documentId: documentId.slice(-8) });
         return true;
     }
-    catch (updateError) {
-        context.log(`Update failed, attempting create for ${collectionId}`, { 
-            documentId: documentId.slice(-8),
-            updateError: updateError instanceof Error ? updateError.message : 'Unknown error'
-        });
-        
+    catch (error) {
         try {
-            context.log(`Attempting to create ${collectionId} document`, { 
-                documentId: documentId.slice(-8),
-                dataKeys: Object.keys(data).join(', '),
-                entrant: data.entrant ? data.entrant.slice(-8) : 'none'
-            });
-            
             // For money-flow-history documents, verify entrant exists before creating relationship
             if (collectionId === 'money-flow-history' && data.entrant) {
                 try {
                     await databases.getDocument(databaseId, 'entrants', data.entrant);
-                    context.log('Entrant document exists for relationship', { 
-                        entrantId: data.entrant.slice(-8) 
-                    });
                 } catch (entrantError) {
                     context.error('Entrant document does not exist for relationship', {
                         entrantId: data.entrant,
@@ -843,151 +813,17 @@ export async function performantUpsert(databases, databaseId, collectionId, docu
                 }
             }
             
-            const createResult = await databases.createDocument(databaseId, collectionId, documentId, data);
-            context.log(`Successfully created ${collectionId} document`, { 
-                documentId: documentId.slice(-8),
-                resultId: createResult.$id.slice(-8),
-                entrantRelationship: data.entrant ? data.entrant.slice(-8) : 'none'
-            });
+            await databases.createDocument(databaseId, collectionId, documentId, data);
             return true;
         }
         catch (createError) {
             context.error(`Failed to create ${collectionId} document`, {
                 documentId,
-                updateError: updateError instanceof Error ? updateError.message : 'Unknown error',
-                createError: createError instanceof Error ? createError.message : 'Unknown error',
-                createErrorCode: createError.code || 'no-code',
-                createErrorType: createError.type || 'no-type',
-                dataKeys: Object.keys(data),
-                entrantId: data.entrant ? data.entrant.slice(-8) : 'unknown',
-                dataPreview: {
-                    entrant: data.entrant,
-                    holdPercentage: data.holdPercentage,
-                    timeInterval: data.timeInterval
-                }
+                error: createError instanceof Error ? createError.message : 'Unknown error'
             });
             return false;
         }
     }
-}
-
-/**
- * Process meetings in parallel with error isolation
- * @param {Object} databases - Appwrite Databases instance
- * @param {string} databaseId - Database ID
- * @param {Array} meetings - Array of meeting objects
- * @param {Object} context - Appwrite function context for logging
- * @returns {Object} Processing results with counts
- */
-export async function processMeetings(databases, databaseId, meetings, context) {
-    let meetingsProcessed = 0;
-    
-    const meetingPromises = meetings.map(async (meeting) => {
-        try {
-            const meetingDoc = {
-                meetingId: meeting.meeting,
-                meetingName: meeting.name,
-                country: meeting.country,
-                raceType: meeting.category_name,
-                date: meeting.date,
-                status: 'active'
-            };
-            const success = await performantUpsert(databases, databaseId, 'meetings', meeting.meeting, meetingDoc, context);
-            if (success) {
-                context.log('Upserted meeting', { meetingId: meeting.meeting, name: meeting.name });
-                return { success: true, meetingId: meeting.meeting };
-            }
-            else {
-                return { success: false, meetingId: meeting.meeting };
-            }
-        }
-        catch (error) {
-            context.error('Failed to process meeting', {
-                meetingId: meeting.meeting,
-                meetingName: meeting.name,
-                error: error instanceof Error ? error.message : 'Unknown error'
-            });
-            return { success: false, meetingId: meeting.meeting, error };
-        }
-    });
-    
-    const meetingResults = await Promise.all(meetingPromises);
-    meetingsProcessed = meetingResults.filter(result => result.success).length;
-    
-    return { meetingsProcessed };
-}
-
-/**
- * Process races in batches with error isolation
- * @param {Object} databases - Appwrite Databases instance
- * @param {string} databaseId - Database ID
- * @param {Array} meetings - Array of meeting objects containing races
- * @param {Object} context - Appwrite function context for logging
- * @returns {Object} Processing results with counts and race IDs
- */
-export async function processRaces(databases, databaseId, meetings, context) {
-    let racesProcessed = 0;
-    const processedRaceIds = [];
-    
-    const allRaces = [];
-    meetings.forEach(meeting => {
-        meeting.races.forEach(race => {
-            allRaces.push({ meeting: meeting.meeting, race });
-        });
-    });
-    
-    const batchSize = 15;
-    for (let i = 0; i < allRaces.length; i += batchSize) {
-        const batch = allRaces.slice(i, i + batchSize);
-        const racePromises = batch.map(async ({ meeting, race }) => {
-            try {
-                const raceDoc = {
-                    raceId: race.id,
-                    name: race.name,
-                    raceNumber: race.race_number,
-                    startTime: race.start_time,
-                    ...(race.distance !== undefined && { distance: race.distance }),
-                    ...(race.track_condition !== undefined && { trackCondition: race.track_condition }),
-                    ...(race.weather !== undefined && { weather: race.weather }),
-                    status: race.status,
-                    meeting: meeting
-                };
-                const success = await performantUpsert(databases, databaseId, 'races', race.id, raceDoc, context);
-                if (success) {
-                    context.log('Upserted race', { raceId: race.id, name: race.name });
-                    return { success: true, raceId: race.id };
-                }
-                else {
-                    return { success: false, raceId: race.id };
-                }
-            }
-            catch (error) {
-                context.error('Failed to process race', {
-                    raceId: race.id,
-                    raceName: race.name,
-                    meetingId: meeting,
-                    error: error instanceof Error ? error.message : 'Unknown error'
-                });
-                return { success: false, raceId: race.id, error };
-            }
-        });
-        
-        const batchResults = await Promise.all(racePromises);
-        const successfulRaces = batchResults.filter(result => result.success);
-        const successfulRaceIds = successfulRaces.map(result => result.raceId);
-        processedRaceIds.push(...successfulRaceIds);
-        racesProcessed += successfulRaces.length;
-        
-        context.log('Processed race batch', {
-            batchNumber: Math.floor(i / batchSize) + 1,
-            batchSize: batch.length,
-            successful: successfulRaces.length,
-            failed: batch.length - successfulRaces.length,
-            totalProcessed: racesProcessed
-        });
-    }
-    
-    return { racesProcessed, raceIds: processedRaceIds };
 }
 
 /**
