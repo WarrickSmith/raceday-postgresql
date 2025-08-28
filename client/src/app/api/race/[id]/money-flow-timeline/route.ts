@@ -36,7 +36,7 @@ export async function GET(
         'money-flow-history',
         [
           Query.equal('entrant', entrantIds),
-          // Query.equal('raceId', raceId), // Skip raceId filter if field doesn't exist yet
+          Query.equal('raceId', raceId), // CRITICAL FIX: Enable raceId filter now that field exists
           Query.equal('type', 'bucketed_aggregation'), // Only bucketed aggregation records with pre-calculated increments
           Query.isNotNull('timeInterval'), // Only records with timeInterval (bucketed data)
           Query.greaterThan('timeInterval', -65), // Extended range to capture more pre/post race data  
@@ -76,7 +76,7 @@ export async function GET(
           'money-flow-history',
           [
             Query.equal('entrant', entrantIds),
-            // Query.equal('raceId', raceId), // Skip raceId filter if field doesn't exist yet
+            Query.equal('raceId', raceId), // CRITICAL FIX: Enable raceId filter now that field exists
             Query.isNotNull('timeToStart'), // Only records with timeToStart
             Query.greaterThan('timeToStart', -65), // Extended range to capture more pre/post race data  
             Query.lessThan('timeToStart', 66), // Include 65m baseline data (using lessThan with 66)
