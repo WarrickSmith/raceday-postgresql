@@ -135,14 +135,31 @@ export default async function main(context) {
               const currentRace = await databases.getDocument(databaseId, 'races', raceId);
               
               if (currentRace.status !== raceEventData.race.status) {
-                await databases.updateDocument(databaseId, 'races', raceId, {
-                  status: raceEventData.race.status
-                });
+                const statusChangeTimestamp = new Date().toISOString();
+                const updateData = {
+                  status: raceEventData.race.status,
+                  lastStatusChange: statusChangeTimestamp
+                };
+                
+                // Add specific finalization timestamp for Final status
+                if (raceEventData.race.status === 'Final' || raceEventData.race.status === 'Finalized') {
+                  updateData.finalizedAt = statusChangeTimestamp;
+                }
+                
+                // Add specific abandonment timestamp for Abandoned status
+                if (raceEventData.race.status === 'Abandoned') {
+                  updateData.abandonedAt = statusChangeTimestamp;
+                }
+                
+                await databases.updateDocument(databaseId, 'races', raceId, updateData);
                 raceStatusUpdated = true;
-                context.log(`Updated race status`, { 
+                context.log(`Updated race status with timestamp`, { 
                   raceId, 
                   oldStatus: currentRace.status, 
-                  newStatus: raceEventData.race.status 
+                  newStatus: raceEventData.race.status,
+                  statusChangeTimestamp,
+                  finalizedAt: updateData.finalizedAt,
+                  abandonedAt: updateData.abandonedAt
                 });
               }
             } catch (error) {

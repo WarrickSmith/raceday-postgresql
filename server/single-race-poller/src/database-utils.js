@@ -332,15 +332,38 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
         return 0;
     }
 
-    // Skip processing money tracker data for finalized races (they will have 0% values)
-    if (raceStatus === 'Final' || raceStatus === 'Finalized' || raceStatus === 'Abandoned') {
-        context.log('Skipping money tracker processing for finalized race', { 
-            raceId, 
-            raceStatus,
-            reason: 'Finalized races have 0% values for hold/bet percentages'
-        });
-        return 0;
+    // Only skip processing money tracker data for races abandoned from start (never had betting activity)
+    // Continue processing through Open → Closed → Interim → Final to preserve timeline data
+    if (raceStatus === 'Abandoned') {
+        // Check if we have any existing money flow data for this race
+        try {
+            const existingData = await databases.listDocuments(databaseId, 'money-flow-history', [
+                'equal("raceId", "' + raceId + '")',
+                'limit(1)'
+            ]);
+            
+            if (existingData.documents.length === 0) {
+                context.log('Skipping money tracker processing for abandoned race with no prior data', { 
+                    raceId, 
+                    raceStatus,
+                    reason: 'Abandoned race never had betting activity'
+                });
+                return 0;
+            } else {
+                context.log('Processing final data for abandoned race with existing timeline', { 
+                    raceId, 
+                    raceStatus,
+                    reason: 'Preserving timeline data for race that was abandoned mid-process'
+                });
+            }
+        } catch (error) {
+            context.log('Could not check existing data, skipping abandoned race', { raceId, raceStatus });
+            return 0;
+        }
     }
+    
+    // Continue processing for all other race statuses (Open, Closed, Interim, Final)
+    // This ensures complete timeline data is preserved for historical viewing
 
     let entrantsProcessed = 0;
     
@@ -408,6 +431,7 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
  * @returns {number} Timeline interval bucket
  */
 function getTimelineInterval(timeToStartMinutes) {
+    // Pre-start intervals (standard 5-minute buckets, then 1-minute as race approaches)
     if (timeToStartMinutes >= 60) return 60;
     if (timeToStartMinutes >= 55) return 55;
     if (timeToStartMinutes >= 50) return 50;
@@ -424,9 +448,21 @@ function getTimelineInterval(timeToStartMinutes) {
     if (timeToStartMinutes >= 3) return 3;
     if (timeToStartMinutes >= 2) return 2;
     if (timeToStartMinutes >= 1) return 1;
-    if (timeToStartMinutes >= 0) return 0; // Race start
-    if (timeToStartMinutes >= -0.5) return -0.5; // -30s
-    return Math.ceil(timeToStartMinutes); // -1, -2, -3, etc. for delayed starts
+    if (timeToStartMinutes >= 0) return 0; // Race scheduled start
+    
+    // Post-start intervals (standard progression: -30s, -1m, -1:30s, -2m, -2:30s, etc.)
+    if (timeToStartMinutes >= -0.5) return -0.5;   // -30s
+    if (timeToStartMinutes >= -1) return -1;       // -1m  
+    if (timeToStartMinutes >= -1.5) return -1.5;   // -1:30s
+    if (timeToStartMinutes >= -2) return -2;       // -2m
+    if (timeToStartMinutes >= -2.5) return -2.5;   // -2:30s
+    if (timeToStartMinutes >= -3) return -3;       // -3m
+    if (timeToStartMinutes >= -3.5) return -3.5;   // -3:30s
+    if (timeToStartMinutes >= -4) return -4;       // -4m
+    if (timeToStartMinutes >= -4.5) return -4.5;   // -4:30s
+    
+    // For longer delays, continue at 1-minute intervals
+    return Math.ceil(timeToStartMinutes); // -5, -6, -7, etc.
 }
 
 /**
@@ -468,28 +504,115 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
             } else {
                 intervalType = 'live'; // Live updates during/after race
             }
+        } else {
+            context.error('Race document missing startTime field', { raceId });
+            return 0; // Cannot create bucketed data without race start time
         }
     } catch (error) {
-        context.log('Could not calculate timeInterval for bucketed storage', { raceId });
+        context.error('Could not fetch race document for bucketed storage', { 
+            raceId, 
+            error: error.message 
+        });
+        return 0; // Cannot create bucketed data without race information
+    }
+    
+    // Validate required time calculation succeeded
+    if (timeToStart === null || timeInterval === null) {
+        context.error('Failed to calculate time intervals for bucketed storage', { 
+            raceId, 
+            timeToStart, 
+            timeInterval 
+        });
+        return 0; // Cannot create bucketed data without proper time intervals
     }
 
-    // Save bucketed data for each entrant
+    // Save bucketed data for each entrant with proper incremental calculation
     for (const [entrantId, moneyData] of Object.entries(entrantMoneyData)) {
         try {
-            // Calculate pool amounts from aggregated percentages
+            // Calculate pool amounts from aggregated percentages (convert to cents)
             const holdPercent = moneyData.hold_percentage / 100;
-            const winPoolAmount = Math.round((racePoolData?.winPoolTotal || 0) * holdPercent);
-            const placePoolAmount = Math.round((racePoolData?.placePoolTotal || 0) * holdPercent);
+            const winPoolAmount = Math.round((racePoolData?.winPoolTotal || 0) * holdPercent * 100); // Convert to cents
+            const placePoolAmount = Math.round((racePoolData?.placePoolTotal || 0) * holdPercent * 100); // Convert to cents
+            
+            // Get previous interval data for incremental calculation
+            let incrementalWinAmount = 0;
+            let incrementalPlaceAmount = 0;
+            
+            try {
+                // FIXED: Query for the chronologically PREVIOUS interval (next higher timeInterval value)
+                // Example: current = 45m bucket, need to find 50m bucket (not highest like 60m)
+                const allPreviousIntervals = await databases.listDocuments(databaseId, 'money-flow-history', [
+                    'equal("entrant", "' + entrantId + '")',
+                    'equal("raceId", "' + raceId + '")',
+                    'equal("type", "bucketed_aggregation")',
+                    'greaterThan("timeInterval", ' + timeInterval + ')', // Find intervals > current interval
+                    'orderBy("timeInterval", "asc")', // Order ascending to get the closest higher interval
+                    'limit(1)' // Get the immediately previous chronological interval
+                ]);
+                
+                if (allPreviousIntervals.documents.length > 0) {
+                    const prevDoc = allPreviousIntervals.documents[0];
+                    // Calculate increment: current bucket total - previous bucket total
+                    incrementalWinAmount = winPoolAmount - (prevDoc.winPoolAmount || 0);
+                    incrementalPlaceAmount = placePoolAmount - (prevDoc.placePoolAmount || 0);
+                    
+                    // Allow negative increments (money can flow out of entrants)
+                    // but log unusual cases for debugging
+                    if (incrementalWinAmount < 0) {
+                        context.log('Negative increment detected (money flowing OUT)', { 
+                            entrantId: entrantId.slice(0, 8) + '...', 
+                            timeInterval, 
+                            previousInterval: prevDoc.timeInterval,
+                            winDecrement: incrementalWinAmount
+                        });
+                    }
+                    
+                    context.log('Calculated bucket increment', {
+                        entrantId: entrantId.slice(0, 8) + '...',
+                        currentInterval: timeInterval,
+                        previousInterval: prevDoc.timeInterval,
+                        currentTotal: winPoolAmount,
+                        previousTotal: prevDoc.winPoolAmount,
+                        increment: incrementalWinAmount
+                    });
+                } else {
+                    // No previous interval found - this must be the baseline (60m) or first record
+                    if (timeInterval === 60) {
+                        // 60m bucket: show absolute baseline amount
+                        incrementalWinAmount = winPoolAmount;
+                        incrementalPlaceAmount = placePoolAmount;
+                        context.log('60m baseline bucket', { entrantId: entrantId.slice(0, 8) + '...', baselineAmount: winPoolAmount });
+                    } else {
+                        // This should not happen in well-formed data - log as warning
+                        incrementalWinAmount = winPoolAmount;
+                        incrementalPlaceAmount = placePoolAmount;
+                        context.warn('No previous interval found for non-baseline bucket', { 
+                            entrantId: entrantId.slice(0, 8) + '...', 
+                            timeInterval,
+                            usingAbsoluteAmount: winPoolAmount
+                        });
+                    }
+                }
+            } catch (queryError) {
+                // If query fails, use absolute amounts
+                incrementalWinAmount = winPoolAmount;
+                incrementalPlaceAmount = placePoolAmount;
+                context.log('Could not query previous intervals, using absolute amounts', { entrantId: entrantId.slice(0, 8) + '...' });
+            }
             
             const bucketedDoc = {
                 entrant: entrantId,
-                // Note: race info accessible via entrant relationship, no separate raceId needed
+                raceId: raceId,
+                timeToStart: timeToStart,
                 timeInterval: timeInterval,
                 intervalType: intervalType,
                 holdPercentage: moneyData.hold_percentage,
                 betPercentage: moneyData.bet_percentage,
-                winPoolAmount: winPoolAmount,
-                placePoolAmount: placePoolAmount,
+                winPoolAmount: winPoolAmount, // Absolute amount in cents
+                placePoolAmount: placePoolAmount, // Absolute amount in cents
+                incrementalAmount: incrementalWinAmount, // Pre-calculated incremental for win pool (backwards compatibility)
+                incrementalWinAmount: incrementalWinAmount, // Pre-calculated increment in cents
+                incrementalPlaceAmount: incrementalPlaceAmount, // Pre-calculated increment in cents
                 pollingTimestamp: timestamp,
                 eventTimestamp: timestamp,
                 type: 'bucketed_aggregation',
@@ -498,6 +621,13 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
             
             await databases.createDocument(databaseId, 'money-flow-history', ID.unique(), bucketedDoc);
             recordsCreated++;
+            
+            context.log('Saved bucketed money flow with increments', {
+                entrantId: entrantId.slice(0, 8) + '...',
+                timeInterval,
+                winIncrement: incrementalWinAmount,
+                placeIncrement: incrementalPlaceAmount
+            });
             
         } catch (error) {
             context.error('Failed to save bucketed money flow history', {
