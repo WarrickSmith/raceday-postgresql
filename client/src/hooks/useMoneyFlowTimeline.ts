@@ -50,7 +50,8 @@ interface UseMoneyFlowTimelineResult {
 export function useMoneyFlowTimeline(
   raceId: string,
   entrantIds: string[],
-  poolType: 'win' | 'place' | 'quinella' | 'trifecta' | 'exacta' | 'first4' = 'win'
+  poolType: 'win' | 'place' | 'quinella' | 'trifecta' | 'exacta' | 'first4' = 'win',
+  raceStatus?: string // Add race status to control post-race behavior
 ): UseMoneyFlowTimelineResult {
   const [timelineData, setTimelineData] = useState<Map<string, EntrantMoneyFlowTimeline>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
@@ -61,6 +62,14 @@ export function useMoneyFlowTimeline(
   // Fetch money flow timeline data for all entrants
   const fetchTimelineData = useCallback(async () => {
     if (!raceId || entrantIds.length === 0) return;
+
+    // Check race status to avoid unnecessary polling for completed races
+    const isRaceComplete = raceStatus && ['Final', 'Finalized', 'Abandoned', 'Cancelled'].includes(raceStatus);
+    
+    if (isRaceComplete && timelineData.size > 0) {
+      console.log(`🏁 Race ${raceId} is complete (status: ${raceStatus}), skipping timeline data fetch to preserve final state`);
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
@@ -75,6 +84,14 @@ export function useMoneyFlowTimeline(
 
       const data = await response.json();
       const documents = data.documents || [];
+      
+      // Log interval coverage analysis if available
+      if (data.intervalCoverage) {
+        console.log('📊 Timeline interval coverage:', data.intervalCoverage);
+        if (data.intervalCoverage.criticalPeriodGaps.length > 0) {
+          console.warn('⚠️ Gaps detected in critical 5m-0s period:', data.intervalCoverage.criticalPeriodGaps);
+        }
+      }
 
       // Log the API response for debugging
       if (data.message) {
@@ -89,221 +106,24 @@ export function useMoneyFlowTimeline(
         return;
       }
 
-      // Check if server is providing bucketed data (optimized processing)
-      if (data.bucketedData) {
-        console.log('📊 Processing bucketed money flow data (server pre-processed)');
-        const entrantDataMap = processBucketedTimelineData(documents, entrantIds);
-        setTimelineData(entrantDataMap);
-        setLastUpdate(new Date());
-        
-        console.log('📊 Bucketed money flow timeline data processed:', {
-          raceId,
-          totalDocuments: documents.length,
-          entrantsRequested: entrantIds.length,
-          entrantsWithData: Array.from(entrantDataMap.values()).filter(d => d.dataPoints.length > 0).length,
-          optimizations: data.queryOptimizations || []
-        });
-        
-        return;
-      }
-
-      // Fallback: Legacy processing for non-bucketed data
-      console.log('📊 Processing legacy (non-bucketed) money flow data');
-      const transformedPoints: MoneyFlowDataPoint[] = documents.map((doc: ServerMoneyFlowPoint) => {
-        const totalPoolAmount = (doc.winPoolAmount || 0) + (doc.placePoolAmount || 0);
-        const poolPercentage = doc.holdPercentage || doc.betPercentage || 0;
-        
-        // Extract entrant ID - server returns complex nested object structure
-        let entrantId = 'unknown';
-        if (typeof doc.entrant === 'string') {
-          entrantId = doc.entrant;
-        } else if (doc.entrant && typeof doc.entrant === 'object') {
-          // Try multiple possible fields for entrant ID
-          entrantId = doc.entrant.entrantId || doc.entrant.$id || doc.entrant.id || 'unknown';
-        }
-        
-        console.log(`🔍 Processing document for entrant: ${entrantId}`, {
-          docEntrant: typeof doc.entrant === 'object' ? Object.keys(doc.entrant).slice(0, 5) : doc.entrant,
-          timeToStart: doc.timeToStart,
-          winPoolAmount: doc.winPoolAmount
-        });
-        
-        const transformed = {
-          $id: doc.$id,
-          $createdAt: doc.$createdAt,
-          $updatedAt: doc.$updatedAt,
-          entrant: entrantId, // Use extracted entrant ID
-          pollingTimestamp: doc.pollingTimestamp || doc.$createdAt,
-          timeToStart: doc.timeToStart || 0,
-          winPoolAmount: doc.winPoolAmount || 0,
-          placePoolAmount: doc.placePoolAmount || 0,
-          totalPoolAmount,
-          poolPercentage,
-          incrementalAmount: 0, // Will be calculated below
-          pollingInterval: 5 // Default polling interval in minutes
-        };
-
-        // Skip documents without timeToStart for timeline processing
-        if (doc.timeToStart === undefined) {
-          console.warn(`⚠️ Document missing timeToStart for entrant ${entrantId}`);
-        }
-
-        return transformed;
-      });
-
-      // Group and consolidate data points by entrant, handling duplicate timeToStart values
-      const entrantDataMap = new Map<string, EntrantMoneyFlowTimeline>();
-      
-      for (const entrantId of entrantIds) {
-        const entrantRawPoints = transformedPoints.filter(point => point.entrant === entrantId);
-        
-        // Process ALL records for now to see what data we have
-        const allRecords = entrantRawPoints;
-        
-        // Group records by timeToStart
-        const timePointMap = new Map<number, MoneyFlowDataPoint[]>();
-        
-        allRecords.forEach(point => {
-          const timeKey = point.timeToStart ?? -999; // Use -999 for undefined timeToStart
-          if (!timePointMap.has(timeKey)) {
-            timePointMap.set(timeKey, []);
-          }
-          timePointMap.get(timeKey)!.push(point);
-        });
-        
-        // Create consolidated timeline points (one per unique timeToStart)
-        const consolidatedPoints: MoneyFlowDataPoint[] = [];
-        
-        for (const [timeToStart, timePoints] of timePointMap) {
-          if (timeToStart === -999) continue; // Skip undefined timeToStart values
-          
-          // Consolidate multiple records at the same timeToStart by summing pool amounts
-          let totalWinPoolAmount = 0;
-          let totalPlacePoolAmount = 0;
-          let consolidatedPercentage = 0;
-          let latestTimestamp = '';
-          
-          timePoints.forEach(point => {
-            // CORRECT: Sum pool amounts (multiple bet transactions should be summed)
-            totalWinPoolAmount += (point.winPoolAmount || 0);
-            totalPlacePoolAmount += (point.placePoolAmount || 0);
-            consolidatedPercentage += (point.poolPercentage || 0);
-            if (point.pollingTimestamp > latestTimestamp) {
-              latestTimestamp = point.pollingTimestamp;
-            }
-          });
-          
-          const consolidatedPoint: MoneyFlowDataPoint = {
-            $id: timePoints[0].$id, // Use first point's ID
-            $createdAt: timePoints[0].$createdAt,
-            $updatedAt: timePoints[0].$updatedAt,
-            entrant: entrantId,
-            pollingTimestamp: latestTimestamp || timePoints[0].pollingTimestamp,
-            timeToStart,
-            winPoolAmount: totalWinPoolAmount,
-            placePoolAmount: totalPlacePoolAmount,
-            totalPoolAmount: totalWinPoolAmount + totalPlacePoolAmount,
-            poolPercentage: consolidatedPercentage,
-            incrementalAmount: 0, // Will be calculated below
-            pollingInterval: 5
-          };
-          
-          consolidatedPoints.push(consolidatedPoint);
-        }
-        
-        // Sort by timeToStart descending for proper chronological order (earlier times first)
-        // CORRECTED: timeToStart format: 60, 50, 40... 2, 1, 0, -1, -2, -4... (positive=before, negative=after)
-        // Higher positive = earlier in time, lower negative = later after start
-        consolidatedPoints.sort((a, b) => {
-          return (b.timeToStart || -Infinity) - (a.timeToStart || -Infinity);
-        });
-        
-        // Calculate incremental amounts between chronological time points
-        // CORRECTED: Iterate from latest to earliest, calculating increments properly
-        for (let i = consolidatedPoints.length - 1; i >= 0; i--) {
-          const current = consolidatedPoints[i];
-          
-          const getCurrentPoolAmount = () => {
-            switch (poolType) {
-              case 'win':
-                return current.winPoolAmount;
-              case 'place':
-                return current.placePoolAmount;
-              default:
-                return current.totalPoolAmount;
-            }
-          };
-          
-          const currentPoolAmount = getCurrentPoolAmount();
-          
-          if (i === consolidatedPoints.length - 1) {
-            // Latest chronological point (closest to race start) - show absolute amount as baseline
-            current.incrementalAmount = currentPoolAmount;
-          } else {
-            // Calculate increment from next chronological time point (which is later in time)
-            // Next point in array is later in time due to our sort order
-            const nextInTime = consolidatedPoints[i + 1];
-            
-            const getNextPoolAmount = () => {
-              switch (poolType) {
-                case 'win':
-                  return nextInTime.winPoolAmount;
-                case 'place':
-                  return nextInTime.placePoolAmount;
-                default:
-                  return nextInTime.totalPoolAmount;
-              }
-            };
-            
-            const nextPoolAmount = getNextPoolAmount();
-            // Current amount minus next amount = increment that happened FROM this time TO next time
-            // This gives us the change that occurred in this time interval
-            const increment = nextPoolAmount - currentPoolAmount;
-            
-            // Store the actual increment (can be positive, negative, or zero)
-            current.incrementalAmount = increment;
-          }
-        }
-        
-        // Calculate trend and other metadata
-        const latestPoint = consolidatedPoints[consolidatedPoints.length - 1];
-        const secondLatestPoint = consolidatedPoints.length > 1 ? consolidatedPoints[consolidatedPoints.length - 2] : null;
-        
-        let trend: 'up' | 'down' | 'neutral' = 'neutral';
-        let significantChange = false;
-        
-        if (latestPoint && secondLatestPoint) {
-          const percentageChange = latestPoint.poolPercentage - secondLatestPoint.poolPercentage;
-          trend = percentageChange > 0 ? 'up' : percentageChange < 0 ? 'down' : 'neutral';
-          significantChange = Math.abs(percentageChange) >= 5; // 5% or more is significant
-        }
-
-        entrantDataMap.set(entrantId, {
-          entrantId,
-          dataPoints: consolidatedPoints, // Use consolidated points instead of raw points
-          latestPercentage: latestPoint?.poolPercentage || 0,
-          trend,
-          significantChange
-        });
-      }
-
+      // Use unified processing for both bucketed and legacy data
+      console.log('📊 Processing money flow data with unified algorithm');
+      const entrantDataMap = processTimelineData(documents, entrantIds, poolType, data.bucketedData);
       setTimelineData(entrantDataMap);
       setLastUpdate(new Date());
       
-      // Log summary of fetched data for debugging
-      const entrantsWithData = Array.from(entrantDataMap.values()).filter(d => d.dataPoints.length > 0).length;
       console.log('📊 Money flow timeline data processed:', {
         raceId,
         totalDocuments: documents.length,
         entrantsRequested: entrantIds.length,
-        entrantsWithData,
-        sampleDocument: documents[0],
-        sampleTransformed: transformedPoints[0]
+        entrantsWithData: Array.from(entrantDataMap.values()).filter(d => d.dataPoints.length > 0).length,
+        dataType: data.bucketedData ? 'bucketed' : 'legacy',
+        optimizations: data.queryOptimizations || []
       });
       
-      if (entrantsWithData === 0 && documents.length > 0) {
-        console.warn('⚠️ Money flow data fetched but no entrants matched. Check entrant ID format.');
-      }
+      return;
+      // This code path should no longer be reached due to unified processing above
+      console.warn('⚠️ Fallback legacy processing path reached - this should not happen');
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch timeline data');
@@ -311,7 +131,7 @@ export function useMoneyFlowTimeline(
     } finally {
       setIsLoading(false);
     }
-  }, [raceId, entrantIds.join(','), poolType]);
+  }, [raceId, entrantIds.join(','), poolType, raceStatus, timelineData.size]);
 
   // Generate timeline grid data optimized for component display
   const gridData = useMemo(() => {
@@ -390,46 +210,60 @@ export function useMoneyFlowTimeline(
 
   // Get formatted data for specific entrant and time interval
   const getEntrantDataForInterval = useCallback((entrantId: string, interval: number, requestedPoolType: 'win' | 'place') => {
-    // Handle empty data gracefully - no grid data available
-    if (!gridData || Object.keys(gridData).length === 0) {
+    // Handle empty timeline data gracefully
+    if (!timelineData || timelineData.size === 0) {
       return '—';
     }
     
-    // Use exact interval for lookup (no rounding for high-frequency data)
-    const intervalData = gridData[interval];
-    if (!intervalData || !intervalData[entrantId]) {
+    // Get entrant's timeline data directly
+    const entrantTimeline = timelineData.get(entrantId);
+    if (!entrantTimeline || entrantTimeline.dataPoints.length === 0) {
       return '—';
     }
     
-    const entrantData = intervalData[entrantId];
-    if (entrantData.poolType !== requestedPoolType) {
+    // Find data point for this specific interval
+    const dataPoint = entrantTimeline.dataPoints.find(point => {
+      const pointInterval = (point.timeInterval ?? point.timeToStart ?? -999);
+      return pointInterval === interval;
+    });
+    
+    if (!dataPoint) {
       return '—';
     }
     
-    const amount = entrantData.incrementalAmount;
+    // SIMPLIFIED: Server pre-calculated everything in incrementalWinAmount/incrementalPlaceAmount
+    // For 60m: server stored absolute total in incrementalWinAmount
+    // For others: server stored true increment in incrementalWinAmount
+    const displayAmount = requestedPoolType === 'win' ? 
+      (dataPoint.incrementalWinAmount || dataPoint.incrementalAmount || 0) : 
+      (dataPoint.incrementalPlaceAmount || dataPoint.incrementalAmount || 0);
     
-    // Convert cents to dollars for display (NZ TAB stores amounts in cents)
-    const amountInDollars = Math.round(amount / 100);
+    // Convert cents to dollars for display
+    const amountInDollars = Math.round(displayAmount / 100);
     
-    // For 60m column, show absolute amount without + sign (baseline)
-    // For other columns, show incremental change with + or —
+    // Debug logging to verify server calculations
+    console.log(`💰 SIMPLIFIED display for entrant ${entrantId}, interval ${interval}:`, {
+      displayAmount,
+      amountInDollars,
+      incrementalWinAmount: dataPoint.incrementalWinAmount,
+      incrementalPlaceAmount: dataPoint.incrementalPlaceAmount,
+      requestedPoolType,
+      timeInterval: dataPoint.timeInterval
+    });
+    
+    // Format for display: 60m shows baseline ($2,341), others show increment (+$344)
+    if (amountInDollars <= 0) {
+      return '—'; // No data or zero amount
+    }
+    
     if (interval === 60) {
-      // 60m column shows absolute baseline amount
-      if (amountInDollars <= 0) {
-        return '—';
-      }
+      // 60m column: baseline amount (server stored absolute total)
       return `$${amountInDollars.toLocaleString()}`;
     } else {
-      // Other columns show incremental changes
-      if (Math.abs(amountInDollars) < 1) {
-        return '—'; // No change
-      } else if (amountInDollars > 0) {
-        return `+$${amountInDollars.toLocaleString()}`;
-      } else {
-        return `—`; // No negative money flow
-      }
+      // All other columns: incremental change (server calculated increment)
+      return `+$${amountInDollars.toLocaleString()}`;
     }
-  }, [gridData]);
+  }, [timelineData]);
 
   // Set up real-time subscription for money flow updates
   useEffect(() => {
@@ -437,6 +271,13 @@ export function useMoneyFlowTimeline(
 
     // Initial fetch
     fetchTimelineData();
+
+    // Skip real-time subscriptions for completed races to preserve final state
+    const isRaceComplete = raceStatus && ['Final', 'Finalized', 'Abandoned', 'Cancelled'].includes(raceStatus);
+    if (isRaceComplete) {
+      console.log(`🏁 Race ${raceId} is complete (status: ${raceStatus}), skipping real-time subscription`);
+      return;
+    }
 
     // Set up real-time subscription with proper channel format
     let unsubscribe: (() => void) | null = null;
@@ -483,7 +324,7 @@ export function useMoneyFlowTimeline(
         }
       }
     };
-  }, [raceId, entrantIds.join(','), fetchTimelineData]); // Use entrantIds.join(',') to avoid array reference issues
+  }, [raceId, entrantIds.join(','), raceStatus, fetchTimelineData]); // Use entrantIds.join(',') to avoid array reference issues
 
   return {
     timelineData,
@@ -497,12 +338,15 @@ export function useMoneyFlowTimeline(
 }
 
 /**
- * Process bucketed timeline data (much simpler since server does the heavy lifting)
+ * Unified processing function for all timeline data (bucketed or legacy)
+ * Standardizes incremental calculation logic to eliminate inconsistencies
  */
-function processBucketedTimelineData(documents: ServerMoneyFlowPoint[], entrantIds: string[]): Map<string, EntrantMoneyFlowTimeline> {
-  console.log('📊 Processing bucketed timeline data:', {
+function processTimelineData(documents: ServerMoneyFlowPoint[], entrantIds: string[], poolType: string, isBucketed: boolean = false): Map<string, EntrantMoneyFlowTimeline> {
+  console.log('📊 Processing timeline data (unified approach):', {
     documentsCount: documents.length,
     entrantIds: entrantIds.length,
+    poolType,
+    isBucketed,
     sampleDoc: documents[0] ? {
       entrant: documents[0].entrant,
       timeInterval: (documents[0] as any).timeInterval,
@@ -512,70 +356,118 @@ function processBucketedTimelineData(documents: ServerMoneyFlowPoint[], entrantI
     } : null
   });
   
+  // Enhanced debugging: analyze document distribution by time interval
+  if (documents.length > 0) {
+    const intervalDistribution = documents.reduce((acc, doc) => {
+      const interval = (doc as any).timeInterval ?? doc.timeToStart ?? 'unknown';
+      acc[interval] = (acc[interval] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    console.log('📊 Document distribution by interval:', intervalDistribution);
+    
+    // Identify critical period coverage
+    const criticalIntervals = [5, 4, 3, 2, 1, 0];
+    const criticalCoverage = criticalIntervals.filter(interval => intervalDistribution[interval]);
+    const missingCritical = criticalIntervals.filter(interval => !intervalDistribution[interval]);
+    
+    if (missingCritical.length > 0) {
+      console.warn('⚠️ Missing critical intervals (5m-0s period):', missingCritical);
+    }
+    
+    console.log('🎯 Critical period (5m-0s) coverage:', {
+      covered: criticalCoverage,
+      missing: missingCritical,
+      coveragePercent: Math.round((criticalCoverage.length / criticalIntervals.length) * 100)
+    });
+  }
+  
   const entrantDataMap = new Map<string, EntrantMoneyFlowTimeline>();
   
   for (const entrantId of entrantIds) {
-    // Filter documents for this entrant
+    // Extract entrant ID consistently across all data formats
     const entrantDocs = documents.filter(doc => {
-      let docEntrantId = 'unknown';
-      if (typeof doc.entrant === 'string') {
-        docEntrantId = doc.entrant;
-      } else if (doc.entrant && typeof doc.entrant === 'object') {
-        docEntrantId = doc.entrant.entrantId || doc.entrant.$id || doc.entrant.id || 'unknown';
-      }
+      const docEntrantId = extractEntrantId(doc.entrant);
       return docEntrantId === entrantId;
     });
     
+    if (entrantDocs.length === 0) {
+      console.log(`⚠️ No documents found for entrant ${entrantId}`);
+      // Create empty entry to maintain consistency
+      entrantDataMap.set(entrantId, {
+        entrantId,
+        dataPoints: [],
+        latestPercentage: 0,
+        trend: 'neutral',
+        significantChange: false
+      });
+      continue;
+    }
+    
     console.log(`📊 Processing entrant ${entrantId}: ${entrantDocs.length} documents`);
     
-    // Sort by time interval descending (60, 55, 50... 0, -0.5, -1)
-    const sortedDocs = entrantDocs.sort((a, b) => {
-      const aInterval = (a as any).timeInterval ?? a.timeToStart ?? 0;
-      const bInterval = (b as any).timeInterval ?? b.timeToStart ?? 0;
-      return bInterval - aInterval;
-    });
+    // Group documents by time interval to handle duplicates
+    const intervalMap = new Map<number, ServerMoneyFlowPoint[]>();
     
-    // Transform to timeline data points (server has pre-calculated incrementals)
-    const dataPoints: MoneyFlowDataPoint[] = sortedDocs.map(doc => {
-      const timeInterval = (doc as any).timeInterval;
-      const winAmount = doc.winPoolAmount || 0;
-      const placeAmount = doc.placePoolAmount || 0;
-      
-      // Use pre-calculated incremental amounts if available, otherwise use pool amounts
-      let incrementalAmount = 0;
-      if (timeInterval === 60) {
-        // 60m column shows absolute amount as baseline
-        incrementalAmount = winAmount; // Use win pool as default
-      } else {
-        // Other columns use server pre-calculated incremental amounts
-        incrementalAmount = (doc as any).incrementalWinAmount || (doc as any).incrementalAmount || 0;
+    entrantDocs.forEach(doc => {
+      // Use timeInterval if available (bucketed), otherwise timeToStart (legacy)
+      const interval = (doc as any).timeInterval ?? doc.timeToStart ?? -999;
+      if (interval === -999) {
+        console.warn(`⚠️ Document missing time information for entrant ${entrantId}`);
+        return;
       }
       
-      return {
+      if (!intervalMap.has(interval)) {
+        intervalMap.set(interval, []);
+      }
+      intervalMap.get(interval)!.push(doc);
+    });
+    
+    // Use server pre-calculated timeline points directly (no client consolidation)
+    // Per Implementation Guide: Server provides clean bucket data with pre-calculated increments
+    const timelinePoints: MoneyFlowDataPoint[] = [];
+    
+    for (const [interval, intervalDocs] of intervalMap) {
+      // Use the latest document for this interval (server should provide one clean bucket per interval)
+      const doc = intervalDocs[intervalDocs.length - 1]; // Get most recent if multiple
+      
+      // Trust server pre-calculated data - no client processing needed
+      const timelinePoint: MoneyFlowDataPoint = {
         $id: doc.$id,
         $createdAt: doc.$createdAt,
         $updatedAt: doc.$updatedAt,
         entrant: entrantId,
         pollingTimestamp: doc.pollingTimestamp || doc.$createdAt,
         timeToStart: doc.timeToStart || 0,
-        timeInterval: timeInterval || 0,
+        timeInterval: (doc as any).timeInterval || interval,
         intervalType: (doc as any).intervalType || '5m',
-        winPoolAmount: winAmount,
-        placePoolAmount: placeAmount,
-        totalPoolAmount: winAmount + placeAmount,
+        winPoolAmount: doc.winPoolAmount || 0,
+        placePoolAmount: doc.placePoolAmount || 0,
+        totalPoolAmount: (doc.winPoolAmount || 0) + (doc.placePoolAmount || 0),
         poolPercentage: doc.holdPercentage || doc.betPercentage || 0,
-        incrementalAmount,
+        // Use server pre-calculated incremental amounts directly
+        incrementalAmount: (doc as any).incrementalWinAmount || (doc as any).incrementalAmount || 0,
         incrementalWinAmount: (doc as any).incrementalWinAmount || 0,
         incrementalPlaceAmount: (doc as any).incrementalPlaceAmount || 0,
-        pollingInterval: (doc as any).intervalType === '30s' ? 0.5 : (doc as any).intervalType === '1m' ? 1 : 5
+        pollingInterval: getPollingIntervalFromType((doc as any).intervalType)
       };
+      
+      timelinePoints.push(timelinePoint);
+    }
+    
+    // Sort by time interval descending (60, 55, 50... 0, -0.5, -1)
+    timelinePoints.sort((a, b) => {
+      const aInterval = (a.timeInterval ?? a.timeToStart ?? -Infinity);
+      const bInterval = (b.timeInterval ?? b.timeToStart ?? -Infinity);
+      return bInterval - aInterval;
     });
     
-    console.log(`📊 Processed ${dataPoints.length} data points for entrant ${entrantId}`);
+    // Server pre-calculated incremental amounts - no client calculation needed
+    // Per Implementation Guide: "Server pre-calculated everything in incrementalWinAmount/incrementalPlaceAmount"
     
     // Calculate trend and metadata
-    const latestPoint = dataPoints[dataPoints.length - 1];
-    const secondLatestPoint = dataPoints.length > 1 ? dataPoints[dataPoints.length - 2] : null;
+    const latestPoint = timelinePoints[timelinePoints.length - 1];
+    const secondLatestPoint = timelinePoints.length > 1 ? timelinePoints[timelinePoints.length - 2] : null;
     
     let trend: 'up' | 'down' | 'neutral' = 'neutral';
     let significantChange = false;
@@ -583,29 +475,50 @@ function processBucketedTimelineData(documents: ServerMoneyFlowPoint[], entrantI
     if (latestPoint && secondLatestPoint) {
       const percentageChange = latestPoint.poolPercentage - secondLatestPoint.poolPercentage;
       trend = percentageChange > 0.5 ? 'up' : percentageChange < -0.5 ? 'down' : 'neutral';
-      significantChange = Math.abs(percentageChange) >= 5;
+      significantChange = Math.abs(percentageChange) >= 1.0; // Reduced threshold for more sensitivity
     }
 
     entrantDataMap.set(entrantId, {
       entrantId,
-      dataPoints,
+      dataPoints: timelinePoints,
       latestPercentage: latestPoint?.poolPercentage || 0,
       trend,
       significantChange
     });
+    
+    console.log(`✅ Processed entrant ${entrantId}: ${timelinePoints.length} timeline points using server pre-calculated data`);
   }
   
-  console.log('📊 Bucketed processing complete:', {
+  console.log('📊 Timeline processing complete:', {
     entrantsProcessed: entrantDataMap.size,
-    sampleEntrant: Array.from(entrantDataMap.values())[0] ? {
-      entrantId: Array.from(entrantDataMap.values())[0].entrantId,
-      dataPointsCount: Array.from(entrantDataMap.values())[0].dataPoints.length,
-      samplePoints: Array.from(entrantDataMap.values())[0].dataPoints.slice(0, 3).map(p => ({
-        timeInterval: (p as any).timeInterval,
-        incrementalAmount: p.incrementalAmount
-      }))
-    } : null
+    totalDataPoints: Array.from(entrantDataMap.values()).reduce((sum, data) => sum + data.dataPoints.length, 0)
   });
   
   return entrantDataMap;
 }
+
+/**
+ * Extract entrant ID consistently from various data formats
+ */
+function extractEntrantId(entrant: any): string {
+  if (typeof entrant === 'string') {
+    return entrant;
+  }
+  if (entrant && typeof entrant === 'object') {
+    return entrant.entrantId || entrant.$id || entrant.id || 'unknown';
+  }
+  return 'unknown';
+}
+
+/**
+ * Get polling interval from interval type string
+ */
+function getPollingIntervalFromType(intervalType?: string): number {
+  switch (intervalType) {
+    case '30s': return 0.5;
+    case '1m': return 1;
+    case '5m': return 5;
+    default: return 5;
+  }
+}
+

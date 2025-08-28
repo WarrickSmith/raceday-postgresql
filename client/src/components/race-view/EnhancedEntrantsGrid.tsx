@@ -603,25 +603,26 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       const dynamicIntervals: number[] = []
       
       if (raceStatus === 'Open') {
-        // For open races, generate dynamic columns based on actual time elapsed
+        // For open races, generate standard post-start progression to match server-side logic
+        // FIXED: Use standard post-start intervals that match server-side getTimelineInterval()
         const postStartMinutes = actualPostStartMinutes
         
-        // CORRECTED: Use negative intervals for post-start (matches backend format)
-        // 30-second intervals for first 2 minutes
-        if (postStartMinutes <= 2) {
-          const thirtySecondIntervals = Math.ceil(postStartMinutes * 2)
-          for (let i = 1; i <= thirtySecondIntervals; i++) {
-            dynamicIntervals.push(-i * 0.5) // Negative for post-start
+        // Standard post-start progression: -30s, -1m, -1:30s, -2m, -2:30s, -3m, -4m, etc.
+        const standardPostStartIntervals = [-0.5, -1.0, -1.5, -2.0, -2.5, -3.0]
+        
+        // Add standard intervals up to current elapsed time + buffer
+        const maxPostStartToShow = Math.max(postStartMinutes + 1, 5) // Show at least 5 minutes or current time + 1min buffer
+        
+        // Add all standard intervals up to the maximum
+        for (const interval of standardPostStartIntervals) {
+          if (Math.abs(interval) <= maxPostStartToShow) {
+            dynamicIntervals.push(interval)
           }
         }
         
-        // Then minute intervals
-        if (postStartMinutes > 2) {
-          dynamicIntervals.push(-0.5, -1.0, -1.5, -2.0)
-          const additionalMinutes = Math.floor(postStartMinutes) - 2
-          for (let i = 1; i <= additionalMinutes && i <= 10; i++) {
-            dynamicIntervals.push(-(2 + i)) // Negative for post-start
-          }
+        // Continue with additional minute intervals if needed (matches server-side logic)
+        for (let i = 4; i <= Math.ceil(maxPostStartToShow) && i <= 15; i++) {
+          dynamicIntervals.push(-i) // -4m, -5m, -6m, etc.
         }
       } else {
         // For closed/final/interim/abandoned races, show all columns based on existing data points
@@ -631,18 +632,14 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           for (const [entrantId, entrantData] of timelineData) {
             if (entrantData.dataPoints && entrantData.dataPoints.length > 0) {
               entrantData.dataPoints.forEach(point => {
-                if (point.timeToStart !== undefined) {
-                  // For closed races, show all timeline intervals (both pre and post-race)
-                  const interval = point.timeToStart
-                  
-                  // Add post-race intervals to dynamic columns (keep negative timeToStart values)
+                // FIXED: Use timeInterval when available (server-calculated), fallback to timeToStart
+                const interval = point.timeInterval ?? point.timeToStart
+                
+                if (interval !== undefined) {
+                  // Add post-race intervals to dynamic columns (negative intervals = post-start)
                   if (interval < 0) {
-                    // Negative timeToStart means post-race start, keep as negative interval
-                    if (Math.abs(interval) > 0) {
-                      // Round to nearest 0.5 minute for consistency
-                      const roundedInterval = -Math.round(Math.abs(interval) * 2) / 2
-                      dataIntervals.add(roundedInterval)
-                    }
+                    // Use server-calculated timeInterval directly (already properly bucketed)
+                    dataIntervals.add(interval)
                   }
                 }
               })
@@ -655,8 +652,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           dynamicIntervals.push(...Array.from(dataIntervals).sort((a, b) => a - b))
         } else {
           // Fallback: Show standard post-race intervals for completed races even without data
-          // This ensures race review capability is preserved (CORRECTED: negative for post-start)
-          const standardPostRaceIntervals = [-0.5, -1.0, -1.5, -2.0, -3.0, -4.0, -5.0]
+          // FIXED: Use standard progression that matches server-side
+          const standardPostRaceIntervals = [-0.5, -1.0, -1.5, -2.0, -2.5, -3.0, -4.0, -5.0]
           dynamicIntervals.push(...standardPostRaceIntervals)
         }
       }
