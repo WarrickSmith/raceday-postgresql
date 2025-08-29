@@ -12,6 +12,7 @@ const collections = {
     entrants: 'entrants',
     oddsHistory: 'odds-history',
     moneyFlowHistory: 'money-flow-history',
+    racePools: 'race-pools',
     userAlertConfigs: 'user-alert-configs',
     notifications: 'notifications',
 };
@@ -180,6 +181,7 @@ export async function ensureDatabaseSetup(config, context) {
         
         await ensureOddsHistoryCollection(databases, config, context);
         await ensureMoneyFlowHistoryCollection(databases, config, context);
+        await ensureRacePoolsCollection(databases, config, context);
         await ensureUserAlertConfigsCollection(databases, config, context);
         await ensureNotificationsCollection(databases, config, context);
         
@@ -384,6 +386,11 @@ async function ensureRacesCollection(databases, config, context) {
         
         // Polling coordination (for master race scheduler)
         { key: 'last_poll_time', type: 'datetime', required: false }, // Tracks when race was last polled by master scheduler
+        
+        // Race status change tracking (added for proper timeline finalization)
+        { key: 'lastStatusChange', type: 'datetime', required: false }, // Timestamp of last status change
+        { key: 'finalizedAt', type: 'datetime', required: false }, // Timestamp when race status became Final/Finalized
+        { key: 'abandonedAt', type: 'datetime', required: false }, // Timestamp when race was abandoned
     ];
     // Create attributes in parallel for improved performance
     await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
@@ -641,6 +648,30 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
         { key: 'betPercentage', type: 'float', required: false },  // Optional - used for bet_percentage data
         { key: 'eventTimestamp', type: 'datetime', required: true },
         { key: 'type', type: 'string', size: 20, required: true }, // Enum: 'hold_percentage' or 'bet_percentage'
+        
+        // CRITICAL MISSING FIELD - Required for proper race filtering
+        { key: 'raceId', type: 'string', size: 50, required: false }, // Race identifier for filtering
+        
+        // Timeline display fields - Story 4.9 implementation
+        { key: 'pollingTimestamp', type: 'datetime', required: false }, // When the polling occurred
+        { key: 'timeToStart', type: 'integer', required: false }, // Minutes to race start at polling time
+        { key: 'winPoolAmount', type: 'integer', required: false }, // Win pool amount for this entrant
+        { key: 'placePoolAmount', type: 'integer', required: false }, // Place pool amount for this entrant
+        { key: 'incrementalAmount', type: 'integer', required: false }, // Calculated incremental change
+        { key: 'poolType', type: 'string', size: 10, required: false }, // 'win' or 'place' for timeline specificity
+        
+        // NEW ATTRIBUTES for bucketed storage - Story 4.9 enhanced implementation
+        { key: 'timeInterval', type: 'integer', required: false }, // Minutes before race start (60, 55, 50, etc.)
+        { key: 'intervalType', type: 'string', size: 10, required: false }, // '5m', '1m', '30s'
+        { key: 'incrementalWinAmount', type: 'integer', required: false }, // Win pool increment
+        { key: 'incrementalPlaceAmount', type: 'integer', required: false }, // Place pool increment
+        { key: 'isConsolidated', type: 'boolean', required: false, default: false }, // Aggregated data flag
+        { key: 'bucketDocumentId', type: 'string', size: 100, required: false }, // For upserts
+        { key: 'rawPollingData', type: 'string', size: 2000, required: false }, // JSON debug data
+        
+        // MISSING POOL-SPECIFIC PERCENTAGE FIELDS - Required for proper timeline calculations
+        { key: 'winPoolPercentage', type: 'float', required: false }, // Win-specific percentage (winPoolAmount / totalWinPool * 100)
+        { key: 'placePoolPercentage', type: 'float', required: false }, // Place-specific percentage (placePoolAmount / totalPlacePool * 100)
     ];
     // Create attributes in parallel for improved performance
     await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
@@ -664,6 +695,60 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
             context.log('eventTimestamp attribute is not available for index creation, skipping idx_timestamp index');
         }
     }
+    
+    // Add performance indexes for bucketed storage - Story 4.9
+    if (!moneyFlowCollection.indexes.some((idx) => idx.key === 'idx_time_interval')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'timeInterval', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_time_interval', IndexType.Key, ['timeInterval']);
+                context.log('idx_time_interval index created successfully for money flow history');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_time_interval index for money flow history: ${error}`);
+            }
+        }
+    }
+    
+    if (!moneyFlowCollection.indexes.some((idx) => idx.key === 'idx_interval_type')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'intervalType', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_interval_type', IndexType.Key, ['intervalType']);
+                context.log('idx_interval_type index created successfully for money flow history');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_interval_type index for money flow history: ${error}`);
+            }
+        }
+    }
+    
+    if (!moneyFlowCollection.indexes.some((idx) => idx.key === 'idx_polling_timestamp')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'pollingTimestamp', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_polling_timestamp', IndexType.Key, ['pollingTimestamp']);
+                context.log('idx_polling_timestamp index created successfully for money flow history');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_polling_timestamp index for money flow history: ${error}`);
+            }
+        }
+    }
+    
+    // CRITICAL INDEX for race filtering - Previously missing
+    if (!moneyFlowCollection.indexes.some((idx) => idx.key === 'idx_race_id')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'raceId', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_race_id', IndexType.Key, ['raceId']);
+                context.log('idx_race_id index created successfully for money flow history');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_race_id index for money flow history: ${error}`);
+            }
+        }
+    }
     // Note: Appwrite does not support creating compound indexes that include relationship attributes.
     // This limitation means that queries requiring both eventTimestamp and entrant fields cannot leverage
     // a single compound index for optimized performance. Instead, such queries may require scanning
@@ -674,6 +759,49 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
     // 2. For cross-entrant queries, use the entrant relationship field directly and filter results in code.
     // 3. If performance becomes an issue, consider denormalizing data or creating additional collections
     //    to store pre-aggregated or indexed data for specific query patterns.
+}
+async function ensureRacePoolsCollection(databases, config, context) {
+    const collectionId = collections.racePools;
+    const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
+    if (!exists) {
+        context.log('Creating race pools collection...');
+        await databases.createCollection(config.databaseId, collectionId, 'RacePools', [
+            Permission.read(Role.any()),
+            Permission.create(Role.users()),
+            Permission.update(Role.users()),
+            Permission.delete(Role.users()),
+        ]);
+    }
+    const requiredAttributes = [
+        { key: 'raceId', type: 'string', size: 50, required: true },
+        { key: 'winPoolTotal', type: 'integer', required: false, default: 0 },
+        { key: 'placePoolTotal', type: 'integer', required: false, default: 0 },
+        { key: 'quinellaPoolTotal', type: 'integer', required: false, default: 0 },
+        { key: 'trifectaPoolTotal', type: 'integer', required: false, default: 0 },
+        { key: 'exactaPoolTotal', type: 'integer', required: false, default: 0 },
+        { key: 'first4PoolTotal', type: 'integer', required: false, default: 0 },
+        { key: 'totalRacePool', type: 'integer', required: false, default: 0 },
+        { key: 'currency', type: 'string', size: 10, required: false, default: '$' },
+        { key: 'lastUpdated', type: 'datetime', required: false },
+    ];
+    // Create attributes in parallel for improved performance
+    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
+    const racePoolsCollection = await databases.getCollection(config.databaseId, collectionId);
+    if (!racePoolsCollection.indexes.some((idx) => idx.key === 'idx_race_id')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'raceId', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_race_id', IndexType.Unique, ['raceId']);
+                context.log('idx_race_id index created successfully for race pools');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_race_id index for race pools: ${error}`);
+            }
+        }
+        else {
+            context.log('raceId attribute is not available for index creation, skipping idx_race_id index');
+        }
+    }
 }
 async function ensureUserAlertConfigsCollection(databases, config, context) {
     const collectionId = collections.userAlertConfigs;

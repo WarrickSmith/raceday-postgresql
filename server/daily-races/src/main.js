@@ -131,7 +131,7 @@ export default async function main(context) {
             // Process detailed race data
             racesProcessed = await processDetailedRaces(databases, databaseId, detailedRaces, context);
             
-            // Process entrants for each race (consolidated with race processing)
+            // Process entrants for each race
             for (const { basicRace, entrantsData } of detailedRaces) {
                 if (entrantsData && entrantsData.length > 0) {
                     const raceEntrantsProcessed = await processEntrants(
@@ -146,7 +146,7 @@ export default async function main(context) {
             }
         }
         
-        context.log('Daily races function completed (consolidated)', {
+        context.log('Daily races function completed', {
             timestamp: new Date().toISOString(),
             racesFound: racesResult.documents.length,
             racesProcessed,

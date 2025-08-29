@@ -4,7 +4,6 @@ import { memo, useMemo, useCallback, useState, useEffect } from 'react';
 import type { 
   RacePoolData, 
   RaceResultsData, 
-  PoolTotal, 
   PoolType, 
   RaceStatus,
   RaceStatusDisplay 
@@ -12,8 +11,17 @@ import type {
 import { useRace } from '@/contexts/RaceContext';
 import { useRealtimeRace } from '@/hooks/useRealtimeRace';
 import { useRacePoolData } from '@/hooks/useRacePoolData';
-import { screenReader, KeyboardHandler } from '@/utils/accessibility';
+import { screenReader } from '@/utils/accessibility';
 import { STATUS_CONFIG, getStatusConfig } from '@/utils/raceStatusConfig';
+
+// Utility function to convert cents to dollars for display (rounded to nearest dollar)
+const formatPoolAmount = (cents: number): string => {
+  const dollars = Math.round(cents / 100); // Round to nearest dollar
+  return dollars.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  });
+};
 
 interface RaceFooterProps {
   raceId: string;
@@ -109,111 +117,6 @@ const CountdownTimer = memo(function CountdownTimer({
   );
 });
 
-// Pool summary component
-const PoolSummary = memo(function PoolSummary({
-  poolData,
-  showBreakdown = true
-}: {
-  poolData?: RacePoolData;
-  showBreakdown?: boolean;
-}) {
-  const poolTotals = useMemo((): PoolTotal[] => {
-    if (!poolData) return [];
-
-    const pools: PoolTotal[] = [
-      {
-        poolType: 'win',
-        totalAmount: poolData.winPoolTotal,
-        currency: poolData.currency,
-        percentage: (poolData.winPoolTotal / poolData.totalRacePool) * 100,
-        isActive: true
-      },
-      {
-        poolType: 'place',
-        totalAmount: poolData.placePoolTotal,
-        currency: poolData.currency,
-        percentage: (poolData.placePoolTotal / poolData.totalRacePool) * 100,
-        isActive: true
-      },
-      {
-        poolType: 'quinella',
-        totalAmount: poolData.quinellaPoolTotal,
-        currency: poolData.currency,
-        percentage: (poolData.quinellaPoolTotal / poolData.totalRacePool) * 100,
-        isActive: poolData.quinellaPoolTotal > 0
-      },
-      {
-        poolType: 'trifecta',
-        totalAmount: poolData.trifectaPoolTotal,
-        currency: poolData.currency,
-        percentage: (poolData.trifectaPoolTotal / poolData.totalRacePool) * 100,
-        isActive: poolData.trifectaPoolTotal > 0
-      },
-      {
-        poolType: 'exacta',
-        totalAmount: poolData.exactaPoolTotal,
-        currency: poolData.currency,
-        percentage: (poolData.exactaPoolTotal / poolData.totalRacePool) * 100,
-        isActive: poolData.exactaPoolTotal > 0
-      },
-      {
-        poolType: 'first4',
-        totalAmount: poolData.first4PoolTotal,
-        currency: poolData.currency,
-        percentage: (poolData.first4PoolTotal / poolData.totalRacePool) * 100,
-        isActive: poolData.first4PoolTotal > 0
-      }
-    ];
-
-    return pools.filter(pool => pool.isActive && pool.totalAmount > 0);
-  }, [poolData]);
-
-  if (!poolData || poolTotals.length === 0) {
-    return (
-      <div className="text-center text-gray-500 py-4">
-        <p>Pool information not available</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {/* Total Pool */}
-      <div className="text-center border-b border-gray-200 pb-2">
-        <div className="text-lg font-bold text-gray-900">
-          Total Pool: {poolData.currency}{poolData.totalRacePool.toLocaleString()}
-        </div>
-        <div className="text-xs text-gray-500">
-          Last updated: {new Date(poolData.lastUpdated).toLocaleTimeString('en-US', { 
-            hour12: true, 
-            hour: 'numeric', 
-            minute: '2-digit', 
-            second: '2-digit' 
-          })}
-        </div>
-      </div>
-
-      {/* Pool Breakdown */}
-      {showBreakdown && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {poolTotals.map((pool) => (
-            <div key={pool.poolType} className="text-center">
-              <div className="text-xs font-medium text-gray-500 uppercase">
-                {pool.poolType}
-              </div>
-              <div className="text-sm font-semibold text-gray-900">
-                {pool.currency}{pool.totalAmount.toLocaleString()}
-              </div>
-              <div className="text-xs text-gray-400">
-                {pool.percentage.toFixed(1)}%
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-});
 
 // Race results component
 const RaceResults = memo(function RaceResults({
@@ -448,21 +351,16 @@ export const RaceFooter = memo(function RaceFooter({
       poolError
     });
   }, [currentRaceId, poolData, livePoolData, currentPoolData, poolLoading, poolError]);
-  const [activeTab, setActiveTab] = useState<'pools' | 'results'>('pools');
-
-  // Determine which tab should be shown by default and announce status changes
+  // Announce results availability when they become available
   useEffect(() => {
     if (resultsData && resultsData.results.length > 0 && showResults) {
-      setActiveTab('results');
       // Announce results availability
       screenReader?.announce(
         `Race results are now available with ${resultsData.results.length} positions`,
         'assertive'
       );
-    } else if (currentPoolData && showPoolBreakdown) {
-      setActiveTab('pools');
     }
-  }, [resultsData, currentPoolData, showResults, showPoolBreakdown]);
+  }, [resultsData, showResults]);
 
   // Announce race status changes
   useEffect(() => {
@@ -474,69 +372,119 @@ export const RaceFooter = memo(function RaceFooter({
 
   const shouldShowTabs = useMemo(() => {
     const hasResults = resultsData && resultsData.results.length > 0 && showResults;
-    const hasPools = currentPoolData && showPoolBreakdown;
-    return hasResults && hasPools;
-  }, [resultsData, currentPoolData, showResults, showPoolBreakdown]);
+    // Since pools are now in header, only show tabs if we have results
+    return hasResults;
+  }, [resultsData, showResults]);
 
-  // Enhanced tab navigation with keyboard support
-  const handleTabClick = useCallback((tab: 'pools' | 'results') => {
-    setActiveTab(tab);
-    screenReader?.announce(
-      `Switched to ${tab === 'pools' ? 'Pool Summary' : 'Race Results'} tab`,
-      'polite'
-    );
-  }, []);
-
-  const handleTabKeyDown = useCallback((event: React.KeyboardEvent) => {
-    const tabs = ['pools', 'results'];
-    const currentIndex = tabs.indexOf(activeTab);
-    
-    KeyboardHandler.handleTabNavigation(
-      event.nativeEvent,
-      Array.from(event.currentTarget.querySelectorAll('button')) as HTMLElement[],
-      currentIndex,
-      (newIndex) => {
-        const newTab = tabs[newIndex] as 'pools' | 'results';
-        handleTabClick(newTab);
-      }
-    );
-  }, [activeTab, handleTabClick]);
 
   return (
-    <div className={`race-footer bg-white border-t-2 border-gray-300 ${className}`}>
+    <div className={`race-footer bg-white border-2 border-gray-300 shadow-lg rounded-lg ${className}`}>
       {/* Race Status Header - Enhanced and Bigger */}
-      <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-300">
+      <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-300 rounded-t-lg">
         <div className="flex justify-between items-center">
-          {/* Pool Summary on Left - Big and Bold */}
+          {/* Consolidated Pool Summary on Left - All Pools Displayed */}
           {currentPoolData && (
-            <div className="flex items-center space-x-8">
+            <div className="flex items-center space-x-6">
+              {/* Total Pool */}
               <div className="text-center">
                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                   Total Pool
                 </div>
                 <div className="text-3xl font-bold text-gray-900">
-                  {currentPoolData.currency}{currentPoolData.totalRacePool.toLocaleString()}
+                  {currentPoolData.currency}{formatPoolAmount(currentPoolData.totalRacePool)}
                 </div>
               </div>
-              {/* Only show countdown for non-abandoned races */}
-              {currentRaceStatus?.toLowerCase() !== 'abandoned' && currentRaceStatus?.toLowerCase() !== 'postponed' && (
-                <div className="text-center">
-                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                    Race Starts
-                  </div>
-                  <div className="text-xl font-bold text-blue-600">
-                    <CountdownTimer 
-                      targetTime={currentRaceStartTime}
-                      raceStatus={currentRaceStatus}
-                      onTimeExpired={() => {}}
-                    />
-                  </div>
+              
+              {/* Individual Pool Breakdown - Horizontal Layout */}
+              <div className="space-y-2">
+                <div className="flex items-center space-x-4">
+                  {/* Win Pool */}
+                  {currentPoolData.winPoolTotal > 0 && (
+                    <div className="text-center">
+                      <div className="text-xs font-medium text-gray-500 uppercase">
+                        Win
+                      </div>
+                      <div className="text-lg font-bold text-gray-900">
+                        ${formatPoolAmount(currentPoolData.winPoolTotal)}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Place Pool */}
+                  {currentPoolData.placePoolTotal > 0 && (
+                    <div className="text-center">
+                      <div className="text-xs font-medium text-gray-500 uppercase">
+                        Place
+                      </div>
+                      <div className="text-lg font-bold text-gray-900">
+                        ${formatPoolAmount(currentPoolData.placePoolTotal)}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Quinella Pool */}
+                  {currentPoolData.quinellaPoolTotal > 0 && (
+                    <div className="text-center">
+                      <div className="text-xs font-medium text-gray-500 uppercase">
+                        Quinella
+                      </div>
+                      <div className="text-lg font-bold text-gray-900">
+                        ${formatPoolAmount(currentPoolData.quinellaPoolTotal)}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Trifecta Pool */}
+                  {currentPoolData.trifectaPoolTotal > 0 && (
+                    <div className="text-center">
+                      <div className="text-xs font-medium text-gray-500 uppercase">
+                        Trifecta
+                      </div>
+                      <div className="text-lg font-bold text-gray-900">
+                        ${formatPoolAmount(currentPoolData.trifectaPoolTotal)}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Exacta Pool */}
+                  {currentPoolData.exactaPoolTotal > 0 && (
+                    <div className="text-center">
+                      <div className="text-xs font-medium text-gray-500 uppercase">
+                        Exacta
+                      </div>
+                      <div className="text-lg font-bold text-gray-900">
+                        ${formatPoolAmount(currentPoolData.exactaPoolTotal)}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* First4 Pool */}
+                  {currentPoolData.first4PoolTotal > 0 && (
+                    <div className="text-center">
+                      <div className="text-xs font-medium text-gray-500 uppercase">
+                        First4
+                      </div>
+                      <div className="text-lg font-bold text-gray-900">
+                        ${formatPoolAmount(currentPoolData.first4PoolTotal)}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+                
+                {/* Last Updated - moved here from tab content */}
+                <div className="text-xs text-gray-500 text-center">
+                  Last updated: {new Date(currentPoolData.lastUpdated).toLocaleTimeString('en-US', { 
+                    hour12: true, 
+                    hour: 'numeric', 
+                    minute: '2-digit', 
+                    second: '2-digit' 
+                  })}
+                </div>
+              </div>
             </div>
           )}
           
-          {/* Race Status on Right - Big and Bold */}
+          {/* Race Status on Right - Keep existing formatting */}
           <div className="text-right">
             <RaceStatusDisplay
               status={currentRaceStatus}
@@ -547,97 +495,26 @@ export const RaceFooter = memo(function RaceFooter({
         </div>
       </div>
 
-      {/* Enhanced Tab Navigation with accessibility */}
+      {/* Race Results Header - Only show when results are available */}
       {shouldShowTabs && (
         <div className="px-6 border-b border-gray-200">
-          <nav 
-            className="flex space-x-8" 
-            role="tablist" 
-            aria-label="Race information tabs"
-            onKeyDown={handleTabKeyDown}
-          >
-            <button
-              onClick={() => handleTabClick('pools')}
-              role="tab"
-              aria-selected={activeTab === 'pools'}
-              aria-controls="pools-panel"
-              id="pools-tab"
-              tabIndex={activeTab === 'pools' ? 0 : -1}
-              className={`py-3 px-1 border-b-2 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                activeTab === 'pools'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Pool Summary
-            </button>
-            <button
-              onClick={() => handleTabClick('results')}
-              role="tab"
-              aria-selected={activeTab === 'results'}
-              aria-controls="results-panel"
-              id="results-tab"
-              tabIndex={activeTab === 'results' ? 0 : -1}
-              className={`py-3 px-1 border-b-2 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                activeTab === 'results'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Race Results
-            </button>
-          </nav>
+          <div className="py-3">
+            <h3 className="text-lg font-medium text-gray-900">Race Results</h3>
+          </div>
         </div>
       )}
 
-      {/* Content Area */}
-      <div className="px-6 py-4">
-        {shouldShowTabs ? (
-          // Tabbed content with proper ARIA
-          <>
-            {activeTab === 'pools' && (
-              <div 
-                role="tabpanel" 
-                id="pools-panel" 
-                aria-labelledby="pools-tab"
-                tabIndex={0}
-              >
-                <PoolSummary poolData={currentPoolData} showBreakdown={showPoolBreakdown} />
-              </div>
-            )}
-            {activeTab === 'results' && (
-              <div 
-                role="tabpanel" 
-                id="results-panel" 
-                aria-labelledby="results-tab"
-                tabIndex={0}
-              >
-                <RaceResults resultsData={resultsData} />
-              </div>
-            )}
-          </>
-        ) : (
-          // Single content area
-          <>
-            {currentPoolData && showPoolBreakdown && (
-              <PoolSummary poolData={currentPoolData} showBreakdown={showPoolBreakdown} />
-            )}
-            {resultsData && resultsData.results.length > 0 && showResults && (
-              <RaceResults resultsData={resultsData} />
-            )}
-            {!currentPoolData && !resultsData && (
-              <div className="text-center text-gray-500 py-8">
-                <p>Race information will be displayed here when available</p>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      {/* Content Area - Only show results when available */}
+      {shouldShowTabs && (
+        <div className="px-6 py-4">
+          <RaceResults resultsData={resultsData} />
+        </div>
+      )}
 
       {/* Accessibility announcements */}
       <div className="sr-only" aria-live="polite">
         Race status: {STATUS_CONFIG[currentRaceStatus]?.description}.
-        {currentPoolData && ` Total pool: ${currentPoolData.currency}${currentPoolData.totalRacePool.toLocaleString()}.`}
+        {currentPoolData && ` Total pool: ${currentPoolData.currency}${formatPoolAmount(currentPoolData.totalRacePool)}.`}
         {resultsData && resultsData.results.length > 0 && ` Results available with ${resultsData.results.length} positions.`}
       </div>
     </div>

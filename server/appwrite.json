@@ -138,6 +138,37 @@
       ]
     },
     {
+      "$id": "daily-initial-data",
+      "name": "Daily Initial Data Population",
+      "runtime": "node-22",
+      "specification": "s-2vcpu-2gb",
+      "path": "daily-initial-data",
+      "execute": ["any"],
+      "events": [],
+      "schedule": "30 20 * * *",
+      "timeout": 840,
+      "enabled": true,
+      "logging": true,
+      "entrypoint": "src/main.js",
+      "commands": "npm install",
+      "scopes": [
+        "databases.read",
+        "databases.write",
+        "collections.read",
+        "collections.write",
+        "attributes.read",
+        "attributes.write",
+        "indexes.read",
+        "indexes.write",
+        "documents.read",
+        "documents.write",
+        "functions.read",
+        "functions.write",
+        "execution.read",
+        "execution.write"
+      ]
+    },
+    {
       "$id": "master-race-scheduler",
       "name": "Master Race Scheduler",
       "runtime": "node-22",

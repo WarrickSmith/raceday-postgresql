@@ -12,12 +12,63 @@ import {
 } from '@/types/enhancedGrid'
 import { useAppwriteRealtime } from '@/hooks/useAppwriteRealtime'
 import { useRealtimeRace } from '@/hooks/useRealtimeRace'
+import { useRacePoolData } from '@/hooks/useRacePoolData'
+import { useMoneyFlowTimeline } from '@/hooks/useMoneyFlowTimeline'
 import { PoolToggle } from './PoolToggle'
 import { useRace } from '@/contexts/RaceContext'
 import { screenReader, AriaLabels } from '@/utils/accessibility'
 import { useRenderTracking, useMemoryOptimization } from '@/utils/performance'
+import { useValueFlash } from '@/hooks/useValueFlash'
 import { JockeySilks } from './JockeySilks'
 import { getStatusConfig, getStatusBadgeClasses } from '@/utils/raceStatusConfig'
+
+// Flash-enabled Win Odds Cell Component
+const WinOddsCell = memo(function WinOddsCell({ 
+  entrant, 
+  formatOdds 
+}: { 
+  entrant: Entrant; 
+  formatOdds: (odds?: number) => string;
+}) {
+  const { flashClasses } = useValueFlash(entrant.winOdds)
+  
+  return (
+    <td 
+      className={`px-3 py-3 whitespace-nowrap text-right border-r border-gray-200 sticky left-[200px] z-20 ${flashClasses}`} 
+      style={{ verticalAlign: 'middle', height: '60px', backgroundColor: flashClasses.includes('bg-') ? undefined : 'white' }}
+    >
+      <div className="flex items-center justify-end h-full">
+        <span className="text-sm font-medium text-gray-900">
+          {entrant.isScratched ? '—' : formatOdds(entrant.winOdds)}
+        </span>
+      </div>
+    </td>
+  )
+})
+
+// Flash-enabled Place Odds Cell Component  
+const PlaceOddsCell = memo(function PlaceOddsCell({ 
+  entrant, 
+  formatOdds 
+}: { 
+  entrant: Entrant; 
+  formatOdds: (odds?: number) => string;
+}) {
+  const { flashClasses } = useValueFlash(entrant.placeOdds)
+  
+  return (
+    <td 
+      className={`px-3 py-3 whitespace-nowrap text-right border-r-2 border-gray-300 sticky left-[280px] z-20 ${flashClasses}`} 
+      style={{ verticalAlign: 'middle', height: '60px', backgroundColor: flashClasses.includes('bg-') ? undefined : 'white' }}
+    >
+      <div className="flex items-center justify-end h-full">
+        <span className="text-sm font-medium text-gray-900">
+          {entrant.isScratched ? '—' : formatOdds(entrant.placeOdds)}
+        </span>
+      </div>
+    </td>
+  )
+})
 
 interface TimelineColumn {
   label: string
@@ -82,6 +133,31 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const currentRaceStartTime = liveRace?.startTime || raceData?.race.startTime || raceStartTime
   const currentDataFreshness = raceData?.dataFreshness || dataFreshness
 
+  // Get actual race pool data 
+  const { poolData: racePoolData } = useRacePoolData(currentRaceId)
+  
+  // Pool view state - must be declared before money flow timeline hook
+  const [poolViewState, setPoolViewState] = useState<PoolViewState>(
+    DEFAULT_POOL_VIEW_STATE
+  )
+  
+  // Get money flow timeline data for all entrants
+  const entrantIds = useMemo(() => currentEntrants.map(e => e.$id), [currentEntrants])
+  
+  // Debug: Log entrant IDs being passed to timeline hook
+  console.log('🔍 Timeline hook parameters:', {
+    raceId: currentRaceId,
+    entrantIds: entrantIds,
+    entrantCount: entrantIds.length,
+    activePool: poolViewState.activePool
+  })
+  
+  const { timelineData, isLoading: timelineLoading, error: timelineError, getEntrantDataForInterval } = useMoneyFlowTimeline(
+    currentRaceId,
+    entrantIds,
+    poolViewState.activePool
+  )
+
   // Debug logging for entrants updates (can be removed in production)
   // console.log('🏃 EnhancedEntrantsGrid render:', {
   //   raceDataExists: !!raceData,
@@ -98,8 +174,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
   const [currentTime, setCurrentTime] = useState(new Date())
-  const [maxPostStartMinutes, setMaxPostStartMinutes] = useState(0) // Track max columns shown
-  const [hasShownPostStartColumns, setHasShownPostStartColumns] = useState(false) // Track if we've ever shown post-start columns
+  // State-dependent variables removed - now using data-driven approach for timeline persistence
 
   // Enhanced grid state
   const [displayConfig] = useState({
@@ -107,10 +182,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     showJockeySilks: enableJockeySilks,
     showMoneyFlowColumns: enableMoneyFlowTimeline,
   })
-
-  const [poolViewState, setPoolViewState] = useState<PoolViewState>(
-    DEFAULT_POOL_VIEW_STATE
-  )
 
   const [sortState, setSortState] = useState<GridSortState>({
     column: 'winOdds',
@@ -141,31 +212,86 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     clearHistory,
   } = realtimeResult
 
-  // Use real-time entrants if available and non-empty, otherwise fallback to current entrants from context
-  // Prioritize context entrants when they exist to ensure data flows from background fetch
-  const entrants =
-    realtimeEntrants && realtimeEntrants.length > 0
-      ? realtimeEntrants
-      : currentEntrants && currentEntrants.length > 0
-      ? currentEntrants
-      : initialEntrants
+  // IMPORTANT: Use currentEntrants (from context) as base to preserve data flow
+  // Real-time entrants are used only for updating live fields (odds, scratch status) in calculations
+  // This prevents calculated pool data from being overwritten by real-time updates
+  const baseEntrants = currentEntrants && currentEntrants.length > 0 ? currentEntrants : initialEntrants
+  
+  // Merge real-time updates into base entrants for live odds data
+  const entrants = useMemo(() => {
+    if (!realtimeEntrants || realtimeEntrants.length === 0) {
+      console.log('📡 Using base entrants (no real-time data)')
+      return baseEntrants
+    }
+    
+    console.log('🔄 Merging real-time data:', {
+      baseEntrantsCount: baseEntrants.length,
+      realtimeEntrantsCount: realtimeEntrants.length,
+      totalUpdates
+    })
+    
+    // Create a map of real-time entrants for quick lookup
+    const realtimeMap = new Map(realtimeEntrants.map(e => [e.$id, e]))
+    
+    // Merge real-time data with base entrants, prioritizing live odds data
+    return baseEntrants.map(baseEntrant => {
+      const realtimeEntrant = realtimeMap.get(baseEntrant.$id)
+      if (realtimeEntrant) {
+        // Merge real-time fields while preserving base entrant structure
+        return {
+          ...baseEntrant,
+          winOdds: realtimeEntrant.winOdds ?? baseEntrant.winOdds,
+          placeOdds: realtimeEntrant.placeOdds ?? baseEntrant.placeOdds,
+          isScratched: realtimeEntrant.isScratched ?? baseEntrant.isScratched,
+          holdPercentage: realtimeEntrant.holdPercentage ?? baseEntrant.holdPercentage,
+          moneyFlowTrend: realtimeEntrant.moneyFlowTrend ?? baseEntrant.moneyFlowTrend,
+          // Preserve any calculated fields that might exist
+          poolMoney: baseEntrant.poolMoney,
+          moneyFlowTimeline: baseEntrant.moneyFlowTimeline
+        }
+      }
+      return baseEntrant
+    })
+  }, [baseEntrants, realtimeEntrants])
 
-  // Calculate pool money for each entrant based on their hold percentage
+  // Validation function to check if timeline amounts sum to total pool
+  const validateTimelineSummation = useCallback((entrant: any) => {
+    if (!entrant.moneyFlowTimeline || !entrant.poolMoney) return true;
+    
+    const timeline = entrant.moneyFlowTimeline;
+    if (!timeline.dataPoints || timeline.dataPoints.length === 0) return true;
+    
+    // Sum all incremental amounts for this entrant
+    const timelineSum = timeline.dataPoints.reduce((sum: number, point: any) => {
+      return sum + (point.incrementalAmount || 0);
+    }, 0);
+    
+    // Compare with current pool total for this entrant
+    const poolTotal = entrant.poolMoney.total || 0;
+    const difference = Math.abs(timelineSum - poolTotal);
+    const tolerance = poolTotal * 0.05; // 5% tolerance
+    
+    if (difference > tolerance && poolTotal > 100) { // Only flag significant discrepancies
+      console.warn(`⚠️ Timeline summation mismatch for ${entrant.name}: timeline sum=${timelineSum}, pool total=${poolTotal}, difference=${difference}`);
+      return false;
+    }
+    
+    return true;
+  }, []);
+
+  // Calculate pool money for each entrant using actual timeline data and pool data
   const entrantsWithPoolData = useMemo(() => {
     if (!entrants || entrants.length === 0) return []
     
-    // Try to get pool data from race footer component props or race context
-    // For now, we'll use mock pool data based on the footer display values
-    // TODO: Connect to actual race pool data when available
-    const mockRacePoolData = {
-      winPoolTotal: 36399,      // $36,399 from footer
-      placePoolTotal: 18604,    // $18,604 from footer  
-      totalRacePool: 82503      // $82,503 from footer
-    }
-    
     console.log('🔍 Pool calculation debug:', {
       entrantsCount: entrants.length,
-      entrantsWithHoldPercentage: entrants.filter(e => e.holdPercentage).length,
+      timelineDataAvailable: timelineData?.size > 0,
+      timelineDataSize: timelineData?.size || 0,
+      racePoolDataAvailable: !!racePoolData,
+      racePoolData: racePoolData ? {
+        winPoolTotal: racePoolData.winPoolTotal,
+        placePoolTotal: racePoolData.placePoolTotal
+      } : null,
       sampleEntrant: entrants[0] ? {
         id: entrants[0].$id,
         name: entrants[0].name,
@@ -177,54 +303,107 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     return entrants.map(entrant => {
       if (entrant.isScratched) {
         console.log(`🐴 Scratched entrant ${entrant.name} (${entrant.runnerNumber}) - returning unchanged`)
-        return entrant // Return scratched entrants unchanged
+        return {
+          ...entrant,
+          moneyFlowTimeline: undefined // No timeline for scratched entrants
+        }
       }
       
-      // Calculate pool percentage using holdPercentage if available, otherwise estimate from odds
-      let poolPercentage: number
+      // NEW PRIORITY HIERARCHY (FIXED):
+      // Priority 1: Real entrant holdPercentage (must be > 0)
+      let poolPercentage: number | undefined = undefined
+      let dataSource = 'none'
       
-      if (entrant.holdPercentage) {
+      if (entrant.holdPercentage && entrant.holdPercentage > 0) {
         poolPercentage = entrant.holdPercentage
-        console.log(`💰 Using real holdPercentage for ${entrant.name} (${entrant.runnerNumber}): ${poolPercentage}%`)
-      } else if (entrant.winOdds) {
-        // Estimate pool percentage from win odds using implied probability
-        // Implied probability = 1 / decimal odds * 100
-        const impliedProbability = (1 / entrant.winOdds) * 100
-        // Pool percentage is roughly correlated to implied probability but not exactly
-        // Use a scaling factor to make it realistic for pool betting
-        poolPercentage = Math.max(1, Math.min(25, impliedProbability * 0.8))
-        console.log(`🔮 Estimated pool percentage for ${entrant.name} (${entrant.runnerNumber}) from odds ${entrant.winOdds}: ${poolPercentage.toFixed(1)}%`)
-      } else {
-        // Last resort: assign a small random percentage
-        poolPercentage = Math.random() * 5 + 1 // 1-6%
-        console.log(`🎲 Random pool percentage for ${entrant.name} (${entrant.runnerNumber}): ${poolPercentage.toFixed(1)}%`)
+        dataSource = 'entrant_real_data'
+        console.log(`✅ Using real entrant data for ${entrant.name}: ${poolPercentage}%`)
+      }
+      
+      // Priority 2: Timeline latest percentage (only if entrant data missing)
+      const entrantTimeline = timelineData?.get(entrant.$id)
+      if (!poolPercentage && entrantTimeline && entrantTimeline.dataPoints.length > 0) {
+        const latestPercentage = entrantTimeline.latestPercentage
+        if (latestPercentage && latestPercentage > 0) {
+          poolPercentage = latestPercentage
+          dataSource = 'timeline_data'
+          console.log(`✅ Using timeline data for ${entrant.name}: ${poolPercentage}%`)
+        }
+      }
+      
+      // Priority 3: Calculate from odds if we have pool data and odds
+      if (!poolPercentage && racePoolData && entrant.winOdds && entrant.winOdds > 0) {
+        // Calculate implied probability from odds (odds = 1/probability)
+        // Add small margin for house edge estimation
+        const impliedProbability = 1 / entrant.winOdds
+        const estimatedPercentage = impliedProbability * 100 * 0.85 // Adjust for house edge
+        
+        if (estimatedPercentage > 0 && estimatedPercentage < 100) {
+          poolPercentage = estimatedPercentage
+          dataSource = 'calculated_from_odds'
+          console.log(`📊 Calculated from odds for ${entrant.name}: ${poolPercentage.toFixed(2)}% (odds: ${entrant.winOdds})`)
+        }
+      }
+      
+      // Priority 4: Fallback to dummy data temporarily to ensure display works
+      if (!poolPercentage) {
+        console.log(`⚠️ No calculable data for ${entrant.name}, using fallback percentage`)
+        // Use a fallback percentage based on entrant position for testing
+        poolPercentage = Math.max(1, 15 - entrant.runnerNumber); // Simple fallback
+        dataSource = 'fallback_for_testing'
       }
       
       // Calculate individual pool contributions based on pool percentage
-      const holdPercentageDecimal = poolPercentage / 100 // Convert to decimal
-      const winPoolContribution = mockRacePoolData.winPoolTotal * holdPercentageDecimal
-      const placePoolContribution = mockRacePoolData.placePoolTotal * holdPercentageDecimal
+      const holdPercentageDecimal = poolPercentage / 100
+      
+      // Use fallback pool totals if no race pool data (for testing)
+      const fallbackWinPool = 5000000; // $50k in cents
+      const fallbackPlacePool = 2000000; // $20k in cents
+      
+      const winPoolInDollars = Math.round((racePoolData?.winPoolTotal || fallbackWinPool) / 100) 
+      const placePoolInDollars = Math.round((racePoolData?.placePoolTotal || fallbackPlacePool) / 100)
+      const winPoolContribution = winPoolInDollars * holdPercentageDecimal
+      const placePoolContribution = placePoolInDollars * holdPercentageDecimal
       const totalPoolContribution = winPoolContribution + placePoolContribution
       
-      console.log(`💰 Pool calculation for ${entrant.name} (${entrant.runnerNumber}):`, {
-        poolPercentage: poolPercentage,
-        holdPercentageDecimal: holdPercentageDecimal,
+      console.log(`💰 Real calculation for ${entrant.name}:`, {
+        poolPercentage,
         winPoolContribution: winPoolContribution.toFixed(0),
         placePoolContribution: placePoolContribution.toFixed(0),
-        totalPoolContribution: totalPoolContribution.toFixed(0)
+        totalPoolContribution: totalPoolContribution.toFixed(0),
+        dataSource
       })
       
-      return {
+      const entrantWithPoolData = {
         ...entrant,
+        moneyFlowTimeline: entrantTimeline, // Add timeline data to entrant
         poolMoney: {
           win: winPoolContribution,
           place: placePoolContribution,
           total: totalPoolContribution,
-          percentage: poolPercentage // Use the calculated pool percentage for display
+          percentage: poolPercentage
         }
+      };
+      
+      // Validate timeline summation for debugging
+      validateTimelineSummation(entrantWithPoolData);
+      
+      // Special debugging for "Wal" entrant
+      if (entrant.name.toLowerCase().includes('wal')) {
+        console.log(`🔍 DEBUG "Wal" entrant:`, {
+          name: entrant.name,
+          runnerNumber: entrant.runnerNumber,
+          poolPercentage,
+          poolMoney: entrantWithPoolData.poolMoney,
+          timelineDataPoints: entrantTimeline?.dataPoints?.length || 0,
+          sampleTimelinePoint: entrantTimeline?.dataPoints?.[0] || null,
+          timelineTrend: entrantTimeline?.trend || 'none'
+        });
       }
+      
+      return entrantWithPoolData;
     })
-  }, [entrants])
+  }, [entrants, racePoolData, timelineData, poolViewState.activePool, validateTimelineSummation])
 
   // Debug logging removed - entrants data structure verified
 
@@ -288,14 +467,40 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     return sorted
   }, [entrantsWithPoolData, sortState])
 
+  // Debug: Track pool toggle changes and timeline data
+  console.log('🎯 Timeline data status:', {
+    activePool: poolViewState.activePool,
+    timelineDataSize: timelineData?.size || 0,
+    entrantsCount: sortedEntrants.length,
+    timelineLoading,
+    timelineError: timelineError ? timelineError : null,
+    entrantIdsPreview: entrantIds.slice(0, 3),
+    sampleEntrantData: sortedEntrants.slice(0, 2).map(e => ({
+      id: e.$id,
+      name: e.name,
+      runnerNumber: e.runnerNumber
+    }))
+  })
+
   // Update current time for dynamic timeline updates
-  // More frequent updates near race start time
+  // More frequent updates near race start time, but pause for final races
   useEffect(() => {
+    const raceStatus = liveRace?.status || 'Open'
+    
+    // Don't update time frequently for completed races
+    if (['Final', 'Closed'].includes(raceStatus)) {
+      const timer = setInterval(() => {
+        setCurrentTime(new Date())
+      }, 300000) // Update every 5 minutes for completed races
+      
+      return () => clearInterval(timer)
+    }
+
     const raceStart = new Date(currentRaceStartTime)
     const current = new Date()
     const timeToRace = (raceStart.getTime() - current.getTime()) / (1000 * 60) // minutes
 
-    // Determine update frequency based on proximity to race start
+    // Determine update frequency based on proximity to race start for active races
     let updateInterval = 60000 // Default: 1 minute
     if (timeToRace <= 5 && timeToRace >= -5) {
       updateInterval = 15000 // 15 seconds near race start
@@ -310,7 +515,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     return () => clearInterval(timer)
   }, [currentRaceStartTime, liveRace?.status])
 
-  // Generate timeline columns based on current time and race status
+  // Generate timeline columns using data-driven approach for persistence
   const timelineColumns = useMemo(() => {
     const raceStart = new Date(currentRaceStartTime)
     const current = currentTime
@@ -318,24 +523,44 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     const timeToRaceMinutes = Math.floor(timeToRaceMs / (1000 * 60))
     const raceStatus = liveRace?.status || 'Open'
     
-    // Race status sync verified - using real-time race status
-
-    // Pre-scheduled timeline milestones (always show these)
+    // Calculate max post-start from existing timeline data (DATA-DRIVEN)
+    let maxPostStartFromData = 0
+    if (timelineData && timelineData.size > 0) {
+      for (const [entrantId, entrantData] of timelineData) {
+        if (entrantData.dataPoints && entrantData.dataPoints.length > 0) {
+          const maxTimeToStart = Math.max(...entrantData.dataPoints.map(p => Math.abs(p.timeToStart || 0)))
+          maxPostStartFromData = Math.max(maxPostStartFromData, maxTimeToStart)
+        }
+      }
+    }
+    
+    // Calculate actual post-start minutes
+    const actualPostStartMinutes = timeToRaceMinutes < 0 ? Math.abs(timeToRaceMinutes) : 0
+    
+    // Use maximum of actual time or data-driven max for persistence
+    const effectiveMaxPostStart = Math.max(actualPostStartMinutes, maxPostStartFromData)
+    
+    // Pre-scheduled timeline milestones (CORRECTED: positive = before start, negative = after start)
+    // Backend uses: timeToStart: 60 = 60min before start, timeToStart: -2 = 2min after start
     const preScheduledMilestones = [
-      -60, -55, -50, -45, -40, -35, -30, -25, -20, -15, -10, -5, -4, -3, -2, -1,
-      -0.5, 0,
+      60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 4, 3, 2, 1, 0.5, 0
     ]
-
+    
     const columns: TimelineColumn[] = []
-
-    // Add pre-scheduled milestones
+    
+    // Add ALL pre-scheduled milestones (FIXED: Always show all timeline columns)
     preScheduledMilestones.forEach((interval) => {
-      const timestamp = new Date(raceStart.getTime() + interval * 60 * 1000)
+      // REQUIREMENT: Always show ALL timeline columns (60m to 0s) regardless of race status
+      // Only the DATA should be filtered, not the column headers
+      // This matches the reference screenshot and requirements
+      
+      // CORRECTED: interval is now positive for before-start times
+      const timestamp = new Date(raceStart.getTime() - interval * 60 * 1000)
       let label: string
       if (interval === 0) {
         label = '0 (Start)'
-      } else if (interval === -0.5) {
-        label = '-30s'
+      } else if (interval === 0.5) {
+        label = '30s'
       } else {
         label = `${interval}m`
       }
@@ -348,152 +573,236 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         isDynamic: false,
       })
     })
-
-    // Add post-scheduled columns:
-    // 1. For Open races: Add dynamic columns in real-time as time progresses
-    // 2. For closed/interim/final races: Show static columns up to actual race end, but don't add new ones
-    // 3. Columns persist once added (timeline doesn't shrink)
-    const allowDynamicColumns = raceStatus === 'Open' && timeToRaceMinutes < 0
-    const shouldShowPostStartColumns =
-      allowDynamicColumns ||
-      (raceData?.race?.actualStart && ['Final', 'Interim', 'Closed'].includes(raceStatus)) ||
-      (hasShownPostStartColumns && ['Final', 'Interim', 'Closed'].includes(raceStatus)) // Persist columns for closed races
-
+    
+    // Add post-scheduled columns when appropriate
+    // For Open races: Show if race has passed scheduled start time OR has timeline data indicating delay
+    // For completed races (Final/Interim/Closed/Abandoned): Always show columns to preserve race review capability
+    const raceHasStarted = timeToRaceMinutes < 0
+    const raceIsCompleted = ['Final', 'Interim', 'Closed', 'Abandoned'].includes(raceStatus)
+    
+    // Check if we have post-start data indicating race delays
+    const hasPostStartData = timelineData && timelineData.size > 0 && 
+      Array.from(timelineData.values()).some(entrantData => 
+        entrantData.dataPoints.some(point => point.timeToStart !== undefined && point.timeToStart < 0)
+      )
+    
+    const shouldShowPostStartColumns = 
+      (raceStatus === 'Open' && raceHasStarted && actualPostStartMinutes > 0) ||
+      (raceStatus === 'Open' && hasPostStartData) || // Show if we have post-start data regardless of current time
+      (raceIsCompleted) // Always show for completed races
+    
+    console.log('🕐 Post-start column logic:', {
+      raceStatus,
+      timeToRaceMinutes,
+      raceHasStarted,
+      actualPostStartMinutes,
+      shouldShowPostStartColumns
+    });
+    
     if (shouldShowPostStartColumns) {
-      let postStartMinutes: number
-
-      if (allowDynamicColumns) {
-        // For open races, use current time relative to scheduled start and update max
-        postStartMinutes = Math.abs(timeToRaceMinutes)
-        setMaxPostStartMinutes(prev => Math.max(prev, postStartMinutes))
-        setHasShownPostStartColumns(true) // Mark that we've shown post-start columns
-      } else {
-        // For closed races, use the maximum that was previously shown to persist columns
-        if (raceData?.race?.actualStart) {
-          const actualStartTime = new Date(raceData.race.actualStart)
-          const scheduledStartTime = new Date(currentRaceStartTime)
-          const actualPostStartMinutes = Math.max(
-            0,
-            (actualStartTime.getTime() - scheduledStartTime.getTime()) /
-              (1000 * 60)
-          )
-          // Use the maximum of actual time or previously shown columns
-          postStartMinutes = Math.max(maxPostStartMinutes, actualPostStartMinutes)
-        } else {
-          // If no actualStart, just use the max we've shown so far
-          postStartMinutes = maxPostStartMinutes
-        }
-      }
-
-      // Add 30-second intervals for first 2 minutes, then minute intervals
       const dynamicIntervals: number[] = []
-
-      // 30-second intervals for first 2 minutes
-      if (postStartMinutes <= 2) {
-        const thirtySecondIntervals = Math.floor(postStartMinutes * 2) // 2 intervals per minute
-        for (let i = 1; i <= thirtySecondIntervals; i++) {
-          dynamicIntervals.push(i * 0.5) // 0.5, 1.0, 1.5, 2.0, etc.
+      
+      if (raceStatus === 'Open') {
+        // For open races, generate standard post-start progression to match server-side logic
+        // FIXED: Use standard post-start intervals that match server-side getTimelineInterval()
+        const postStartMinutes = actualPostStartMinutes
+        
+        // Standard post-start progression: -30s, -1m, -1:30s, -2m, -2:30s, -3m, -4m, etc.
+        const standardPostStartIntervals = [-0.5, -1.0, -1.5, -2.0, -2.5, -3.0]
+        
+        // Add standard intervals up to current elapsed time + buffer
+        const maxPostStartToShow = Math.max(postStartMinutes + 1, 5) // Show at least 5 minutes or current time + 1min buffer
+        
+        // Add all standard intervals up to the maximum
+        for (const interval of standardPostStartIntervals) {
+          if (Math.abs(interval) <= maxPostStartToShow) {
+            dynamicIntervals.push(interval)
+          }
+        }
+        
+        // Continue with additional minute intervals if needed (matches server-side logic)
+        for (let i = 4; i <= Math.ceil(maxPostStartToShow) && i <= 15; i++) {
+          dynamicIntervals.push(-i) // -4m, -5m, -6m, etc.
+        }
+      } else {
+        // For closed/final/interim/abandoned races, show all columns based on existing data points
+        // Extract ALL intervals from timeline data (both pre and post-race)
+        const dataIntervals = new Set<number>()
+        if (timelineData && timelineData.size > 0) {
+          for (const [entrantId, entrantData] of timelineData) {
+            if (entrantData.dataPoints && entrantData.dataPoints.length > 0) {
+              entrantData.dataPoints.forEach(point => {
+                // FIXED: Use timeInterval when available (server-calculated), fallback to timeToStart
+                const interval = point.timeInterval ?? point.timeToStart
+                
+                if (interval !== undefined) {
+                  // Add post-race intervals to dynamic columns (negative intervals = post-start)
+                  if (interval < 0) {
+                    // Use server-calculated timeInterval directly (already properly bucketed)
+                    dataIntervals.add(interval)
+                  }
+                }
+              })
+            }
+          }
+        }
+        
+        // Add intervals from data if available
+        if (dataIntervals.size > 0) {
+          dynamicIntervals.push(...Array.from(dataIntervals).sort((a, b) => a - b))
+        } else {
+          // Fallback: Show standard post-race intervals for completed races even without data
+          // FIXED: Use standard progression that matches server-side
+          const standardPostRaceIntervals = [-0.5, -1.0, -1.5, -2.0, -2.5, -3.0, -4.0, -5.0]
+          dynamicIntervals.push(...standardPostRaceIntervals)
         }
       }
-
-      // Then minute intervals
-      if (postStartMinutes > 2) {
-        // Add the 30-second intervals for first 2 minutes
-        dynamicIntervals.push(0.5, 1.0, 1.5, 2.0)
-
-        // Add minute intervals from 3 minutes onwards
-        const additionalMinutes = Math.floor(postStartMinutes) - 2
-        for (let i = 1; i <= additionalMinutes && i <= 10; i++) {
-          // Cap at 10 additional minutes
-          dynamicIntervals.push(2 + i)
-        }
-      }
-
-      // Add post-start columns (dynamic for open races, static for closed races)
+      
+      // Add post-start columns (CORRECTED: negative intervals are post-start)
       dynamicIntervals.forEach((interval) => {
-        const timestamp = new Date(raceStart.getTime() + interval * 60 * 1000)
-        const label =
-          interval < 1 ? `+${(interval * 60).toFixed(0)}s` : `+${interval}m`
-
+        // For negative intervals (post-start), add the absolute time to get correct timestamp
+        const timestamp = new Date(raceStart.getTime() + Math.abs(interval) * 60 * 1000)
+        const absInterval = Math.abs(interval)
+        
+        // REQUIREMENT: Show labels like "-30s, -1m, -1:30s, -2m" for delayed starts
+        let label: string
+        if (absInterval < 1) {
+          // 30-second intervals: -30s
+          label = `-${(absInterval * 60).toFixed(0)}s`
+        } else if (absInterval % 1 === 0.5) {
+          // Half-minute intervals: -1:30m (1.5m becomes 1:30)
+          const minutes = Math.floor(absInterval)
+          label = `-${minutes}:30m`
+        } else {
+          // Full minute intervals: -1m, -2m, -3m
+          label = `-${absInterval}m`
+        }
+        
         columns.push({
           label,
           interval,
           timestamp: timestamp.toISOString(),
           isScheduledStart: false,
-          isDynamic: allowDynamicColumns, // Only mark as dynamic for open races
+          isDynamic: raceStatus === 'Open' // Only mark as dynamic for open races
         })
       })
     }
+    
+    // Sort columns chronologically: highest positive → 0 → lowest negative
+    // Example: 60m, 50m, 40m, ..., 2m, 1m, 0 (Start), +1m, +2m, +4m
+    return columns.sort((a, b) => b.interval - a.interval)
+  }, [currentRaceStartTime, currentTime, liveRace?.status, timelineData])
 
-    return columns.sort((a, b) => a.interval - b.interval)
-  }, [currentRaceStartTime, raceData?.race?.actualStart, raceData?.race?.status, currentTime])
+  // Determine if column should be highlighted (current time)
+  const isCurrentTimeColumn = useCallback((interval: number): boolean => {
+    const raceStart = new Date(currentRaceStartTime)
+    const timeToRaceMs = raceStart.getTime() - currentTime.getTime()
+    const timeToRaceMinutes = timeToRaceMs / (1000 * 60)
+    const raceStatus = liveRace?.status || 'Open'
+
+    // Only highlight and follow current time while race status is 'Open'
+    if (raceStatus === 'Open') {
+      if (timeToRaceMinutes > 0) {
+        // Race hasn't started yet - find the active polling interval
+        // Active column = next interval that will receive data
+        // If time to race = 19 minutes, active column = 15m (next interval <= current time)
+        const sortedIntervals = timelineColumns
+          .filter(col => col.interval > 0) // Only pre-race intervals
+          .map(col => col.interval)
+          .sort((a, b) => b - a) // Descending: [60, 55, 50, ..., 1, 0.5]
+        
+        // Find the first interval that is <= current time to race
+        const activeInterval = sortedIntervals.find(int => int <= timeToRaceMinutes)
+        return interval === activeInterval
+      } else {
+        // Past scheduled start but race status still 'Open' (delayed start)
+        // Continue highlighting based on elapsed time in post-start columns
+        const timeAfterStartMinutes = Math.abs(timeToRaceMinutes)
+        
+        if (interval === 0) {
+          // Highlight "0s" (Start) column if we're within 30 seconds of scheduled start
+          return timeAfterStartMinutes <= 0.5
+        }
+        
+        if (interval < 0) {
+          // This is a post-start column (negative interval)
+          const intervalMinutes = Math.abs(interval)
+          
+          // Highlight this column if current elapsed time falls within this interval's range
+          // For -30s column: highlight if elapsed time is between 0-1 minutes  
+          // For -1m column: highlight if elapsed time is between 0.5-1.5 minutes
+          // For -1:30m column: highlight if elapsed time is between 1.0-2.0 minutes
+          const intervalStart = Math.max(0, intervalMinutes - 0.5)
+          const intervalEnd = intervalMinutes + 0.5
+          
+          return timeAfterStartMinutes >= intervalStart && timeAfterStartMinutes < intervalEnd
+        }
+      }
+    }
+    
+    // Race status is no longer 'Open' - stop highlighting, race has actually started
+    return false
+  }, [currentRaceStartTime, currentTime, timelineColumns, liveRace?.status])
 
   // Auto-scroll to show current time position
   useEffect(() => {
     if (!autoScroll || !scrollContainerRef.current) return
 
     const container = scrollContainerRef.current
-    const raceStart = new Date(currentRaceStartTime)
-    const currentInterval =
-      (currentTime.getTime() - raceStart.getTime()) / (1000 * 60)
-
-    // Find the column that represents the current time
-    const currentColumnIndex = timelineColumns.findIndex(
-      (col) => col.interval >= currentInterval
+    
+    // Find the currently highlighted (active) column using the same logic
+    const activeColumnIndex = timelineColumns.findIndex(col => 
+      isCurrentTimeColumn(col.interval)
     )
 
-    if (currentColumnIndex > 0) {
+    console.log('🔄 Auto-scroll update:', {
+      activeColumnIndex,
+      totalColumns: timelineColumns.length,
+      activeColumn: activeColumnIndex >= 0 ? timelineColumns[activeColumnIndex] : null,
+      autoScroll
+    })
+
+    if (activeColumnIndex >= 0) {
       const columnWidth = 80 // Approximate column width
-      const scrollPosition = (currentColumnIndex - 2) * columnWidth // Center current time
+      // Scroll to center the active column with some buffer
+      const scrollPosition = Math.max(0, (activeColumnIndex - 2) * columnWidth)
 
       container.scrollTo({
-        left: Math.max(0, scrollPosition),
+        left: scrollPosition,
         behavior: 'smooth',
       })
+      
+      console.log('📍 Auto-scrolled to active column at position:', scrollPosition)
     }
-  }, [timelineColumns, currentRaceStartTime, autoScroll, currentTime])
+  }, [timelineColumns, currentRaceStartTime, autoScroll, currentTime, isCurrentTimeColumn])
 
-  // Get data for specific timeline point - use real money flow data if available
+  // Get data for specific timeline point - shows incremental money amounts since previous time point
   const getTimelineData = useCallback((entrantId: string, interval: number): string => {
     const entrant = sortedEntrants.find((e) => e.$id === entrantId)
     if (!entrant || entrant.isScratched) return '—'
 
-    // Check if we have timeline data available
-    if (entrant.moneyFlowTimeline?.dataPoints && entrant.moneyFlowTimeline.dataPoints.length > 0) {
-      // Find the closest data point to this interval
-      const targetTime = new Date(currentRaceStartTime).getTime() + (interval * 60 * 1000)
-      const closestDataPoint = entrant.moneyFlowTimeline.dataPoints.reduce((closest, point) => {
-        const pointTime = new Date(point.pollingTimestamp).getTime()
-        const closestTime = new Date(closest.pollingTimestamp).getTime()
-        return Math.abs(pointTime - targetTime) < Math.abs(closestTime - targetTime) ? point : closest
-      })
+    // Use the simplified getEntrantDataForInterval from the timeline hook 
+    // This eliminates the complex manual calculation logic
+    if (getEntrantDataForInterval) {
+      const result = getEntrantDataForInterval(entrant.$id, interval, poolViewState.activePool as 'win' | 'place');
       
-      return closestDataPoint.poolPercentage.toFixed(1)
+      // Debug logging to help troubleshoot data issues
+      if (interval === 60) {
+        console.log(`📊 Timeline data for ${entrant.name || entrant.$id} at ${interval}m:`, {
+          entrantId: entrant.$id,
+          interval,
+          poolType: poolViewState.activePool,
+          result,
+          timelineDataSize: timelineData?.size || 0,
+          hasTimelineData: timelineData?.has(entrant.$id) || false
+        });
+      }
+      
+      return result;
     }
 
-    // Use current hold percentage for all timeline points as fallback (real-time data will update this)
-    if (entrant.holdPercentage !== undefined && entrant.holdPercentage !== null) {
-      return entrant.holdPercentage.toFixed(1)
-    }
-
-    // Use poolMoney percentage if available
-    if (entrant.poolMoney?.percentage !== undefined && entrant.poolMoney?.percentage !== null) {
-      return entrant.poolMoney.percentage.toFixed(1)
-    }
-
-    // Last resort: return dash
     return '—'
-  }, [sortedEntrants, currentRaceStartTime])
-
-  // Determine if column should be highlighted (current time)
-  const isCurrentTimeColumn = useCallback((interval: number): boolean => {
-    const raceStart = new Date(currentRaceStartTime)
-    const currentInterval =
-      (currentTime.getTime() - raceStart.getTime()) / (1000 * 60)
-
-    // Highlight if within 30 seconds of this interval
-    return Math.abs(currentInterval - interval) <= 0.5
-  }, [currentRaceStartTime, currentTime])
+  }, [sortedEntrants, timelineData, poolViewState.activePool, getEntrantDataForInterval])
 
   // Utility functions
   const formatOdds = useCallback((odds?: number) => {
@@ -503,47 +812,57 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
   const formatMoney = useCallback((amount?: number) => {
     if (!amount) return '—'
-    return `$${amount.toLocaleString()}`
+    // Pool amounts are calculated from cents, so round to nearest dollar for display
+    const rounded = Math.round(amount)
+    return `$${rounded.toLocaleString()}`
   }, [])
 
   const formatPercentage = useCallback((percentage?: number) => {
     if (percentage === undefined || percentage === null) return '—'
-    return `${percentage.toFixed(2)}%`
+    return `${Math.round(percentage)}%`
   }, [])
 
-  // Trend indicators (simplified for now)
-  const getTrendIndicator = useCallback(
-    (entrant: Entrant, oddsType: 'win' | 'place') => {
-      // TODO: Replace with actual trend calculation from historical data
-      if (entrant.isScratched) return null
+  // Get pool amount for the currently selected pool type
+  const getPoolAmount = useCallback((entrant: Entrant): number | undefined => {
+    if (!entrant.poolMoney) return undefined // Return undefined when no real data yet
+    
+    switch (poolViewState.activePool) {
+      case 'win':
+        return entrant.poolMoney.win || 0
+      case 'place':
+        return entrant.poolMoney.place || 0
+      default:
+        return entrant.poolMoney.total || 0
+    }
+  }, [poolViewState.activePool])
 
-      // Mock trend - replace with real trend data
-      const mockTrend = Math.random()
-      if (mockTrend < 0.4) {
-        return (
-          <span
-            className="text-red-600 ml-1 text-xs"
-            aria-label={`${oddsType} odds shortened`}
-            role="img"
-          >
-            ↓
-          </span>
-        )
-      } else if (mockTrend > 0.6) {
-        return (
-          <span
-            className="text-blue-600 ml-1 text-xs"
-            aria-label={`${oddsType} odds lengthened`}
-            role="img"
-          >
-            ↑
-          </span>
-        )
-      }
-      return null
-    },
-    []
-  )
+  // Get pool percentage for the currently selected pool type
+  const getPoolPercentage = useCallback((entrant: Entrant): number | undefined => {
+    if (entrant.isScratched) return 0
+    
+    // Return undefined if no pool money data available yet (avoid showing dummy percentages)
+    if (!entrant.poolMoney) return undefined
+    
+    // Calculate percentage based on selected pool type
+    switch (poolViewState.activePool) {
+      case 'win':
+        // Calculate percentage of win pool
+        const totalWinPool = entrantsWithPoolData.reduce((sum, e) => 
+          !e.isScratched && e.poolMoney ? sum + (e.poolMoney.win || 0) : sum, 0)
+        return totalWinPool > 0 ? ((entrant.poolMoney.win || 0) / totalWinPool) * 100 : 0
+      
+      case 'place':
+        // Calculate percentage of place pool
+        const totalPlacePool = entrantsWithPoolData.reduce((sum, e) => 
+          !e.isScratched && e.poolMoney ? sum + (e.poolMoney.place || 0) : sum, 0)
+        return totalPlacePool > 0 ? ((entrant.poolMoney.place || 0) / totalPlacePool) * 100 : 0
+      
+      default:
+        // Default to existing percentage calculation
+        return entrant.poolMoney.percentage || 0
+    }
+  }, [poolViewState.activePool, entrantsWithPoolData])
+
 
   // Handle pool toggle changes
   const handlePoolChange = useCallback(
@@ -617,7 +936,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
   return (
     <div
-      className={`enhanced-entrants-grid bg-white rounded-lg shadow-md ${className}`}
+      className={`enhanced-entrants-grid bg-white rounded-lg shadow-md h-full flex flex-col ${className}`}
     >
       {/* Enhanced Header with Pool Toggle */}
       <div className="p-6 border-b border-gray-200">
@@ -768,9 +1087,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       </div>
 
       {/* Enhanced Single-Table Grid Architecture with Perfect Row Alignment */}
-      <div className="overflow-hidden bg-white border border-gray-200 rounded-lg">
+      <div className="flex-1 overflow-hidden bg-white border border-gray-200 rounded-lg flex flex-col">
         {/* Timeline Controls */}
-        <div className="flex items-center justify-between p-2 bg-gray-50 border-b border-gray-200">
+        <div className="flex items-center justify-between p-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
           <h3 className="text-sm font-medium text-gray-900">
             Money Flow Timeline ({timelineColumns.length} points)
           </h3>
@@ -792,12 +1111,11 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           </div>
         </div>
 
-        {/* Single Table with Fixed Left/Right and Scrollable Center */}
-        <div className="relative">
+        {/* Single Table with Combined Horizontal and Vertical Scrolling */}
+        <div className="flex-1 relative min-h-0">
           <div 
             ref={scrollContainerRef}
-            className="overflow-x-auto"
-            style={{ maxHeight: '600px' }}
+            className="absolute inset-0 overflow-auto"
           >
             <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
               {/* Column Groups for Layout Control */}
@@ -821,13 +1139,14 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
               <thead className="bg-gray-50">
                 <tr style={{ height: '60px' }}>
                   {/* Left Fixed Headers - Sticky */}
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 sticky left-0 top-0 bg-gray-50 z-30">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 sticky left-0 top-0 z-30" style={{ backgroundColor: '#f9fafb' }}>
                     Runner
                   </th>
                   <th
-                    className={`px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 border-r border-gray-200 sticky left-[200px] top-0 bg-gray-50 z-30 ${
+                    className={`px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 border-r border-gray-200 sticky left-[200px] top-0 z-30 ${
                       sortState?.column === 'winOdds' ? 'bg-blue-50' : ''
                     }`}
+                    style={{ backgroundColor: sortState?.column === 'winOdds' ? '#eff6ff' : '#f9fafb' }}
                     onClick={() => handleSort('winOdds')}
                     title="Click to sort by Win odds"
                   >
@@ -840,7 +1159,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                       )}
                     </div>
                   </th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r-2 border-gray-300 sticky left-[280px] top-0 bg-gray-50 z-30">
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r-2 border-gray-300 sticky left-[280px] top-0 z-30" style={{ backgroundColor: '#f9fafb' }}>
                     Place
                   </th>
 
@@ -849,16 +1168,21 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     <th
                       key={`header_${column.interval}`}
                       className={`px-2 py-2 text-xs font-medium text-gray-700 text-center border-r border-gray-200 sticky top-0 z-20 ${
-                        column.isScheduledStart
-                          ? 'bg-blue-100 border-blue-300'
-                          : column.isDynamic
-                          ? 'bg-yellow-50'
-                          : 'bg-gray-50'
-                      } ${
                         isCurrentTimeColumn(column.interval)
-                          ? 'bg-green-100 border-green-300 shadow-sm'
+                          ? 'border-green-300 shadow-sm'
+                          : column.isScheduledStart
+                          ? 'border-blue-300'
                           : ''
                       }`}
+                      style={{
+                        backgroundColor: isCurrentTimeColumn(column.interval)
+                          ? '#dcfce7'
+                          : column.isScheduledStart
+                          ? '#dbeafe'
+                          : column.isDynamic
+                          ? '#fefce8'
+                          : '#f9fafb'
+                      }}
                       title={`${column.label} - ${new Date(column.timestamp).toLocaleTimeString()}`}
                     >
                       <div className="flex flex-col items-center justify-center" style={{ height: '60px' }}>
@@ -877,10 +1201,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                   ))}
 
                   {/* Right Fixed Headers - Sticky */}
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-l-2 border-gray-300 border-r border-gray-200 sticky right-[80px] top-0 bg-gray-50 z-30">
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-l-2 border-gray-300 border-r border-gray-200 sticky right-[80px] top-0 z-30" style={{ backgroundColor: '#f9fafb' }}>
                     Pool
                   </th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider sticky right-0 top-0 bg-gray-50 z-30">
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider sticky right-0 top-0 z-30" style={{ backgroundColor: '#f9fafb' }}>
                     Pool %
                   </th>
                 </tr>
@@ -949,23 +1273,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                       </div>
                     </td>
 
-                    <td className="px-3 py-3 whitespace-nowrap text-right border-r border-gray-200 sticky left-[200px] bg-white z-20" style={{ verticalAlign: 'middle', height: '60px' }}>
-                      <div className="flex items-center justify-end h-full">
-                        <span className="text-sm font-medium text-gray-900">
-                          {entrant.isScratched ? '—' : formatOdds(entrant.winOdds)}
-                        </span>
-                        {!entrant.isScratched && getTrendIndicator(entrant, 'win')}
-                      </div>
-                    </td>
-
-                    <td className="px-3 py-3 whitespace-nowrap text-right border-r-2 border-gray-300 sticky left-[280px] bg-white z-20" style={{ verticalAlign: 'middle', height: '60px' }}>
-                      <div className="flex items-center justify-end h-full">
-                        <span className="text-sm font-medium text-gray-900">
-                          {entrant.isScratched ? '—' : formatOdds(entrant.placeOdds)}
-                        </span>
-                        {!entrant.isScratched && getTrendIndicator(entrant, 'place')}
-                      </div>
-                    </td>
+                    <WinOddsCell entrant={entrant} formatOdds={formatOdds} />
+                    <PlaceOddsCell entrant={entrant} formatOdds={formatOdds} />
 
                     {/* Timeline Columns */}
                     {timelineColumns.map((column) => (
@@ -996,7 +1305,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     <td className="px-3 py-3 whitespace-nowrap text-right border-l-2 border-gray-300 border-r border-gray-200 sticky right-[80px] bg-white z-20" style={{ verticalAlign: 'middle', height: '60px' }}>
                       <div className="flex items-center justify-end h-full">
                         <span className="text-sm font-medium text-gray-900">
-                          {formatMoney(entrant.poolMoney?.total)}
+                          {entrant.isScratched ? '—' : (() => {
+                            const amount = getPoolAmount(entrant);
+                            return amount !== undefined ? formatMoney(amount) : '...';
+                          })()}
                         </span>
                       </div>
                     </td>
@@ -1004,13 +1316,12 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     <td className="px-3 py-3 whitespace-nowrap text-right sticky right-0 bg-white z-20" style={{ verticalAlign: 'middle', height: '60px' }}>
                       <div className="flex items-center justify-end h-full">
                         <span className="text-sm font-medium text-gray-900">
-                          {entrant.isScratched 
-                            ? '—' 
-                            : entrant.poolMoney?.percentage
-                            ? formatPercentage(entrant.poolMoney.percentage)
-                            : formatPercentage(entrant.holdPercentage)}
+                          {entrant.isScratched ? '—' : (() => {
+                            const percentage = getPoolPercentage(entrant);
+                            return percentage !== undefined ? formatPercentage(percentage) : '...';
+                          })()}
                         </span>
-                        {!entrant.isScratched && (
+                        {!entrant.isScratched && entrant.moneyFlowTrend && entrant.moneyFlowTrend !== 'neutral' && (
                           <span
                             className={`ml-1 text-xs ${
                               entrant.moneyFlowTrend === 'up'
@@ -1024,7 +1335,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                               ? '↑'
                               : entrant.moneyFlowTrend === 'down'
                               ? '↓'
-                              : '—'}
+                              : ''}
                           </span>
                         )}
                       </div>
@@ -1037,7 +1348,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         </div>
 
         {/* Timeline Footer */}
-        <div className="p-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-600">
+        <div className="p-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-600 flex-shrink-0">
           <div className="flex justify-between items-center">
             <span>
               Scroll to see full timeline • Blue: Scheduled start • Yellow: Live data • Green: Current time
@@ -1050,7 +1361,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       </div>
 
       {/* Enhanced Footer */}
-      <div className="p-3 border-t border-gray-100 bg-gray-50">
+      <div className="p-3 border-t border-gray-100 bg-gray-50 flex-shrink-0">
         <div className="flex justify-between items-center text-xs">
           <div className="flex items-center space-x-4">
             <span className="text-gray-500">

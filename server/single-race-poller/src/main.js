@@ -1,6 +1,6 @@
 import { Client, Databases } from 'node-appwrite'
 import { fetchRaceEventData } from './api-client.js'
-import { processEntrants, processMoneyTrackerData } from './database-utils.js'
+import { processEntrants, processMoneyTrackerData, processToteTrendsData } from './database-utils.js'
 import {
   validateEnvironmentVariables,
   executeApiCallWithTimeout,
@@ -135,14 +135,31 @@ export default async function main(context) {
               const currentRace = await databases.getDocument(databaseId, 'races', raceId);
               
               if (currentRace.status !== raceEventData.race.status) {
-                await databases.updateDocument(databaseId, 'races', raceId, {
-                  status: raceEventData.race.status
-                });
+                const statusChangeTimestamp = new Date().toISOString();
+                const updateData = {
+                  status: raceEventData.race.status,
+                  lastStatusChange: statusChangeTimestamp
+                };
+                
+                // Add specific finalization timestamp for Final status
+                if (raceEventData.race.status === 'Final' || raceEventData.race.status === 'Finalized') {
+                  updateData.finalizedAt = statusChangeTimestamp;
+                }
+                
+                // Add specific abandonment timestamp for Abandoned status
+                if (raceEventData.race.status === 'Abandoned') {
+                  updateData.abandonedAt = statusChangeTimestamp;
+                }
+                
+                await databases.updateDocument(databaseId, 'races', raceId, updateData);
                 raceStatusUpdated = true;
-                context.log(`Updated race status`, { 
+                context.log(`Updated race status with timestamp`, { 
                   raceId, 
                   oldStatus: currentRace.status, 
-                  newStatus: raceEventData.race.status 
+                  newStatus: raceEventData.race.status,
+                  statusChangeTimestamp,
+                  finalizedAt: updateData.finalizedAt,
+                  abandonedAt: updateData.abandonedAt
                 });
               }
             } catch (error) {
@@ -153,7 +170,43 @@ export default async function main(context) {
             }
           }
           
-          // Process both entrants and money flow in parallel
+          // Process tote pools data FIRST to get pool totals for money flow calculations
+          let racePoolData = null;
+          if (raceEventData.tote_pools && Array.isArray(raceEventData.tote_pools)) {
+            try {
+              // Process the tote_pools array from NZTAB API
+              await processToteTrendsData(databases, databaseId, raceId, raceEventData.tote_pools, context);
+              
+              // Extract pool data for money flow processing using new structure
+              racePoolData = { winPoolTotal: 0, placePoolTotal: 0, totalRacePool: 0 };
+              
+              raceEventData.tote_pools.forEach(pool => {
+                const total = pool.total || 0;
+                racePoolData.totalRacePool += total;
+                
+                switch(pool.product_type) {
+                  case "Win":
+                    racePoolData.winPoolTotal = total;
+                    break;
+                  case "Place":
+                    racePoolData.placePoolTotal = total;
+                    break;
+                }
+              });
+              
+              context.log(`Processed tote pools data for race ${raceId}`, {
+                poolsCount: raceEventData.tote_pools.length,
+                racePoolData,
+              });
+            } catch (error) {
+              context.error('Failed to process tote trends data', {
+                raceId,
+                error: error instanceof Error ? error.message : 'Unknown error'
+              });
+            }
+          }
+          
+          // Process entrants and money flow with pool data in parallel
           const processingPromises = []
           
           // Update entrant data if available
@@ -164,12 +217,29 @@ export default async function main(context) {
             )
           }
           
-          // Process money tracker data if available
+          // Process money tracker data with pool data if available (with race status filtering)
           if (raceEventData.money_tracker) {
+            context.log('Found money_tracker data in API response', {
+              raceId,
+              hasEntrants: !!(raceEventData.money_tracker.entrants),
+              entrantCount: raceEventData.money_tracker.entrants ? raceEventData.money_tracker.entrants.length : 0
+            });
+            const raceStatus = raceEventData.race && raceEventData.race.status ? raceEventData.race.status : null;
             processingPromises.push(
-              processMoneyTrackerData(databases, databaseId, raceEventData.money_tracker, context)
-                .then(count => { moneyFlowProcessed = count })
+              processMoneyTrackerData(databases, databaseId, raceEventData.money_tracker, context, raceId, racePoolData, raceStatus)
+                .then(count => { 
+                  moneyFlowProcessed = count;
+                  context.log('Money tracker processing completed', { raceId, moneyFlowProcessed });
+                })
+                .catch(error => {
+                  context.error('Money tracker processing failed', {
+                    raceId,
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                  });
+                })
             )
+          } else {
+            context.log('No money_tracker data found in API response', { raceId });
           }
           
           // Wait for all processing to complete

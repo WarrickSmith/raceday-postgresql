@@ -117,7 +117,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({}: RaceDataHeaderPro
   
   if (!raceData) {
     return (
-      <header className="bg-white rounded-lg shadow-md p-6 mb-6" role="banner">
+      <header className="bg-white rounded-lg shadow-md p-6" role="banner">
         <div className="animate-pulse">
           <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
           <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
@@ -130,7 +130,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({}: RaceDataHeaderPro
   const { race, meeting } = raceData;
 
   return (
-    <header className="bg-white rounded-lg shadow-md p-6 mb-6" role="banner">
+    <header className="bg-white rounded-lg shadow-md p-6" role="banner">
       {/* Screen reader announcement for race updates */}
       <div 
         aria-live="assertive" 

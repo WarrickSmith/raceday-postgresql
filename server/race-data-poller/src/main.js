@@ -1,6 +1,6 @@
 import { Client, Databases, Query } from 'node-appwrite'
 import { fetchRaceEventData } from './api-client.js'
-import { processEntrants, processMoneyTrackerData } from './database-utils.js'
+import { processEntrants, processMoneyTrackerData, processToteTrendsData } from './database-utils.js'
 import {
   validateEnvironmentVariables,
   executeApiCallWithTimeout,
@@ -107,6 +107,48 @@ export default async function main(context) {
           }
         }
 
+        // Process tote pools data FIRST to get pool totals for money flow calculations
+        let racePoolData = null;
+        if (raceEventData.tote_pools && Array.isArray(raceEventData.tote_pools)) {
+          try {
+            // Process the tote_pools array from NZTAB API
+            await processToteTrendsData(
+              databases,
+              databaseId,
+              race.raceId,
+              raceEventData.tote_pools,
+              context
+            );
+            
+            // Extract pool data for money flow processing using new structure
+            racePoolData = { winPoolTotal: 0, placePoolTotal: 0, totalRacePool: 0 };
+            
+            raceEventData.tote_pools.forEach(pool => {
+              const total = pool.total || 0;
+              racePoolData.totalRacePool += total;
+              
+              switch(pool.product_type) {
+                case "Win":
+                  racePoolData.winPoolTotal = total;
+                  break;
+                case "Place":
+                  racePoolData.placePoolTotal = total;
+                  break;
+              }
+            });
+            
+            context.log(`Processed tote pools data for race ${race.raceId}`, {
+              poolsCount: raceEventData.tote_pools.length,
+              racePoolData,
+            });
+          } catch (error) {
+            context.error('Failed to process tote trends data', {
+              raceId: race.raceId,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+          }
+        }
+
         // Update entrant data if available
         if (raceEventData.entrants && raceEventData.entrants.length > 0) {
           const entrantsUpdated = await processEntrants(
@@ -119,16 +161,22 @@ export default async function main(context) {
           updatesProcessed += entrantsUpdated
         }
 
-        // Process money tracker data if available
+        // Process money tracker data with pool data if available (with race status filtering)
         if (raceEventData.money_tracker) {
+          const raceStatus = raceEventData.race && raceEventData.race.status ? raceEventData.race.status : race.status;
           const moneyFlowProcessed = await processMoneyTrackerData(
             databases,
             databaseId,
             raceEventData.money_tracker,
-            context
+            context,
+            race.raceId,
+            racePoolData,
+            raceStatus
           )
           context.log(`Processed money tracker data for race ${race.raceId}`, {
             entrantsProcessed: moneyFlowProcessed,
+            racePoolDataAvailable: !!racePoolData,
+            raceStatus: raceStatus
           })
         }
 
