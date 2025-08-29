@@ -124,6 +124,11 @@ Three independent Appwrite functions handle different polling scenarios:
 - **Dependencies**: Each function includes full node_modules
 - **Environment**: Individual .env configuration per function
 - **Benefits**: Independent deployment, isolated failures, scalable execution
+  **Implementation note:** All Appwrite-based server functions must import and use the Appwrite SDK's Query helpers (for example: `Query.equal`, `Query.greaterThan`, `Query.orderAsc`). Omitting the `Query` import will cause runtime failures in listDocuments queries and lead to fallback behaviour where every record is treated as a baseline. Ensure each function module imports Query alongside other Appwrite helpers, e.g.:
+
+```javascript
+import { ID, Query } from 'node-appwrite'
+```
 
 ### Polling Strategy
 
@@ -202,6 +207,11 @@ const previousQuery = await databases.listDocuments(
     Query.equal('raceId', raceId),
     Query.equal('type', 'bucketed_aggregation'),
     Query.greaterThan('timeInterval', currentInterval),
+Robust previous-bucket lookup algorithm:
+1. Query for the nearest previous bucket where timeInterval > currentInterval, ordered ascending, limit 1 (this should return the chronologically closest previous bucket).
+2. If no immediate previous bucket is found, query for any prior bucket with non-zero pool data (e.g., Query.notEqual('winPoolAmount', 0)) ordered ascending, limit 1 — this handles gaps where one or more intermediate bucket writes were missed.
+3. If still no previous bucket is found, apply the documented fallback policy (baseline vs non-first behavior).
+Log concise status information for these steps (match counts and interval IDs). Avoid dumping full document arrays into production logs; reserve full dumps for debug mode only.
     Query.orderAsc('timeInterval'),
     Query.limit(1),
   ]
@@ -223,6 +233,11 @@ incrementalPlaceAmount = currentPlaceAmount - (prevDoc.placePoolAmount || 0)
 **Result**: Final bucket shows increment from 55m to most recent poll in 50m period
 
 ### 3.5 Expected Data Consistency
+
+Fallback policy when previous bucket is unavailable:
+
+- If the timeInterval corresponds to a first/baseline bucket (e.g. 60 or 55): treat the record as baseline and set the increment equal to the current pool total (incrementalWinAmount = winPoolAmount, incrementalPlaceAmount = placePoolAmount).
+- If the timeInterval is a non-first bucket and no previous bucket is found: store incrementalWinAmount and incrementalPlaceAmount as explicit 0 (not null). This makes the server’s intent unambiguous and allows the client to display '—' for no change while preserving arithmetic correctness in timeline sums.
 
 - **No negative increments**: Pool amounts only increase
 - **Sum validation**: All entrant increments = total pool growth
@@ -321,6 +336,15 @@ incrementalPlaceAmount = currentPlaceAmount - (prevDoc.placePoolAmount || 0)
 
 ### 4.3 Expected Storage Results
 
+Client contract for incremental fields and display:
+
+- Server provides `incrementalWinAmount`, `incrementalPlaceAmount`, and/or `incrementalAmount` (stored in cents). The client should:
+
+  - Prefer pool-specific incremental fields (incrementalWinAmount / incrementalPlaceAmount) when present.
+  - Fall back to `incrementalAmount` or `0` when pool-specific fields are absent.
+  - Treat `0` as "no change" and render an em-dash (—) in timeline cells.
+  - Log or flag negative incremental values for investigation (these are unusual and indicate potential data issues).
+
 - **3 document types per polling cycle**: hold, bet, bucketed_aggregation
 - **Document volume**: ~50-100 documents per race (17 intervals × 3 types × variable entrants)
 - **Storage growth**: Linear with number of races and polling frequency
@@ -401,6 +425,10 @@ const timelineColumns = [...preStartColumns, ...postStartColumns]
 ### 6.1 Open Status
 
 - **Polling**: Active at determined intervals
+  Logging guidance:
+- Use concise status logs for bucket lookups (e.g., "previous-bucket matched", "previous-bucket not found", with entrantId and timeInterval).
+- Avoid dumping full document arrays to production logs — reserve document-level dumps for debug mode only.
+- Log negative incremental values (if any) as warnings along with entrantId and interval to enable investigation.
 - **Data Collection**: All document types created
 - **Client Updates**: Live subscription active
 - **Display**: Current active column highlighted
@@ -457,6 +485,13 @@ npm run deploy:master-scheduler  # Deploy master-race-scheduler function
 ```
 
 #### Local Testing Commands
+
+Post-deploy validation checklist:
+
+- Poll a race repeatedly across multiple intervals and verify that the sum of entrant incremental amounts for an interval equals the total pool growth for that interval (Σ(entrant_increments) == current_pool_total - previous_pool_total).
+- Confirm stable pools produce zero incremental amounts for subsequent non-first buckets (incrementalWinAmount/incrementalPlaceAmount === 0).
+- Confirm client displays '—' for zero increments and '+$N' for positive increments.
+- If any negative increments are detected, log them and investigate whether they are due to pool corrections or data inconsistencies.
 
 ```bash
 npm run meetings               # Run daily-meetings locally
