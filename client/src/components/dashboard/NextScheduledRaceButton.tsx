@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Meeting, Race } from '@/types/meetings';
+import { client } from '@/lib/appwrite-client';
 
 interface NextScheduledRaceButtonProps {
   meetings: Meeting[];
@@ -20,31 +21,146 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [nextScheduledRace, setNextScheduledRace] = useState<NextScheduledRace | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch the next scheduled race from the API
-  useEffect(() => {
-    const fetchNextScheduledRace = async () => {
-      try {
-        const response = await fetch('/api/next-scheduled-race');
-        if (response.ok) {
-          const data = await response.json();
-          setNextScheduledRace(data.nextScheduledRace);
-        } else {
-          setNextScheduledRace(null);
-        }
-      } catch (error) {
-        console.error('Failed to fetch next scheduled race:', error);
+  const fetchNextScheduledRace = useCallback(async () => {
+    try {
+      const response = await fetch('/api/next-scheduled-race');
+      if (response.ok) {
+        const data = await response.json();
+        setNextScheduledRace(data.nextScheduledRace);
+      } else {
         setNextScheduledRace(null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch next scheduled race:', error);
+      setNextScheduledRace(null);
+    }
+  }, []);
+
+  // Setup intelligent polling based on race timing
+  const setupIntelligentPolling = useCallback(() => {
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    let pollInterval = 60000; // Default 1 minute
+    
+    if (nextScheduledRace) {
+      const now = new Date();
+      const raceTime = new Date(nextScheduledRace.startTime);
+      const minutesUntilRace = (raceTime.getTime() - now.getTime()) / (1000 * 60);
+      
+      // Increase polling frequency as race approaches
+      if (minutesUntilRace <= 1) {
+        pollInterval = 10000; // 10 seconds when race is within 1 minute
+      } else if (minutesUntilRace <= 5) {
+        pollInterval = 30000; // 30 seconds when race is within 5 minutes
+      } else if (minutesUntilRace <= 15) {
+        pollInterval = 60000; // 1 minute when race is within 15 minutes
+      }
+    }
+
+    fetchTimeoutRef.current = setTimeout(() => {
+      fetchNextScheduledRace().then(() => {
+        setupIntelligentPolling(); // Schedule next poll
+      });
+    }, pollInterval);
+  }, [nextScheduledRace, fetchNextScheduledRace]);
+
+  // Setup real-time subscriptions for race status changes
+  useEffect(() => {
+    const setupSubscriptions = async () => {
+      try {
+        // Clean up existing subscription
+        if (unsubscribeRef.current) {
+          unsubscribeRef.current();
+        }
+
+        const unsubscribe = client.subscribe([
+          'databases.raceday-db.collections.races.documents'
+        ], async (response) => {
+          try {
+            const { events, payload } = response;
+            
+            // Handle race status changes that might affect next scheduled race
+            if (events.some(e => e.includes('races.documents'))) {
+              const race = payload as Race;
+              
+              // If this race status changed to Started, Abandoned, or Finalized,
+              // or if it's a new race, refresh the next scheduled race
+              if (events.some(e => e.includes('.update') || e.includes('.create'))) {
+                if (race.status === 'Running' || race.status === 'Abandoned' || 
+                    race.status === 'Final' || race.status === 'Interim') {
+                  // Small delay to allow database to settle
+                  setTimeout(fetchNextScheduledRace, 1000);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error processing race status update:', error);
+          }
+        });
+
+        unsubscribeRef.current = unsubscribe;
+        setIsConnected(true);
+      } catch (error) {
+        console.error('Failed to setup race subscriptions:', error);
+        setIsConnected(false);
       }
     };
 
-    fetchNextScheduledRace();
-    
-    // Refresh every minute to keep the data current
-    const interval = setInterval(fetchNextScheduledRace, 60000);
-    
-    return () => clearInterval(interval);
+    // Initial fetch and setup
+    fetchNextScheduledRace().then(() => {
+      setupSubscriptions();
+      setupIntelligentPolling();
+    });
+
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
   }, []);
+
+  // Update polling when race changes
+  useEffect(() => {
+    setupIntelligentPolling();
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
+  }, [setupIntelligentPolling]);
+
+  // Handle real-time countdown updates and race transitions
+  useEffect(() => {
+    if (!nextScheduledRace) return;
+
+    const updateInterval = setInterval(() => {
+      const now = new Date();
+      const raceTime = new Date(nextScheduledRace.startTime);
+      const diff = raceTime.getTime() - now.getTime();
+      
+      // If race has started (passed start time), fetch updated next race
+      if (diff <= 0) {
+        console.log('🏁 Race has started, fetching next scheduled race');
+        fetchNextScheduledRace();
+        return;
+      }
+      
+      // Force re-render to update countdown display
+      // This is handled by the state update in getTimeUntilRace
+    }, 1000); // Update every second for countdown
+
+    return () => clearInterval(updateInterval);
+  }, [nextScheduledRace, fetchNextScheduledRace]);
 
   // Handle navigation to next scheduled race
   const handleNavigateToNextRace = useCallback(async () => {
@@ -73,11 +189,61 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
     });
   };
 
+  // Calculate time until race for dynamic display
+  const getTimeUntilRace = (raceTime: string) => {
+    const now = new Date();
+    const race = new Date(raceTime);
+    const diff = race.getTime() - now.getTime();
+    
+    if (diff <= 0) return 'Starting now';
+    
+    const totalMinutes = Math.floor(diff / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    
+    if (totalMinutes < 1) {
+      return `${seconds}s`;
+    } else if (totalMinutes < 60) {
+      return `${totalMinutes}m`;
+    } else {
+      const hours = Math.floor(totalMinutes / 60);
+      const remainingMinutes = totalMinutes % 60;
+      return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+    }
+  };
+
+  // Handle edge cases for race status
+  const getRaceStatusIndicator = () => {
+    if (!nextScheduledRace) return null;
+    
+    const now = new Date();
+    const raceTime = new Date(nextScheduledRace.startTime);
+    const diff = raceTime.getTime() - now.getTime();
+    
+    if (diff <= 0) {
+      return (
+        <span className="text-xs font-medium text-yellow-200 animate-pulse">
+          • Starting
+        </span>
+      );
+    }
+    
+    const minutes = Math.floor(diff / (1000 * 60));
+    if (minutes <= 5) {
+      return (
+        <span className="text-xs font-medium text-green-200">
+          • Soon
+        </span>
+      );
+    }
+    
+    return null;
+  };
+
   return (
     <button
       onClick={handleNavigateToNextRace}
       disabled={isDisabled}
-      className={`inline-flex items-center gap-3 px-6 py-3 text-base font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200 ease-in-out shadow-md whitespace-nowrap ${
+      className={`inline-flex items-center gap-3 px-6 py-3 text-base font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200 ease-in-out shadow-md ${
         isDisabled
           ? 'text-gray-400 bg-gray-50 border border-gray-200 cursor-not-allowed shadow-none'
           : 'text-white bg-blue-600 border border-blue-700 hover:bg-blue-700 focus:ring-blue-500 hover:shadow-lg transform hover:scale-105'
@@ -88,25 +254,37 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
           : 'No upcoming races available'
       }
     >
-      <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
+      <div className="relative">
+        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        {/* Real-time connection indicator */}
+        {!isDisabled && (
+          <div className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${
+            isConnected ? 'bg-green-400' : 'bg-red-400'
+          }`} title={isConnected ? 'Real-time connected' : 'Offline mode'} />
+        )}
+      </div>
       
       {nextScheduledRace ? (
-        <div className="flex flex-col items-start min-w-0">
-          {/* Top row: Next Race text, time, and meeting name */}
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col items-start">
+          {/* Top row: Next Race text, countdown, time, and meeting name - all on one line */}
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold">Next Race</span>
             <span className={`text-sm font-medium ${isDisabled ? 'text-gray-400' : 'text-blue-100'}`}>
-              {formatTime(nextScheduledRace.startTime)}
+              in {getTimeUntilRace(nextScheduledRace.startTime)}
+            </span>
+            {getRaceStatusIndicator()}
+            <span className={`text-xs font-normal ${isDisabled ? 'text-gray-400' : 'text-blue-200'}`}>
+              @ {formatTime(nextScheduledRace.startTime)}
             </span>
             <span className={`text-sm font-normal ${isDisabled ? 'text-gray-400' : 'text-blue-100'}`}>
-              @ {nextScheduledRace.meetingName}
+              in {nextScheduledRace.meetingName}
             </span>
           </div>
-          {/* Bottom row: Race number and name */}
+          {/* Race details row */}
           <span className={`text-sm font-normal leading-tight ${isDisabled ? 'text-gray-400' : 'text-blue-100'}`}>
-            Race {nextScheduledRace.raceNumber} - {nextScheduledRace.name}
+            R{nextScheduledRace.raceNumber} - {nextScheduledRace.name}
           </span>
         </div>
       ) : (
