@@ -169,6 +169,33 @@
       ]
     },
     {
+      "$id": "meeting-status-poller",
+      "name": "Meeting Status Poller",
+      "runtime": "node-22",
+      "specification": "s-1vcpu-1gb",
+      "path": "meeting-status-poller",
+      "execute": ["any"],
+      "events": [],
+      "schedule": "",
+      "timeout": 300,
+      "enabled": true,
+      "logging": true,
+      "entrypoint": "src/main.js",
+      "commands": "npm install",
+      "scopes": [
+        "databases.read",
+        "databases.write",
+        "collections.read",
+        "collections.write",
+        "attributes.read",
+        "attributes.write",
+        "indexes.read",
+        "indexes.write",
+        "documents.read",
+        "documents.write"
+      ]
+    },
+    {
       "$id": "master-race-scheduler",
       "name": "Master Race Scheduler",
       "runtime": "node-22",
@@ -192,7 +219,11 @@
         "indexes.read",
         "indexes.write",
         "documents.read",
-        "documents.write"
+        "documents.write",
+        "functions.read",
+        "functions.write",
+        "execution.read",
+        "execution.write"
       ]
     }
   ]
