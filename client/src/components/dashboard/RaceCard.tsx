@@ -232,14 +232,37 @@ function RaceCardComponent({ race, onClick }: RaceCardProps) {
         </div>
       </div>
       
-      <div className="flex items-center justify-between text-xs text-gray-500">
-        <span className="truncate">
-          ID: {race.raceId}
-        </span>
+      <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 min-w-0 flex-1">
+          {race.distance && (
+            <span className="flex items-center">
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+              {race.distance}m
+            </span>
+          )}
+          {race.runnerCount && (
+            <span className="flex items-center">
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              {race.runnerCount} runners
+            </span>
+          )}
+          {race.trackCondition && (
+            <span className="flex items-center">
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.002 4.002 0 003 15z" />
+              </svg>
+              Track: {race.trackCondition}
+            </span>
+          )}
+        </div>
         
         <time 
           dateTime={race.startTime}
-          className="font-medium text-gray-700 ml-2"
+          className="font-medium text-gray-700 ml-3 flex-shrink-0"
           aria-label={`Race starts at ${formatTime(race.startTime)}`}
         >
           {formatTime(race.startTime)}

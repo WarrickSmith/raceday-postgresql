@@ -16,6 +16,8 @@ export interface Meeting {
   category: SupportedRaceTypeCode; // Race type code: H or T (currently supported)
   date: string;
   firstRaceTime?: string;
+  weather?: string;  // Weather conditions (e.g. "Fine", "Overcast")
+  trackCondition?: string;  // Track condition (e.g. "Good 3", "Heavy 8")
 }
 
 export interface Race {
@@ -32,6 +34,7 @@ export interface Race {
   status: string;
   distance?: number;  // Race distance in metres
   trackCondition?: string;  // Track condition (e.g. "Good 3", "Heavy 8")
+  runnerCount?: number;  // Number of runners in the race
 }
 
 export interface MeetingWithRaces extends Meeting {
