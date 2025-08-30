@@ -58,10 +58,11 @@ describe('MeetingsListClient', () => {
   it('should render meetings list with connection status', () => {
     render(<MeetingsListClient initialData={mockMeetings} />);
 
-    expect(screen.getByText("Today's Race Meetings")).toBeInTheDocument();
+    expect(screen.getByText("Today's Meetings")).toBeInTheDocument();
     expect(screen.getByLabelText('Connected')).toBeInTheDocument();
-    expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
-    expect(screen.getByText('Addington Harness')).toBeInTheDocument();
+    // Meetings appear in both meeting cards and race cards, so expect multiple instances
+    expect(screen.getAllByText('Flemington Race Meeting').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Addington Harness').length).toBeGreaterThan(0);
   });
 
   it('should show disconnected status when not connected', () => {
@@ -135,7 +136,8 @@ describe('MeetingsListClient', () => {
   it('should display correct meeting count', () => {
     render(<MeetingsListClient initialData={mockMeetings} />);
 
-    expect(screen.getByText('Showing 2 meetings for today')).toBeInTheDocument();
+    // The count text might be split across elements, so use a more flexible matcher
+    expect(screen.getByText(/2.*meeting.*available/)).toBeInTheDocument();
   });
 
   it('should display singular meeting count correctly', () => {
@@ -149,7 +151,8 @@ describe('MeetingsListClient', () => {
 
     render(<MeetingsListClient initialData={singleMeeting} />);
 
-    expect(screen.getByText('Showing 1 meeting for today')).toBeInTheDocument();
+    // Use flexible matcher for singular meeting text
+    expect(screen.getByText(/1.*meeting.*available/)).toBeInTheDocument();
   });
 
   it('should have proper accessibility attributes', () => {
@@ -191,15 +194,11 @@ describe('MeetingsListClient', () => {
     rerender(<MeetingsListClient initialData={mockMeetings} />);
 
     expect(screen.getByText('New Meeting')).toBeInTheDocument();
-    expect(screen.getByText('Showing 3 meetings for today')).toBeInTheDocument();
+    expect(screen.getByText(/3.*meeting.*available/)).toBeInTheDocument();
   });
 
   it('should handle race navigation correctly', async () => {
     render(<MeetingsListClient initialData={mockMeetings} />);
-
-    // Find and expand a meeting to show races (this would trigger RacesList to render)
-    const expandButton = screen.getAllByLabelText(/Expand to show races/)[0];
-    fireEvent.click(expandButton);
 
     // Wait for component to render properly
     await waitFor(() => {
@@ -208,8 +207,11 @@ describe('MeetingsListClient', () => {
       expect(list).toBeInTheDocument(); 
     });
 
-    // Since we can't easily trigger the actual race click without mocking RacesList,
-    // we verify the component renders correctly with navigation setup
+    // Verify that meetings are rendered and navigation setup exists
+    expect(screen.getAllByText('Flemington Race Meeting').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Addington Harness').length).toBeGreaterThan(0);
+    
+    // Since expansion was removed, we just verify no navigation has occurred yet
     expect(mockPush).not.toHaveBeenCalled(); // No navigation yet, as expected
   });
 });
