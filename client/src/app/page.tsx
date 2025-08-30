@@ -21,18 +21,18 @@ async function MeetingsServerComponent() {
 
 export default function Dashboard() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-100">
       <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">
             Race Day Dashboard
           </h1>
           <p className="mt-2 text-gray-600">
-            Today&apos;s race meetings in chronological order
+            Today&apos;s race meetings and races
           </p>
         </header>
 
-        <main>
+        <main className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8 h-[calc(100vh-12rem)] min-h-[600px]">
           <Suspense fallback={<MeetingsListSkeleton />}>
             <MeetingsServerComponent />
           </Suspense>
