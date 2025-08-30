@@ -129,7 +129,10 @@ export interface Entrant {
   jockey?: string;
   trainerName?: string;
   weight?: number;
-  silkUrl?: string;
+  silkUrl?: string; // Legacy field - may not be populated
+  silkColours?: string; // Silk color description from NZ TAB
+  silkUrl64?: string; // 64x64 silk image URL from NZ TAB
+  silkUrl128?: string; // 128x128 silk image URL from NZ TAB
   isScratched: boolean;
   race: string;  // Race ID this entrant belongs to
   winOdds?: number;  // Current win odds
