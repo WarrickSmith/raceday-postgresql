@@ -74,7 +74,7 @@ describe('MeetingCard Integration Tests', () => {
       races: [],
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
   });
 
@@ -83,7 +83,7 @@ describe('MeetingCard Integration Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<MeetingCard meeting={mockMeeting} />);
@@ -106,7 +106,7 @@ describe('MeetingCard Integration Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     const { rerender } = render(<MeetingCard meeting={mockMeeting} />);
@@ -129,7 +129,7 @@ describe('MeetingCard Integration Tests', () => {
       races: updatedRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     rerender(<MeetingCard meeting={mockMeeting} />);
@@ -147,7 +147,7 @@ describe('MeetingCard Integration Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     // Expand the meeting
@@ -181,7 +181,7 @@ describe('MeetingCard Integration Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     const expandButton = screen.getByRole('button', { name: /expand to show races/i });
@@ -209,7 +209,7 @@ describe('MeetingCard Integration Tests', () => {
       races: [...mockRaces, newRace],
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     // Force re-render to simulate real-time race addition
@@ -229,7 +229,7 @@ describe('MeetingCard Integration Tests', () => {
       races: [],
       isLoading: true,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<MeetingCard meeting={mockMeeting} />);
@@ -250,7 +250,7 @@ describe('MeetingCard Integration Tests', () => {
       races: [],
       isLoading: false,
       error: 'Failed to fetch races',
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<MeetingCard meeting={mockMeeting} />);
@@ -285,7 +285,7 @@ describe('MeetingCard Integration Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<MeetingCard meeting={mockMeeting} />);

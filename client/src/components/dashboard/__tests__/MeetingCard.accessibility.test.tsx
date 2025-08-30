@@ -108,7 +108,7 @@ describe('MeetingCard Accessibility Tests', () => {
       races: [],
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
   });
 
@@ -124,7 +124,7 @@ describe('MeetingCard Accessibility Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     const { container } = render(<MeetingCard meeting={mockMeeting} />);
@@ -187,7 +187,7 @@ describe('MeetingCard Accessibility Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<MeetingCard meeting={mockMeeting} />);
@@ -209,7 +209,7 @@ describe('MeetingCard Accessibility Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<MeetingCard meeting={mockMeeting} />);
@@ -236,7 +236,7 @@ describe('MeetingCard Accessibility Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<MeetingCard meeting={mockMeeting} />);
@@ -264,7 +264,7 @@ describe('MeetingCard Accessibility Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<MeetingCard meeting={mockMeeting} />);
@@ -314,7 +314,7 @@ describe('MeetingCard Accessibility Tests', () => {
       races: [],
       isLoading: true,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<MeetingCard meeting={mockMeeting} />);
@@ -350,7 +350,7 @@ describe('MeetingCard Accessibility Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<MeetingCard meeting={mockMeeting} />);

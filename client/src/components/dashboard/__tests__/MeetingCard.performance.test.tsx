@@ -91,7 +91,7 @@ describe('MeetingCard Performance Tests', () => {
       races: [],
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
   });
 
@@ -101,7 +101,7 @@ describe('MeetingCard Performance Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<MeetingCard meeting={mockMeeting} />);
@@ -137,7 +137,7 @@ describe('MeetingCard Performance Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<MeetingCard meeting={mockMeeting} />);
@@ -198,7 +198,7 @@ describe('MeetingCard Performance Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<MeetingCard meeting={mockMeeting} />);
@@ -235,7 +235,7 @@ describe('MeetingCard Performance Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
     
     const expandButton = screen.getByRole('button', { name: /expand to show races/i });
@@ -260,7 +260,7 @@ describe('MeetingCard Performance Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     // Render multiple meeting cards
@@ -312,7 +312,7 @@ describe('MeetingCard Performance Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<MeetingCard meeting={mockMeeting} />);
@@ -340,7 +340,7 @@ describe('MeetingCard Performance Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     const { rerender } = render(<MeetingCard meeting={mockMeeting} />);
@@ -380,7 +380,7 @@ describe('MeetingCard Performance Tests', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     const expandButton = screen.getByRole('button', { name: /expand to show races/i });
