@@ -9,9 +9,9 @@
 This document organizes user feedback into actionable development tasks, referencing established coding standards, UI/UX specifications, and architectural patterns. Each task includes relevant project resources for investigation and implementation.
 
 ### Status Summary
-- ✅ **COMPLETED**: 4 tasks
+- ✅ **COMPLETED**: 5 tasks
 - ⏳ **PENDING**: 5 tasks
-- **Total**: 9 tasks
+- **Total**: 10 tasks
 
 ---
 
@@ -157,10 +157,53 @@ The "Next Race" button currently only updates when the page is refreshed or relo
 
 ---
 
+### Task 5: Ensure Real-time Meeting and Race Status Subscriptions
+**Status:** ⏳ **PENDING**  
+**Priority:** High  
+**Complexity:** High
+
+**Problem Description:**  
+Race delays and meeting changes can have cascading effects on subsequent races and other meetings due to TV broadcast scheduling. The meetings page needs robust real-time subscriptions for meeting start times, race start times, meeting status, and race status to ensure users see accurate, live-updated information when events change.
+
+**Requirements:**
+- Review and ensure meeting start time (first race) is subscribed for live updates
+- Verify race start times for displayed races are real-time subscribed
+- Confirm meeting status changes are properly subscribed and displayed
+- Ensure race status changes are reflected in real-time on meetings page
+- Assess backend polling frequency for meeting and race data changes
+- Evaluate if daily-meetings function should be called more frequently (every 15 minutes) from master-scheduler
+- Optimize API polling efficiency while maintaining data freshness
+
+**Project Resources to Investigate:**
+- **Meetings Page Components:** `/client/src/app/page.tsx`, `/client/src/components/dashboard/MeetingCard.tsx`
+- **Real-time Hooks:** `/client/src/hooks/useRealtimeMeetings.tsx`, `/client/src/hooks/useRealtimeRace.ts`
+- **Appwrite Subscriptions:** `/client/src/hooks/useAppwriteRealtime.ts` - check subscription patterns
+- **Meeting Data Fetching:** `/client/src/server/meetings-data.ts` - current data source
+- **Backend Functions:** `/server/daily-meetings/`, `/server/master-race-scheduler/` - data polling and scheduling
+- **Database Collections:** Appwrite Collections for Meetings and Races - subscription targets
+
+**Standards & Guidelines:**
+- **Real-time Performance:** <100ms update target per `/docs/stories/4.7.enhance-race-interface-ui-architecture.md#L255`
+- **Appwrite Integration:** Follow patterns documented in `/CLAUDE.md#L44-L52` for real-time subscriptions
+- **Backend Architecture:** Function coordination per `/CLAUDE.md#L30-L35`
+- **Data Flow:** Reference `/CLAUDE.md#L54-L60` for real-time data flow patterns
+
+**Implementation Approach:**
+1. Audit current real-time subscriptions in meetings page components
+2. Review which meeting and race data fields are subscribed vs static
+3. Analyze Appwrite database collections for meeting/race status fields
+4. Assess current polling frequency in daily-meetings and master-scheduler functions
+5. Evaluate trade-offs of increased polling frequency vs API rate limits
+6. Test real-time updates during simulated race delays and meeting changes
+7. Implement enhanced subscription patterns if gaps are identified
+8. Update master-scheduler to call daily-meetings every 15 minutes if beneficial
+
+---
+
 ## 🏇 Race Page Visual & Display Issues
 
-### Task 5: Fix Jockey Silk Colors Display
-**Status:** ⏳ **PENDING**  
+### Task 6: Fix Jockey Silk Colors Display
+**Status:** ✅ **COMPLETED**  
 **Priority:** Medium  
 **Complexity:** Low-Medium
 
@@ -193,7 +236,7 @@ Jockey silk colors are not displayed despite race and entrant data including URL
 
 ---
 
-### Task 6: Fix Timeline Column Visibility and Highlighting Issues
+### Task 7: Fix Timeline Column Visibility and Highlighting Issues
 **Status:** ⏳ **PENDING**  
 **Priority:** High  
 **Complexity:** Medium-High
@@ -229,7 +272,7 @@ Multiple timeline column issues: columns show simultaneously when reaching 0s, d
 
 ---
 
-### Task 7: Resolve Race Status and Timing Display Issues  
+### Task 8: Resolve Race Status and Timing Display Issues  
 **Status:** ⏳ **PENDING**  
 **Priority:** High  
 **Complexity:** Medium
@@ -266,7 +309,7 @@ Race status display problems: shows 'Started' for 30s then 'Delayed' with curren
 
 ## ⚡ Race Page Real-time & Polling Issues
 
-### Task 8: Fix Money Flow Polling Frequency and Data Updates
+### Task 9: Fix Money Flow Polling Frequency and Data Updates
 **Status:** ⏳ **PENDING**  
 **Priority:** High  
 **Complexity:** High
@@ -302,7 +345,7 @@ Money flow updates not occurring frequently enough from -5m to -5m and beyond. D
 
 ---
 
-### Task 9: Resolve Race Status Transitions and Delayed Race Handling
+### Task 10: Resolve Race Status Transitions and Delayed Race Handling
 **Status:** ⏳ **PENDING**  
 **Priority:** High  
 **Complexity:** High  
