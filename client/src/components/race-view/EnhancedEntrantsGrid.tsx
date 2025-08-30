@@ -1242,7 +1242,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                               runnerNumber={entrant.runnerNumber}
                               runnerName={entrant.name}
                               jockey={entrant.jockey}
-                              fallbackUrl={entrant.silkUrl}
+                              fallbackUrl={entrant.silkUrl128 || entrant.silkUrl64 || entrant.silkUrl}
                               config={{ size: 'small' }}
                             />
                           )}
