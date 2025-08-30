@@ -137,7 +137,7 @@ function RaceCardComponent({ race, onClick }: RaceCardProps) {
   };
 
   // Get status configuration for background coloring - matches raceStatusConfig.ts
-  const normalizedStatus = race.status.toLowerCase();
+  const normalizedStatus = (typeof race.status === 'string' ? race.status : 'unknown').toLowerCase();
   
   // Map statuses to colors that match the race page status configuration
   const getStatusColors = (status: string) => {
@@ -234,6 +234,9 @@ function RaceCardComponent({ race, onClick }: RaceCardProps) {
       
       <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
         <div className="flex items-center flex-wrap gap-x-3 gap-y-1 min-w-0 flex-1">
+          <span className="font-medium text-gray-600">
+            ID: {race.raceId}
+          </span>
           {race.distance && (
             <span className="flex items-center">
               <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
