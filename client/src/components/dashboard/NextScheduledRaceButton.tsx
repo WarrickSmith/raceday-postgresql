@@ -24,6 +24,7 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
   const [isConnected, setIsConnected] = useState(false);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch the next scheduled race from the API
   const fetchNextScheduledRace = useCallback(async () => {
@@ -95,8 +96,13 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
               if (events.some(e => e.includes('.update') || e.includes('.create'))) {
                 if (race.status === 'Running' || race.status === 'Abandoned' || 
                     race.status === 'Final' || race.status === 'Interim') {
-                  // Small delay to allow database to settle
-                  setTimeout(fetchNextScheduledRace, 1000);
+                  
+                  // Debounce API calls to prevent excessive requests
+                  if (debounceTimeoutRef.current) {
+                    clearTimeout(debounceTimeoutRef.current);
+                  }
+                  
+                  debounceTimeoutRef.current = setTimeout(fetchNextScheduledRace, 2000);
                 }
               }
             }
@@ -126,6 +132,9 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
       }
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -136,6 +145,9 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
       }
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
     };
   }, [setupIntelligentPolling]);
 
@@ -143,14 +155,16 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
   useEffect(() => {
     if (!nextScheduledRace) return;
 
+    let hasTriggeredNextFetch = false;
     const updateInterval = setInterval(() => {
       const now = new Date();
       const raceTime = new Date(nextScheduledRace.startTime);
       const diff = raceTime.getTime() - now.getTime();
       
-      // If race has started (passed start time), fetch updated next race
-      if (diff <= 0) {
+      // If race has started (passed start time), fetch updated next race ONLY ONCE
+      if (diff <= 0 && !hasTriggeredNextFetch) {
         console.log('🏁 Race has started, fetching next scheduled race');
+        hasTriggeredNextFetch = true;
         fetchNextScheduledRace();
         return;
       }

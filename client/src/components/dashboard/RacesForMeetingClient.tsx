@@ -15,7 +15,7 @@ function RacesForMeetingClientComponent({
   selectedMeeting, 
   onRaceClick 
 }: RacesForMeetingClientProps) {
-  const { races, isLoading, error } = useRacesForMeeting({
+  const { races, isLoading, error, isConnected } = useRacesForMeeting({
     meetingId: selectedMeeting?.meetingId || '',
     enabled: !!selectedMeeting,
   });
@@ -97,9 +97,23 @@ function RacesForMeetingClientComponent({
         <h2 className="text-lg font-semibold text-gray-900">
           {selectedMeeting.meetingName}
         </h2>
-        <p className="text-sm text-gray-600 mt-1">
-          {races.length} race{races.length !== 1 ? 's' : ''}
-        </p>
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-sm text-gray-600">
+            {races.length} race{races.length !== 1 ? 's' : ''}
+          </p>
+          {/* Real-time connection status */}
+          <div className="flex items-center space-x-1">
+            <div
+              className={`w-1.5 h-1.5 rounded-full ${
+                isConnected ? 'bg-green-400' : 'bg-gray-300'
+              }`}
+              aria-label={isConnected ? 'Race updates connected' : 'Race updates disconnected'}
+            />
+            <span className="text-xs text-gray-500">
+              {isConnected ? 'Live' : 'Static'}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Races List */}
