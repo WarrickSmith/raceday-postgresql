@@ -136,9 +136,68 @@ function RaceCardComponent({ race, onClick }: RaceCardProps) {
     );
   };
 
+  // Get status configuration for background coloring - matches raceStatusConfig.ts
+  const normalizedStatus = race.status.toLowerCase();
+  
+  // Map statuses to colors that match the race page status configuration
+  const getStatusColors = (status: string) => {
+    switch (status) {
+      case 'open':
+        return {
+          border: 'border-green-400',
+          bg: 'bg-green-50',
+          hover: 'hover:bg-green-100'
+        };
+      case 'closed':
+      case 'started':
+      case 'running':
+        return {
+          border: 'border-yellow-400',
+          bg: 'bg-yellow-50',
+          hover: 'hover:bg-yellow-100'
+        };
+      case 'interim':
+        return {
+          border: 'border-blue-400',
+          bg: 'bg-blue-50',
+          hover: 'hover:bg-blue-100'
+        };
+      case 'final':
+      case 'finalized':
+      case 'finished':
+      case 'complete':
+      case 'completed':
+        return {
+          border: 'border-purple-400',
+          bg: 'bg-purple-50',
+          hover: 'hover:bg-purple-100'
+        };
+      case 'abandoned':
+        return {
+          border: 'border-red-400',
+          bg: 'bg-red-50',
+          hover: 'hover:bg-red-100'
+        };
+      case 'postponed':
+        return {
+          border: 'border-orange-400',
+          bg: 'bg-orange-50',
+          hover: 'hover:bg-orange-100'
+        };
+      default:
+        return {
+          border: 'border-gray-300',
+          bg: 'bg-slate-50',
+          hover: 'hover:bg-slate-100'
+        };
+    }
+  };
+
+  const statusColors = getStatusColors(normalizedStatus);
+
   return (
     <div 
-      className={`border-l-4 border-gray-200 bg-white p-4 hover:bg-gray-50 transition-colors ${
+      className={`border-l-4 ${statusColors.border} ${statusColors.bg} p-4 ${statusColors.hover} transition-colors rounded-lg border border-slate-200/50 shadow-sm ${
         onClick ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50' : ''
       }`}
       role={onClick ? 'button' : 'article'}

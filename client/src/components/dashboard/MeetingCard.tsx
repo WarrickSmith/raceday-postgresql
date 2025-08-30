@@ -147,7 +147,7 @@ function MeetingCardComponent({ meeting, onRaceClick }: MeetingCardProps) {
 
   return (
     <article 
-      className={`border rounded-lg p-6 transition-colors hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-opacity-50 ${statusColors[status]}`}
+      className={`border border-slate-200/50 rounded-lg p-6 shadow-sm transition-all duration-200 hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-opacity-50 ${statusColors[status]}`}
       role="article"
       aria-labelledby={`meeting-${meeting.$id}`}
     >
