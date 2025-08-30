@@ -52,43 +52,6 @@ Current meetings page displays meetings in a simple list format. Users need a du
 
 ---
 
-### Task 9: Implement Real-time Next Race Button Updates
-**Status:** ⏳ **PENDING**  
-**Priority:** Medium  
-**Complexity:** Medium
-
-**Problem Description:**  
-The "Next Race" button currently only updates when the page is refreshed or reloaded. As time progresses and races start/finish, the button should automatically update to display the next scheduled race without manual intervention.
-
-**Requirements:**
-- Subscribe to race schedule updates and status changes
-- Automatically update the Next Race button when the current next race starts
-- Handle race delays, postponements, and cancellations 
-- Maintain real-time accuracy throughout the day
-- Update button text, timing, and meeting information automatically
-
-**Project Resources to Investigate:**
-- **Next Race Button:** `/client/src/components/dashboard/NextScheduledRaceButton.tsx` - current implementation
-- **Real-time Hooks:** `/client/src/hooks/useRealtimeMeetings.tsx`, `/client/src/hooks/useRealtimeRace.ts`
-- **API Endpoint:** `/client/src/app/api/next-scheduled-race/route.ts` - backend logic
-- **Server Functions:** `/server/master-race-scheduler/` - race timing coordination
-
-**Standards & Guidelines:**
-- **Real-time Updates:** <100ms update target per `/docs/stories/4.7.enhance-race-interface-ui-architecture.md#L255`
-- **Performance:** Minimize API calls with intelligent polling per `/docs/architecture/8-coding-standards.md#L103-L122`
-- **Error Handling:** Graceful fallbacks per `/docs/architecture/8-coding-standards.md#L244-L251`
-- **Component Optimization:** React.memo and useMemo patterns per `/docs/architecture/8-coding-standards.md#L79-L101`
-
-**Implementation Approach:**
-1. Add real-time subscription to race status changes in NextScheduledRaceButton
-2. Implement intelligent polling that increases frequency near race start times
-3. Add race transition detection (race starts → find next race)
-4. Handle edge cases: delayed races, cancelled races, no more races for the day
-5. Optimize to prevent unnecessary API calls and re-renders
-6. Test with various race timing scenarios
-
----
-
 ### Task 2: Enhance Meeting and Race Card Information Display
 **Status:** ✅ **COMPLETED**  
 **Priority:** Medium-High  
@@ -157,9 +120,46 @@ Missing click interactions for cards. Users need to click race cards to navigate
 
 ---
 
+### Task 4: Implement Real-time Next Race Button Updates
+**Status:** ⏳ **PENDING**  
+**Priority:** Medium  
+**Complexity:** Medium
+
+**Problem Description:**  
+The "Next Race" button currently only updates when the page is refreshed or reloaded. As time progresses and races start/finish, the button should automatically update to display the next scheduled race without manual intervention.
+
+**Requirements:**
+- Subscribe to race schedule updates and status changes
+- Automatically update the Next Race button when the current next race starts
+- Handle race delays, postponements, and cancellations 
+- Maintain real-time accuracy throughout the day
+- Update button text, timing, and meeting information automatically
+
+**Project Resources to Investigate:**
+- **Next Race Button:** `/client/src/components/dashboard/NextScheduledRaceButton.tsx` - current implementation
+- **Real-time Hooks:** `/client/src/hooks/useRealtimeMeetings.tsx`, `/client/src/hooks/useRealtimeRace.ts`
+- **API Endpoint:** `/client/src/app/api/next-scheduled-race/route.ts` - backend logic
+- **Server Functions:** `/server/master-race-scheduler/` - race timing coordination
+
+**Standards & Guidelines:**
+- **Real-time Updates:** <100ms update target per `/docs/stories/4.7.enhance-race-interface-ui-architecture.md#L255`
+- **Performance:** Minimize API calls with intelligent polling per `/docs/architecture/8-coding-standards.md#L103-L122`
+- **Error Handling:** Graceful fallbacks per `/docs/architecture/8-coding-standards.md#L244-L251`
+- **Component Optimization:** React.memo and useMemo patterns per `/docs/architecture/8-coding-standards.md#L79-L101`
+
+**Implementation Approach:**
+1. Add real-time subscription to race status changes in NextScheduledRaceButton
+2. Implement intelligent polling that increases frequency near race start times
+3. Add race transition detection (race starts → find next race)
+4. Handle edge cases: delayed races, cancelled races, no more races for the day
+5. Optimize to prevent unnecessary API calls and re-renders
+6. Test with various race timing scenarios
+
+---
+
 ## 🏇 Race Page Visual & Display Issues
 
-### Task 4: Fix Jockey Silk Colors Display
+### Task 5: Fix Jockey Silk Colors Display
 **Status:** ⏳ **PENDING**  
 **Priority:** Medium  
 **Complexity:** Low-Medium
@@ -193,7 +193,7 @@ Jockey silk colors are not displayed despite race and entrant data including URL
 
 ---
 
-### Task 5: Fix Timeline Column Visibility and Highlighting Issues
+### Task 6: Fix Timeline Column Visibility and Highlighting Issues
 **Status:** ⏳ **PENDING**  
 **Priority:** High  
 **Complexity:** Medium-High
@@ -229,7 +229,7 @@ Multiple timeline column issues: columns show simultaneously when reaching 0s, d
 
 ---
 
-### Task 6: Resolve Race Status and Timing Display Issues  
+### Task 7: Resolve Race Status and Timing Display Issues  
 **Status:** ⏳ **PENDING**  
 **Priority:** High  
 **Complexity:** Medium
@@ -266,7 +266,7 @@ Race status display problems: shows 'Started' for 30s then 'Delayed' with curren
 
 ## ⚡ Race Page Real-time & Polling Issues
 
-### Task 7: Fix Money Flow Polling Frequency and Data Updates
+### Task 8: Fix Money Flow Polling Frequency and Data Updates
 **Status:** ⏳ **PENDING**  
 **Priority:** High  
 **Complexity:** High
@@ -302,7 +302,7 @@ Money flow updates not occurring frequently enough from -5m to -5m and beyond. D
 
 ---
 
-### Task 8: Resolve Race Status Transitions and Delayed Race Handling
+### Task 9: Resolve Race Status Transitions and Delayed Race Handling
 **Status:** ⏳ **PENDING**  
 **Priority:** High  
 **Complexity:** High  
