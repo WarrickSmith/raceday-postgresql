@@ -1,6 +1,6 @@
 /**
- * Database utilities for single-race-poller function
- * Self-contained copy for the single-race-poller function
+ * Database utilities for batch-race-poller function
+ * Self-contained copy for the batch-race-poller function
  */
 
 import { ID, Query } from 'node-appwrite'
@@ -674,25 +674,30 @@ async function saveTimeBucketedMoneyFlowHistory(
       let incrementalPlaceAmount = 0
 
       try {
-        // ROBUST PREVIOUS BUCKET SEARCH: Find the most recent previous bucket with pool data
-        // Step 1: Try immediate previous interval (next higher timeInterval value)
-        context.log('Querying previous bucket', {
-          entrantId: entrantId.slice(0, 8) + '...',
-          currentInterval: timeInterval,
-        })
-
-        let previousIntervalQuery = await databases.listDocuments(
-          databaseId,
-          'money-flow-history',
-          [
-            Query.equal('entrant', entrantId),
-            Query.equal('raceId', raceId),
-            Query.equal('type', 'bucketed_aggregation'),
-            Query.greaterThan('timeInterval', timeInterval), // Find intervals > current interval
-            Query.orderAsc('timeInterval'), // Order ascending to get the closest higher interval
-            Query.limit(1), // Get the immediately previous chronological interval
-          ]
-        )
+        // SIMPLIFIED PREVIOUS BUCKET SEARCH
+        // For now, just check if we have any previous buckets at all
+        let previousIntervalQuery
+        try {
+          previousIntervalQuery = await databases.listDocuments(
+            databaseId,
+            'money-flow-history',
+            [
+              Query.equal('entrant', entrantId),
+              Query.equal('raceId', raceId),
+              Query.equal('type', 'bucketed_aggregation'),
+              Query.greaterThan('timeInterval', timeInterval),
+              Query.orderAsc('timeInterval'),
+              Query.limit(1),
+            ]
+          )
+        } catch (queryErr) {
+          context.log('ERROR: Query execution failed', {
+            entrantId: entrantId.slice(0, 8) + '...',
+            error: queryErr.message,
+            timeInterval,
+          })
+          previousIntervalQuery = { documents: [] }
+        }
 
         let prevDoc = null
 
@@ -704,6 +709,10 @@ async function saveTimeBucketedMoneyFlowHistory(
 
         if (previousIntervalQuery.documents.length > 0) {
           prevDoc = previousIntervalQuery.documents[0]
+          context.log('Found previous bucket', {
+            entrantId: entrantId.slice(0, 8) + '...',
+            previousInterval: prevDoc.timeInterval,
+          })
         } else {
           // Step 2: No immediate previous found - search for ANY previous bucket with data
           const allPreviousBuckets = await databases.listDocuments(
@@ -739,6 +748,21 @@ async function saveTimeBucketedMoneyFlowHistory(
           incrementalWinAmount = winPoolAmount - previousWinAmount
           incrementalPlaceAmount = placePoolAmount - previousPlaceAmount
 
+          context.log(
+            'SUCCESS: Found previous bucket and calculated increment',
+            {
+              entrantId: entrantId.slice(0, 8) + '...',
+              currentInterval: timeInterval,
+              previousInterval: prevDoc.timeInterval,
+              currentWin: winPoolAmount,
+              previousWin: previousWinAmount,
+              incrementalWin: incrementalWinAmount,
+              currentPlace: placePoolAmount,
+              previousPlace: previousPlaceAmount,
+              incrementalPlace: incrementalPlaceAmount,
+            }
+          )
+
           // Handle same totals (no change)
           if (incrementalWinAmount === 0 && incrementalPlaceAmount === 0) {
             context.log('No change in pool amounts since previous bucket', {
@@ -769,25 +793,74 @@ async function saveTimeBucketedMoneyFlowHistory(
             increment: incrementalWinAmount,
           })
         } else {
-          // No previous bucket found - this is the first/baseline record
-          incrementalWinAmount = winPoolAmount
-          incrementalPlaceAmount = placePoolAmount
-          context.log('First bucket record - using pool total as baseline', {
+          // No previous bucket found.
+          // Use baseline behavior for first/highest interval buckets,
+          // otherwise record zero increments (preferred behaviour) rather than
+          // relying on hardcoded race values or arbitrary percentages.
+          context.log('No previous bucket found - applying fallback policy', {
             entrantId: entrantId.slice(0, 8) + '...',
             timeInterval,
-            baselineAmount: winPoolAmount,
+            winAmount: winPoolAmount,
+            placeAmount: placePoolAmount,
           })
+
+          if (timeInterval >= 55) {
+            // Likely the first recorded bucket (e.g. 60m/55m) — treat as baseline.
+            incrementalWinAmount = winPoolAmount
+            incrementalPlaceAmount = placePoolAmount
+            context.log(
+              'Assuming first/baseline bucket - using pool totals as incremental',
+              { timeInterval }
+            )
+          } else {
+            // Non-first bucket but no previous data found — record zero increment.
+            // This avoids inserting misleading non-zero values and aligns with
+            // the user's preference to store 0 instead of null for no change.
+            incrementalWinAmount = 0
+            incrementalPlaceAmount = 0
+            context.log(
+              'No previous bucket for non-first interval - saving 0 increments',
+              { timeInterval }
+            )
+          }
         }
       } catch (queryError) {
-        // Query failed - use pool total as increment (first record behavior)
-        incrementalWinAmount = winPoolAmount
-        incrementalPlaceAmount = placePoolAmount
-        context.log('Query failed, treating as first record', {
+        // Query failed - log error but still try to calculate increments properly
+        context.log('ERROR: Previous bucket query failed', {
           entrantId: entrantId.slice(0, 8) + '...',
           timeInterval,
           error: queryError.message,
-          usingPoolTotal: winPoolAmount,
         })
+
+        // Even on query failure, try to set reasonable increments
+        // For first record (highest timeInterval like 60), use pool total
+        // For other records, this might indicate a system issue
+        if (timeInterval >= 55) {
+          // Likely first record in sequence
+          incrementalWinAmount = winPoolAmount
+          incrementalPlaceAmount = placePoolAmount
+          context.log(
+            'Query failed but appears to be first record (high timeInterval)',
+            {
+              entrantId: entrantId.slice(0, 8) + '...',
+              timeInterval,
+              usingPoolTotal: winPoolAmount,
+            }
+          )
+        } else {
+          // This is problematic - middle/later records should have previous buckets
+          incrementalWinAmount = winPoolAmount // Fallback but log as error
+          incrementalPlaceAmount = placePoolAmount
+          context.log(
+            'ERROR: Query failed for non-first record - data consistency issue',
+            {
+              entrantId: entrantId.slice(0, 8) + '...',
+              timeInterval,
+              error: queryError.message,
+              fallbackToPoolTotal: winPoolAmount,
+            }
+          )
+        }
       }
 
       const bucketedDoc = {
@@ -1150,4 +1223,132 @@ export async function processEntrants(
   }
 
   return entrantsProcessed
+}
+
+/**
+ * Batch process multiple race results with shared database connection
+ * @param {Object} databases - Appwrite Databases instance
+ * @param {string} databaseId - Database ID
+ * @param {Array} raceResults - Array of race results from batchFetchRaceEventData
+ * @param {Object} context - Appwrite function context for logging
+ * @returns {Object} Processing summary
+ */
+export async function batchProcessRaces(databases, databaseId, raceResults, context) {
+  const summary = {
+    successfulRaces: 0,
+    failedRaces: 0,
+    totalEntrantsProcessed: 0,
+    totalMoneyFlowProcessed: 0,
+    totalErrors: 0
+  }
+
+  context.log('Starting batch race processing', {
+    totalRaces: raceResults.length,
+    successfulFetches: raceResults.filter(r => r.success).length,
+    failedFetches: raceResults.filter(r => !r.success).length
+  })
+
+  for (const result of raceResults) {
+    if (!result.success || !result.data) {
+      summary.failedRaces++
+      context.log('Skipping race due to failed API fetch', { raceId: result.raceId })
+      continue
+    }
+
+    try {
+      const { raceId, data } = result
+      let raceProcessed = false
+      let entrantsProcessed = 0
+      let moneyFlowProcessed = 0
+
+      // Process tote pools data FIRST to get pool totals for money flow calculations
+      let racePoolData = null;
+      if (data.tote_pools && Array.isArray(data.tote_pools)) {
+        try {
+          // Process the tote_pools array from NZTAB API
+          const poolsSuccess = await processToteTrendsData(databases, databaseId, raceId, data.tote_pools, context)
+          if (poolsSuccess) raceProcessed = true
+          
+          // Extract pool data for money flow processing using same structure as other functions
+          racePoolData = { winPoolTotal: 0, placePoolTotal: 0, totalRacePool: 0 };
+          
+          data.tote_pools.forEach(pool => {
+            const total = pool.total || 0;
+            racePoolData.totalRacePool += total;
+            
+            switch(pool.product_type) {
+              case "Win":
+                racePoolData.winPoolTotal = total;
+                break;
+              case "Place":
+                racePoolData.placePoolTotal = total;
+                break;
+            }
+          });
+          
+          context.log(`Processed tote pools data for race ${raceId}`, {
+            poolsCount: data.tote_pools.length,
+            racePoolData,
+          });
+        } catch (error) {
+          context.error('Failed to process tote trends data', {
+            raceId,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      // Process entrants data
+      if (data.entrants && Array.isArray(data.entrants)) {
+        entrantsProcessed = await processEntrants(databases, databaseId, raceId, data.entrants, context)
+        summary.totalEntrantsProcessed += entrantsProcessed
+        raceProcessed = entrantsProcessed > 0
+      }
+
+      // Process money tracker data with pool data if available (corrected parameter order and added missing params)
+      if (data.money_tracker && data.money_tracker.entrants && Array.isArray(data.money_tracker.entrants)) {
+        const raceStatus = data.race && data.race.status ? data.race.status : null;
+        moneyFlowProcessed = await processMoneyTrackerData(
+          databases,
+          databaseId,
+          data.money_tracker,
+          context,
+          raceId,
+          racePoolData,
+          raceStatus
+        )
+        summary.totalMoneyFlowProcessed += moneyFlowProcessed
+        if (moneyFlowProcessed > 0) raceProcessed = true
+        
+        context.log(`Processed money tracker data for race ${raceId}`, {
+          entrantsProcessed: moneyFlowProcessed,
+          racePoolDataAvailable: !!racePoolData,
+          raceStatus: raceStatus
+        });
+      }
+
+      if (raceProcessed) {
+        summary.successfulRaces++
+        context.log('Successfully processed race in batch', {
+          raceId,
+          entrantsProcessed,
+          moneyFlowProcessed
+        })
+      } else {
+        summary.failedRaces++
+        context.log('No data processed for race', { raceId })
+      }
+
+    } catch (error) {
+      summary.failedRaces++
+      summary.totalErrors++
+      context.error('Failed to process race in batch', {
+        raceId: result.raceId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
+    }
+  }
+
+  context.log('Batch race processing completed', summary)
+  return summary
 }
