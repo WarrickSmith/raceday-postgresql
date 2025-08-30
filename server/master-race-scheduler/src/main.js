@@ -96,6 +96,74 @@ async function runSchedulerLogic(context) {
     // Active from 65 minutes before first race until all NZ/AUS races are finalized
     const now = new Date()
     const nzTime = new Date(now.toLocaleString("en-US", {timeZone: "Pacific/Auckland"}))
+
+    // Call meeting-status-poller every 30 minutes to refresh meeting-level data
+    // Check if it's time to refresh meeting data (every 30 minutes)
+    const now30MinInterval = Math.floor(now.getTime() / (30 * 60 * 1000));
+    
+    // Try to get the last meeting refresh timestamp from database
+    let shouldTriggerMeetingRefresh = false;
+    try {
+      // Query for the scheduler state document
+      const schedulerStates = await databases.listDocuments(databaseId, 'scheduler_state', [
+        Query.equal('key', 'lastMeetingRefresh'),
+        Query.limit(1)
+      ]);
+      
+      const lastMeetingRefresh = schedulerStates.documents.length > 0 
+        ? parseInt(schedulerStates.documents[0].value) 
+        : 0;
+      
+      shouldTriggerMeetingRefresh = now30MinInterval > lastMeetingRefresh;
+      
+      if (shouldTriggerMeetingRefresh) {
+        context.log('Triggering meeting-status-poller refresh (30-minute interval)', {
+          currentInterval: now30MinInterval,
+          lastInterval: lastMeetingRefresh
+        });
+        
+        try {
+          await functions.createExecution(
+            'meeting-status-poller',
+            JSON.stringify({}),
+            false // async execution
+          );
+          
+          // Update the last meeting refresh timestamp in database
+          if (schedulerStates.documents.length > 0) {
+            await databases.updateDocument(
+              databaseId, 
+              'scheduler_state', 
+              schedulerStates.documents[0].$id,
+              { value: now30MinInterval.toString() }
+            );
+          } else {
+            await databases.createDocument(
+              databaseId,
+              'scheduler_state',
+              'lastMeetingRefresh',
+              {
+                key: 'lastMeetingRefresh',
+                value: now30MinInterval.toString(),
+                updatedAt: now.toISOString()
+              }
+            );
+          }
+          
+          context.log('✅ meeting-status-poller refresh triggered successfully');
+        } catch (error) {
+          context.error('Failed to trigger meeting-status-poller refresh', {
+            error: error.message
+          });
+        }
+      }
+    } catch (error) {
+      // If scheduler_state collection doesn't exist, skip meeting refresh for this run
+      context.log('scheduler_state collection not found, skipping meeting refresh', {
+        error: error.message,
+        note: 'This is expected if scheduler_state collection has not been created yet'
+      });
+    }
     
     // Query today's races to determine active period
     // Generate today's date in NZ timezone for filtering
