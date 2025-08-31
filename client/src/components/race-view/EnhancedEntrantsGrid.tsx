@@ -111,7 +111,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const { raceData } = useRace()
 
   // Use live race data for status synchronization (same as header and footer)
-  const { race: liveRace, isConnected: raceConnected } = useRealtimeRace({ 
+  const { race: liveRace } = useRealtimeRace({ 
     initialRace: raceData?.race || {
       $id: raceId || 'fallback',
       raceId: raceId || 'fallback', 
@@ -252,17 +252,17 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       }
       return baseEntrant
     })
-  }, [baseEntrants, realtimeEntrants])
+  }, [baseEntrants, realtimeEntrants, totalUpdates])
 
   // Validation function to check if timeline amounts sum to total pool
-  const validateTimelineSummation = useCallback((entrant: any) => {
+  const validateTimelineSummation = useCallback((entrant: Entrant) => {
     if (!entrant.moneyFlowTimeline || !entrant.poolMoney) return true;
     
     const timeline = entrant.moneyFlowTimeline;
     if (!timeline.dataPoints || timeline.dataPoints.length === 0) return true;
     
     // Sum all incremental amounts for this entrant
-    const timelineSum = timeline.dataPoints.reduce((sum: number, point: any) => {
+    const timelineSum = timeline.dataPoints.reduce((sum: number, point: {incrementalAmount?: number}) => {
       return sum + (point.incrementalAmount || 0);
     }, 0);
     
@@ -403,7 +403,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       
       return entrantWithPoolData;
     })
-  }, [entrants, racePoolData, timelineData, poolViewState.activePool, validateTimelineSummation])
+  }, [entrants, racePoolData, timelineData, validateTimelineSummation])
 
   // Debug logging removed - entrants data structure verified
 
@@ -523,10 +523,17 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     const timeToRaceMinutes = Math.floor(timeToRaceMs / (1000 * 60))
     const raceStatus = liveRace?.status || 'Open'
     
+    // FIXED: Declare these variables at the top to avoid "before initialization" errors
+    const raceHasStarted = timeToRaceMinutes < 0
+    const raceIsCompleted = ['Final', 'Interim', 'Closed', 'Abandoned'].includes(raceStatus)
+    
+    // Calculate actual post-start minutes
+    const actualPostStartMinutes = timeToRaceMinutes < 0 ? Math.abs(timeToRaceMinutes) : 0
+    
     // Calculate max post-start from existing timeline data (DATA-DRIVEN)
     let maxPostStartFromData = 0
     if (timelineData && timelineData.size > 0) {
-      for (const [entrantId, entrantData] of timelineData) {
+      for (const [, entrantData] of timelineData) {
         if (entrantData.dataPoints && entrantData.dataPoints.length > 0) {
           const maxTimeToStart = Math.max(...entrantData.dataPoints.map(p => Math.abs(p.timeToStart || 0)))
           maxPostStartFromData = Math.max(maxPostStartFromData, maxTimeToStart)
@@ -534,11 +541,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       }
     }
     
-    // Calculate actual post-start minutes
-    const actualPostStartMinutes = timeToRaceMinutes < 0 ? Math.abs(timeToRaceMinutes) : 0
-    
     // Use maximum of actual time or data-driven max for persistence
-    const effectiveMaxPostStart = Math.max(actualPostStartMinutes, maxPostStartFromData)
+    // const effectiveMaxPostStart = Math.max(actualPostStartMinutes, maxPostStartFromData) // Currently unused
     
     // Pre-scheduled timeline milestones (CORRECTED: positive = before start, negative = after start)
     // Backend uses: timeToStart: 60 = 60min before start, timeToStart: -2 = 2min after start
@@ -548,48 +552,43 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     
     const columns: TimelineColumn[] = []
     
-    // Add ALL pre-scheduled milestones (FIXED: Always show all timeline columns)
+    // Add pre-scheduled milestones (FIXED: Show columns progressively, not all at once)
     preScheduledMilestones.forEach((interval) => {
-      // REQUIREMENT: Always show ALL timeline columns (60m to 0s) regardless of race status
-      // Only the DATA should be filtered, not the column headers
-      // This matches the reference screenshot and requirements
+      // FIXED: Only show timeline columns that are active or past
+      // This prevents all columns showing at once at 0s
+      // For pre-start: show column if we've reached that time point (time to race <= interval)
+      // For completed/delayed races: show all columns for historical review  
+      const shouldShowColumn = (timeToRaceMinutes <= interval && timeToRaceMinutes > 0) || 
+                              raceIsCompleted || timeToRaceMinutes <= 0
       
-      // CORRECTED: interval is now positive for before-start times
-      const timestamp = new Date(raceStart.getTime() - interval * 60 * 1000)
-      let label: string
-      if (interval === 0) {
-        label = '0 (Start)'
-      } else if (interval === 0.5) {
-        label = '30s'
-      } else {
-        label = `${interval}m`
-      }
+      if (shouldShowColumn) {
+        // CORRECTED: interval is now positive for before-start times
+        const timestamp = new Date(raceStart.getTime() - interval * 60 * 1000)
+        let label: string
+        if (interval === 0) {
+          label = '0 (Start)'
+        } else if (interval === 0.5) {
+          label = '30s'
+        } else {
+          label = `${interval}m`
+        }
 
-      columns.push({
-        label,
-        interval,
-        timestamp: timestamp.toISOString(),
-        isScheduledStart: interval === 0,
-        isDynamic: false,
-      })
+        columns.push({
+          label,
+          interval,
+          timestamp: timestamp.toISOString(),
+          isScheduledStart: interval === 0,
+          isDynamic: false,
+        })
+      }
     })
     
-    // Add post-scheduled columns when appropriate
-    // For Open races: Show if race has passed scheduled start time OR has timeline data indicating delay
-    // For completed races (Final/Interim/Closed/Abandoned): Always show columns to preserve race review capability
-    const raceHasStarted = timeToRaceMinutes < 0
-    const raceIsCompleted = ['Final', 'Interim', 'Closed', 'Abandoned'].includes(raceStatus)
-    
-    // Check if we have post-start data indicating race delays
-    const hasPostStartData = timelineData && timelineData.size > 0 && 
-      Array.from(timelineData.values()).some(entrantData => 
-        entrantData.dataPoints.some(point => point.timeToStart !== undefined && point.timeToStart < 0)
-      )
-    
+    // Add post-scheduled columns when appropriate - FIXED to be time-driven, not data-driven  
+    // FIXED: Base delayed column visibility on actual elapsed time, not existing data
+    // This ensures columns appear progressively as time elapses, not all at once
     const shouldShowPostStartColumns = 
       (raceStatus === 'Open' && raceHasStarted && actualPostStartMinutes > 0) ||
-      (raceStatus === 'Open' && hasPostStartData) || // Show if we have post-start data regardless of current time
-      (raceIsCompleted) // Always show for completed races
+      (raceIsCompleted) // Always show for completed races to preserve review capability
     
     console.log('🕐 Post-start column logic:', {
       raceStatus,
@@ -603,33 +602,40 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       const dynamicIntervals: number[] = []
       
       if (raceStatus === 'Open') {
-        // For open races, generate standard post-start progression to match server-side logic
-        // FIXED: Use standard post-start intervals that match server-side getTimelineInterval()
+        // FIXED: For open races, show delayed columns progressively based on actual elapsed time
+        // Only show columns for time periods that have actually been reached
         const postStartMinutes = actualPostStartMinutes
         
         // Standard post-start progression: -30s, -1m, -1:30s, -2m, -2:30s, -3m, -4m, etc.
-        const standardPostStartIntervals = [-0.5, -1.0, -1.5, -2.0, -2.5, -3.0]
+        const standardPostStartIntervals = [-0.5, -1.0, -1.5, -2.0, -2.5, -3.0, -4.0, -5.0, -6.0, -7.0, -8.0, -9.0, -10.0]
         
-        // Add standard intervals up to current elapsed time + buffer
-        const maxPostStartToShow = Math.max(postStartMinutes + 1, 5) // Show at least 5 minutes or current time + 1min buffer
+        // FIXED: Only show intervals that have been reached by actual elapsed time
+        // Show columns progressively: only add the NEXT interval when time is reached
+        const sortedPostStartIntervals = [...standardPostStartIntervals].sort((a, b) => Math.abs(a) - Math.abs(b))
         
-        // Add all standard intervals up to the maximum
-        for (const interval of standardPostStartIntervals) {
-          if (Math.abs(interval) <= maxPostStartToShow) {
+        // FIXED: Show all intervals that have been reached progressively
+        // This shows columns as they become available during delayed periods
+        for (const interval of sortedPostStartIntervals) {
+          const intervalMinutes = Math.abs(interval)
+          // Only add this interval if we've reached its time point
+          if (postStartMinutes >= intervalMinutes) {
             dynamicIntervals.push(interval)
+          } else {
+            // Stop adding intervals once we reach one we haven't passed yet
+            break
           }
         }
         
-        // Continue with additional minute intervals if needed (matches server-side logic)
-        for (let i = 4; i <= Math.ceil(maxPostStartToShow) && i <= 15; i++) {
-          dynamicIntervals.push(-i) // -4m, -5m, -6m, etc.
+        // Only log when intervals change to reduce verbosity
+        if (dynamicIntervals.length > 0 && postStartMinutes % 0.5 === 0) {
+          console.log('🕐 Intervals updated:', { postStartMinutes, intervals: dynamicIntervals.length })
         }
       } else {
         // For closed/final/interim/abandoned races, show all columns based on existing data points
         // Extract ALL intervals from timeline data (both pre and post-race)
         const dataIntervals = new Set<number>()
         if (timelineData && timelineData.size > 0) {
-          for (const [entrantId, entrantData] of timelineData) {
+          for (const [, entrantData] of timelineData) {
             if (entrantData.dataPoints && entrantData.dataPoints.length > 0) {
               entrantData.dataPoints.forEach(point => {
                 // FIXED: Use timeInterval when available (server-calculated), fallback to timeToStart
@@ -693,7 +699,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     return columns.sort((a, b) => b.interval - a.interval)
   }, [currentRaceStartTime, currentTime, liveRace?.status, timelineData])
 
-  // Determine if column should be highlighted (current time)
+  // Determine if column should be highlighted (current time) - FIXED to highlight only ONE column
   const isCurrentTimeColumn = useCallback((interval: number): boolean => {
     const raceStart = new Date(currentRaceStartTime)
     const timeToRaceMs = raceStart.getTime() - currentTime.getTime()
@@ -703,40 +709,77 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     // Only highlight and follow current time while race status is 'Open'
     if (raceStatus === 'Open') {
       if (timeToRaceMinutes > 0) {
-        // Race hasn't started yet - find the active polling interval
-        // Active column = next interval that will receive data
-        // If time to race = 19 minutes, active column = 15m (next interval <= current time)
+        // Race hasn't started yet - find the SINGLE active polling interval
         const sortedIntervals = timelineColumns
           .filter(col => col.interval > 0) // Only pre-race intervals
           .map(col => col.interval)
           .sort((a, b) => b - a) // Descending: [60, 55, 50, ..., 1, 0.5]
         
-        // Find the first interval that is <= current time to race
-        const activeInterval = sortedIntervals.find(int => int <= timeToRaceMinutes)
+        // FIXED: Find the active column - largest interval that is <= current time
+        // Examples: 10.5min → 10m column, 9.9min → 5m column, 0.3min → 0.5m column
+        let activeInterval = null
+        
+        // Handle edge case for times > 60 minutes first
+        if (timeToRaceMinutes > 60) {
+          activeInterval = 60
+        } else {
+          // Find the largest interval that is <= current time to race
+          for (const intervalMinutes of sortedIntervals) {
+            if (timeToRaceMinutes >= intervalMinutes) {
+              activeInterval = intervalMinutes
+              break // Found the largest interval <= current time
+            }
+          }
+          
+          // If no interval found (time < 0.5), use the smallest interval (0.5)
+          if (!activeInterval && sortedIntervals.length > 0) {
+            activeInterval = sortedIntervals[sortedIntervals.length - 1] // 0.5
+          }
+        }
+        
         return interval === activeInterval
       } else {
         // Past scheduled start but race status still 'Open' (delayed start)
-        // Continue highlighting based on elapsed time in post-start columns
         const timeAfterStartMinutes = Math.abs(timeToRaceMinutes)
         
-        if (interval === 0) {
-          // Highlight "0s" (Start) column if we're within 30 seconds of scheduled start
-          return timeAfterStartMinutes <= 0.5
+        // FIXED: Find active post-start column - largest interval <= elapsed time
+        // Examples: 0.1min elapsed → 0 (Start), 0.6min elapsed → -30s, 1.2min elapsed → -1m
+        
+        // Get all available post-start intervals sorted by absolute value ascending: [0.5, 1, 1.5, 2, ...]
+        const postStartIntervals = timelineColumns
+          .filter(col => col.interval < 0)
+          .map(col => Math.abs(col.interval))
+          .sort((a, b) => a - b)
+        
+        // If no post-start columns exist, highlight the 0 (Start) column
+        if (postStartIntervals.length === 0) {
+          return interval === 0
         }
         
-        if (interval < 0) {
-          // This is a post-start column (negative interval)
-          const intervalMinutes = Math.abs(interval)
-          
-          // Highlight this column if current elapsed time falls within this interval's range
-          // For -30s column: highlight if elapsed time is between 0-1 minutes  
-          // For -1m column: highlight if elapsed time is between 0.5-1.5 minutes
-          // For -1:30m column: highlight if elapsed time is between 1.0-2.0 minutes
-          const intervalStart = Math.max(0, intervalMinutes - 0.5)
-          const intervalEnd = intervalMinutes + 0.5
-          
-          return timeAfterStartMinutes >= intervalStart && timeAfterStartMinutes < intervalEnd
+        // Find the largest post-start interval that has been reached
+        let activePostStartInterval = null
+        for (const postInterval of postStartIntervals) {
+          if (timeAfterStartMinutes >= postInterval) {
+            activePostStartInterval = postInterval
+          } else {
+            break // Stop at first interval we haven't reached
+          }
         }
+        
+        // If we haven't reached any post-start interval yet, highlight "0 (Start)"
+        if (activePostStartInterval === null) {
+          return interval === 0
+        }
+        
+        // Check if this column matches the active post-start interval
+        if (interval < 0) {
+          return Math.abs(interval) === activePostStartInterval
+        } else if (interval === 0) {
+          // Don't highlight start column if we've moved past it
+          return false
+        }
+        
+        return false
       }
     }
     
@@ -1201,7 +1244,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                   ))}
 
                   {/* Right Fixed Headers - Sticky */}
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-l-2 border-gray-300 border-r border-gray-200 sticky right-[80px] top-0 z-30" style={{ backgroundColor: '#f9fafb' }}>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-l-2 border-l-gray-300 border-r border-r-gray-200 sticky right-[80px] top-0 z-30" style={{ backgroundColor: '#f9fafb' }}>
                     Pool
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider sticky right-0 top-0 z-30" style={{ backgroundColor: '#f9fafb' }}>
@@ -1302,7 +1345,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     ))}
 
                     {/* Right Fixed Columns */}
-                    <td className="px-3 py-3 whitespace-nowrap text-right border-l-2 border-gray-300 border-r border-gray-200 sticky right-[80px] bg-white z-20" style={{ verticalAlign: 'middle', height: '60px' }}>
+                    <td className="px-3 py-3 whitespace-nowrap text-right border-l-2 border-l-gray-300 border-r border-r-gray-200 sticky right-[80px] bg-white z-20" style={{ verticalAlign: 'middle', height: '60px' }}>
                       <div className="flex items-center justify-end h-full">
                         <span className="text-sm font-medium text-gray-900">
                           {entrant.isScratched ? '—' : (() => {
