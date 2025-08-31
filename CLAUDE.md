@@ -25,6 +25,8 @@ RaceDay is a real-time horse racing dashboard built with Next.js 15+ and Appwrit
 - `npm run deploy:single-race` - Deploy single-race-poller function
 - `npm run deploy:batch-race-poller` - Deploy batch-race-poller function
 - `npm run deploy:master-scheduler` - Deploy master-race-scheduler function
+- `npm run deploy:meeting-status` - Deploy meeting-status-poller function
+- `npm run deploy:initial-data` - Deploy daily-initial-data function
 - `npm run vars:all` - Update environment variables for all functions
 
 **Note**: Deployment scripts utilize Appwrite CLI and are detailed in `server/package.json`. Each function contains its own dependencies and libraries for self-contained deployment to Appwrite.
@@ -32,8 +34,12 @@ RaceDay is a real-time horse racing dashboard built with Next.js 15+ and Appwrit
 ### Manual Function Execution
 - `npm run meetings` - Execute daily-meetings function
 - `npm run races` - Execute daily-races function
+- `npm run initial-data` - Execute daily-initial-data function
 - `npm run poller` - Execute race-data-poller function
+- `npm run single-race` - Execute single-race-poller function
+- `npm run meeting-status` - Execute meeting-status-poller function
 - `npm run batch-race-poller` - Execute batch-race-poller function
+- `npm run master-scheduler` - Execute master-race-scheduler function
 
 ## Architecture Overview
 
@@ -56,10 +62,12 @@ RaceDay is a real-time horse racing dashboard built with Next.js 15+ and Appwrit
 - **Key Functions**:
   - `daily-meetings` - Import daily meeting data from NZ TAB API
   - `daily-races` - Import race data and entrants
+  - `daily-initial-data` - Initial data setup and import
   - `race-data-poller` - Poll for live race updates
-  - `batch-race-poller` - Batch processing of multiple race updates
-  - `master-race-scheduler` - Coordinate race polling schedules
   - `single-race-poller` - Individual race data updates
+  - `batch-race-poller` - Batch processing of multiple race updates
+  - `meeting-status-poller` - Monitor meeting status changes
+  - `master-race-scheduler` - Coordinate race polling schedules
 
 ### Real-Time Data Flow
 1. **Data Import**: Scheduled functions import race data from NZ TAB API
@@ -99,7 +107,13 @@ RaceDay is a real-time horse racing dashboard built with Next.js 15+ and Appwrit
 1. Set up Appwrite Cloud project with required environment variables
 2. Run `npm install` in both `client/` and `server/` directories
 3. Use `npm run setup:appwrite` from client directory to initialize database schema
-4. Ensure real-time subscriptions are properly configured for live data flow
+4. Create required user role labels in Appwrite console: "user" and "admin"
+5. Ensure real-time subscriptions are properly configured for live data flow
+
+### Prerequisites
+- Node.js v22.17.0+ (server functions require Node.js 22)
+- Appwrite CLI installed globally (`npm install -g appwrite-cli`)
+- Appwrite Cloud account with project created
 
 ### Testing Strategy
 - Unit tests configured with Jest and React Testing Library
@@ -142,3 +156,10 @@ RaceDay is a real-time horse racing dashboard built with Next.js 15+ and Appwrit
 - Client components subscribe to collection changes via Appwrite real-time
 - Money flow calculations use live pool data, not estimated fallback values
 - Pool percentages and amounts must be mathematically consistent
+
+## Important Instructions and Reminders
+
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
