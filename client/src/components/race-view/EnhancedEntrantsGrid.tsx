@@ -552,14 +552,15 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     
     const columns: TimelineColumn[] = []
     
-    // Add pre-scheduled milestones (FIXED: Show columns progressively, not all at once)
+    // Add pre-scheduled milestones (FIXED: Always show standard columns by default)
     preScheduledMilestones.forEach((interval) => {
-      // FIXED: Only show timeline columns that are active or past
-      // This prevents all columns showing at once at 0s
-      // For pre-start: show column if we've reached that time point (time to race <= interval)
+      // FIXED: Standard pre-race columns (60m-0m) should always be visible by default
+      // Progressive display logic only applies to post-race delayed columns
+      // For pre-race intervals (>= 0): Always show
       // For completed/delayed races: show all columns for historical review  
-      const shouldShowColumn = (timeToRaceMinutes <= interval && timeToRaceMinutes > 0) || 
-                              raceIsCompleted || timeToRaceMinutes <= 0
+      const shouldShowColumn = interval >= 0 || 
+                              raceIsCompleted || 
+                              timeToRaceMinutes <= 0
       
       if (shouldShowColumn) {
         // CORRECTED: interval is now positive for before-start times
