@@ -16,6 +16,8 @@ export interface Meeting {
   category: SupportedRaceTypeCode; // Race type code: H or T (currently supported)
   date: string;
   firstRaceTime?: string;
+  weather?: string;  // Weather conditions (e.g. "Fine", "Overcast")
+  trackCondition?: string;  // Track condition (e.g. "Good 3", "Heavy 8")
 }
 
 export interface Race {
@@ -32,6 +34,7 @@ export interface Race {
   status: string;
   distance?: number;  // Race distance in metres
   trackCondition?: string;  // Track condition (e.g. "Good 3", "Heavy 8")
+  runnerCount?: number;  // Number of runners in the race
 }
 
 export interface MeetingWithRaces extends Meeting {
@@ -126,7 +129,10 @@ export interface Entrant {
   jockey?: string;
   trainerName?: string;
   weight?: number;
-  silkUrl?: string;
+  silkUrl?: string; // Legacy field - may not be populated
+  silkColours?: string; // Silk color description from NZ TAB
+  silkUrl64?: string; // 64x64 silk image URL from NZ TAB
+  silkUrl128?: string; // 128x128 silk image URL from NZ TAB
   isScratched: boolean;
   race: string;  // Race ID this entrant belongs to
   winOdds?: number;  // Current win odds

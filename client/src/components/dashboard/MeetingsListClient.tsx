@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { MeetingCard } from './MeetingCard';
+import { RacesForMeetingClient } from './RacesForMeetingClient';
 import { MeetingsListSkeleton } from '../skeletons/MeetingCardSkeleton';
 import { NextScheduledRaceButton } from './NextScheduledRaceButton';
 import { useRealtimeMeetings } from '@/hooks/useRealtimeMeetings';
@@ -16,6 +17,7 @@ interface MeetingsListClientProps {
 export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
 
   const handleError = useCallback((error: Error) => {
     console.error('Real-time connection error:', error);
@@ -46,16 +48,48 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
     onError: handleError,
   });
 
+  // Auto-select the first meeting on initial load
+  useEffect(() => {
+    if (meetings.length > 0 && !selectedMeeting) {
+      // Select first meeting by default
+      setSelectedMeeting(meetings[0]);
+    }
+  }, [meetings, selectedMeeting]);
+
+  // Handle meeting card click
+  const handleMeetingClick = useCallback((meeting: Meeting) => {
+    setSelectedMeeting(meeting);
+  }, []);
+
   // Memoize the meetings list to prevent unnecessary re-renders
   const meetingsList = useMemo(() => {
     return meetings.map((meeting) => (
-      <MeetingCard 
-        key={meeting.$id} 
-        meeting={meeting}
-        onRaceClick={handleRaceClick}
-      />
+      <div
+        key={meeting.$id}
+        className={`cursor-pointer transition-all duration-200 rounded-lg ${
+          selectedMeeting?.$id === meeting.$id 
+            ? 'ring-2 ring-blue-500 ring-opacity-50' 
+            : ''
+        }`}
+        onClick={() => handleMeetingClick(meeting)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleMeetingClick(meeting);
+          }
+        }}
+        aria-pressed={selectedMeeting?.$id === meeting.$id}
+        aria-label={`Select ${meeting.meetingName} meeting`}
+      >
+        <MeetingCard 
+          meeting={meeting}
+          onRaceClick={handleRaceClick}
+        />
+      </div>
     ));
-  }, [meetings, handleRaceClick]);
+  }, [meetings, handleRaceClick, selectedMeeting, handleMeetingClick]);
 
   // Show loading state only if we have no data
   if (!meetings.length && connectionAttempts === 0) {
@@ -63,13 +97,10 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <>
       {/* Header with connection status and next race button */}
-      <div className="flex items-center justify-between">
+      <div className="col-span-1 lg:col-span-2 flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Today&apos;s Race Meetings
-          </h2>
           <NextScheduledRaceButton meetings={meetings} />
         </div>
         
@@ -89,7 +120,7 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
 
       {/* Error banner */}
       {error && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+        <div className="col-span-1 lg:col-span-2 bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex">
               <div className="flex-shrink-0">
@@ -112,37 +143,47 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
         </div>
       )}
 
-      {/* Meetings list */}
-      {meetings.length > 0 ? (
-        <div 
-          className="space-y-4"
-          role="list"
-          aria-label="Race meetings"
-        >
-          {meetingsList}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <div className="mx-auto h-12 w-12 text-gray-400">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a4 4 0 118 0v4m-4 8a4 4 0 11-8 0V7a4 4 0 114 0v4" />
-            </svg>
-          </div>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No meetings today</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            There are no race meetings scheduled for today.
+      {/* Left Panel - Meetings List */}
+      <div className="bg-slate-50 rounded-lg border border-slate-200 h-full flex flex-col min-h-0">
+        <div className="p-4 border-b border-slate-200 flex-shrink-0 bg-slate-50">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Today&apos;s Meetings
+          </h2>
+          <p className="text-sm text-gray-600 mt-1">
+            {meetings.length} meeting{meetings.length !== 1 ? 's' : ''} available
           </p>
         </div>
-      )}
 
-      {/* Meetings count */}
-      {meetings.length > 0 && (
-        <div className="text-center pt-4 border-t border-gray-200">
-          <p className="text-sm text-gray-500">
-            Showing {meetings.length} meeting{meetings.length !== 1 ? 's' : ''} for today
-          </p>
+        <div className="flex-1 overflow-y-auto p-4">
+          {meetings.length > 0 ? (
+            <div 
+              className="space-y-3"
+              role="list"
+              aria-label="Race meetings"
+            >
+              {meetingsList}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="mx-auto h-12 w-12 text-gray-400">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a4 4 0 118 0v4m-4 8a4 4 0 11-8 0V7a4 4 0 114 0v4" />
+                </svg>
+              </div>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No meetings today</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                There are no race meetings scheduled for today.
+              </p>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </div>
+
+      {/* Right Panel - Races for Selected Meeting */}
+      <RacesForMeetingClient 
+        selectedMeeting={selectedMeeting}
+        onRaceClick={handleRaceClick}
+      />
+    </>
   );
 }

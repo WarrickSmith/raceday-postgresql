@@ -48,18 +48,29 @@ export const RaceHeader = memo(function RaceHeader({ initialRace, meeting, navig
         const diff = raceTime.getTime() - now.getTime();
         
         if (diff <= 0) {
-          // Race should have started - check if it's delayed
+          // Race has passed scheduled start time
           const delayDiff = Math.abs(diff);
           const delayMinutes = Math.floor(delayDiff / (1000 * 60));
           const delaySeconds = Math.floor((delayDiff % (1000 * 60)) / 1000);
           
-          if (race.status === 'Open' && delayDiff > 30000) { // More than 30 seconds late
+          // FIXED: Show "Delayed" immediately from 0s if race status is still 'Open'
+          // This addresses the issue where races showed "Started" for 30s before switching to "Delayed"
+          
+          // Only log significant delay transitions to reduce verbosity
+          if (delaySeconds === 0 || delaySeconds === 30 || (delaySeconds > 0 && delaySeconds % 60 === 0)) {
+            console.log(`🏁 DELAY: status="${race.status}" delay=${delaySeconds}s`);
+          }
+          
+          if (race.status === 'Open' || race.status === 'open') {
+            // Race is delayed - show delay time in format "Delayed: -X:XX"
             if (delayMinutes > 0) {
-              setTimeToStart(`Delayed: ${delayMinutes}:${delaySeconds.toString().padStart(2, '0')}`);
+              setTimeToStart(`Delayed: -${delayMinutes}:${delaySeconds.toString().padStart(2, '0')}`);
             } else {
-              setTimeToStart(`Delayed: 0:${delaySeconds.toString().padStart(2, '0')}`);
+              // FIXED: Show delay time immediately from 0 seconds, not just when > 0
+              setTimeToStart(`Delayed: -0:${delaySeconds.toString().padStart(2, '0')}`);
             }
           } else {
+            // Race status has changed from 'Open' - show appropriate status
             setTimeToStart('Started');
           }
           return;
@@ -96,8 +107,24 @@ export const RaceHeader = memo(function RaceHeader({ initialRace, meeting, navig
   }, [race.startTime, race.status]);
 
   const statusConfig = useMemo(() => {
+    // Check if race is delayed (past start time but still Open)
+    const now = new Date();
+    const raceTime = new Date(race.startTime);
+    const isPastStartTime = !isNaN(raceTime.getTime()) && now > raceTime;
+    const isDelayed = isPastStartTime && (race.status === 'Open' || race.status === 'open');
+    
+    if (isDelayed) {
+      return {
+        label: 'Delayed',
+        color: 'text-red-700',
+        bgColor: 'bg-red-100', 
+        icon: '⏰',
+        description: 'Race is delayed past scheduled start time'
+      };
+    }
+    
     return getStatusConfig(race.status);
-  }, [race.status]);
+  }, [race.status, race.startTime, timeToStart]); // Add timeToStart dependency to re-evaluate when time changes
 
   const statusClasses = useMemo(() => {
     return `${statusConfig.color} ${statusConfig.bgColor}`;

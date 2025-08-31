@@ -29,7 +29,7 @@ describe('Home Page', () => {
     render(<Home />)
     
     expect(screen.getByText('Race Day Dashboard')).toBeInTheDocument()
-    expect(screen.getByText('Today\'s race meetings in chronological order')).toBeInTheDocument()
+    expect(screen.getByText('Today\'s race meetings and races')).toBeInTheDocument()
   })
 
   it('renders main content area', async () => {

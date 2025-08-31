@@ -674,25 +674,30 @@ async function saveTimeBucketedMoneyFlowHistory(
       let incrementalPlaceAmount = 0
 
       try {
-        // ROBUST PREVIOUS BUCKET SEARCH: Find the most recent previous bucket with pool data
-        // Step 1: Try immediate previous interval (next higher timeInterval value)
-        context.log('Querying previous bucket', {
-          entrantId: entrantId.slice(0, 8) + '...',
-          currentInterval: timeInterval,
-        })
-
-        let previousIntervalQuery = await databases.listDocuments(
-          databaseId,
-          'money-flow-history',
-          [
-            Query.equal('entrant', entrantId),
-            Query.equal('raceId', raceId),
-            Query.equal('type', 'bucketed_aggregation'),
-            Query.greaterThan('timeInterval', timeInterval), // Find intervals > current interval
-            Query.orderAsc('timeInterval'), // Order ascending to get the closest higher interval
-            Query.limit(1), // Get the immediately previous chronological interval
-          ]
-        )
+        // SIMPLIFIED PREVIOUS BUCKET SEARCH
+        // For now, just check if we have any previous buckets at all
+        let previousIntervalQuery
+        try {
+          previousIntervalQuery = await databases.listDocuments(
+            databaseId,
+            'money-flow-history',
+            [
+              Query.equal('entrant', entrantId),
+              Query.equal('raceId', raceId),
+              Query.equal('type', 'bucketed_aggregation'),
+              Query.greaterThan('timeInterval', timeInterval),
+              Query.orderAsc('timeInterval'),
+              Query.limit(1),
+            ]
+          )
+        } catch (queryErr) {
+          context.log('ERROR: Query execution failed', {
+            entrantId: entrantId.slice(0, 8) + '...',
+            error: queryErr.message,
+            timeInterval,
+          })
+          previousIntervalQuery = { documents: [] }
+        }
 
         let prevDoc = null
 
@@ -704,6 +709,10 @@ async function saveTimeBucketedMoneyFlowHistory(
 
         if (previousIntervalQuery.documents.length > 0) {
           prevDoc = previousIntervalQuery.documents[0]
+          context.log('Found previous bucket', {
+            entrantId: entrantId.slice(0, 8) + '...',
+            previousInterval: prevDoc.timeInterval,
+          })
         } else {
           // Step 2: No immediate previous found - search for ANY previous bucket with data
           const allPreviousBuckets = await databases.listDocuments(
@@ -739,6 +748,21 @@ async function saveTimeBucketedMoneyFlowHistory(
           incrementalWinAmount = winPoolAmount - previousWinAmount
           incrementalPlaceAmount = placePoolAmount - previousPlaceAmount
 
+          context.log(
+            'SUCCESS: Found previous bucket and calculated increment',
+            {
+              entrantId: entrantId.slice(0, 8) + '...',
+              currentInterval: timeInterval,
+              previousInterval: prevDoc.timeInterval,
+              currentWin: winPoolAmount,
+              previousWin: previousWinAmount,
+              incrementalWin: incrementalWinAmount,
+              currentPlace: placePoolAmount,
+              previousPlace: previousPlaceAmount,
+              incrementalPlace: incrementalPlaceAmount,
+            }
+          )
+
           // Handle same totals (no change)
           if (incrementalWinAmount === 0 && incrementalPlaceAmount === 0) {
             context.log('No change in pool amounts since previous bucket', {
@@ -770,8 +794,9 @@ async function saveTimeBucketedMoneyFlowHistory(
           })
         } else {
           // No previous bucket found.
-          // For first/highest-interval buckets, treat as baseline (use pool totals).
-          // For non-first intervals, record zero increments (store 0 instead of null).
+          // Use baseline behavior for first/highest interval buckets,
+          // otherwise record zero increments (preferred behaviour) rather than
+          // relying on hardcoded race values or arbitrary percentages.
           context.log('No previous bucket found - applying fallback policy', {
             entrantId: entrantId.slice(0, 8) + '...',
             timeInterval,
@@ -789,6 +814,8 @@ async function saveTimeBucketedMoneyFlowHistory(
             )
           } else {
             // Non-first bucket but no previous data found — record zero increment.
+            // This avoids inserting misleading non-zero values and aligns with
+            // the user's preference to store 0 instead of null for no change.
             incrementalWinAmount = 0
             incrementalPlaceAmount = 0
             context.log(
@@ -798,15 +825,42 @@ async function saveTimeBucketedMoneyFlowHistory(
           }
         }
       } catch (queryError) {
-        // Query failed - use pool total as increment (first record behavior)
-        incrementalWinAmount = winPoolAmount
-        incrementalPlaceAmount = placePoolAmount
-        context.log('Query failed, treating as first record', {
+        // Query failed - log error but still try to calculate increments properly
+        context.log('ERROR: Previous bucket query failed', {
           entrantId: entrantId.slice(0, 8) + '...',
           timeInterval,
           error: queryError.message,
-          usingPoolTotal: winPoolAmount,
         })
+
+        // Even on query failure, try to set reasonable increments
+        // For first record (highest timeInterval like 60), use pool total
+        // For other records, this might indicate a system issue
+        if (timeInterval >= 55) {
+          // Likely first record in sequence
+          incrementalWinAmount = winPoolAmount
+          incrementalPlaceAmount = placePoolAmount
+          context.log(
+            'Query failed but appears to be first record (high timeInterval)',
+            {
+              entrantId: entrantId.slice(0, 8) + '...',
+              timeInterval,
+              usingPoolTotal: winPoolAmount,
+            }
+          )
+        } else {
+          // This is problematic - middle/later records should have previous buckets
+          incrementalWinAmount = winPoolAmount // Fallback but log as error
+          incrementalPlaceAmount = placePoolAmount
+          context.log(
+            'ERROR: Query failed for non-first record - data consistency issue',
+            {
+              entrantId: entrantId.slice(0, 8) + '...',
+              timeInterval,
+              error: queryError.message,
+              fallbackToPoolTotal: winPoolAmount,
+            }
+          )
+        }
       }
 
       const bucketedDoc = {

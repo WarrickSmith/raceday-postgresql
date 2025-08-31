@@ -17,7 +17,7 @@ jest.mock('next/navigation', () => ({
   useRouter: jest.fn(() => ({
     push: jest.fn(),
     replace: jest.fn(),
-    prefetch: jest.fn(),
+    prefetch: jest.fn(), isConnected: true,
   })),
 }));
 
@@ -27,12 +27,12 @@ const mockUseRealtimeRace = useRealtimeRaceModule.useRealtimeRace as jest.Mocked
 
 const mockRace: Race = {
   $id: 'race-123',
-  $createdAt: '2025-08-10T10:00:00.000Z',
-  $updatedAt: '2025-08-10T10:00:00.000Z',
-  raceId: 'R1-2025-08-10-ROTORUA',
+  $createdAt: '2025-08-31T10:00:00.000Z',
+  $updatedAt: '2025-08-31T10:00:00.000Z',
+  raceId: 'R1-2025-08-31-ROTORUA',
   raceNumber: 1,
   name: 'Maiden Plate',
-  startTime: '2025-08-10T10:20:00.000Z',
+  startTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour in the future
   meeting: 'meeting-456',
   status: 'Open',
   distance: 2200,
@@ -55,19 +55,19 @@ const mockNavigationData: RaceNavigationData = {
   previousRace: {
     raceId: 'prev-race-123',
     name: 'Previous Race',
-    startTime: '2025-08-10T09:50:00.000Z',
+    startTime: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
     meetingName: 'ROTORUA'
   },
   nextRace: {
     raceId: 'next-race-123',
     name: 'Next Race',
-    startTime: '2025-08-10T10:50:00.000Z',
+    startTime: new Date(Date.now() + 90 * 60 * 1000).toISOString(), // 1.5 hours in future
     meetingName: 'ROTORUA'
   },
   nextScheduledRace: {
     raceId: 'scheduled-race-123',
     name: 'Scheduled Race',
-    startTime: '2025-08-10T11:20:00.000Z',
+    startTime: new Date(Date.now() + 120 * 60 * 1000).toISOString(), // 2 hours in future
     meetingName: 'AUCKLAND'
   }
 };

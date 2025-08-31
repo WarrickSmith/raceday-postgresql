@@ -18,12 +18,7 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
     // Subscribe only to this specific race to minimize network overhead
     const channel = `databases.raceday-db.collections.races.documents.${initialRace.$id}`;
     
-    console.log('🏁 useRealtimeRace setup for:', {
-      raceId: initialRace.raceId,
-      documentId: initialRace.$id,
-      channel,
-      initialStatus: initialRace.status
-    });
+    console.log('🏁 Realtime setup:', { raceId: initialRace.raceId, status: initialRace.status });
 
     let unsubscribe: (() => void) | null = null;
     let retryTimeout: NodeJS.Timeout | null = null;
@@ -31,13 +26,10 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
     const setupSubscription = async () => {
       try {
         unsubscribe = client.subscribe(channel, (response: { payload?: Partial<Race> }) => {
-          console.log('🔄 useRealtimeRace received update:', {
-            channel,
-            payload: response.payload,
-            expectedId: initialRace.$id,
-            payloadId: response.payload?.$id,
-            matches: response.payload?.$id === initialRace.$id
-          });
+          // Only log meaningful status changes to reduce noise
+          if (response.payload?.status && response.payload.status !== initialRace.status) {
+            console.log('🔄 Status update:', { from: initialRace.status, to: response.payload.status });
+          }
           
           // Only update if this is our specific race and has meaningful changes
           if (response.payload && response.payload.$id === initialRace.$id) {
@@ -53,12 +45,7 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
               );
               
               if (hasSignificantChange) {
-                console.log('🏁 useRealtimeRace applying changes:', {
-                  raceId: currentRace.raceId,
-                  oldStatus: currentRace.status,
-                  newStatus: changes.status,
-                  changes
-                });
+                console.log('🏁 Applying changes:', { raceId: currentRace.raceId, status: changes.status });
                 setLastUpdate(new Date());
                 return { ...currentRace, ...changes };
               }

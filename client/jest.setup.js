@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/jest-globals'
+import 'jest-axe/extend-expect'
 
 // Setup environment variables for tests
 process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT = 'https://cloud.appwrite.io/v1'

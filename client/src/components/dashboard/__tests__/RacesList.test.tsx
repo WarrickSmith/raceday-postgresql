@@ -51,7 +51,7 @@ describe('RacesList', () => {
       races: [],
       isLoading: true,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<RacesList meetingId="meeting1" />);
@@ -65,7 +65,7 @@ describe('RacesList', () => {
       races: [],
       isLoading: false,
       error: 'Failed to load races',
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<RacesList meetingId="meeting1" />);
@@ -79,7 +79,7 @@ describe('RacesList', () => {
       races: [],
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<RacesList meetingId="meeting1" />);
@@ -93,7 +93,7 @@ describe('RacesList', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<RacesList meetingId="meeting1" />);
@@ -111,7 +111,7 @@ describe('RacesList', () => {
       races: unsortedRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<RacesList meetingId="meeting1" />);
@@ -137,7 +137,7 @@ describe('RacesList', () => {
       races: manyRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<RacesList meetingId="meeting1" />);
@@ -154,7 +154,7 @@ describe('RacesList', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<RacesList meetingId="meeting1" onRaceClick={handleRaceClick} />);
@@ -170,7 +170,7 @@ describe('RacesList', () => {
       races: mockRaces,
       isLoading: false,
       error: null,
-      refetch: jest.fn(),
+      refetch: jest.fn(), isConnected: true,
     });
 
     render(<RacesList meetingId="meeting1" />);
@@ -190,6 +190,7 @@ describe('RacesList', () => {
       isLoading: false,
       error: null,
       refetch: mockRefetch,
+      isConnected: true,
     });
 
     render(<RacesList meetingId="meeting1" />);

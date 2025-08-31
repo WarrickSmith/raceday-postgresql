@@ -1,13 +1,7 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MeetingCard } from '../MeetingCard';
-import { useRacesForMeeting } from '@/hooks/useRacesForMeeting';
 import { Meeting } from '@/types/meetings';
-import { Race } from '@/types/meetings';
 import { RACE_TYPE_CODES } from '@/constants/raceTypes';
-
-// Mock the useRacesForMeeting hook
-jest.mock('@/hooks/useRacesForMeeting');
-const mockUseRacesForMeeting = useRacesForMeeting as jest.MockedFunction<typeof useRacesForMeeting>;
 
 // Mock performance measurement
 const mockPerformance = {
@@ -24,38 +18,6 @@ Object.defineProperty(window, 'performance', {
   value: mockPerformance,
 });
 
-// Mock the RacesList component directly with performance tracking
-jest.mock('../RacesList', () => ({
-  RacesList: ({ meetingId }: { meetingId: string }) => {
-    const startTime = performance.now();
-    const { races, isLoading } = mockUseRacesForMeeting({ meetingId });
-    const endTime = performance.now();
-    
-    // Track render time
-    performance.mark(`races-list-${meetingId}-render-end`);
-    
-    if (isLoading) {
-      return <div data-testid={`races-list-${meetingId}`}>Loading...</div>;
-    }
-
-    return (
-      <div 
-        data-testid={`races-list-${meetingId}`}
-        data-render-time={endTime - startTime}
-      >
-        {races.map((race) => (
-          <div 
-            key={race.raceId} 
-            data-testid={`race-${race.raceId}`}
-          >
-            {race.name}
-          </div>
-        ))}
-      </div>
-    );
-  }
-}));
-
 describe('MeetingCard Performance Tests', () => {
   const mockMeeting: Meeting = {
     $id: '1',
@@ -70,100 +32,51 @@ describe('MeetingCard Performance Tests', () => {
     firstRaceTime: '2024-01-01T10:00:00Z',
   };
 
-  const createMockRaces = (count: number): Race[] => {
-    return Array.from({ length: count }, (_, i) => ({
-      $id: `race${i + 1}`,
-      $createdAt: '2024-01-01T08:00:00Z',
-      $updatedAt: '2024-01-01T08:00:00Z',
-      raceId: `R${String(i + 1).padStart(3, '0')}`,
-      raceNumber: i + 1,
-      name: `Race ${i + 1}`,  // Changed from raceName to name
-      startTime: `2024-01-01T${String(15 + i).padStart(2, '0')}:00:00Z`,
-      meeting: 'meeting1',
-      status: 'Open',
-    }));
-  };
-
   beforeEach(() => {
     jest.clearAllMocks();
     mockPerformance.now.mockReturnValue(100);
-    mockUseRacesForMeeting.mockReturnValue({
-      races: [],
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
+    
+    // Mock fetch for meeting completion status
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ isCompleted: false }),
+      })
+    ) as jest.Mock;
   });
 
-  it('should expand within performance target (<=100ms)', async () => {
-    const mockRaces = createMockRaces(5);
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
-    render(<MeetingCard meeting={mockMeeting} />);
-    
-    // Set up performance timing
+  it('should render within performance target (<=50ms)', async () => {
     let startTime = 0;
     let endTime = 0;
     
     mockPerformance.now
-      .mockReturnValueOnce(0) // Initial render
-      .mockReturnValueOnce(10) // Click start
-      .mockReturnValueOnce(50); // Click end / expansion complete
+      .mockReturnValueOnce(0) // Start render
+      .mockReturnValueOnce(40); // End render
 
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    
     startTime = performance.now();
-    fireEvent.click(expandButton);
+    render(<MeetingCard meeting={mockMeeting} />);
     
+    // Wait for async state updates to complete
     await waitFor(() => {
-      expect(screen.getByTestId('races-list-meeting1')).toBeInTheDocument();
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
     });
     
     endTime = performance.now();
-    const expansionTime = endTime - startTime;
-    
-    // Should expand within performance target
-    expect(expansionTime).toBeLessThanOrEqual(100);
-  });
-
-  it('should handle large number of races efficiently', async () => {
-    const mockRaces = createMockRaces(20); // Large number of races
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-
-    render(<MeetingCard meeting={mockMeeting} />);
-    
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    
-    const startTime = performance.now();
-    fireEvent.click(expandButton);
-    
-    await waitFor(() => {
-      expect(screen.getByTestId('races-list-meeting1')).toBeInTheDocument();
-    });
-    
-    const endTime = performance.now();
     const renderTime = endTime - startTime;
     
-    // Should handle 20 races within acceptable time
-    expect(renderTime).toBeLessThan(200);
+    // Should render within performance target
+    expect(renderTime).toBeLessThanOrEqual(50);
     
-    // Verify all races are rendered
-    mockRaces.forEach((race) => {
-      expect(screen.getByTestId(`race-${race.raceId}`)).toBeInTheDocument();
-    });
+    // Verify component is fully rendered
+    expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
   });
 
-  it('should minimize re-renders during expand/collapse', () => {
+  it('should minimize re-renders with React.memo', () => {
     const renderSpy = jest.fn();
     
     const TestComponent = ({ meeting }: { meeting: Meeting }) => {
@@ -175,102 +88,26 @@ describe('MeetingCard Performance Tests', () => {
     
     const initialRenders = renderSpy.mock.calls.length;
     
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    
-    // Expand
-    fireEvent.click(expandButton);
-    
-    // Collapse
-    fireEvent.click(expandButton);
-    
     // Re-render with same props (should not cause additional renders due to memoization)
     rerender(<TestComponent meeting={mockMeeting} />);
     
     const finalRenders = renderSpy.mock.calls.length;
     
-    // Should minimize unnecessary re-renders
-    expect(finalRenders - initialRenders).toBeLessThan(5);
+    // Should have minimal additional renders (TestComponent itself will re-render)
+    expect(finalRenders - initialRenders).toBeLessThanOrEqual(1);
   });
 
-  it('should handle rapid expand/collapse operations', async () => {
-    const mockRaces = createMockRaces(10);
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-
-    render(<MeetingCard meeting={mockMeeting} />);
-    
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    
-    const startTime = performance.now();
-    
-    // Rapid expand/collapse operations
-    for (let i = 0; i < 5; i++) {
-      fireEvent.click(expandButton); // Expand
-      fireEvent.click(expandButton); // Collapse
-    }
-    
-    const endTime = performance.now();
-    const totalTime = endTime - startTime;
-    
-    // Should handle rapid operations without performance degradation
-    expect(totalTime).toBeLessThan(500);
-    
-    // Should end in collapsed state
-    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('should lazy load efficiently', async () => {
-    const mockRaces = createMockRaces(8);
-    
-    render(<MeetingCard meeting={mockMeeting} />);
-    
-    // RacesList should not be loaded initially
-    expect(screen.queryByTestId('races-list-meeting1')).not.toBeInTheDocument();
-    
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-    
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    
-    const loadStartTime = performance.now();
-    fireEvent.click(expandButton);
-    
-    await waitFor(() => {
-      expect(screen.getByTestId('races-list-meeting1')).toBeInTheDocument();
-    });
-    
-    const loadEndTime = performance.now();
-    const lazyLoadTime = loadEndTime - loadStartTime;
-    
-    // Lazy loading should be fast
-    expect(lazyLoadTime).toBeLessThan(150);
-  });
-
-  it('should maintain performance with multiple expanded meetings', async () => {
-    const mockRaces = createMockRaces(5);
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-
-    // Render multiple meeting cards
-    const meetings = Array.from({ length: 3 }, (_, i) => ({
+  it('should handle multiple meeting cards efficiently', async () => {
+    // Create multiple meetings
+    const meetings = Array.from({ length: 5 }, (_, i) => ({
       ...mockMeeting,
       $id: `meeting${i + 1}`,
       meetingId: `meeting${i + 1}`,
       meetingName: `Meeting ${i + 1}`,
     }));
 
+    const startTime = performance.now();
+    
     const { container } = render(
       <div>
         {meetings.map((meeting) => (
@@ -279,50 +116,36 @@ describe('MeetingCard Performance Tests', () => {
       </div>
     );
 
-    const startTime = performance.now();
-    
-    // Expand all meetings
-    const expandButtons = screen.getAllByRole('button', { name: /expand to show races/i });
-    expandButtons.forEach((button) => {
-      fireEvent.click(button);
-    });
-
+    // Wait for all components to render
     await waitFor(() => {
       meetings.forEach((meeting) => {
-        expect(screen.getByTestId(`races-list-${meeting.meetingId}`)).toBeInTheDocument();
+        expect(screen.getByText(meeting.meetingName)).toBeInTheDocument();
       });
     });
 
     const endTime = performance.now();
-    const totalExpansionTime = endTime - startTime;
+    const totalRenderTime = endTime - startTime;
     
-    // Should handle multiple expansions efficiently
-    expect(totalExpansionTime).toBeLessThan(300);
+    // Should handle multiple cards efficiently
+    expect(totalRenderTime).toBeLessThan(250);
     
     // Verify DOM structure is clean
-    const allRaceLists = container.querySelectorAll('[data-testid^="races-list-"]');
-    expect(allRaceLists).toHaveLength(3);
+    const allMeetingCards = container.querySelectorAll('[role="article"]');
+    expect(allMeetingCards).toHaveLength(5);
   });
 
-  it('should handle memory efficiently during expand/collapse cycles', () => {
+  it('should handle memory efficiently', async () => {
     const initialMemoryUsage = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize || 0;
     
-    const mockRaces = createMockRaces(15);
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-
-    render(<MeetingCard meeting={mockMeeting} />);
-    
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    
-    // Perform multiple expand/collapse cycles
+    // Render and unmount multiple times
     for (let i = 0; i < 10; i++) {
-      fireEvent.click(expandButton); // Expand
-      fireEvent.click(expandButton); // Collapse
+      const { unmount } = render(<MeetingCard meeting={mockMeeting} />);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
+      });
+      
+      unmount();
     }
     
     const finalMemoryUsage = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize || 0;
@@ -334,66 +157,105 @@ describe('MeetingCard Performance Tests', () => {
     }
   });
 
-  it('should optimize render performance with React.memo', () => {
-    const mockRaces = createMockRaces(5);
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-
+  it('should optimize render performance with stable props', async () => {
+    const renderStartTime = performance.now();
+    
     const { rerender } = render(<MeetingCard meeting={mockMeeting} />);
     
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    fireEvent.click(expandButton);
+    // Wait for initial render
+    await waitFor(() => {
+      expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
+    });
     
-    const renderStartTime = performance.now();
+    const rerenderStartTime = performance.now();
     
     // Re-render with same props (should be optimized by React.memo)
     rerender(<MeetingCard meeting={mockMeeting} />);
     
     const renderEndTime = performance.now();
-    const memoizedRenderTime = renderEndTime - renderStartTime;
+    const memoizedRenderTime = renderEndTime - rerenderStartTime;
     
     // Memoized re-render should be very fast
-    expect(memoizedRenderTime).toBeLessThan(50);
+    expect(memoizedRenderTime).toBeLessThan(25);
     
-    // Component should still be expanded
-    expect(expandButton).toHaveAttribute('aria-expanded', 'true');
+    // Component should still be rendered correctly
+    expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
   });
 
-  it('should validate bundle size impact', async () => {
-    // This test would typically use webpack-bundle-analyzer or similar tools
-    // For now, we'll simulate checking component complexity
-    
+  it('should validate DOM complexity', async () => {
     const { container } = render(<MeetingCard meeting={mockMeeting} />);
     
-    // Count DOM nodes as a proxy for bundle complexity
+    // Wait for component to render
+    await waitFor(() => {
+      expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
+    });
+    
+    // Count DOM nodes as a proxy for complexity
     const nodeCount = container.querySelectorAll('*').length;
     
     // Should have reasonable DOM complexity
-    expect(nodeCount).toBeLessThan(50); // Collapsed state should be lightweight
+    expect(nodeCount).toBeLessThan(30); // Should be lightweight
     
-    const mockRaces = createMockRaces(10);
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
+    // Should have essential elements
+    expect(container.querySelector('[role="article"]')).toBeInTheDocument();
+    expect(container.querySelector('h3')).toBeInTheDocument();
+    expect(container.querySelector('time')).toBeInTheDocument();
+  });
 
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    fireEvent.click(expandButton);
+  it('should handle async operations efficiently', async () => {
+    // Mock a slower API response
+    global.fetch = jest.fn(() =>
+      new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({
+            ok: true,
+            json: () => Promise.resolve({ isCompleted: true }),
+          } as Response);
+        }, 50);
+      })
+    ) as jest.Mock;
 
+    const startTime = performance.now();
+    
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    // Wait for async operations to complete and status to update
     await waitFor(() => {
-      expect(screen.getByTestId('races-list-meeting1')).toBeInTheDocument();
-    });
-
-    const expandedNodeCount = container.querySelectorAll('*').length;
-    const nodeGrowth = expandedNodeCount - nodeCount;
+      expect(screen.getByLabelText('Status: completed')).toBeInTheDocument();
+    }, { timeout: 1000 });
     
-    // Node growth should be proportional to races (indicating efficient structure)
-    expect(nodeGrowth).toBeLessThan(mockRaces.length * 5); // Max 5 nodes per race
+    const endTime = performance.now();
+    const totalTime = endTime - startTime;
+    
+    // Should handle async operations within reasonable time
+    expect(totalTime).toBeLessThan(500);
+    
+    // Should show completed status after async update
+    expect(screen.getByLabelText('Status: completed')).toBeInTheDocument();
+  });
+
+  it('should handle error states efficiently', async () => {
+    // Mock fetch failure
+    global.fetch = jest.fn(() =>
+      Promise.reject(new Error('Network error'))
+    ) as jest.Mock;
+
+    const startTime = performance.now();
+    
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    // Wait for error handling to complete
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
+    }, { timeout: 1000 });
+    
+    const endTime = performance.now();
+    const totalTime = endTime - startTime;
+    
+    // Should handle errors efficiently
+    expect(totalTime).toBeLessThan(150);
+    
+    // Should still render the component
+    expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
   });
 });

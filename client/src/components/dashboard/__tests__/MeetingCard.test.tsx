@@ -1,18 +1,7 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MeetingCard } from '../MeetingCard';
 import { Meeting } from '@/types/meetings';
 import { RACE_TYPE_CODES } from '@/constants/raceTypes';
-
-// Mock the dynamic import and RacesList component
-jest.mock('next/dynamic', () => {
-  return () => {
-    const Component = ({ meetingId }: { meetingId: string }) => (
-      <div data-testid={`races-list-${meetingId}`}>Mocked RacesList</div>
-    );
-    Component.displayName = 'MockedRacesList';
-    return Component;
-  };
-});
 
 describe('MeetingCard', () => {
   const mockMeeting: Meeting = {
@@ -28,30 +17,57 @@ describe('MeetingCard', () => {
     firstRaceTime: '2024-01-01T10:00:00Z',
   };
 
-  it('should render meeting information correctly', () => {
+  beforeEach(() => {
+    // Mock fetch for meeting completion status
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ isCompleted: false }),
+      })
+    ) as jest.Mock;
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('should render meeting information correctly', async () => {
     render(<MeetingCard meeting={mockMeeting} />);
 
     expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
     expect(screen.getByText('Thoroughbred')).toBeInTheDocument();
     expect(screen.getByText('ID: meeting1')).toBeInTheDocument();
-    // Check that time is displayed (format may vary by timezone)
-    expect(screen.getByLabelText(/First race at/)).toBeInTheDocument();
+    
+    // Wait for async status to load
+    await waitFor(() => {
+      expect(screen.getByLabelText(/First race at/)).toBeInTheDocument();
+    });
   });
 
-  it('should display Australian flag for AUS country', () => {
+  it('should display Australian flag for AUS country', async () => {
     render(<MeetingCard meeting={mockMeeting} />);
     
     expect(screen.getByLabelText('Country: AUS')).toBeInTheDocument();
+    
+    // Wait for component to fully render
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
+    });
   });
 
-  it('should display New Zealand flag for NZ country', () => {
+  it('should display New Zealand flag for NZ country', async () => {
     const nzMeeting = { ...mockMeeting, country: 'NZ' };
     render(<MeetingCard meeting={nzMeeting} />);
     
     expect(screen.getByLabelText('Country: NZ')).toBeInTheDocument();
+    
+    // Wait for component to fully render
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
+    });
   });
 
-  it('should show upcoming status for future races', () => {
+  it('should show upcoming status for future races', async () => {
     const futureMeeting = {
       ...mockMeeting,
       firstRaceTime: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
@@ -59,11 +75,13 @@ describe('MeetingCard', () => {
     
     render(<MeetingCard meeting={futureMeeting} />);
     
-    expect(screen.getByLabelText('Status: upcoming')).toBeInTheDocument();
-    expect(screen.getByText('Upcoming')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByLabelText('Status: upcoming')).toBeInTheDocument();
+      expect(screen.getByText('Upcoming')).toBeInTheDocument();
+    });
   });
 
-  it('should show live status for current races', () => {
+  it('should show live status for current races', async () => {
     const liveMeeting = {
       ...mockMeeting,
       firstRaceTime: new Date(Date.now() - 1800000).toISOString(), // 30 minutes ago
@@ -71,19 +89,23 @@ describe('MeetingCard', () => {
     
     render(<MeetingCard meeting={liveMeeting} />);
     
-    expect(screen.getByLabelText('Status: live')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByLabelText('Status: live')).toBeInTheDocument();
+    });
   });
 
-  it('should handle missing first race time gracefully', () => {
+  it('should handle missing first race time gracefully', async () => {
     const meetingWithoutRaceTime = { ...mockMeeting, firstRaceTime: undefined };
     
     render(<MeetingCard meeting={meetingWithoutRaceTime} />);
     
     // Check that fallback time is displayed (format may vary by timezone)
-    expect(screen.getByLabelText(/First race at/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByLabelText(/First race at/)).toBeInTheDocument();
+    });
   });
 
-  it('should display race type correctly for Harness racing', () => {
+  it('should display race type correctly for Harness racing', async () => {
     const harnessMeeting = { 
       ...mockMeeting, 
       raceType: 'Harness Horse Racing', 
@@ -93,9 +115,14 @@ describe('MeetingCard', () => {
     render(<MeetingCard meeting={harnessMeeting} />);
     
     expect(screen.getByText('Harness')).toBeInTheDocument();
+    
+    // Wait for component to fully render
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
+    });
   });
 
-  it('should have proper accessibility attributes', () => {
+  it('should have proper accessibility attributes', async () => {
     render(<MeetingCard meeting={mockMeeting} />);
     
     const article = screen.getByRole('article');
@@ -104,11 +131,13 @@ describe('MeetingCard', () => {
     const heading = screen.getByRole('heading', { level: 3 });
     expect(heading).toHaveAttribute('id', 'meeting-1');
     
-    const timeElement = screen.getByLabelText(/First race at/);
-    expect(timeElement).toHaveAttribute('dateTime');
+    await waitFor(() => {
+      const timeElement = screen.getByLabelText(/First race at/);
+      expect(timeElement).toHaveAttribute('dateTime');
+    });
   });
 
-  it('should truncate long meeting names', () => {
+  it('should truncate long meeting names', async () => {
     const longNameMeeting = {
       ...mockMeeting,
       meetingName: 'Very Long Meeting Name That Should Be Truncated For Display Purposes',
@@ -118,137 +147,136 @@ describe('MeetingCard', () => {
     
     const heading = screen.getByRole('heading', { level: 3 });
     expect(heading).toHaveClass('truncate');
+    
+    // Wait for component to fully render
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
+    });
   });
 
-  it('should display country code text beside flag', () => {
+  it('should display country code text beside flag', async () => {
     render(<MeetingCard meeting={mockMeeting} />);
     
     // Check that the country code text is visible
     expect(screen.getByText('AUS')).toBeInTheDocument();
     expect(screen.getByText('AUS')).toHaveClass('text-blue-600', 'font-bold');
+    
+    // Wait for component to fully render
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
+    });
   });
 
-  it('should display NZ country code for New Zealand', () => {
+  it('should display NZ country code for New Zealand', async () => {
     const nzMeeting = { ...mockMeeting, country: 'NZ' };
     render(<MeetingCard meeting={nzMeeting} />);
     
     expect(screen.getByText('NZ')).toBeInTheDocument();
     expect(screen.getByText('NZ')).toHaveClass('text-green-600', 'font-bold');
-  });
-
-  it('should render expand/collapse button', () => {
-    render(<MeetingCard meeting={mockMeeting} />);
     
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    expect(expandButton).toBeInTheDocument();
-    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('should toggle expand/collapse state when button is clicked', async () => {
-    render(<MeetingCard meeting={mockMeeting} />);
-    
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    
-    // Initially collapsed
-    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByTestId(`races-list-${mockMeeting.meetingId}`)).not.toBeInTheDocument();
-    
-    // Click to expand
-    fireEvent.click(expandButton);
-    
-    expect(expandButton).toHaveAttribute('aria-expanded', 'true');
-    expect(expandButton).toHaveAccessibleName(/collapse races/i);
-    
-    // Wait for RacesList to be rendered
+    // Wait for component to fully render
     await waitFor(() => {
-      expect(screen.getByTestId(`races-list-${mockMeeting.meetingId}`)).toBeInTheDocument();
-    });
-    
-    // Click to collapse
-    fireEvent.click(expandButton);
-    
-    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
-    expect(expandButton).toHaveAccessibleName(/expand to show races/i);
-  });
-
-  it('should handle keyboard navigation for expand/collapse', async () => {
-    render(<MeetingCard meeting={mockMeeting} />);
-    
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    
-    // Test Enter key
-    fireEvent.keyDown(expandButton, { key: 'Enter' });
-    
-    expect(expandButton).toHaveAttribute('aria-expanded', 'true');
-    
-    await waitFor(() => {
-      expect(screen.getByTestId(`races-list-${mockMeeting.meetingId}`)).toBeInTheDocument();
-    });
-    
-    // Test Space key to collapse
-    fireEvent.keyDown(expandButton, { key: ' ' });
-    
-    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('should show chevron icon with correct rotation', () => {
-    render(<MeetingCard meeting={mockMeeting} />);
-    
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    const chevronIcon = expandButton.querySelector('svg');
-    
-    expect(chevronIcon).toBeInTheDocument();
-    expect(chevronIcon).toHaveClass('transition-transform');
-    
-    // Click to expand and check rotation
-    fireEvent.click(expandButton);
-    
-    expect(chevronIcon).toHaveClass('rotate-180');
-  });
-
-  it('should lazy load RacesList only when expanded', async () => {
-    render(<MeetingCard meeting={mockMeeting} />);
-    
-    // RacesList should not be in DOM initially
-    expect(screen.queryByTestId(`races-list-${mockMeeting.meetingId}`)).not.toBeInTheDocument();
-    
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    fireEvent.click(expandButton);
-    
-    // RacesList should be lazy loaded after expansion
-    await waitFor(() => {
-      expect(screen.getByTestId(`races-list-${mockMeeting.meetingId}`)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
     });
   });
 
-  it('should maintain expand state during re-renders', async () => {
+  it('should handle API errors gracefully', async () => {
+    // Mock fetch failure
+    global.fetch = jest.fn(() => Promise.reject(new Error('API Error'))) as jest.Mock;
+    
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    // Should still render the meeting information
+    expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
+    
+    // Wait for error handling and fallback status
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
+    });
+  });
+
+  it('should show completed status when API returns completed', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ isCompleted: true }),
+      })
+    ) as jest.Mock;
+
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    await waitFor(() => {
+      expect(screen.getByLabelText('Status: completed')).toBeInTheDocument();
+      expect(screen.getByText('Completed')).toBeInTheDocument();
+    });
+  });
+
+  it('should display weather information when available', async () => {
+    const meetingWithWeather = {
+      ...mockMeeting,
+      weather: 'Fine',
+    };
+    
+    render(<MeetingCard meeting={meetingWithWeather} />);
+    
+    expect(screen.getByText('Fine')).toBeInTheDocument();
+    
+    // Wait for component to fully render
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
+    });
+  });
+
+  it('should display track condition when available', async () => {
+    const meetingWithTrack = {
+      ...mockMeeting,
+      trackCondition: 'Good',
+    };
+    
+    render(<MeetingCard meeting={meetingWithTrack} />);
+    
+    expect(screen.getByText(/Track: Good/)).toBeInTheDocument();
+    
+    // Wait for component to fully render
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle unknown country gracefully', async () => {
+    const unknownCountryMeeting = {
+      ...mockMeeting,
+      country: 'XX',
+    };
+    
+    render(<MeetingCard meeting={unknownCountryMeeting} />);
+    
+    // Should display unknown country fallback
+    expect(screen.getByText('XX')).toBeInTheDocument();
+    
+    // Wait for component to fully render
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
+    });
+  });
+
+  it('should maintain component state during re-renders', async () => {
     const { rerender } = render(<MeetingCard meeting={mockMeeting} />);
     
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    
-    // Expand the meeting
-    fireEvent.click(expandButton);
-    expect(expandButton).toHaveAttribute('aria-expanded', 'true');
-    
+    // Wait for initial render
     await waitFor(() => {
-      expect(screen.getByTestId(`races-list-${mockMeeting.meetingId}`)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
     });
     
     // Re-render with updated meeting data (simulating real-time update)
     const updatedMeeting = { ...mockMeeting, $updatedAt: '2024-01-01T09:00:00Z' };
     rerender(<MeetingCard meeting={updatedMeeting} />);
     
-    // Expand state should be maintained
-    expect(screen.getByRole('button', { name: /collapse races/i })).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId(`races-list-${mockMeeting.meetingId}`)).toBeInTheDocument();
-  });
-
-  it('should have proper accessibility attributes for expand/collapse', () => {
-    render(<MeetingCard meeting={mockMeeting} />);
+    // Should still render correctly
+    expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
     
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    
-    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
-    expect(expandButton).toHaveAttribute('aria-label', 'Expand to show races');
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
+    });
   });
 });

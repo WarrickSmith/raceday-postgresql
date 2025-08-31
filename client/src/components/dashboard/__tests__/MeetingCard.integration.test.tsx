@@ -1,33 +1,7 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MeetingCard } from '../MeetingCard';
-import { useRacesForMeeting } from '@/hooks/useRacesForMeeting';
 import { Meeting } from '@/types/meetings';
-import { Race } from '@/types/meetings';
 import { RACE_TYPE_CODES } from '@/constants/raceTypes';
-
-// Mock the useRacesForMeeting hook
-jest.mock('@/hooks/useRacesForMeeting');
-const mockUseRacesForMeeting = useRacesForMeeting as jest.MockedFunction<typeof useRacesForMeeting>;
-
-// Mock the RacesList component directly
-jest.mock('../RacesList', () => ({
-  RacesList: ({ meetingId, onRaceClick }: { meetingId: string; onRaceClick?: (id: string) => void }) => {
-    const { races } = mockUseRacesForMeeting({ meetingId });
-    return (
-      <div data-testid={`races-list-${meetingId}`}>
-        {races.map((race) => (
-          <div 
-            key={race.raceId} 
-            data-testid={`race-${race.raceId}`}
-            onClick={() => onRaceClick?.(race.raceId)}
-          >
-            {race.name} - {race.status}
-          </div>
-        ))}
-      </div>
-    );
-  }
-}));
 
 describe('MeetingCard Integration Tests', () => {
   const mockMeeting: Meeting = {
@@ -43,265 +17,223 @@ describe('MeetingCard Integration Tests', () => {
     firstRaceTime: '2024-01-01T10:00:00Z',
   };
 
-  const mockRaces: Race[] = [
-    {
-      $id: 'race1',
-      $createdAt: '2024-01-01T08:00:00Z',
-      $updatedAt: '2024-01-01T08:00:00Z',
-      raceId: 'R001',
-      raceNumber: 1,
-      name: 'First Race',  // Changed from raceName to name
-      startTime: '2024-01-01T15:00:00Z',
-      meeting: 'meeting1',
-      status: 'Open',
-    },
-    {
-      $id: 'race2',
-      $createdAt: '2024-01-01T08:00:00Z',
-      $updatedAt: '2024-01-01T08:00:00Z',
-      raceId: 'R002',
-      raceNumber: 2,
-      name: 'Second Race',  // Changed from raceName to name
-      startTime: '2024-01-01T16:00:00Z',
-      meeting: 'meeting1',
-      status: 'Closed',
-    },
-  ];
-
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseRacesForMeeting.mockReturnValue({
-      races: [],
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
+    
+    // Mock fetch for meeting completion status
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ isCompleted: false }),
+      })
+    ) as jest.Mock;
   });
 
-  it('should display races when meeting is expanded', async () => {
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('should integrate with API to show meeting status', async () => {
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    // Wait for API call to complete
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
     });
+
+    // Should display the meeting information
+    expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
+    expect(screen.getByText('Thoroughbred')).toBeInTheDocument();
+    
+    // Verify API was called
+    expect(global.fetch).toHaveBeenCalledWith('/api/meetings/meeting1/status');
+  });
+
+  it('should handle API errors gracefully', async () => {
+    // Mock API failure
+    global.fetch = jest.fn(() => Promise.reject(new Error('API Error'))) as jest.Mock;
+    
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    // Should still render meeting info despite API error
+    expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
+    
+    // Wait for fallback status logic
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
+    });
+
+    // Should use fallback heuristic for status when API fails
+    expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
+  });
+
+  it('should show completed status from API response', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ isCompleted: true }),
+      })
+    ) as jest.Mock;
 
     render(<MeetingCard meeting={mockMeeting} />);
     
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    fireEvent.click(expandButton);
-
     await waitFor(() => {
-      expect(screen.getByTestId('races-list-meeting1')).toBeInTheDocument();
-      expect(screen.getByTestId('race-R001')).toBeInTheDocument();
-      expect(screen.getByTestId('race-R002')).toBeInTheDocument();
-      expect(screen.getByText('First Race - Open')).toBeInTheDocument();
-      expect(screen.getByText('Second Race - Closed')).toBeInTheDocument();
+      expect(screen.getByLabelText('Status: completed')).toBeInTheDocument();
     });
+
+    expect(screen.getByText('Completed')).toBeInTheDocument();
   });
 
-  it.skip('should handle real-time race status updates when expanded', async () => {
-    // Initially show races in Open and Closed status
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
+  it('should update status when API response changes', async () => {
+    let resolvePromise: (value: any) => void;
+    const promise = new Promise((resolve) => {
+      resolvePromise = resolve;
     });
 
-    const { rerender } = render(<MeetingCard meeting={mockMeeting} />);
+    global.fetch = jest.fn(() => promise) as jest.Mock;
 
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    fireEvent.click(expandButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('First Race - Open')).toBeInTheDocument();
-      expect(screen.getByText('Second Race - Closed')).toBeInTheDocument();
-    });
-
-    // Simulate real-time update: First race becomes Running
-    const updatedRaces = [
-      { ...mockRaces[0], status: 'Running', $updatedAt: '2024-01-01T08:30:00Z' },
-      mockRaces[1],
-    ];
-
-    mockUseRacesForMeeting.mockReturnValue({
-      races: updatedRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-
-    rerender(<MeetingCard meeting={mockMeeting} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('First Race - Running')).toBeInTheDocument();
-      expect(screen.getByText('Second Race - Closed')).toBeInTheDocument();
-    });
-  });
-
-  it('should preserve expand state during meeting updates', async () => {
     const { rerender } = render(<MeetingCard meeting={mockMeeting} />);
     
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
+    // Initially should show loading/default state
+    expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
 
-    // Expand the meeting
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    fireEvent.click(expandButton);
+    // Resolve the API call
+    resolvePromise!({
+      ok: true,
+      json: () => Promise.resolve({ isCompleted: true }),
+    });
 
     await waitFor(() => {
-      expect(screen.getByTestId('races-list-meeting1')).toBeInTheDocument();
+      expect(screen.getByLabelText('Status: completed')).toBeInTheDocument();
     });
 
-    // Simulate meeting data update (real-time update)
-    const updatedMeeting = {
-      ...mockMeeting,
-      $updatedAt: '2024-01-01T09:00:00Z',
-      meetingName: 'Updated Flemington Race Meeting',
-    };
-
+    // Re-render with updated meeting (simulating real-time update)
+    const updatedMeeting = { ...mockMeeting, $updatedAt: '2024-01-01T09:00:00Z' };
     rerender(<MeetingCard meeting={updatedMeeting} />);
 
-    // Expand state should be preserved - button should still be expanded
-    expect(screen.getByRole('button', { name: /collapse races/i })).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId('races-list-meeting1')).toBeInTheDocument();
-    expect(screen.getByText('Updated Flemington Race Meeting')).toBeInTheDocument();
+    // Should maintain the completed status
+    expect(screen.getByLabelText('Status: completed')).toBeInTheDocument();
   });
 
-  it('should handle race additions in expanded meetings', async () => {
-    render(<MeetingCard meeting={mockMeeting} />);
+  it('should handle different country codes properly', async () => {
+    const nzMeeting = { ...mockMeeting, country: 'NZ' };
     
-    // Initially show 2 races
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    fireEvent.click(expandButton);
-
+    render(<MeetingCard meeting={nzMeeting} />);
+    
+    // Should display correct country flag and code
+    expect(screen.getByLabelText('Country: NZ')).toBeInTheDocument();
+    expect(screen.getByText('NZ')).toBeInTheDocument();
+    expect(screen.getByText('NZ')).toHaveClass('text-green-600');
+    
+    // Wait for status to load
     await waitFor(() => {
-      expect(screen.getByTestId('race-R001')).toBeInTheDocument();
-      expect(screen.getByTestId('race-R002')).toBeInTheDocument();
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
     });
+  });
 
-    // Add a new race
-    const newRace: Race = {
-      $id: 'race3',
-      $createdAt: '2024-01-01T08:00:00Z',
-      $updatedAt: '2024-01-01T08:00:00Z',
-      raceId: 'R003',
-      raceNumber: 3,
-      name: 'Third Race',  // Changed from raceName to name
-      startTime: '2024-01-01T17:00:00Z',
-      meeting: 'meeting1',
-      status: 'Open',
+  it('should handle race type categories correctly', async () => {
+    const harnessMeeting = {
+      ...mockMeeting,
+      raceType: 'Harness Horse Racing',
+      category: RACE_TYPE_CODES.HARNESS,
     };
-
-    mockUseRacesForMeeting.mockReturnValue({
-      races: [...mockRaces, newRace],
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-
-    // Force re-render to simulate real-time race addition
-    fireEvent.click(expandButton); // Collapse
-    fireEvent.click(expandButton); // Expand again
-
+    
+    render(<MeetingCard meeting={harnessMeeting} />);
+    
+    // Should display correct race type
+    expect(screen.getByText('Harness')).toBeInTheDocument();
+    
     await waitFor(() => {
-      expect(screen.getByTestId('race-R001')).toBeInTheDocument();
-      expect(screen.getByTestId('race-R002')).toBeInTheDocument();
-      expect(screen.getByTestId('race-R003')).toBeInTheDocument();
-      expect(screen.getByText('Third Race - Open')).toBeInTheDocument();
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
     });
   });
 
-  it('should handle loading state while fetching races', async () => {
-    mockUseRacesForMeeting.mockReturnValue({
-      races: [],
-      isLoading: true,
-      error: null,
-      refetch: jest.fn(),
-    });
-
-    render(<MeetingCard meeting={mockMeeting} />);
+  it('should integrate with real-time status determination', async () => {
+    // Test with past race time (should be live)
+    const pastMeeting = {
+      ...mockMeeting,
+      firstRaceTime: new Date(Date.now() - 1800000).toISOString(), // 30 minutes ago
+    };
     
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    fireEvent.click(expandButton);
-
+    render(<MeetingCard meeting={pastMeeting} />);
+    
     await waitFor(() => {
-      expect(screen.getByTestId('races-list-meeting1')).toBeInTheDocument();
+      expect(screen.getByLabelText('Status: live')).toBeInTheDocument();
     });
-
-    // Should show loading skeleton (mocked as empty races list)
-    expect(screen.queryByTestId('race-R001')).not.toBeInTheDocument();
+    
+    expect(screen.getByText('Live')).toBeInTheDocument();
   });
 
-  it('should handle error state when race fetching fails', async () => {
-    mockUseRacesForMeeting.mockReturnValue({
-      races: [],
-      isLoading: false,
-      error: 'Failed to fetch races',
-      refetch: jest.fn(),
-    });
-
-    render(<MeetingCard meeting={mockMeeting} />);
+  it('should handle missing optional data integration', async () => {
+    const incompleteData = {
+      ...mockMeeting,
+      firstRaceTime: undefined,
+      weather: undefined,
+      trackCondition: undefined,
+    };
     
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    fireEvent.click(expandButton);
-
+    render(<MeetingCard meeting={incompleteData} />);
+    
+    // Should still render core information
+    expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
+    
     await waitFor(() => {
-      expect(screen.getByTestId('races-list-meeting1')).toBeInTheDocument();
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
     });
-
-    // Error state handled by RacesList component (mocked as empty)
-    expect(screen.queryByTestId('race-R001')).not.toBeInTheDocument();
+    
+    // Should handle fallback time display
+    expect(screen.getByLabelText(/First race at/)).toBeInTheDocument();
   });
 
-  it('should call useRacesForMeeting with correct meetingId', async () => {
-    render(<MeetingCard meeting={mockMeeting} />);
+  it('should integrate with weather and track conditions when available', async () => {
+    const meetingWithConditions = {
+      ...mockMeeting,
+      weather: 'Fine',
+      trackCondition: 'Good',
+    };
     
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    fireEvent.click(expandButton);
-
+    render(<MeetingCard meeting={meetingWithConditions} />);
+    
+    // Should display weather and track information
+    expect(screen.getByText('Fine')).toBeInTheDocument();
+    expect(screen.getByText(/Track: Good/)).toBeInTheDocument();
+    
     await waitFor(() => {
-      expect(mockUseRacesForMeeting).toHaveBeenCalledWith({
-        meetingId: 'meeting1',
-      });
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
     });
   });
 
-  it('should handle race clicks when expanded', async () => {
+  it('should handle component lifecycle with async operations', async () => {
+    const { unmount } = render(<MeetingCard meeting={mockMeeting} />);
     
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-
-    render(<MeetingCard meeting={mockMeeting} />);
-    
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    fireEvent.click(expandButton);
-
+    // Wait for initial render
     await waitFor(() => {
-      expect(screen.getByTestId('race-R001')).toBeInTheDocument();
+      expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
     });
+    
+    // Unmount component
+    unmount();
+    
+    // Should cleanup properly without memory leaks
+    // (This is mainly tested by the absence of console errors)
+  });
 
-    // Click on first race
-    fireEvent.click(screen.getByTestId('race-R001'));
-
-    // Note: In real implementation, this would trigger navigation or race details
-    // For now, just verify the race element is clickable
-    expect(screen.getByTestId('race-R001')).toBeInTheDocument();
+  it('should integrate with memoization for performance', async () => {
+    const { rerender } = render(<MeetingCard meeting={mockMeeting} />);
+    
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
+    });
+    
+    const initialFetchCallCount = (global.fetch as jest.Mock).mock.calls.length;
+    
+    // Re-render with identical props
+    rerender(<MeetingCard meeting={mockMeeting} />);
+    
+    // Should not make additional API calls due to memoization
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(initialFetchCallCount);
+    
+    // Component should still be rendered
+    expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
   });
 });

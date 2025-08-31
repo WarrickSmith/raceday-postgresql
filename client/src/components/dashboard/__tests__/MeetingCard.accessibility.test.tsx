@@ -1,67 +1,8 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { axe, toHaveNoViolations } from 'jest-axe';
+import { render, screen, waitFor } from '@testing-library/react';
+import { axe } from 'jest-axe';
 import { MeetingCard } from '../MeetingCard';
-import { useRacesForMeeting } from '@/hooks/useRacesForMeeting';
 import { Meeting } from '@/types/meetings';
-import { Race } from '@/types/meetings';
 import { RACE_TYPE_CODES } from '@/constants/raceTypes';
-
-// Extend Jest with axe matchers
-expect.extend(toHaveNoViolations);
-
-// Mock the useRacesForMeeting hook
-jest.mock('@/hooks/useRacesForMeeting');
-const mockUseRacesForMeeting = useRacesForMeeting as jest.MockedFunction<typeof useRacesForMeeting>;
-
-// Mock the dynamic import with accessibility attributes
-jest.mock('next/dynamic', () => {
-  return () => {
-    const Component = ({ meetingId }: { meetingId: string }) => {
-      const { races, isLoading } = mockUseRacesForMeeting({ meetingId });
-      
-      if (isLoading) {
-        return (
-          <div 
-            data-testid={`races-list-${meetingId}`}
-            role="region"
-            aria-label="Loading races..."
-            aria-live="polite"
-          >
-            Loading races...
-          </div>
-        );
-      }
-
-      return (
-        <div 
-          data-testid={`races-list-${meetingId}`}
-          role="region"
-          aria-label="Races for this meeting"
-          id={`races-${meetingId}`}
-        >
-          <div className="sr-only" aria-live="polite">
-            {races.length} races scheduled
-          </div>
-          {races.map((race) => (
-            <div 
-              key={race.raceId} 
-              data-testid={`race-${race.raceId}`}
-              role="article"
-              aria-labelledby={`race-title-${race.raceId}`}
-              tabIndex={0}
-            >
-              <h4 id={`race-title-${race.raceId}`}>{race.name}</h4>
-              <span aria-label={`Race number ${race.raceNumber}`}>{race.raceNumber}</span>
-              <span aria-label={`Race status: ${race.status}`}>{race.status}</span>
-            </div>
-          ))}
-        </div>
-      );
-    };
-    Component.displayName = 'MockedRacesList';
-    return Component;
-  };
-});
 
 describe('MeetingCard Accessibility Tests', () => {
   const mockMeeting: Meeting = {
@@ -77,306 +18,159 @@ describe('MeetingCard Accessibility Tests', () => {
     firstRaceTime: '2024-01-01T10:00:00Z',
   };
 
-  const mockRaces: Race[] = [
-    {
-      $id: 'race1',
-      $createdAt: '2024-01-01T08:00:00Z',
-      $updatedAt: '2024-01-01T08:00:00Z',
-      raceId: 'R001',
-      raceNumber: 1,
-      name: 'First Race',
-      startTime: '2024-01-01T15:00:00Z',
-      meeting: 'meeting1',
-      status: 'Open',
-    },
-    {
-      $id: 'race2',
-      $createdAt: '2024-01-01T08:00:00Z',
-      $updatedAt: '2024-01-01T08:00:00Z',
-      raceId: 'R002',
-      raceNumber: 2,
-      name: 'Second Race',
-      startTime: '2024-01-01T16:00:00Z',
-      meeting: 'meeting1',
-      status: 'Closed',
-    },
-  ];
-
+  // Mock the meeting completion status API
   beforeEach(() => {
-    jest.clearAllMocks();
-    mockUseRacesForMeeting.mockReturnValue({
-      races: [],
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ isCompleted: false }),
+      })
+    ) as jest.Mock;
   });
 
-  it('should have no accessibility violations in collapsed state', async () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('should have no accessibility violations', async () => {
     const { container } = render(<MeetingCard meeting={mockMeeting} />);
     
+    // Wait for async state updates to complete
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
+    });
+    
+    // Check for accessibility violations
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
 
-  it('should have no accessibility violations in expanded state', async () => {
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-
-    const { container } = render(<MeetingCard meeting={mockMeeting} />);
+  it('should display meeting information with proper semantics', async () => {
+    render(<MeetingCard meeting={mockMeeting} />);
     
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    fireEvent.click(expandButton);
-
+    // Wait for async state updates to complete
     await waitFor(() => {
-      expect(screen.getByTestId('races-list-meeting1')).toBeInTheDocument();
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
     });
-
-    const results = await axe(container);
-    expect(results).toHaveNoViolations();
-  });
-
-  it('should support keyboard navigation for expand/collapse', () => {
-    render(<MeetingCard meeting={mockMeeting} />);
     
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    
-    // Should be focusable
-    expect(expandButton).toHaveAttribute('tabIndex', '0');
-    
-    // Focus the button
-    expandButton.focus();
-    expect(document.activeElement).toBe(expandButton);
-    
-    // Test Enter key
-    fireEvent.keyDown(expandButton, { key: 'Enter' });
-    expect(expandButton).toHaveAttribute('aria-expanded', 'true');
-    
-    // Test Space key
-    fireEvent.keyDown(expandButton, { key: ' ' });
-    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
-    
-    // Test Escape key (should not affect expand/collapse)
-    fireEvent.keyDown(expandButton, { key: 'Escape' });
-    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('should have proper ARIA attributes for expand/collapse', () => {
-    render(<MeetingCard meeting={mockMeeting} />);
-    
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    
-    // Check initial ARIA attributes
-    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
-    // ARIA controls not implemented in current version
-    expect(expandButton).toHaveAttribute('type', 'button');
-    
-    // Expand and check updated attributes
-    fireEvent.click(expandButton);
-    
-    expect(expandButton).toHaveAttribute('aria-expanded', 'true');
-    expect(expandButton).toHaveAccessibleName(/collapse races/i);
-  });
-
-  it('should announce state changes to screen readers', async () => {
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-
-    render(<MeetingCard meeting={mockMeeting} />);
-    
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    fireEvent.click(expandButton);
-
-    await waitFor(() => {
-      // Check for screen reader announcements
-      const liveRegion = screen.getByText('2 races scheduled');
-      expect(liveRegion).toBeInTheDocument();
-      // The sr-only div has aria-live="polite" but it's hidden so we check its parent
-      expect(liveRegion).toHaveClass('sr-only');
-    });
-  });
-
-  it('should have proper heading hierarchy', async () => {
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-
-    render(<MeetingCard meeting={mockMeeting} />);
+    // Meeting should be wrapped in article
+    const meetingArticle = screen.getByRole('article');
+    expect(meetingArticle).toBeInTheDocument();
+    expect(meetingArticle).toHaveAttribute('aria-labelledby', 'meeting-1');
     
     // Meeting title should be h3
     const meetingHeading = screen.getByRole('heading', { level: 3 });
     expect(meetingHeading).toHaveTextContent('Flemington Race Meeting');
     expect(meetingHeading).toHaveAttribute('id', 'meeting-1');
     
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    fireEvent.click(expandButton);
+    // Check status indicator has proper labeling
+    const statusElement = screen.getByText(/live|upcoming|completed/i);
+    expect(statusElement).toHaveAttribute('aria-label');
+  });
 
+  it('should have accessible country flag information', async () => {
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    // Wait for component to fully render
     await waitFor(() => {
-      // Race titles should be h4 (one level below meeting)
-      const raceHeadings = screen.getAllByRole('heading', { level: 4 });
-      expect(raceHeadings).toHaveLength(2);
-      expect(raceHeadings[0]).toHaveTextContent('First Race');
-      expect(raceHeadings[1]).toHaveTextContent('Second Race');
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
     });
+    
+    // Country flag should have proper labeling
+    const countryFlag = screen.getByLabelText(/Australia flag/i);
+    expect(countryFlag).toBeInTheDocument();
+    
+    // Country container should also have proper labeling
+    const countryContainer = screen.getByLabelText(/Country: AUS/i);
+    expect(countryContainer).toBeInTheDocument();
   });
 
-  it('should support screen reader navigation with landmarks', async () => {
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-
+  it('should announce status changes to screen readers', async () => {
     render(<MeetingCard meeting={mockMeeting} />);
     
-    // Meeting card should be an article
-    const meetingArticle = screen.getByRole('article');
-    expect(meetingArticle).toHaveAttribute('aria-labelledby', 'meeting-1');
-    
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    fireEvent.click(expandButton);
-
+    // Wait for async state updates to complete
     await waitFor(() => {
-      // Races list should be a region
-      const racesRegion = screen.getByRole('region', { name: /races for this meeting/i });
-      expect(racesRegion).toBeInTheDocument();
-      
-      // Individual races should be articles
-      const raceArticles = screen.getAllByRole('article');
-      expect(raceArticles).toHaveLength(3); // 1 meeting + 2 races
-    });
-  });
-
-  it('should handle focus management when expanding/collapsing', async () => {
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-
-    render(<MeetingCard meeting={mockMeeting} />);
-    
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    
-    // Focus the expand button
-    expandButton.focus();
-    expect(document.activeElement).toBe(expandButton);
-    
-    // Expand the meeting
-    fireEvent.click(expandButton);
-    
-    await waitFor(() => {
-      expect(screen.getByTestId('races-list-meeting1')).toBeInTheDocument();
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
     });
     
-    // Focus should remain on the button (now collapse button)
-    expect(document.activeElement).toBe(expandButton);
-    
-    // Collapse the meeting
-    fireEvent.click(expandButton);
-    
-    // Focus should still be on the button
-    expect(document.activeElement).toBe(expandButton);
-  });
-
-  it('should provide appropriate labels for meeting metadata', () => {
-    render(<MeetingCard meeting={mockMeeting} />);
-    
-    // Country should have proper labeling
-    expect(screen.getByLabelText('Country: AUS')).toBeInTheDocument();
-    
-    // Meeting ID should be labeled
-    expect(screen.getByText('ID: meeting1')).toBeInTheDocument();
-    
-    // Race type should be labeled
-    expect(screen.getByText('Thoroughbred')).toBeInTheDocument();
-    
-    // First race time should have proper datetime labeling
-    const timeElement = screen.getByLabelText(/First race at/);
-    expect(timeElement).toHaveAttribute('dateTime');
-  });
-
-  it('should handle loading states accessibly', async () => {
-    mockUseRacesForMeeting.mockReturnValue({
-      races: [],
-      isLoading: true,
-      error: null,
-      refetch: jest.fn(),
-    });
-
-    render(<MeetingCard meeting={mockMeeting} />);
-    
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    fireEvent.click(expandButton);
-
-    await waitFor(() => {
-      const loadingRegion = screen.getByRole('region', { name: /loading races/i });
-      expect(loadingRegion).toBeInTheDocument();
-      expect(loadingRegion).toHaveAttribute('aria-live', 'polite');
-      expect(screen.getByText('Loading races...')).toBeInTheDocument();
-    });
-  });
-
-  it('should support high contrast mode', () => {
-    render(<MeetingCard meeting={mockMeeting} />);
-    
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    const chevronIcon = expandButton.querySelector('svg');
-    
-    // Check that important elements have appropriate styling for high contrast
-    expect(expandButton).toHaveClass('hover:bg-gray-100');
-    expect(chevronIcon).toHaveClass('transition-transform');
-    
-    // Status indicators should have sufficient contrast
+    // Status should have proper aria-label for screen readers
     const statusElement = screen.getByLabelText(/Status:/);
     expect(statusElement).toBeInTheDocument();
+    expect(statusElement).toHaveClass('inline-flex');
   });
 
-  it('should work with screen reader virtual cursor', async () => {
-    mockUseRacesForMeeting.mockReturnValue({
-      races: mockRaces,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
-
+  it('should have proper color contrast for status indicators', async () => {
     render(<MeetingCard meeting={mockMeeting} />);
     
-    // Simulate screen reader reading through content
-    const meetingHeading = screen.getByRole('heading', { level: 3 });
-    const expandButton = screen.getByRole('button', { name: /expand to show races/i });
-    
-    // All interactive elements should be discoverable
-    expect(meetingHeading).toBeInTheDocument();
-    expect(expandButton).toBeInTheDocument();
-    
-    fireEvent.click(expandButton);
-
+    // Wait for async state updates to complete
     await waitFor(() => {
-      // Expanded content should be readable by screen readers
-      const racesRegion = screen.getByRole('region', { name: /races for this meeting/i });
-      const raceArticles = screen.getAllByRole('article');
-      
-      expect(racesRegion).toBeInTheDocument();
-      expect(raceArticles).toHaveLength(3); // Meeting + 2 races
-      
-      // Each race should have proper structure for screen readers
-      raceArticles.slice(1).forEach((raceArticle, index) => {
-        expect(raceArticle).toHaveAttribute('aria-labelledby', `race-title-${mockRaces[index].raceId}`);
-      });
+      expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
     });
+    
+    // Status badges should have proper contrast classes
+    const statusElement = screen.getByLabelText(/Status:/);
+    expect(statusElement).toHaveClass(/bg-(green|blue|gray)-100/);
+    expect(statusElement).toHaveClass(/text-(green|blue|gray)-800/);
+  });
+
+  it('should display time information in accessible format', async () => {
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    // Wait for component to fully render
+    await waitFor(() => {
+      expect(screen.getByRole('time')).toBeInTheDocument();
+    });
+    
+    // Time element should be properly formatted
+    const timeElement = screen.getByRole('time');
+    expect(timeElement).toHaveAttribute('datetime', '2024-01-01T10:00:00Z');
+    expect(timeElement).toHaveAttribute('aria-label');
+    expect(timeElement).toHaveTextContent(/\d{2}:\d{2}/); // HH:MM format
+  });
+
+  it('should have proper focus management', async () => {
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    // Wait for component to fully render
+    await waitFor(() => {
+      expect(screen.getByRole('article')).toBeInTheDocument();
+    });
+    
+    // Meeting card should be focusable within its container
+    const article = screen.getByRole('article');
+    expect(article).toHaveClass('focus-within:ring-2');
+  });
+
+  it('should provide clear race type information', async () => {
+    render(<MeetingCard meeting={mockMeeting} />);
+    
+    // Wait for component to fully render
+    await waitFor(() => {
+      expect(screen.getByText(/Thoroughbred/)).toBeInTheDocument();
+    });
+    
+    // Race type should be clearly displayed
+    expect(screen.getByText(/Thoroughbred/)).toBeInTheDocument();
+  });
+
+  it('should handle missing optional data gracefully', async () => {
+    const incompleteEvent: Meeting = {
+      ...mockMeeting,
+      firstRaceTime: undefined,
+    };
+    
+    const { container } = render(<MeetingCard meeting={incompleteEvent} />);
+    
+    // Wait for component to fully render
+    await waitFor(() => {
+      expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
+    });
+    
+    // Should still render without errors
+    expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
+    
+    // Should not have accessibility violations even with missing data
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

@@ -15,11 +15,20 @@ interface UseRacesForMeetingResult {
   isLoading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
+  isConnected: boolean;
 }
 
 // Cache to store races per meeting to avoid re-fetching on expand/collapse
 const racesCache = new Map<string, { races: Race[]; timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Event emitter for cache updates
+class CacheEventEmitter extends EventTarget {
+  emit(meetingId: string, races: Race[]) {
+    this.dispatchEvent(new CustomEvent('cache-update', { detail: { meetingId, races } }));
+  }
+}
+const cacheEmitter = new CacheEventEmitter();
 
 export function useRacesForMeeting({ 
   meetingId, 
@@ -29,6 +38,7 @@ export function useRacesForMeeting({
   const [races, setRaces] = useState<Race[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const fetchAttemptRef = useRef(0);
 
@@ -122,6 +132,28 @@ export function useRacesForMeeting({
     }
   }, [getCachedRaces, setCachedRaces, onError]);
 
+  // Setup cache event listening for real-time updates from useRealtimeMeetings
+  const setupCacheEventListening = useCallback(() => {
+    if (!enabled || !meetingId) return;
+
+    const handleCacheUpdate = (event: CustomEvent) => {
+      const { meetingId: updatedMeetingId, races: updatedRaces } = event.detail;
+      
+      // Only update if this is for our meeting and we have races loaded
+      if (updatedMeetingId === meetingId && races.length > 0) {
+        console.log('🔄 Updating races from real-time cache update for meeting:', meetingId);
+        setRaces(updatedRaces);
+        setIsConnected(true);
+      }
+    };
+
+    cacheEmitter.addEventListener('cache-update', handleCacheUpdate as EventListener);
+    
+    return () => {
+      cacheEmitter.removeEventListener('cache-update', handleCacheUpdate as EventListener);
+    };
+  }, [enabled, meetingId, races.length]);
+
   // Refetch function for manual refresh
   const refetch = useCallback(async () => {
     if (!enabled || !meetingId) return;
@@ -159,6 +191,21 @@ export function useRacesForMeeting({
     };
   }, [enabled, meetingId, fetchRaces]);
 
+  // Setup cache event listening for real-time updates after races are loaded
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+    
+    if (races.length > 0) {
+      cleanup = setupCacheEventListening();
+      setIsConnected(true); // Connected through useRealtimeMeetings global subscription
+    }
+    
+    return () => {
+      if (cleanup) cleanup();
+      setIsConnected(false);
+    };
+  }, [races.length, setupCacheEventListening]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -173,6 +220,7 @@ export function useRacesForMeeting({
     isLoading,
     error,
     refetch,
+    isConnected,
   };
 }
 
@@ -187,6 +235,9 @@ export function updateRaceInCache(meetingId: string, updatedRace: Race): void {
       races: updatedRaces, 
       timestamp: cached.timestamp 
     });
+    
+    // Emit event to notify active useRacesForMeeting hooks
+    cacheEmitter.emit(meetingId, updatedRaces);
   }
 }
 

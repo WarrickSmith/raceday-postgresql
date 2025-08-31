@@ -13,6 +13,7 @@
     "deploy:races": "node scripts/deploy.js daily-races",
     "deploy:poller": "node scripts/deploy.js race-data-poller",
     "deploy:single-race": "node scripts/deploy.js single-race-poller",
+    "deploy:meeting-status": "node scripts/deploy.js meeting-status-poller",
     "deploy:master-scheduler": "node scripts/deploy.js master-race-scheduler",
     "deploy:initial-data": "node scripts/deploy.js daily-initial-data",
     "meetings": "node scripts/run-function.js daily-meetings",
@@ -20,6 +21,7 @@
     "initial-data": "node scripts/run-function.js daily-initial-data",
     "poller": "node scripts/run-function.js race-data-poller",
     "single-race": "node scripts/run-function.js single-race-poller",
+    "meeting-status": "node scripts/run-function.js meeting-status-poller",
     "batch-race-poller": "node scripts/run-function.js batch-race-poller",
     "master-scheduler": "node scripts/run-function.js master-race-scheduler",
     "execute": "node scripts/execute-function.js",
@@ -31,9 +33,10 @@
     "vars:races": "node scripts/update-vars-only.js daily-races",
     "vars:poller": "node scripts/update-vars-only.js race-data-poller",
     "vars:single-race": "node scripts/update-vars-only.js single-race-poller",
+    "vars:meeting-status": "node scripts/update-vars-only.js meeting-status-poller",
     "vars:batch-race-poller": "node scripts/update-vars-only.js batch-race-poller",
     "vars:master-scheduler": "node scripts/update-vars-only.js master-race-scheduler",
-    "vars:all": "npm run vars:meetings && npm run vars:races && npm run vars:poller && npm run vars:single-race && npm run vars:batch-race-poller && npm run vars:master-scheduler"
+    "vars:all": "npm run vars:meetings && npm run vars:races && npm run vars:poller && npm run vars:single-race && npm run vars:meeting-status && npm run vars:batch-race-poller && npm run vars:master-scheduler"
   },
   "dependencies": {
     "node-appwrite": "^17.0.0",
