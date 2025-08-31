@@ -176,7 +176,7 @@
       "path": "meeting-status-poller",
       "execute": ["any"],
       "events": [],
-      "schedule": "",
+      "schedule": "*/15 21-23,0-11 * * *",
       "timeout": 300,
       "enabled": true,
       "logging": true,
