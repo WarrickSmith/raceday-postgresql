@@ -80,7 +80,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
 
   return (
     <div className={`bg-white rounded-lg shadow-md ${className}`} role="banner" style={{ border: '1px solid rgba(209, 213, 219, 0.6)' }}>
-      {/* Exact 4x4 grid matching sample image */}
+      {/* 3x4 grid matching target image layout */}
       <div className="grid grid-cols-4 gap-2 p-3 min-h-[120px]" style={{ gridTemplateColumns: '2fr 200px 200px 200px' }}>
         
         {/* Row 1, Col 1: Navigation */}
@@ -110,19 +110,35 @@ export const RaceDataHeader = memo(function RaceDataHeader({
           </div>
         </div>
 
-        {/* Row 2, Col 1: Race Title (spans full width of column 1) */}
+        {/* Row 2, Col 1: Race Title */}
         <div className="flex flex-col justify-start">
           <h1 className="text-2xl font-bold text-gray-900 mb-1 leading-tight">
             Race {race.raceNumber}: {race.name}
           </h1>
         </div>
         
-        {/* Row 2, Cols 2-4: Empty */}
-        <div></div>
-        <div></div>
-        <div></div>
+        {/* Row 2, Col 2: Weather */}
+        <div className="flex items-center justify-start gap-2">
+          <div className="text-xs text-gray-500 font-bold uppercase">WEATHER</div>
+          <div className="text-sm font-semibold text-gray-800">{race.weather || 'overcast'}</div>
+        </div>
 
-        {/* Row 3, Col 1: Meeting info */}
+        {/* Row 2, Col 3: Track Condition */}
+        <div className="flex items-center justify-start gap-2">
+          <div className="text-xs text-gray-500 font-bold uppercase">TRACK COND</div>
+          <div className="text-sm font-semibold text-green-800">{race.trackCondition || 'Synthetic'}</div>
+        </div>
+
+        {/* Row 2, Col 4: Status */}
+        <div className="flex items-center justify-start gap-2">
+          <div className="text-xs text-gray-500 font-bold uppercase">STATUS</div>
+          <div className="flex items-center gap-1">
+            <div className={`w-2 h-2 rounded-full ${avgLatency !== null ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className="text-sm font-semibold text-green-800">Live</span>
+          </div>
+        </div>
+
+        {/* Row 3, Col 1: Meeting info with inline RENDERS */}
         <div className="flex items-center gap-1 text-sm text-gray-700 flex-wrap">
           <span className="font-medium">{meeting.meetingName}</span>
           <span>•</span>
@@ -130,20 +146,26 @@ export const RaceDataHeader = memo(function RaceDataHeader({
           <span>•</span>
           <time dateTime={race.startTime} className="font-mono">{formattedTime}</time>
           <span className="text-purple-800 font-medium">{meeting.raceType}</span>
+          <span className="text-xs text-gray-500 font-bold uppercase ml-4">RENDERS</span>
+          <span className="text-sm font-mono font-semibold text-purple-800">2</span>
         </div>
         
-        {/* Row 3, Col 2: Weather */}
+        {/* Row 3, Col 2: Race Distance */}
         <div className="flex items-center justify-start gap-2">
-          <div className="text-xs text-gray-500 font-bold uppercase">WEATHER</div>
-          <div className="text-sm font-semibold text-gray-800">{race.weather || 'FINE'}</div>
+          <div className="text-xs text-gray-500 font-bold uppercase">RACE DISTANCE</div>
+          <div className="text-sm font-semibold text-blue-800">{formattedDistance || '2.1km'}</div>
         </div>
 
-        {/* Row 3, Col 3: Status */}
+        {/* Row 3, Col 3: Runners (SCR) */}
         <div className="flex items-center justify-start gap-2">
-          <div className="text-xs text-gray-500 font-bold uppercase">STATUS</div>
-          <div className="flex items-center gap-1">
-            <div className={`w-2 h-2 rounded-full ${avgLatency !== null ? 'bg-green-500' : 'bg-red-500'}`}></div>
-            <span className="text-sm font-semibold text-green-800">Live</span>
+          <div className="text-xs text-gray-500 font-bold uppercase">RUNNERS (SCR)</div>
+          <div className="text-sm font-semibold">
+            <span className="text-blue-800">
+              {runnersCount > 0 ? (scratchedCount > 0 ? `${runnersCount - scratchedCount}` : runnersCount) : '8'}
+            </span>
+            <span className="text-blue-800">
+              {scratchedCount > 0 ? ` (${scratchedCount})` : ' (2)'}
+            </span>
           </div>
         </div>
 
@@ -159,47 +181,8 @@ export const RaceDataHeader = memo(function RaceDataHeader({
               ? 'text-yellow-800'
               : 'text-green-800'
           }`}>
-            {avgLatency === null ? '44ms' : `${avgLatency}ms`}
+            {avgLatency === null ? '416ms' : `${avgLatency}ms`}
           </div>
-        </div>
-
-        {/* Row 4, Col 1: Race Distance and Runners */}
-        <div className="flex items-center justify-start gap-6">
-          <div className="flex items-center gap-2">
-            <div className="text-xs text-gray-500 font-bold uppercase">RACE DISTANCE</div>
-            <div className="text-sm font-semibold text-blue-800">{formattedDistance || '1.1km'}</div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="text-xs text-gray-500 font-bold uppercase">RUNNERS (SCR)</div>
-            <div className="text-sm font-semibold">
-              <span className="text-blue-800">
-                {runnersCount > 0 ? (scratchedCount > 0 ? `${runnersCount - scratchedCount}` : runnersCount) : '8'}
-              </span>
-              <span className="text-blue-800">
-                {scratchedCount > 0 ? ` (${scratchedCount})` : ' (2)'}
-              </span>
-            </div>
-          </div>
-        </div>
-        
-        {/* Row 4, Col 2: Track Condition */}
-        <div className="flex items-center justify-start gap-2">
-          <div className="text-xs text-gray-500 font-bold uppercase">TRACK COND</div>
-          <div className="text-sm font-semibold text-green-800">{race.trackCondition || 'Soft6'}</div>
-        </div>
-
-        {/* Row 4, Col 3: Updated */}
-        <div className="flex items-center justify-start gap-2">
-          <div className="text-xs text-gray-500 font-bold uppercase">UPDATED</div>
-          <div className="text-sm font-mono font-semibold text-gray-800">
-            {currentTime.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-          </div>
-        </div>
-
-        {/* Row 4, Col 4: Renders */}
-        <div className="flex items-center justify-start gap-2">
-          <div className="text-xs text-gray-500 font-bold uppercase">RENDERS</div>
-          <div className="text-sm font-mono font-semibold text-purple-800">2</div>
         </div>
       </div>
     </div>

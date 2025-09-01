@@ -238,13 +238,13 @@ export const RaceNavigation = memo(function RaceNavigation({
         <span>Next Scheduled</span>
       </button>
 
-      {/* Previous/Next Button Pair - wrappable as a unit with new styling */}
-      <div className="flex items-center gap-0 rounded-lg shadow-sm overflow-hidden">
+      {/* Previous/Next Button Pair - wrappable as a unit with consistent gap */}
+      <div className="flex items-center gap-3">
         {/* Previous Race Button */}
         <button
           onClick={handlePreviousClick}
           disabled={navigationStates.previous.disabled}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 min-w-[120px] h-10 text-sm font-medium text-gray-700 bg-white border border-gray-200 border-r-gray-300 hover:bg-gray-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-opacity-75 focus:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-all duration-200 ease-in-out rounded-l-lg"
+          className={buttonClasses}
           aria-label={AriaLabels.generateNavigationLabel(
             'previous',
             navigationData.previousRace?.name,
@@ -264,7 +264,7 @@ export const RaceNavigation = memo(function RaceNavigation({
         <button
           onClick={handleNextClick}
           disabled={navigationStates.next.disabled}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 min-w-[120px] h-10 text-sm font-medium text-gray-700 bg-white border border-gray-200 border-l-0 hover:bg-gray-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-opacity-75 focus:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-all duration-200 ease-in-out rounded-r-lg"
+          className={buttonClasses}
           aria-label={AriaLabels.generateNavigationLabel(
             'next',
             navigationData.nextRace?.name,
