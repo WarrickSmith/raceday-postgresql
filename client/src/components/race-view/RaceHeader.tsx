@@ -1,169 +1,77 @@
-'use client';
+'use client'
 
-import { memo, useMemo, useState, useEffect } from 'react';
-import { Race, Meeting, RaceNavigationData } from '@/types/meetings';
-import { useRealtimeRace } from '@/hooks/useRealtimeRace';
-import { formatDistance, formatRaceTime, formatCategory } from '@/utils/raceFormatters';
-import { RaceNavigation } from './RaceNavigation';
-import { useRace } from '@/contexts/RaceContext';
-import { getStatusConfig } from '@/utils/raceStatusConfig';
+import { memo, useMemo } from 'react'
+import { Race, Meeting, RaceNavigationData } from '@/types/meetings'
+import { useRealtimeRace } from '@/hooks/useRealtimeRace'
+import {
+  formatDistance,
+  formatRaceTime,
+  formatCategory,
+} from '@/utils/raceFormatters'
+import { RaceNavigation } from './RaceNavigation'
+import { useRace } from '@/contexts/RaceContext'
 
 interface RaceHeaderProps {
-  initialRace: Race;
-  meeting: Meeting;
-  navigationData: RaceNavigationData;
+  initialRace: Race
+  meeting: Meeting
+  navigationData: RaceNavigationData
 }
 
-export const RaceHeader = memo(function RaceHeader({ initialRace, meeting, navigationData }: RaceHeaderProps) {
-  const { raceData } = useRace();
-  
+export const RaceHeader = memo(function RaceHeader({
+  initialRace,
+  meeting,
+  navigationData,
+}: RaceHeaderProps) {
+  const { raceData } = useRace()
+
   // Use context data if available, fallback to props for initial render
-  const currentRace = raceData?.race || initialRace;
-  const currentMeeting = raceData?.meeting || meeting;
-  const currentNavigationData = raceData?.navigationData || navigationData;
-  
-  const { race, isConnected } = useRealtimeRace({ initialRace: currentRace });
-  const formattedTime = useMemo(() => formatRaceTime(race.startTime), [race.startTime]);
+  const currentRace = raceData?.race || initialRace
+  const currentMeeting = raceData?.meeting || meeting
+  const currentNavigationData = raceData?.navigationData || navigationData
 
-  const [timeToStart, setTimeToStart] = useState<string | null>(null);
+  const { race, isConnected } = useRealtimeRace({ initialRace: currentRace })
+  const formattedTime = useMemo(
+    () => formatRaceTime(race.startTime),
+    [race.startTime]
+  )
 
-  // Dynamic countdown that updates every second
-  useEffect(() => {
-    const updateCountdown = () => {
-      try {
-        // Don't show countdown for abandoned races or finalized races
-        const status = race.status?.toLowerCase();
-        if (status === 'abandoned' || status === 'final' || status === 'finalized') {
-          setTimeToStart(null);
-          return;
-        }
-        
-        const now = new Date();
-        const raceTime = new Date(race.startTime);
-        if (isNaN(raceTime.getTime())) {
-          setTimeToStart(null);
-          return;
-        }
-        
-        const diff = raceTime.getTime() - now.getTime();
-        
-        if (diff <= 0) {
-          // Race has passed scheduled start time
-          const delayDiff = Math.abs(diff);
-          const delayMinutes = Math.floor(delayDiff / (1000 * 60));
-          const delaySeconds = Math.floor((delayDiff % (1000 * 60)) / 1000);
-          
-          // FIXED: Show "Delayed" immediately from 0s if race status is still 'Open'
-          // This addresses the issue where races showed "Started" for 30s before switching to "Delayed"
-          
-          // Only log significant delay transitions to reduce verbosity
-          if (delaySeconds === 0 || delaySeconds === 30 || (delaySeconds > 0 && delaySeconds % 60 === 0)) {
-            console.log(`🏁 DELAY: status="${race.status}" delay=${delaySeconds}s`);
-          }
-          
-          if (race.status === 'Open' || race.status === 'open') {
-            // Race is delayed - show delay time in format "Delayed: -X:XX"
-            if (delayMinutes > 0) {
-              setTimeToStart(`Delayed: -${delayMinutes}:${delaySeconds.toString().padStart(2, '0')}`);
-            } else {
-              // FIXED: Show delay time immediately from 0 seconds, not just when > 0
-              setTimeToStart(`Delayed: -0:${delaySeconds.toString().padStart(2, '0')}`);
-            }
-          } else {
-            // Race status has changed from 'Open' - show appropriate status
-            setTimeToStart('Started');
-          }
-          return;
-        }
-        
-        const totalMinutes = Math.floor(diff / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-        const hours = Math.floor(totalMinutes / 60);
-        const remainingMinutes = totalMinutes % 60;
-        
-        if (hours > 0) {
-          setTimeToStart(`${hours}h ${remainingMinutes}m`);
-        } else if (totalMinutes > 5) {
-          setTimeToStart(`${totalMinutes}m`);
-        } else if (totalMinutes > 0) {
-          // Show minutes and seconds when less than 5 minutes
-          setTimeToStart(`${totalMinutes}:${seconds.toString().padStart(2, '0')}`);
-        } else {
-          // Show just seconds when less than a minute
-          setTimeToStart(`${seconds}s`);
-        }
-      } catch {
-        setTimeToStart(null);
-      }
-    };
-
-    // Initial call
-    updateCountdown();
-    
-    // Update every second
-    const interval = setInterval(updateCountdown, 1000);
-    
-    return () => clearInterval(interval);
-  }, [race.startTime, race.status]);
-
-  const statusConfig = useMemo(() => {
-    // Check if race is delayed (past start time but still Open)
-    const now = new Date();
-    const raceTime = new Date(race.startTime);
-    const isPastStartTime = !isNaN(raceTime.getTime()) && now > raceTime;
-    const isDelayed = isPastStartTime && (race.status === 'Open' || race.status === 'open');
-    
-    if (isDelayed) {
-      return {
-        label: 'Delayed',
-        color: 'text-red-700',
-        bgColor: 'bg-red-100', 
-        icon: '⏰',
-        description: 'Race is delayed past scheduled start time'
-      };
-    }
-    
-    return getStatusConfig(race.status);
-  }, [race.status, race.startTime, timeToStart]); // Add timeToStart dependency to re-evaluate when time changes
-
-  const statusClasses = useMemo(() => {
-    return `${statusConfig.color} ${statusConfig.bgColor}`;
-  }, [statusConfig]);
-
-  const formattedDistance = useMemo(() => formatDistance(race.distance), [race.distance]);
+  const formattedDistance = useMemo(
+    () => formatDistance(race.distance),
+    [race.distance]
+  )
 
   return (
     <header className="bg-white rounded-lg shadow-md p-6 mb-6" role="banner">
       {/* Race Navigation */}
       <div className="mb-4 pb-4 border-b border-gray-200">
-        <RaceNavigation 
+        <RaceNavigation
           navigationData={currentNavigationData}
           currentRaceId={race.raceId}
         />
       </div>
       {/* Screen reader announcement for race updates */}
-      <div 
-        aria-live="assertive" 
-        aria-atomic="true" 
-        className="sr-only"
-      >
-        Race {race.raceNumber} {race.name} status: {race.status}
-        Race type: {currentMeeting.raceType} Category: {formatCategory(currentMeeting.category)}
+      <div aria-live="assertive" aria-atomic="true" className="sr-only">
+        Race {race.raceNumber} {race.name}
+        Race type: {currentMeeting.raceType} Category:{' '}
+        {formatCategory(currentMeeting.category)}
         {formattedDistance && ` Distance: ${formattedDistance}`}
         {race.trackCondition && ` Track condition: ${race.trackCondition}`}
-        {timeToStart && ` Time to start: ${timeToStart}`}
       </div>
       <div className="mb-4">
         {/* Connection Status Indicator */}
         <div className="flex justify-end mb-2">
-          <span 
+          <span
             className={`text-xs px-2 py-1 rounded-full ${
-              isConnected 
-                ? 'bg-green-100 text-green-700' 
+              isConnected
+                ? 'bg-green-100 text-green-700'
                 : 'bg-red-100 text-red-700'
             }`}
             aria-live="polite"
-            aria-label={isConnected ? 'Connected to live data' : 'Disconnected from live data'}
+            aria-label={
+              isConnected
+                ? 'Connected to live data'
+                : 'Disconnected from live data'
+            }
           >
             {isConnected ? '🔄 Live' : '📶 Disconnected'}
           </span>
@@ -173,84 +81,67 @@ export const RaceHeader = memo(function RaceHeader({ initialRace, meeting, navig
           <span>•</span>
           <span>{currentMeeting.meetingName}</span>
           <span>•</span>
-          <time dateTime={race.startTime}>
-            {formattedTime}
-          </time>
+          <time dateTime={race.startTime}>{formattedTime}</time>
         </div>
-        
-        <h1 
+
+        <h1
           className="text-2xl font-bold text-gray-900 mb-2 font-inter leading-tight"
           id="race-title"
           aria-describedby="race-meta"
         >
           Race {race.raceNumber}: {race.name}
         </h1>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4" id="race-meta" role="group" aria-labelledby="race-title">
+
+        <div
+          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          id="race-meta"
+          role="group"
+          aria-labelledby="race-title"
+        >
           <div className="flex items-center gap-4 flex-wrap">
             {formattedDistance && (
               <div className="flex items-center">
                 <span className="text-sm text-gray-500">Distance:</span>
-                <span className="ml-2 text-sm font-semibold text-gray-800">{formattedDistance}</span>
+                <span className="ml-2 text-sm font-semibold text-gray-800">
+                  {formattedDistance}
+                </span>
               </div>
             )}
-            
+
             {race.trackCondition && (
               <div className="flex items-center">
                 <span className="text-sm text-gray-500">Track:</span>
-                <span className="ml-2 text-sm font-semibold text-gray-800">{race.trackCondition}</span>
+                <span className="ml-2 text-sm font-semibold text-gray-800">
+                  {race.trackCondition}
+                </span>
               </div>
             )}
-            
+
             <div className="flex items-center">
               <span className="text-sm text-gray-500">Type:</span>
-              <span className="ml-2 text-sm font-semibold text-gray-800">{currentMeeting.raceType}</span>
-            </div>
-            
-            <div className="flex items-center">
-              <span className="text-sm text-gray-500">Category:</span>
-              <span className="ml-2 text-sm font-semibold text-gray-800">{formatCategory(currentMeeting.category)}</span>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center">
-              <span className="text-sm text-gray-500">Status:</span>
-              <span 
-                className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${statusClasses}`}
-                role="status"
-                aria-label={`Race status: ${statusConfig.label}`}
-              >
-                {statusConfig.icon} {statusConfig.label}
+              <span className="ml-2 text-sm font-semibold text-gray-800">
+                {currentMeeting.raceType}
               </span>
             </div>
 
-            {timeToStart && (
-              <div className="flex items-center">
-                <span className="text-sm text-gray-500" id="time-to-start-label">Time to start:</span>
-                <span 
-                  className={`ml-2 text-sm font-semibold ${
-                    timeToStart.startsWith('Delayed:') ? 'text-red-600' : 'text-gray-800'
-                  }`}
-                  aria-live="polite"
-                  aria-labelledby="time-to-start-label"
-                  aria-describedby="countdown-description"
-                >
-                  {timeToStart}
-                </span>
-                <span id="countdown-description" className="sr-only">
-                  This countdown updates every second and announces when the race is about to start
-                </span>
-              </div>
-            )}
-            
+            <div className="flex items-center">
+              <span className="text-sm text-gray-500">Category:</span>
+              <span className="ml-2 text-sm font-semibold text-gray-800">
+                {formatCategory(currentMeeting.category)}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center">
               <span className="text-sm text-gray-500">Race ID:</span>
-              <span className="ml-2 text-sm font-mono text-gray-700">{race.raceId}</span>
+              <span className="ml-2 text-sm font-mono text-gray-700">
+                {race.raceId}
+              </span>
             </div>
           </div>
         </div>
       </div>
     </header>
-  );
-});
+  )
+})
