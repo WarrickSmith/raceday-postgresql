@@ -14,7 +14,6 @@ import { useAppwriteRealtime } from '@/hooks/useAppwriteRealtime'
 import { useRealtimeRace } from '@/hooks/useRealtimeRace'
 import { useRacePoolData } from '@/hooks/useRacePoolData'
 import { useMoneyFlowTimeline } from '@/hooks/useMoneyFlowTimeline'
-import { PoolToggle } from './PoolToggle'
 import { useRace } from '@/contexts/RaceContext'
 import { screenReader, AriaLabels } from '@/utils/accessibility'
 import { useRenderTracking, useMemoryOptimization } from '@/utils/performance'
@@ -136,10 +135,11 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   // Get actual race pool data 
   const { poolData: racePoolData } = useRacePoolData(currentRaceId)
   
-  // Pool view state - must be declared before money flow timeline hook
-  const [poolViewState, setPoolViewState] = useState<PoolViewState>(
-    DEFAULT_POOL_VIEW_STATE
-  )
+  // Pool view state - fixed to win pool since toggle is removed
+  const poolViewState: PoolViewState = {
+    ...DEFAULT_POOL_VIEW_STATE,
+    activePool: 'win' // Fixed to win pool as per Phase 1 requirements
+  }
   
   // Get money flow timeline data for all entrants
   const entrantIds = useMemo(() => currentEntrants.map(e => e.$id), [currentEntrants])
@@ -908,26 +908,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   }, [poolViewState.activePool, entrantsWithPoolData])
 
 
-  // Handle pool toggle changes
-  const handlePoolChange = useCallback(
-    (pool: typeof poolViewState.activePool) => {
-      setPoolViewState((prev) => ({
-        ...prev,
-        activePool: pool,
-      }))
-    },
-    [poolViewState]
-  )
-
-  const handleDisplayModeChange = useCallback(
-    (mode: typeof poolViewState.displayMode) => {
-      setPoolViewState((prev) => ({
-        ...prev,
-        displayMode: mode,
-      }))
-    },
-    [poolViewState]
-  )
 
   // Handle entrant selection
   const handleEntrantClick = useCallback((entrantId: string) => {
@@ -1027,13 +1007,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           </div>
         </div>
 
-        {/* Pool Toggle Controls */}
-        <PoolToggle
-          poolViewState={poolViewState}
-          onPoolChange={handlePoolChange}
-          onDisplayModeChange={handleDisplayModeChange}
-          className="mb-4"
-        />
 
         {/* Performance Panel */}
         {showPerformancePanel && (
