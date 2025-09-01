@@ -5,6 +5,7 @@ import { useRace } from '@/contexts/RaceContext'
 import { useRealtimeEntrants } from '@/hooks/useRealtimeEntrants'
 import { formatDistance, formatRaceTime } from '@/utils/raceFormatters'
 import { RaceNavigation } from './RaceNavigation'
+import { useRenderTracking } from '@/utils/performance'
 
 interface RaceDataHeaderProps {
   className?: string
@@ -16,12 +17,21 @@ export const RaceDataHeader = memo(function RaceDataHeader({
   const { raceData } = useRace()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [latencySamples, setLatencySamples] = useState<number[]>([])
+  const [updateCount, setUpdateCount] = useState(0)
   const maxSamples = 6
+  
+  // Track renders for performance monitoring
+  const renderCount = useRenderTracking('RaceDataHeader')
 
   const { entrants } = useRealtimeEntrants({
-    initialEntrants: [],
+    initialEntrants: raceData?.entrants || [],
     raceId: raceData?.race?.raceId || '',
   })
+
+  // Track MoneyFlow grid data updates
+  useEffect(() => {
+    setUpdateCount(prev => prev + 1)
+  }, [entrants])
 
   // Real-time clock update
   useEffect(() => {
@@ -147,7 +157,11 @@ export const RaceDataHeader = memo(function RaceDataHeader({
           <time dateTime={race.startTime} className="font-mono">{formattedTime}</time>
           <span className="text-purple-800 font-medium">{meeting.raceType}</span>
           <span className="text-xs text-gray-500 font-bold uppercase ml-4">RENDERS</span>
-          <span className="text-sm font-mono font-semibold text-purple-800">2</span>
+          <span className={`text-sm font-mono font-semibold ${
+            renderCount > 10 ? 'text-red-600' : renderCount > 5 ? 'text-orange-600' : 'text-purple-800'
+          }`}>{renderCount}</span>
+          <span className="text-xs text-gray-500 font-bold uppercase ml-2">UPDATES</span>
+          <span className="text-sm font-mono font-semibold text-blue-600">{updateCount}</span>
         </div>
         
         {/* Row 3, Col 2: Race Distance */}

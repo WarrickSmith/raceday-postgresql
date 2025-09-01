@@ -166,7 +166,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   //   currentEntrantsCount: currentEntrants.length,
   //   raceId: currentRaceId
   // });
-  const [showPerformancePanel, setShowPerformancePanel] = useState(false)
   const [updateNotifications, setUpdateNotifications] = useState(true)
   const [selectedEntrant, setSelectedEntrant] = useState<string | undefined>()
   
@@ -931,9 +930,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     [handleEntrantClick]
   )
 
-  const togglePerformancePanel = useCallback(() => {
-    setShowPerformancePanel((prev) => !prev)
-  }, [])
 
   // Handle column sorting
   const handleSort = useCallback((column: SortableColumn) => {
@@ -976,12 +972,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
               </div>
             )}
 
-            <button
-              onClick={togglePerformancePanel}
-              className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
-            >
-              📊 Stats
-            </button>
 
             <div className="flex items-center space-x-2">
               <span
@@ -1008,99 +998,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         </div>
 
 
-        {/* Performance Panel */}
-        {showPerformancePanel && (
-          <div className="bg-gray-50 rounded-lg p-4 text-sm space-y-3 border border-gray-200 mb-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-medium text-gray-900">
-                Enhanced Performance
-              </h3>
-              <div className="flex space-x-2">
-                <button
-                  onClick={clearHistory}
-                  className="text-xs px-2 py-1 rounded bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors"
-                >
-                  Clear History
-                </button>
-                <button
-                  onClick={() => {
-                    const report = getMemoryReport()
-                    console.log('📊 Memory Report:', report)
-                    alert(
-                      `Memory Report:\n\nMemory Usage: ${
-                        report.memory.currentMemory
-                          ? (
-                              report.memory.currentMemory
-                                .memoryUsagePercentage * 100
-                            ).toFixed(1) + '%'
-                          : 'N/A'
-                      }\n\nRecommendations:\n${report.recommendations.join(
-                        '\n'
-                      )}`
-                    )
-                  }}
-                  className="text-xs px-2 py-1 rounded bg-blue-200 text-blue-700 hover:bg-blue-300 transition-colors"
-                >
-                  Memory Report
-                </button>
-                <button
-                  onClick={triggerCleanup}
-                  className="text-xs px-2 py-1 rounded bg-orange-200 text-orange-700 hover:bg-orange-300 transition-colors"
-                >
-                  Cleanup
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <div className="text-xs text-gray-500">Connection</div>
-                <div
-                  className={`font-medium ${
-                    isConnected ? 'text-green-600' : 'text-red-600'
-                  }`}
-                >
-                  {isConnected ? 'Connected' : 'Disconnected'}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs text-gray-500">Updates</div>
-                <div className="font-medium text-blue-600">
-                  {totalUpdates} total
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs text-gray-500">Latency</div>
-                <div className="font-medium text-blue-600">
-                  {updateLatency.toFixed(1)}ms
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs text-gray-500">Grid State</div>
-                <div className="font-medium text-purple-600">
-                  Sort: {sortState.column} {sortState.direction}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs text-gray-500">Renders</div>
-                <div className="font-medium text-indigo-600">
-                  #{renderCount}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs text-gray-500">Pool View</div>
-                <div className="font-medium text-indigo-600">
-                  {poolViewState.activePool} / {poolViewState.displayMode}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Enhanced Single-Table Grid Architecture with Perfect Row Alignment */}
