@@ -36,6 +36,7 @@ export interface Race {
   trackCondition?: string // Track condition (e.g. "Good 3", "Heavy 8")
   weather?: string // Weather conditions (e.g. "Fine", "Overcast")
   runnerCount?: number // Number of runners in the race
+  type?: string // Race type code (T, H, G) for category display
 }
 
 export interface MeetingWithRaces extends Meeting {

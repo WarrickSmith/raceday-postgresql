@@ -126,6 +126,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       distance: raceData.distance,
       trackCondition: raceData.trackCondition,
       weather: raceData.weather,
+      type: raceData.type, // Race type code (T, H, G) for category display
     }
 
     const meeting: Meeting = {
@@ -426,6 +427,7 @@ async function getNavigationRaceData(raceId: string): Promise<{
       distance: raceData.distance,
       trackCondition: raceData.trackCondition,
       weather: raceData.weather,
+      type: raceData.type, // Race type code (T, H, G) for category display
     }
 
     const meeting: Meeting = {

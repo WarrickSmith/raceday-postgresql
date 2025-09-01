@@ -53,7 +53,7 @@ export const RaceHeader = memo(function RaceHeader({
       <div aria-live="assertive" aria-atomic="true" className="sr-only">
         Race {race.raceNumber} {race.name}
         Race type: {currentMeeting.raceType} Category:{' '}
-        {formatCategory(currentMeeting.category)}
+        {race.type ? formatCategory(race.type) : '-'}
         {formattedDistance && ` Distance: ${formattedDistance}`}
         {race.trackCondition && ` Track condition: ${race.trackCondition}`}
       </div>
@@ -127,7 +127,7 @@ export const RaceHeader = memo(function RaceHeader({
             <div className="flex items-center">
               <span className="text-sm text-gray-500">Category:</span>
               <span className="ml-2 text-sm font-semibold text-gray-800">
-                {formatCategory(currentMeeting.category)}
+                {race.type ? formatCategory(race.type) : '-'}
               </span>
             </div>
           </div>
