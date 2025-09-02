@@ -469,10 +469,10 @@ async function ensureRaceResultsCollection(databases, config, context) {
         { key: 'resultStatus', type: 'string', size: 20, required: false }, // 'interim', 'final', 'protest'
         { key: 'resultTime', type: 'datetime', required: false }, // Time when results were declared
         
-        // Results and dividends data (JSON strings)
-        { key: 'resultsData', type: 'string', size: 5000, required: false }, // JSON string of race results array
-        { key: 'dividendsData', type: 'string', size: 10000, required: false }, // JSON string of dividends array
-        { key: 'fixedOddsData', type: 'string', size: 5000, required: false }, // JSON string of fixed odds per runner at result time
+        // Results and dividends data (JSON strings) - sizes >16383 to store as pointers not in row
+        { key: 'resultsData', type: 'string', size: 20000, required: false }, // JSON string of race results array
+        { key: 'dividendsData', type: 'string', size: 30000, required: false }, // JSON string of dividends array
+        { key: 'fixedOddsData', type: 'string', size: 20000, required: false }, // JSON string of fixed odds per runner at result time
         
         // Result flags and indicators
         { key: 'photoFinish', type: 'boolean', required: false, default: false }, // Photo finish flag
