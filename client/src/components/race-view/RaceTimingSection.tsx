@@ -1,27 +1,27 @@
-'use client';
+'use client'
 
-import { memo, useState, useEffect, useCallback, useMemo } from 'react';
-import { useRace } from '@/contexts/RaceContext';
-import { useRealtimeRace } from '@/hooks/useRealtimeRace';
-import { getStatusConfig } from '@/utils/raceStatusConfig';
-import type { RaceStatus } from '@/types/racePools';
+import { memo, useState, useEffect, useCallback, useMemo } from 'react'
+import { useRace } from '@/contexts/RaceContext'
+import { useRealtimeRace } from '@/hooks/useRealtimeRace'
+import { getStatusConfig } from '@/utils/raceStatusConfig'
+import type { RaceStatus } from '@/types/racePools'
 
 interface RaceTimingSectionProps {
-  raceStartTime?: string;
-  raceStatus?: RaceStatus;
-  className?: string;
-  showCountdown?: boolean;
+  raceStartTime?: string
+  raceStatus?: RaceStatus
+  className?: string
+  showCountdown?: boolean
 }
 
-export const RaceTimingSection = memo(function RaceTimingSection({ 
+export const RaceTimingSection = memo(function RaceTimingSection({
   raceStartTime,
   raceStatus,
   className = '',
-  showCountdown = true
+  showCountdown = true,
 }: RaceTimingSectionProps) {
-  const { raceData } = useRace();
-  
-  const { race: liveRace } = useRealtimeRace({ 
+  const { raceData } = useRace()
+
+  const { race: liveRace } = useRealtimeRace({
     initialRace: raceData?.race || {
       $id: '',
       $createdAt: '',
@@ -31,140 +31,173 @@ export const RaceTimingSection = memo(function RaceTimingSection({
       name: '',
       startTime: raceStartTime || '',
       meeting: '',
-      status: raceStatus || 'open' as const,
+      status: raceStatus || ('open' as const),
       distance: 0,
-      trackCondition: ''
-    } 
-  });
+      trackCondition: '',
+      actualStart: undefined,
+    },
+  })
 
   const [timeRemaining, setTimeRemaining] = useState<{
-    total: number;
-    hours: number;
-    minutes: number;
-    seconds: number;
-  }>({ total: 0, hours: 0, minutes: 0, seconds: 0 });
+    total: number
+    hours: number
+    minutes: number
+    seconds: number
+  }>({ total: 0, hours: 0, minutes: 0, seconds: 0 })
 
-  const [closedTime, setClosedTime] = useState<string | null>(null);
+  const [delayedTime, setDelayedTime] = useState<string | null>(null)
 
-  const currentStartTime = liveRace?.startTime || raceStartTime;
-  const currentStatus = liveRace?.status?.toLowerCase() as RaceStatus || raceStatus;
+  const currentStartTime = liveRace?.startTime || raceStartTime
+  const currentStatus =
+    (liveRace?.status?.toLowerCase() as RaceStatus) || raceStatus
+  const actualStartTime = (liveRace as unknown as { actualStart?: string })
+    ?.actualStart
 
   const calculateTimeRemaining = useCallback(() => {
-    if (!currentStartTime) return;
+    if (!currentStartTime) return
 
     try {
-      const now = new Date();
-      const target = new Date(currentStartTime);
-      if (isNaN(target.getTime())) return;
-      
-      const difference = target.getTime() - now.getTime();
+      const now = new Date()
+      const target = new Date(currentStartTime)
+      if (isNaN(target.getTime())) return
+
+      const difference = target.getTime() - now.getTime()
 
       if (difference <= 0) {
-        setTimeRemaining({ total: 0, hours: 0, minutes: 0, seconds: 0 });
-        
-        // Set closed time if race should be closed
-        if (currentStatus === 'closed' || currentStatus === 'interim' || currentStatus === 'final') {
-          const closedAt = new Date(target.getTime() - (5 * 60 * 1000)); // 5 minutes before start
-          setClosedTime(closedAt.toLocaleTimeString('en-US', { 
-            hour12: true, 
-            hour: 'numeric', 
-            minute: '2-digit' 
-          }));
+        // Calculate delayed time past the scheduled start
+        const delayMs = Math.abs(difference)
+        const delayMinutes = Math.floor(delayMs / (1000 * 60))
+        const delaySeconds = Math.floor((delayMs % (1000 * 60)) / 1000)
+
+        if (currentStatus === 'open' && delayMs > 0) {
+          setDelayedTime(
+            `DELAYED ${delayMinutes}:${delaySeconds
+              .toString()
+              .padStart(2, '0')}`
+          )
+        } else {
+          setDelayedTime(null)
         }
-        return;
+
+        setTimeRemaining({ total: 0, hours: 0, minutes: 0, seconds: 0 })
+        return
       }
 
-      const hours = Math.floor(difference / (1000 * 60 * 60));
-      const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+      const hours = Math.floor(difference / (1000 * 60 * 60))
+      const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60))
+      const seconds = Math.floor((difference % (1000 * 60)) / 1000)
 
-      setTimeRemaining({ total: difference, hours, minutes, seconds });
+      setTimeRemaining({ total: difference, hours, minutes, seconds })
 
-      // Clear closed time if race is still open
-      if (currentStatus === 'open') {
-        setClosedTime(null);
-      }
-    } catch (error) {
-      setTimeRemaining({ total: 0, hours: 0, minutes: 0, seconds: 0 });
+      // Clear delayed time if race countdown is positive
+      setDelayedTime(null)
+    } catch {
+      setTimeRemaining({ total: 0, hours: 0, minutes: 0, seconds: 0 })
     }
-  }, [currentStartTime, currentStatus]);
+  }, [currentStartTime, currentStatus])
 
   useEffect(() => {
-    calculateTimeRemaining();
-    const interval = setInterval(calculateTimeRemaining, 1000);
-    return () => clearInterval(interval);
-  }, [calculateTimeRemaining]);
+    calculateTimeRemaining()
+    const interval = setInterval(calculateTimeRemaining, 1000)
+    return () => clearInterval(interval)
+  }, [calculateTimeRemaining])
 
   const formatTime = useMemo(() => {
-    const { hours, minutes, seconds } = timeRemaining;
-    
+    const { hours, minutes, seconds } = timeRemaining
+
     if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds
+        .toString()
+        .padStart(2, '0')}`
     }
-    
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  }, [timeRemaining]);
+
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`
+  }, [timeRemaining])
 
   const urgencyClass = useMemo(() => {
-    const { total } = timeRemaining;
-    
-    if (total <= 60000) return 'text-red-600 font-bold animate-pulse'; // 1 minute
-    if (total <= 300000) return 'text-orange-600 font-semibold'; // 5 minutes
-    if (total <= 900000) return 'text-yellow-600'; // 15 minutes
-    
-    return 'text-gray-700';
-  }, [timeRemaining]);
+    const { total } = timeRemaining
 
-  const statusConfig = getStatusConfig(currentStatus || 'open');
-  const showTimer = showCountdown && currentStatus === 'open' && timeRemaining.total > 0;
+    if (total <= 60000) return 'text-red-600 font-bold animate-pulse' // 1 minute
+    if (total <= 300000) return 'text-orange-600 font-semibold' // 5 minutes
+    if (total <= 900000) return 'text-yellow-600' // 15 minutes
+
+    return 'text-gray-700'
+  }, [timeRemaining])
+
+  const statusConfig = getStatusConfig(currentStatus || 'open')
+  const showTimer =
+    showCountdown && currentStatus === 'open' && timeRemaining.total > 0
 
   return (
-    <div className={`text-center space-y-3 ${className}`}>
-      {/* Race Status */}
-      <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-xl ${statusConfig.bgColor} shadow-md`}>
-        <span className="text-xl">{statusConfig.icon}</span>
-        <span className={`text-xl font-bold ${statusConfig.color}`}>
+    <div className={`text-center space-y-2 ${className}`}>
+      {/* Race Status - prominent */}
+      <div
+        className={`inline-flex items-center space-x-2 px-3 py-2 rounded-lg ${statusConfig.bgColor} shadow`}
+      >
+        <span className="text-lg">{statusConfig.icon}</span>
+        <span className={`text-lg font-extrabold ${statusConfig.color}`}>
           {statusConfig.label}
         </span>
       </div>
-      
-      {/* Countdown Timer */}
+
+      {/* Countdown Timer - large */}
       {showTimer && (
         <div>
-          <div className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
             Time to Start
           </div>
-          <div className={`text-3xl font-bold ${urgencyClass}`}>
+          <div
+            className={`text-3xl lg:text-4xl font-extrabold ${urgencyClass}`}
+          >
             {formatTime}
           </div>
         </div>
       )}
 
-      {/* Closed Time */}
-      {closedTime && (currentStatus === 'closed' || currentStatus === 'interim' || currentStatus === 'final') && (
+      {/* Delayed Time Display - prominent red */}
+      {delayedTime && currentStatus === 'open' && (
         <div>
-          <div className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Closed
+          <div className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-1">
+            Status
           </div>
-          <div className="text-lg font-bold text-gray-900">
-            {closedTime}
+          <div className="text-xl font-extrabold text-red-600 animate-pulse">
+            {delayedTime}
           </div>
         </div>
       )}
 
-      {/* Race Start Time */}
+      {/* Actual Start Time (Closed Time) */}
+      {actualStartTime &&
+        (currentStatus === 'closed' ||
+          currentStatus === 'interim' ||
+          currentStatus === 'final') && (
+          <div>
+            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              Closed
+            </div>
+            <div className="text-sm font-bold text-gray-900">
+              {new Date(actualStartTime).toLocaleTimeString('en-US', {
+                hour12: true,
+                hour: 'numeric',
+                minute: '2-digit',
+              })}
+            </div>
+          </div>
+        )}
+
+      {/* Scheduled Start Time - compact */}
       {currentStartTime && (
-        <div className="text-sm text-gray-600">
-          <div className="text-xs text-gray-400 mb-1">Scheduled Start</div>
+        <div className="text-xs text-gray-500">
+          <div className="text-xs text-gray-400 mb-1">Scheduled</div>
           <time dateTime={currentStartTime}>
-            {new Date(currentStartTime).toLocaleTimeString('en-US', { 
-              hour12: true, 
-              hour: 'numeric', 
-              minute: '2-digit' 
+            {new Date(currentStartTime).toLocaleTimeString('en-US', {
+              hour12: true,
+              hour: 'numeric',
+              minute: '2-digit',
             })}
           </time>
         </div>
       )}
     </div>
-  );
-});
+  )
+})

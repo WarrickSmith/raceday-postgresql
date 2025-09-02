@@ -1,140 +1,162 @@
-'use client';
+'use client'
 
-import { memo, useState } from 'react';
-import type { RaceResultsData } from '@/types/racePools';
+import { memo } from 'react'
+import type { RaceResultsData } from '@/types/racePools'
 
 interface RaceResultsSectionProps {
-  resultsData?: RaceResultsData;
-  className?: string;
-  showWinPlaceSelector?: boolean;
+  resultsData?: RaceResultsData
+  className?: string
 }
 
-export const RaceResultsSection = memo(function RaceResultsSection({ 
+export const RaceResultsSection = memo(function RaceResultsSection({
   resultsData,
   className = '',
-  showWinPlaceSelector = true
 }: RaceResultsSectionProps) {
-  const [selectedView, setSelectedView] = useState<'win' | 'place'>('win');
-
   if (!resultsData || resultsData.results.length === 0) {
     return (
-      <div className={`text-center ${className}`}>
-        {/* Win/Place Selector */}
-        {showWinPlaceSelector && (
-          <div className="flex justify-center mb-4">
-            <div className="flex bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setSelectedView('win')}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                  selectedView === 'win'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Win
-              </button>
-              <button
-                onClick={() => setSelectedView('place')}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                  selectedView === 'place'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Place
-              </button>
-            </div>
-          </div>
-        )}
+      <div className={`${className}`}>
+        <div className="text-xs text-gray-500 mb-2 uppercase tracking-wide font-semibold text-left">
+          Results
+        </div>
 
-        <div className="text-gray-500 py-8">
-          <div className="text-lg font-medium mb-2">Results</div>
-          <div className="flex justify-center space-x-8">
-            <div className="text-center">
-              <div className="text-xs text-gray-400 mb-1">1st</div>
-              <div className="text-lg font-bold">—</div>
-            </div>
-            <div className="text-center">
-              <div className="text-xs text-gray-400 mb-1">2nd</div>
-              <div className="text-lg font-bold">—</div>
-            </div>
-            <div className="text-center">
-              <div className="text-xs text-gray-400 mb-1">3rd</div>
-              <div className="text-lg font-bold">—</div>
+        {/* Grid: Left column - top3; Right column - Trifecta/Quinella/Exacta */}
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <div className="grid gap-2">
+              <div className="flex justify-between">
+                <div className="text-xs text-gray-400">1st</div>
+                <div className="text-sm font-bold">—</div>
+              </div>
+              <div className="flex justify-between">
+                <div className="text-xs text-gray-400">2nd</div>
+                <div className="text-sm font-bold">—</div>
+              </div>
+              <div className="flex justify-between">
+                <div className="text-xs text-gray-400">3rd</div>
+                <div className="text-sm font-bold">—</div>
+              </div>
             </div>
           </div>
-          <div className="text-sm mt-4">Results not yet available</div>
+
+          <div>
+            <div className="grid gap-2">
+              <div className="flex justify-between">
+                <div className="text-xs text-gray-400">Trifecta</div>
+                <div className="text-sm font-bold">—</div>
+              </div>
+              <div className="flex justify-between">
+                <div className="text-xs text-gray-400">Quinella</div>
+                <div className="text-sm font-bold">—</div>
+              </div>
+              <div className="flex justify-between">
+                <div className="text-xs text-gray-400">Exacta</div>
+                <div className="text-sm font-bold">—</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div className={`${className}`}>
-      {/* Win/Place Selector */}
-      {showWinPlaceSelector && (
-        <div className="flex justify-center mb-4">
-          <div className="flex bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setSelectedView('win')}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                selectedView === 'win'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Win
-            </button>
-            <button
-              onClick={() => setSelectedView('place')}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                selectedView === 'place'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Place
-            </button>
-          </div>
+      <div>
+        <div className="text-xs text-gray-500 mb-2 uppercase tracking-wide font-semibold text-left">
+          Results
         </div>
-      )}
 
-      {/* Results Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-medium text-gray-900">Race Results</h3>
-        <div className="flex items-center space-x-2">
-          <span className={`text-xs px-2 py-1 rounded ${
-            resultsData.status === 'final' 
-              ? 'bg-green-100 text-green-700' 
-              : 'bg-yellow-100 text-yellow-700'
-          }`}>
+        {/* Results Status Badges */}
+        <div className="flex justify-center items-center space-x-1 mb-3">
+          <span
+            className={`text-xs px-2 py-0.5 rounded ${
+              resultsData.status === 'final'
+                ? 'bg-green-100 text-green-700'
+                : 'bg-yellow-100 text-yellow-700'
+            }`}
+          >
             {resultsData.status}
           </span>
           {resultsData.photoFinish && (
-            <span className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700">
-              Photo Finish
+            <span className="text-xs px-1 py-0.5 rounded bg-blue-100 text-blue-700">
+              Photo
             </span>
           )}
           {resultsData.stewardsInquiry && (
-            <span className="text-xs px-2 py-1 rounded bg-orange-100 text-orange-700">
-              Stewards Inquiry
+            <span className="text-xs px-1 py-0.5 rounded bg-orange-100 text-orange-700">
+              Inquiry
             </span>
           )}
         </div>
-      </div>
 
-      {/* Top 3 Results Display */}
-      <div className="flex justify-center space-x-8 mb-6">
-        {resultsData.results.slice(0, 3).map((result, index) => (
-          <div key={result.position} className="text-center">
-            <div className="text-xs text-gray-400 mb-1">
-              {index + 1 === 1 ? '1st' : index + 1 === 2 ? '2nd' : '3rd'}
-            </div>
-            <div className="text-lg font-bold mb-1">#{result.runnerNumber}</div>
-            <div className="text-sm text-gray-700">{result.runnerName}</div>
-            <div className="text-xs text-gray-500">{result.jockey}</div>
+        {/* Compact results grid aligned with Pools (4-column label/value pairs) */}
+        <div className="grid grid-cols-4 gap-3 text-sm mb-3">
+          {/* Row 1: 1st / value, Trifecta / value */}
+          <div className="text-xs text-gray-400">1st</div>
+          <div className="text-sm font-bold">
+            {resultsData.results[0]
+              ? `#${resultsData.results[0].runnerNumber} ${resultsData.results[0].runnerName}`
+              : '—'}
           </div>
-        ))}
+          <div className="text-xs text-gray-400">Trifecta</div>
+          <div className="text-sm font-bold justify-self-end text-right font-tnum">
+            {resultsData.dividends.find(
+              (d) => d.poolType.toLowerCase() === 'trifecta'
+            )?.dividend !== undefined
+              ? `${
+                  resultsData.dividends.find(
+                    (d) => d.poolType.toLowerCase() === 'trifecta'
+                  )!.currency
+                }${resultsData.dividends
+                  .find((d) => d.poolType.toLowerCase() === 'trifecta')!
+                  .dividend.toFixed(2)}`
+              : '—'}
+          </div>
+
+          {/* Row 2: 2nd / value, Quinella / value */}
+          <div className="text-xs text-gray-400">2nd</div>
+          <div className="text-sm font-bold">
+            {resultsData.results[1]
+              ? `#${resultsData.results[1].runnerNumber} ${resultsData.results[1].runnerName}`
+              : '—'}
+          </div>
+          <div className="text-xs text-gray-400">Quinella</div>
+          <div className="text-sm font-bold justify-self-end text-right font-tnum">
+            {resultsData.dividends.find(
+              (d) => d.poolType.toLowerCase() === 'quinella'
+            )?.dividend !== undefined
+              ? `${
+                  resultsData.dividends.find(
+                    (d) => d.poolType.toLowerCase() === 'quinella'
+                  )!.currency
+                }${resultsData.dividends
+                  .find((d) => d.poolType.toLowerCase() === 'quinella')!
+                  .dividend.toFixed(2)}`
+              : '—'}
+          </div>
+
+          {/* Row 3: 3rd / value, Exacta / value */}
+          <div className="text-xs text-gray-400">3rd</div>
+          <div className="text-sm font-bold">
+            {resultsData.results[2]
+              ? `#${resultsData.results[2].runnerNumber} ${resultsData.results[2].runnerName}`
+              : '—'}
+          </div>
+          <div className="text-xs text-gray-400">Exacta</div>
+          <div className="text-sm font-bold justify-self-end text-right font-tnum">
+            {resultsData.dividends.find(
+              (d) => d.poolType.toLowerCase() === 'exacta'
+            )?.dividend !== undefined
+              ? `${
+                  resultsData.dividends.find(
+                    (d) => d.poolType.toLowerCase() === 'exacta'
+                  )!.currency
+                }${resultsData.dividends
+                  .find((d) => d.poolType.toLowerCase() === 'exacta')!
+                  .dividend.toFixed(2)}`
+              : '—'}
+          </div>
+        </div>
       </div>
 
       {/* Detailed Results Table */}
@@ -157,7 +179,9 @@ export const RaceResultsSection = memo(function RaceResultsSection({
                 <td className="py-2">{result.runnerNumber}</td>
                 <td className="py-2">{result.runnerName}</td>
                 <td className="py-2 text-gray-600">{result.jockey}</td>
-                <td className="py-2 text-right font-mono">{result.odds.toFixed(2)}</td>
+                <td className="py-2 text-right font-mono">
+                  {result.odds.toFixed(2)}
+                </td>
                 <td className="py-2 text-right">{result.margin || '—'}</td>
               </tr>
             ))}
@@ -172,13 +196,18 @@ export const RaceResultsSection = memo(function RaceResultsSection({
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
             {resultsData.dividends.map((dividend) => (
               <div key={dividend.poolType} className="flex justify-between">
-                <span className="text-gray-600 uppercase">{dividend.poolType}:</span>
-                <span className="font-mono font-medium">{dividend.currency}{dividend.dividend.toFixed(2)}</span>
+                <span className="text-gray-600 uppercase">
+                  {dividend.poolType}:
+                </span>
+                <span className="font-mono font-medium">
+                  {dividend.currency}
+                  {dividend.dividend.toFixed(2)}
+                </span>
               </div>
             ))}
           </div>
         </div>
       )}
     </div>
-  );
-});
+  )
+})
