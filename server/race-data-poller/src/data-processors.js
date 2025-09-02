@@ -99,6 +99,33 @@ export function transformRaceData(race, meetingId) {
     if (race.track_condition !== undefined) raceDoc.trackCondition = race.track_condition;
     if (race.weather !== undefined) raceDoc.weather = race.weather;
     
+    // Add results data if present (for Interim or Final status races)
+    if (race.results && Array.isArray(race.results) && race.results.length > 0) {
+        raceDoc.resultsAvailable = true;
+        raceDoc.resultsData = JSON.stringify(race.results);
+        raceDoc.resultTime = new Date().toISOString();
+        
+        // Determine result status based on race status
+        if (race.status === 'Final') {
+            raceDoc.resultStatus = 'final';
+        } else if (race.status === 'Interim') {
+            raceDoc.resultStatus = 'interim';
+        } else {
+            raceDoc.resultStatus = 'interim'; // Default for races with results
+        }
+    }
+    
+    // Add dividends data if present
+    if (race.dividends && Array.isArray(race.dividends) && race.dividends.length > 0) {
+        raceDoc.dividendsData = JSON.stringify(race.dividends);
+        
+        // Extract flags from dividend data
+        const dividendStatuses = race.dividends.map(d => d.status?.toLowerCase());
+        raceDoc.photoFinish = dividendStatuses.includes('photo');
+        raceDoc.stewardsInquiry = dividendStatuses.includes('inquiry');
+        raceDoc.protestLodged = dividendStatuses.includes('protest');
+    }
+    
     return raceDoc;
 }
 
