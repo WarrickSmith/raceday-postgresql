@@ -48,7 +48,7 @@ export const RaceFooter = memo(function RaceFooter({
   const { raceData } = useRace()
 
   // Use the same approach as RaceDataHeader - useRealtimeRace with proper fallback
-  const { race: liveRace, isConnected } = useRealtimeRace({
+  const { race: liveRace } = useRealtimeRace({
     initialRace: raceData?.race || {
       $id: raceId || 'fallback',
       raceId: raceId || 'fallback',
@@ -116,8 +116,8 @@ export const RaceFooter = memo(function RaceFooter({
     <div
       className={`race-footer bg-white border-2 border-gray-300 shadow-lg rounded-lg ${className}`}
     >
-      {/* Enhanced Four-Column Footer Layout: Pools | Results | Info | Timing/Status */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4">
+      {/* Enhanced Three-Column Footer Layout: Pools | Results | Timing/Status */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
         {/* Column 1-2: Separate Pools and Results sections restored */}
         <div className="flex flex-col justify-center col-span-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
@@ -126,58 +126,7 @@ export const RaceFooter = memo(function RaceFooter({
           </div>
         </div>
 
-        {/* Column 3: Additional Controls/Info */}
-        <div className="flex flex-col justify-center items-center">
-          <div className="text-center">
-            <div className="text-xs text-gray-500 mb-2 uppercase tracking-wide font-semibold">
-              Info
-            </div>
-
-            {/* Connection Status Indicator */}
-            <div className="flex items-center justify-center space-x-2 mb-2">
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  isConnected ? 'bg-green-500' : 'bg-red-500'
-                }`}
-              ></div>
-              <span className="text-xs text-gray-600">
-                {isConnected ? 'Live' : 'Disconnected'}
-              </span>
-            </div>
-
-            {/* Pool Data Freshness */}
-            {currentPoolData && (
-              <div className="text-xs text-gray-500">
-                <div>Last Update</div>
-                <div className="font-mono">
-                  {new Date(currentPoolData.lastUpdated).toLocaleTimeString(
-                    'en-US',
-                    {
-                      hour12: true,
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    }
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Loading/Error States */}
-            {poolLoading && (
-              <div className="text-xs text-blue-600">
-                <div className="animate-pulse">Updating...</div>
-              </div>
-            )}
-
-            {poolError && (
-              <div className="text-xs text-red-600">
-                <div>Data Error</div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Column 4: Timing/Status Section (Right) */}
+        {/* Column 3: Timing/Status Section (Right) */}
         <div className="flex flex-col justify-center">
           <RaceTimingSection
             raceStartTime={currentRaceStartTime}
@@ -197,8 +146,6 @@ export const RaceFooter = memo(function RaceFooter({
         {resultsData &&
           resultsData.results.length > 0 &&
           ` Results available with ${resultsData.results.length} positions.`}
-        Connection status:{' '}
-        {isConnected ? 'Live data connected' : 'Data connection lost'}.
       </div>
     </div>
   )
