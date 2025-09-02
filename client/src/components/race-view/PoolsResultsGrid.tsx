@@ -94,7 +94,7 @@ export const PoolsResultsGrid: React.FC<Props> = ({
 
         {/* Right-side bet columns should read: Quinella, Trifecta (pool), FirstFour (pool) */}
         <div className="text-xs text-gray-600">Quinella</div>
-        <div className="text-sm font-bold text-gray-900 justify-self-end text-right font-tnum">
+  <div className="text-sm font-bold text-gray-900 leading-none justify-self-end text-right font-tnum">
           {findDividend('quinella')
             ? `${findDividend('quinella')!.currency}${findDividend(
                 'quinella'
@@ -104,13 +104,13 @@ export const PoolsResultsGrid: React.FC<Props> = ({
 
         {/* Win row */}
         <div className="text-xs text-gray-600">Win</div>
-        <div className="text-sm font-bold text-gray-900">
+        <div className="text-sm font-bold text-gray-900 leading-none justify-self-end text-right font-tnum">
           {poolData && poolData.winPoolTotal
             ? `$${formatPoolAmount(poolData.winPoolTotal)}`
             : '—'}
         </div>
         <div className="text-xs text-gray-600">Trifecta (pool)</div>
-        <div className="text-sm font-bold text-gray-900 justify-self-end text-right">
+  <div className="text-sm font-bold text-gray-900 leading-none justify-self-end text-right font-tnum">
           {poolData && poolData.trifectaPoolTotal
             ? `$${formatPoolAmount(poolData.trifectaPoolTotal)}`
             : '—'}
@@ -118,17 +118,17 @@ export const PoolsResultsGrid: React.FC<Props> = ({
 
         {/* Place row */}
         <div className="text-xs text-gray-600">Place</div>
-        <div className="text-sm font-bold text-gray-900">
+        <div className="text-sm font-bold text-gray-900 leading-none justify-self-end text-right font-tnum">
           {poolData && poolData.placePoolTotal
             ? `$${formatPoolAmount(poolData.placePoolTotal)}`
             : '—'}
         </div>
         <div className="text-xs text-gray-600">Total</div>
-        <div className="text-sm font-bold text-gray-900">
+        <div className="text-sm font-bold text-gray-900 leading-none justify-self-end text-right font-tnum">
           {poolData ? `$${formatPoolAmount(poolData.totalRacePool)}` : '—'}
         </div>
         <div className="text-xs text-gray-600">FirstFour (pool)</div>
-        <div className="text-sm font-bold text-gray-900 justify-self-end text-right">
+  <div className="text-sm font-bold text-gray-900 leading-none justify-self-end text-right font-tnum">
           {poolData && poolData.first4PoolTotal
             ? `$${formatPoolAmount(poolData.first4PoolTotal)}`
             : '—'}
