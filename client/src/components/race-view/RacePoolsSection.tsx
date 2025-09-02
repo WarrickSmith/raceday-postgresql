@@ -124,19 +124,19 @@ export const RacePoolsSection = memo(function RacePoolsSection({
       </div>
 
       {/* Total row moved below the pool breakdown rows so left column order is Win, Place, Total */}
-      <div className="grid grid-cols-4 gap-3 items-baseline text-sm mt-2">
+      <div className="grid grid-cols-4 gap-3 items-baseline text-sm">
         <div className="text-sm text-gray-600">Total</div>
         <div className="text-sm font-bold text-gray-900 leading-none justify-self-end text-right font-tnum">
           {currentPoolData.totalRacePool !== undefined
             ? `$${formatPoolAmount(currentPoolData.totalRacePool)}`
-            : '\u2014'}
+            : '—'}
         </div>
         <div className="text-sm text-gray-600">FirstFour</div>
         <div className="text-sm font-bold text-gray-900 leading-none justify-self-end text-right font-tnum">
           {currentPoolData.first4PoolTotal &&
           currentPoolData.first4PoolTotal > 0
             ? `$${formatPoolAmount(currentPoolData.first4PoolTotal)}`
-            : '\u2014'}
+            : '—'}
         </div>
       </div>
 

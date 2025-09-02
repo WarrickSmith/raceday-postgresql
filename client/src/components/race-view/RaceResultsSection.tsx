@@ -39,7 +39,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
         </div>
 
         {/* Column Headers - Pos, No, Runner, Win, Place + blank columns for bet types */}
-        <div className="grid grid-cols-8 gap-2 mb-2 text-sm">
+        <div className="grid grid-cols-8 gap-2 mb-1 text-sm">
           <div className="col-span-1 text-blue-500 font-semibold">Pos</div>
           <div className="col-span-1 text-blue-500 font-semibold">No</div>
           <div className="col-span-2 text-blue-500 font-semibold">Runner</div>
@@ -61,17 +61,15 @@ export const RaceResultsSection = memo(function RaceResultsSection({
           <div className="grid grid-cols-8 gap-2 items-baseline text-sm">
             <div className="col-span-1 text-blue-500 font-bold">1st</div>
             <div className="col-span-1 text-gray-900 font-bold">—</div>
-            <div className="col-span-2 text-gray-900 font-bold">—</div>
-            <div className="col-span-1 text-gray-900 font-bold text-right">
+            <div className="col-span-2 text-gray-900">—</div>
+            <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
-            <div className="col-span-1 text-gray-900 font-bold text-right">
+            <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
-            <div className="col-span-1 text-blue-500 font-semibold">
-              Quinella
-            </div>
-            <div className="col-span-1 text-gray-900 font-bold text-right">
+            <div className="col-span-1 text-gray-600">Quinella</div>
+            <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
           </div>
@@ -80,15 +78,13 @@ export const RaceResultsSection = memo(function RaceResultsSection({
           <div className="grid grid-cols-8 gap-2 items-baseline text-sm">
             <div className="col-span-1 text-blue-500 font-bold">2nd</div>
             <div className="col-span-1 text-gray-900 font-bold">—</div>
-            <div className="col-span-2 text-gray-900 font-bold">—</div>
-            <div className="col-span-1 text-gray-900 font-bold text-right"></div>
-            <div className="col-span-1 text-gray-900 font-bold text-right">
+            <div className="col-span-2 text-gray-900">—</div>
+            <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum"></div>
+            <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
-            <div className="col-span-1 text-blue-500 font-semibold">
-              Trifecta
-            </div>
-            <div className="col-span-1 text-gray-900 font-bold text-right">
+            <div className="col-span-1 text-gray-600">Trifecta</div>
+            <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
           </div>
@@ -97,15 +93,13 @@ export const RaceResultsSection = memo(function RaceResultsSection({
           <div className="grid grid-cols-8 gap-2 items-baseline text-sm">
             <div className="col-span-1 text-blue-500 font-bold">3rd</div>
             <div className="col-span-1 text-gray-900 font-bold">—</div>
-            <div className="col-span-2 text-gray-900 font-bold">—</div>
-            <div className="col-span-1 text-gray-900 font-bold text-right"></div>
-            <div className="col-span-1 text-gray-900 font-bold text-right">
+            <div className="col-span-2 text-gray-900">—</div>
+            <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum"></div>
+            <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
-            <div className="col-span-1 text-blue-500 font-semibold">
-              FirstFour
-            </div>
-            <div className="col-span-1 text-gray-900 font-bold text-right">
+            <div className="col-span-1 text-gray-600">FirstFour</div>
+            <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
           </div>
@@ -184,7 +178,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
       </div>
 
       {/* Column Headers - Pos, No, Runner, Win, Place + blank columns for bet types */}
-      <div className="grid grid-cols-8 gap-2 mb-2 text-sm">
+      <div className="grid grid-cols-8 gap-2 mb-1 text-sm">
         <div className="col-span-1 text-blue-500 font-semibold">Pos</div>
         <div className="col-span-1 text-blue-500 font-semibold">No</div>
         <div className="col-span-2 text-blue-500 font-semibold">Runner</div>
@@ -220,7 +214,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
                 )
               : '—'}
           </div>
-          <div className="col-span-1 text-gray-900 font-bold text-right font-tnum">
+          <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
             {(() => {
               if (resultsData?.results[0]) {
                 const runnerNumber =
@@ -236,7 +230,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
               return '—'
             })()}
           </div>
-          <div className="col-span-1 text-gray-900 font-bold text-right font-tnum">
+          <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
             {(() => {
               if (resultsData?.results[0]) {
                 const runnerNumber =
@@ -252,8 +246,8 @@ export const RaceResultsSection = memo(function RaceResultsSection({
               return '—'
             })()}
           </div>
-          <div className="col-span-1 text-blue-500 font-semibold">Quinella</div>
-          <div className="col-span-1 text-gray-900 font-bold text-right font-tnum">
+          <div className="col-span-1 text-gray-600">Quinella</div>
+          <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
             {findDividend('quinella')
               ? `$${findDividend('quinella')!.dividend.toFixed(2)}`
               : '—'}
@@ -278,8 +272,8 @@ export const RaceResultsSection = memo(function RaceResultsSection({
                 )
               : '—'}
           </div>
-          <div className="col-span-1 text-gray-900 font-bold text-right font-tnum"></div>
-          <div className="col-span-1 text-gray-900 font-bold text-right font-tnum">
+          <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum"></div>
+          <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
             {(() => {
               if (resultsData?.results[1]) {
                 const runnerNumber =
@@ -295,8 +289,8 @@ export const RaceResultsSection = memo(function RaceResultsSection({
               return '—'
             })()}
           </div>
-          <div className="col-span-1 text-blue-500 font-semibold">Trifecta</div>
-          <div className="col-span-1 text-gray-900 font-bold text-right font-tnum">
+          <div className="col-span-1 text-gray-600">Trifecta</div>
+          <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
             {findDividend('trifecta')
               ? `$${findDividend('trifecta')!.dividend.toFixed(2)}`
               : '—'}
@@ -321,8 +315,8 @@ export const RaceResultsSection = memo(function RaceResultsSection({
                 )
               : '—'}
           </div>
-          <div className="col-span-1 text-gray-900 font-bold text-right font-tnum"></div>
-          <div className="col-span-1 text-gray-900 font-bold text-right font-tnum">
+          <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum"></div>
+          <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
             {(() => {
               if (resultsData?.results[2]) {
                 const runnerNumber =
@@ -338,10 +332,8 @@ export const RaceResultsSection = memo(function RaceResultsSection({
               return '—'
             })()}
           </div>
-          <div className="col-span-1 text-blue-500 font-semibold">
-            FirstFour
-          </div>
-          <div className="col-span-1 text-gray-900 font-bold text-right font-tnum">
+          <div className="col-span-1 text-gray-600">FirstFour</div>
+          <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
             {findDividend('first4')
               ? `$${findDividend('first4')!.dividend.toFixed(2)}`
               : '—'}
