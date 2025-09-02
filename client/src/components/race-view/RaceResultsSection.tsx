@@ -19,13 +19,13 @@ export const RaceResultsSection = memo(function RaceResultsSection({
           Results
         </div>
 
-        {/* Column Headers - Pos, No., Results, Win, Place + blank columns for bet types */}
+        {/* Column Headers - Pos, No, Runner, Win, Place + blank columns for bet types */}
         <div className="grid grid-cols-7 gap-2 mb-2 text-sm">
-          <div className="col-span-1 text-blue-500 font-semibold">POS</div>
-          <div className="col-span-1 text-blue-500 font-semibold">NO.</div>
-          <div className="col-span-1 text-blue-500 font-semibold">RESULTS</div>
-          <div className="col-span-1 text-blue-500 font-semibold text-right">WIN</div>
-          <div className="col-span-1 text-blue-500 font-semibold text-right">PLACE</div>
+          <div className="col-span-1 text-blue-500 font-semibold">Pos</div>
+          <div className="col-span-1 text-blue-500 font-semibold">No</div>
+          <div className="col-span-1 text-blue-500 font-semibold">Runner</div>
+          <div className="col-span-1 text-blue-500 font-semibold text-right">Win</div>
+          <div className="col-span-1 text-blue-500 font-semibold text-right">Place</div>
           <div className="col-span-1"></div> {/* Blank header for bet type labels */}
           <div className="col-span-1"></div> {/* Blank header for bet type values */}
         </div>
@@ -81,13 +81,13 @@ export const RaceResultsSection = memo(function RaceResultsSection({
         Results
       </div>
 
-      {/* Column Headers - Pos, No., Results, Win, Place + blank columns for bet types */}
+      {/* Column Headers - Pos, No, Runner, Win, Place + blank columns for bet types */}
       <div className="grid grid-cols-7 gap-2 mb-2 text-sm">
-        <div className="col-span-1 text-blue-500 font-semibold">POS</div>
-        <div className="col-span-1 text-blue-500 font-semibold">NO.</div>
-        <div className="col-span-1 text-blue-500 font-semibold">RESULTS</div>
-        <div className="col-span-1 text-blue-500 font-semibold text-right">WIN</div>
-        <div className="col-span-1 text-blue-500 font-semibold text-right">PLACE</div>
+        <div className="col-span-1 text-blue-500 font-semibold">Pos</div>
+        <div className="col-span-1 text-blue-500 font-semibold">No</div>
+        <div className="col-span-1 text-blue-500 font-semibold">Runner</div>
+        <div className="col-span-1 text-blue-500 font-semibold text-right">Win</div>
+        <div className="col-span-1 text-blue-500 font-semibold text-right">Place</div>
         <div className="col-span-1"></div> {/* Blank header for bet type labels */}
         <div className="col-span-1"></div> {/* Blank header for bet type values */}
       </div>
