@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { client } from '@/lib/appwrite-client';
-import { Race } from '@/types/meetings';
+import { Race, RaceResults } from '@/types/meetings';
 
 interface UseRealtimeRaceProps {
   initialRace: Race;
@@ -15,17 +15,20 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
 
 
   useEffect(() => {
-    // Subscribe only to this specific race to minimize network overhead
-    const channel = `databases.raceday-db.collections.races.documents.${initialRace.$id}`;
+    // Subscribe to both race data and race-results data
+    const raceChannel = `databases.raceday-db.collections.races.documents.${initialRace.$id}`;
+    const raceResultsChannel = `databases.raceday-db.collections.race-results.documents`;
     
     console.log('🏁 Realtime setup:', { raceId: initialRace.raceId, status: initialRace.status });
 
-    let unsubscribe: (() => void) | null = null;
+    let raceUnsubscribe: (() => void) | null = null;
+    let resultsUnsubscribe: (() => void) | null = null;
     let retryTimeout: NodeJS.Timeout | null = null;
 
-    const setupSubscription = async () => {
+    const setupSubscriptions = async () => {
       try {
-        unsubscribe = client.subscribe(channel, (response: { payload?: Partial<Race> }) => {
+        // Subscribe to race data changes
+        raceUnsubscribe = client.subscribe(raceChannel, (response: { payload?: Partial<Race> }) => {
           // Only log meaningful status changes to reduce noise
           if (response.payload?.status && response.payload.status !== initialRace.status) {
             console.log('🔄 Status update:', { from: initialRace.status, to: response.payload.status });
@@ -45,9 +48,75 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
               );
               
               if (hasSignificantChange) {
-                console.log('🏁 Applying changes:', { raceId: currentRace.raceId, status: changes.status });
+                const updatedRace = { ...currentRace, ...changes };
+                
+                console.log('🏁 Applying race changes:', { 
+                  raceId: currentRace.raceId, 
+                  status: changes.status
+                });
                 setLastUpdate(new Date());
-                return { ...currentRace, ...changes };
+                return updatedRace;
+              }
+              
+              return currentRace;
+            });
+            setIsConnected(true);
+          }
+        });
+
+        // Subscribe to race-results data changes (filter by race relationship)
+        resultsUnsubscribe = client.subscribe(raceResultsChannel, (response: { payload?: Partial<RaceResults> }) => {
+          if (response.payload && response.payload.race === initialRace.$id) {
+            const resultsChanges = response.payload;
+            
+            setRace(currentRace => {
+              const hasResultsChange = (
+                resultsChanges.resultsAvailable !== undefined && resultsChanges.resultsAvailable !== currentRace.resultsAvailable ||
+                resultsChanges.resultsData && resultsChanges.resultsData !== JSON.stringify(currentRace.resultsData) ||
+                resultsChanges.dividendsData && resultsChanges.dividendsData !== JSON.stringify(currentRace.dividendsData) ||
+                resultsChanges.resultStatus && resultsChanges.resultStatus !== currentRace.resultStatus ||
+                resultsChanges.photoFinish !== undefined && resultsChanges.photoFinish !== currentRace.photoFinish ||
+                resultsChanges.stewardsInquiry !== undefined && resultsChanges.stewardsInquiry !== currentRace.stewardsInquiry ||
+                resultsChanges.protestLodged !== undefined && resultsChanges.protestLodged !== currentRace.protestLodged
+              );
+              
+              if (hasResultsChange) {
+                const updatedRace = { ...currentRace };
+                
+                // Update results fields from race-results collection
+                if (resultsChanges.resultsAvailable !== undefined) {
+                  updatedRace.resultsAvailable = resultsChanges.resultsAvailable;
+                }
+                if (resultsChanges.resultsData) {
+                  updatedRace.resultsData = JSON.parse(resultsChanges.resultsData);
+                }
+                if (resultsChanges.dividendsData) {
+                  updatedRace.dividendsData = JSON.parse(resultsChanges.dividendsData);
+                }
+                if (resultsChanges.resultStatus) {
+                  updatedRace.resultStatus = resultsChanges.resultStatus;
+                }
+                if (resultsChanges.photoFinish !== undefined) {
+                  updatedRace.photoFinish = resultsChanges.photoFinish;
+                }
+                if (resultsChanges.stewardsInquiry !== undefined) {
+                  updatedRace.stewardsInquiry = resultsChanges.stewardsInquiry;
+                }
+                if (resultsChanges.protestLodged !== undefined) {
+                  updatedRace.protestLodged = resultsChanges.protestLodged;
+                }
+                if (resultsChanges.resultTime) {
+                  updatedRace.resultTime = resultsChanges.resultTime;
+                }
+                
+                console.log('📊 Applying results changes:', { 
+                  raceId: currentRace.raceId, 
+                  hasResults: !!updatedRace.resultsData,
+                  hasDividends: !!updatedRace.dividendsData,
+                  resultStatus: updatedRace.resultStatus
+                });
+                setLastUpdate(new Date());
+                return updatedRace;
               }
               
               return currentRace;
@@ -58,22 +127,25 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
         
         setIsConnected(true);
       } catch (error) {
-        console.error('Failed to setup race subscription:', error);
+        console.error('Failed to setup race subscriptions:', error);
         setIsConnected(false);
         
         // Retry connection after 5 seconds
         retryTimeout = setTimeout(() => {
-          setupSubscription();
+          setupSubscriptions();
         }, 5000);
       }
     };
 
-    setupSubscription();
+    setupSubscriptions();
 
-    // Cleanup subscription on unmount
+    // Cleanup subscriptions on unmount
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
+      if (raceUnsubscribe) {
+        raceUnsubscribe();
+      }
+      if (resultsUnsubscribe) {
+        resultsUnsubscribe();
       }
       if (retryTimeout) {
         clearTimeout(retryTimeout);

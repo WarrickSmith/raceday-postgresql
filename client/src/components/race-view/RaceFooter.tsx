@@ -93,16 +93,31 @@ export const RaceFooter = memo(function RaceFooter({
   // Use live pool data with fallback to prop for compatibility
   const currentPoolData = livePoolData || poolData
 
+  // Build results data from live race data if available
+  const currentResultsData: RaceResultsData | undefined = 
+    liveRace?.resultsData && liveRace?.dividendsData ? {
+      results: liveRace.resultsData,
+      dividends: liveRace.dividendsData,
+      status: liveRace.resultStatus || 'final',
+      photoFinish: liveRace.photoFinish || false,
+      stewardsInquiry: liveRace.stewardsInquiry || false,
+      protestLodged: liveRace.protestLodged || false,
+      declaredAt: liveRace.resultTime || new Date().toISOString()
+    } : resultsData
+
+  // Get fixed odds data from live race if available
+  const currentFixedOddsData = liveRace?.fixedOddsData || undefined
+
   // Announce results availability when they become available
   useEffect(() => {
-    if (resultsData && resultsData.results.length > 0 && showResults) {
+    if (currentResultsData && currentResultsData.results.length > 0 && showResults) {
       // Announce results availability
       screenReader?.announce(
-        `Race results are now available with ${resultsData.results.length} positions`,
+        `Race results are now available with ${currentResultsData.results.length} positions`,
         'assertive'
       )
     }
-  }, [resultsData, showResults])
+  }, [currentResultsData, showResults])
 
   // Announce race status changes
   useEffect(() => {
@@ -122,12 +137,12 @@ export const RaceFooter = memo(function RaceFooter({
         <div className="flex flex-col justify-center col-span-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
             <RacePoolsSection raceId={raceId} poolData={currentPoolData} />
-            <RaceResultsSection resultsData={resultsData} />
+            <RaceResultsSection resultsData={currentResultsData} fixedOddsData={currentFixedOddsData} />
           </div>
         </div>
 
         {/* Column 3: Timing/Status Section (Right) */}
-        <div className="flex flex-col justify-center">
+        <div className="flex flex-col justify-center items-end">
           <RaceTimingSection
             raceStartTime={currentRaceStartTime}
             raceStatus={currentRaceStatus}
@@ -143,9 +158,9 @@ export const RaceFooter = memo(function RaceFooter({
           ` Total pool: ${currentPoolData.currency}${formatPoolAmount(
             currentPoolData.totalRacePool
           )}.`}
-        {resultsData &&
-          resultsData.results.length > 0 &&
-          ` Results available with ${resultsData.results.length} positions.`}
+        {currentResultsData &&
+          currentResultsData.results.length > 0 &&
+          ` Results available with ${currentResultsData.results.length} positions.`}
       </div>
     </div>
   )
