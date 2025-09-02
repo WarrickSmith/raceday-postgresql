@@ -73,7 +73,11 @@ export const RacePoolsSection = memo(function RacePoolsSection({
       label: 'Quinella',
       value: currentPoolData.quinellaPoolTotal,
     },
-    { key: 'first4', label: 'FirstFour', value: currentPoolData.first4PoolTotal },
+    {
+      key: 'trifecta',
+      label: 'Trifecta',
+      value: currentPoolData.trifectaPoolTotal,
+    },
   ]
 
   // Build explicit pairs matching left/right rows (no trimming; labels always show)
@@ -81,25 +85,13 @@ export const RacePoolsSection = memo(function RacePoolsSection({
 
   return (
     <div className={`${className}`}>
-      <div className="text-sm text-gray-500 uppercase tracking-wide font-semibold mb-1">
-        Pools
+      <div className="flex items-center gap-2 mb-1">
+        <div className="text-sm text-gray-500 uppercase tracking-wide font-semibold">
+          Pools
+        </div>
       </div>
 
-      {/* Total row above the pool breakdown - put value in same column as Win/Place values
-          and show Trifecta in the right column */}
-      <div className="grid grid-cols-4 items-baseline gap-2 mb-2">
-        <div className="text-sm text-gray-600">Total</div>
-        <div className="text-sm font-bold text-gray-900 leading-none justify-self-end text-right font-tnum">
-          ${formatPoolAmount(currentPoolData.totalRacePool)}
-        </div>
-        <div className="text-sm text-gray-600">Trifecta</div>
-        <div className="text-sm font-bold text-gray-900 leading-none justify-self-end text-right font-tnum">
-          {currentPoolData.trifectaPoolTotal &&
-          currentPoolData.trifectaPoolTotal > 0
-            ? `$${formatPoolAmount(currentPoolData.trifectaPoolTotal)}`
-            : '—'}
-        </div>
-      </div>
+      {/* Pool breakdown rows (Win/Place pairs) rendered below; Total will be shown after them */}
 
       {/* Render rows so Win pairs with Trifecta, Place with Quinella, etc. Labels and values share the same font-size; values remain bold. */}
       <div className="space-y-1">
@@ -129,6 +121,23 @@ export const RacePoolsSection = memo(function RacePoolsSection({
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Total row moved below the pool breakdown rows so left column order is Win, Place, Total */}
+      <div className="grid grid-cols-4 gap-3 items-baseline text-sm mt-2">
+        <div className="text-sm text-gray-600">Total</div>
+        <div className="text-sm font-bold text-gray-900 leading-none justify-self-end text-right font-tnum">
+          {currentPoolData.totalRacePool !== undefined
+            ? `$${formatPoolAmount(currentPoolData.totalRacePool)}`
+            : '\u2014'}
+        </div>
+        <div className="text-sm text-gray-600">FirstFour</div>
+        <div className="text-sm font-bold text-gray-900 leading-none justify-self-end text-right font-tnum">
+          {currentPoolData.first4PoolTotal &&
+          currentPoolData.first4PoolTotal > 0
+            ? `$${formatPoolAmount(currentPoolData.first4PoolTotal)}`
+            : '\u2014'}
+        </div>
       </div>
 
       {/* Last updated small */}
