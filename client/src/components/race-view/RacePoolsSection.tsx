@@ -60,11 +60,11 @@ export const RacePoolsSection = memo(function RacePoolsSection({
     )
   }
 
-  // Build layout: Total row will include Trifecta on the right.
-  // Then two paired rows: Win <-> Quinella, Place <-> FirstFour.
+  // Build layout: Three paired rows: Win <-> Quinella, Place <-> Trifecta, Total <-> FirstFour
   const leftTypes: { key: string; label: string; value?: number }[] = [
     { key: 'win', label: 'Win', value: currentPoolData.winPoolTotal },
     { key: 'place', label: 'Place', value: currentPoolData.placePoolTotal },
+    { key: 'total', label: 'Total', value: currentPoolData.totalRacePool },
   ]
 
   const rightRowTypes: { key: string; label: string; value?: number }[] = [
@@ -77,6 +77,11 @@ export const RacePoolsSection = memo(function RacePoolsSection({
       key: 'trifecta',
       label: 'Trifecta',
       value: currentPoolData.trifectaPoolTotal,
+    },
+    {
+      key: 'first4',
+      label: 'FirstFour',
+      value: currentPoolData.first4PoolTotal,
     },
   ]
 
@@ -91,53 +96,43 @@ export const RacePoolsSection = memo(function RacePoolsSection({
         </div>
       </div>
 
-      {/* Pool breakdown rows (Win/Place pairs) rendered below; Total will be shown after them */}
+      {/* Pool breakdown rows rendered as consistent pairs: Win <-> Quinella, Place <-> Trifecta, Total <-> FirstFour */}
 
-      {/* Render rows so Win pairs with Trifecta, Place with Quinella, etc. Labels and values share the same font-size; values remain bold. */}
+      {/* Render all rows with consistent 8-column grid formatting to match Results section */}
       <div className="space-y-1">
         {pairs.map((p, i) => (
           <div
             key={i}
-            className="grid grid-cols-4 gap-3 items-baseline text-sm"
+            className="grid grid-cols-8 gap-2 items-baseline text-sm"
           >
-            {/* Left label */}
-            <div className="text-sm text-gray-600">{p.left?.label ?? ''}</div>
+            {/* Left label - spans 2 columns to match Results layout */}
+            <div className="col-span-2 text-sm text-gray-600">
+              {p.left?.label ?? ''}
+            </div>
 
-            {/* Left value (bold) */}
-            <div className="text-sm font-bold text-gray-900 leading-none justify-self-end text-right font-tnum">
-              {p.left && p.left.value && p.left.value > 0
+            {/* Left value (bold) - spans 1 column */}
+            <div className="col-span-1 text-sm font-bold text-gray-900 leading-none text-right font-tnum">
+              {p.left && p.left.value !== undefined && p.left.value > 0
                 ? `$${formatPoolAmount(p.left.value)}`
                 : '—'}
             </div>
 
-            {/* Right label */}
-            <div className="text-sm text-gray-600">{p.right?.label ?? ''}</div>
+            {/* Spacer columns to align with Results grid */}
+            <div className="col-span-2"></div>
 
-            {/* Right value (bold) */}
-            <div className="text-sm font-bold text-gray-900 leading-none justify-self-end text-right font-tnum">
-              {p.right && p.right.value && p.right.value > 0
+            {/* Right label - spans 1 column to match Results bet type column */}
+            <div className="col-span-1 text-sm text-gray-600">
+              {p.right?.label ?? ''}
+            </div>
+
+            {/* Right value (bold) - spans 1 column to match Results bet value column */}
+            <div className="col-span-1 text-sm font-bold text-gray-900 leading-none text-right font-tnum">
+              {p.right && p.right.value !== undefined && p.right.value > 0
                 ? `$${formatPoolAmount(p.right.value)}`
                 : '—'}
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Total row moved below the pool breakdown rows so left column order is Win, Place, Total */}
-      <div className="grid grid-cols-4 gap-3 items-baseline text-sm">
-        <div className="text-sm text-gray-600">Total</div>
-        <div className="text-sm font-bold text-gray-900 leading-none justify-self-end text-right font-tnum">
-          {currentPoolData.totalRacePool !== undefined
-            ? `$${formatPoolAmount(currentPoolData.totalRacePool)}`
-            : '—'}
-        </div>
-        <div className="text-sm text-gray-600">FirstFour</div>
-        <div className="text-sm font-bold text-gray-900 leading-none justify-self-end text-right font-tnum">
-          {currentPoolData.first4PoolTotal &&
-          currentPoolData.first4PoolTotal > 0
-            ? `$${formatPoolAmount(currentPoolData.first4PoolTotal)}`
-            : '—'}
-        </div>
       </div>
 
       {/* Last updated small */}
