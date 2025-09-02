@@ -1,6 +1,6 @@
 import type { SUPPORTED_RACE_TYPE_CODES } from '@/constants/raceTypes'
 import type { MoneyFlowDataPoint, EntrantMoneyFlowTimeline } from './moneyFlow'
-import type { RacePoolData, PoolType } from './racePools'
+import type { RacePoolData, PoolType, RaceResult, PoolDividend } from './racePools'
 import type { JockeySilk } from './jockeySilks'
 
 type SupportedRaceTypeCode = (typeof SUPPORTED_RACE_TYPE_CODES)[number]
@@ -37,6 +37,32 @@ export interface Race {
   weather?: string // Weather conditions (e.g. "Fine", "Overcast")
   runnerCount?: number // Number of runners in the race
   type?: string // Race type code (T, H, G) for category display
+  // Results data fields
+  resultsAvailable?: boolean // Whether results data is available
+  resultsData?: RaceResult[] // Parsed race results array
+  dividendsData?: PoolDividend[] // Parsed dividends array
+  fixedOddsData?: Record<string, {fixed_win: number | null, fixed_place: number | null, runner_name: string | null, entrant_id: string | null}> // Fixed odds per runner at result time
+  resultStatus?: 'interim' | 'final' | 'protest' // Status of results
+  photoFinish?: boolean // Photo finish flag
+  stewardsInquiry?: boolean // Stewards inquiry flag
+  protestLodged?: boolean // Protest lodged flag
+  resultTime?: string // Time when results were declared
+}
+
+// Race results collection interface - separate from main race data
+export interface RaceResults {
+  $id: string
+  $createdAt: string
+  $updatedAt: string
+  race: string // Relationship to races collection
+  resultsAvailable?: boolean // Whether results data is available
+  resultsData?: string // JSON-stringified race results array
+  dividendsData?: string // JSON-stringified dividends array
+  resultStatus?: 'interim' | 'final' | 'protest' // Status of results
+  photoFinish?: boolean // Photo finish flag
+  stewardsInquiry?: boolean // Stewards inquiry flag
+  protestLodged?: boolean // Protest lodged flag
+  resultTime?: string // Time when results were declared
 }
 
 export interface MeetingWithRaces extends Meeting {

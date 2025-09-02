@@ -36,20 +36,38 @@ export interface RacePoolData {
 // Race results data for display
 export interface RaceResult {
   position: number;
-  runnerNumber: number;
-  runnerName: string;
-  jockey: string;
-  odds: number;
+  runnerNumber?: number;
+  runnerName?: string;
+  jockey?: string;
+  odds?: number;
   margin?: string; // e.g., "1.5L", "neck", "nose"
+  // NZTAB API fields
+  runner_number?: number;
+  name?: string;
+  barrier?: number;
+  margin_length?: number;
+  entrant_id?: string;
 }
 
 // Pool dividends for completed races
 export interface PoolDividend {
-  poolType: PoolType;
+  poolType?: PoolType;
   dividend: number;
-  investment: number; // minimum investment (e.g., $1, $2)
-  winners: string[]; // array of runner numbers or combinations
-  currency: string;
+  investment?: number; // minimum investment (e.g., $1, $2)
+  winners?: string[]; // array of runner numbers or combinations
+  currency?: string;
+  // NZTAB API fields
+  product_name?: string; // e.g., "Pool Win", "Pool Place"
+  product_type?: string;
+  pool_type?: string;
+  type?: string;
+  id?: string;
+  tote?: string;
+  status?: string;
+  pool_size?: number;
+  jackpot_size?: number;
+  positions?: Array<{runner_number: number; position: number}>;
+  description?: string;
 }
 
 // Complete race results with dividends

@@ -100,6 +100,25 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       Query.limit(1),
     ])
 
+    // Fetch race-results data for this race if it exists
+    let raceResultsData = null
+    if (raceQuery.documents.length > 0) {
+      const raceDocumentId = raceQuery.documents[0].$id
+      try {
+        const raceResultsQuery = await databases.listDocuments('raceday-db', 'race-results', [
+          Query.equal('race', raceDocumentId),
+          Query.limit(1),
+        ])
+        
+        if (raceResultsQuery.documents.length > 0) {
+          raceResultsData = raceResultsQuery.documents[0]
+        }
+      } catch (error) {
+        console.error('Error fetching race results:', error)
+        // Continue without results data - not critical for race display
+      }
+    }
+
     if (!raceQuery.documents.length) {
       return null
     }
@@ -127,6 +146,16 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       trackCondition: raceData.trackCondition,
       weather: raceData.weather,
       type: raceData.type, // Race type code (T, H, G) for category display
+      // Results data fields from race-results collection
+      resultsAvailable: raceResultsData?.resultsAvailable || false,
+      resultsData: raceResultsData?.resultsData ? JSON.parse(raceResultsData.resultsData) : undefined,
+      dividendsData: raceResultsData?.dividendsData ? JSON.parse(raceResultsData.dividendsData) : undefined,
+      fixedOddsData: raceResultsData?.fixedOddsData ? JSON.parse(raceResultsData.fixedOddsData) : undefined,
+      resultStatus: raceResultsData?.resultStatus,
+      photoFinish: raceResultsData?.photoFinish || false,
+      stewardsInquiry: raceResultsData?.stewardsInquiry || false,
+      protestLodged: raceResultsData?.protestLodged || false,
+      resultTime: raceResultsData?.resultTime,
     }
 
     const meeting: Meeting = {
@@ -403,6 +432,25 @@ async function getNavigationRaceData(raceId: string): Promise<{
       Query.limit(1),
     ])
 
+    // Fetch race-results data for this race if it exists
+    let raceResultsData = null
+    if (raceQuery.documents.length > 0) {
+      const raceDocumentId = raceQuery.documents[0].$id
+      try {
+        const raceResultsQuery = await databases.listDocuments('raceday-db', 'race-results', [
+          Query.equal('race', raceDocumentId),
+          Query.limit(1),
+        ])
+        
+        if (raceResultsQuery.documents.length > 0) {
+          raceResultsData = raceResultsQuery.documents[0]
+        }
+      } catch (error) {
+        console.error('Error fetching race results:', error)
+        // Continue without results data - not critical for navigation display
+      }
+    }
+
     if (!raceQuery.documents.length) {
       return null
     }
@@ -428,6 +476,16 @@ async function getNavigationRaceData(raceId: string): Promise<{
       trackCondition: raceData.trackCondition,
       weather: raceData.weather,
       type: raceData.type, // Race type code (T, H, G) for category display
+      // Results data fields from race-results collection
+      resultsAvailable: raceResultsData?.resultsAvailable || false,
+      resultsData: raceResultsData?.resultsData ? JSON.parse(raceResultsData.resultsData) : undefined,
+      dividendsData: raceResultsData?.dividendsData ? JSON.parse(raceResultsData.dividendsData) : undefined,
+      fixedOddsData: raceResultsData?.fixedOddsData ? JSON.parse(raceResultsData.fixedOddsData) : undefined,
+      resultStatus: raceResultsData?.resultStatus,
+      photoFinish: raceResultsData?.photoFinish || false,
+      stewardsInquiry: raceResultsData?.stewardsInquiry || false,
+      protestLodged: raceResultsData?.protestLodged || false,
+      resultTime: raceResultsData?.resultTime,
     }
 
     const meeting: Meeting = {
