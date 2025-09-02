@@ -21,11 +21,14 @@ export const PoolsResultsGrid: React.FC<Props> = ({
   resultsData,
   className = '',
 }) => {
-  // helpers to find dividend by poolType
+  // helpers to find dividend by poolType (handle different API field names)
   const findDividend = (type: string) =>
-    resultsData?.dividends.find(
-      (d) => d.poolType.toLowerCase() === type.toLowerCase()
-    )
+    resultsData?.dividends.find((d) => {
+      const poolTypeField =
+        d.poolType || d.product_name || d.product_type || d.pool_type || d.type
+      if (!poolTypeField) return false
+      return poolTypeField.toString().toLowerCase() === type.toLowerCase()
+    })
 
   return (
     <div className={`${className}`}>
@@ -38,11 +41,6 @@ export const PoolsResultsGrid: React.FC<Props> = ({
           Results
         </div>
 
-        {/* Total row */}
-        <div className="text-xs text-gray-600">Total</div>
-        <div className="text-sm font-bold text-gray-900">
-          {poolData ? `$${formatPoolAmount(poolData.totalRacePool)}` : '—'}
-        </div>
         {/* Results block (top3 + odds) - placed to the right, aligned to top */}
         <div className="col-start-3 col-span-2 row-start-1">
           <div className="grid gap-2">
@@ -94,12 +92,12 @@ export const PoolsResultsGrid: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Trifecta dividend column header slot kept for visual parity; will display below */}
-        <div className="text-xs text-gray-600">Trifecta</div>
+        {/* Right-side bet columns should read: Quinella, Trifecta (pool), FirstFour (pool) */}
+        <div className="text-xs text-gray-600">Quinella</div>
         <div className="text-sm font-bold text-gray-900 justify-self-end text-right font-tnum">
-          {findDividend('trifecta')
-            ? `${findDividend('trifecta')!.currency}${findDividend(
-                'trifecta'
+          {findDividend('quinella')
+            ? `${findDividend('quinella')!.currency}${findDividend(
+                'quinella'
               )!.dividend.toFixed(2)}`
             : '—'}
         </div>
@@ -111,10 +109,10 @@ export const PoolsResultsGrid: React.FC<Props> = ({
             ? `$${formatPoolAmount(poolData.winPoolTotal)}`
             : '—'}
         </div>
-        <div className="text-xs text-gray-600">Quinella (pool)</div>
-        <div className="text-sm font-bold text-gray-900">
-          {poolData && poolData.quinellaPoolTotal
-            ? `$${formatPoolAmount(poolData.quinellaPoolTotal)}`
+        <div className="text-xs text-gray-600">Trifecta (pool)</div>
+        <div className="text-sm font-bold text-gray-900 justify-self-end text-right">
+          {poolData && poolData.trifectaPoolTotal
+            ? `$${formatPoolAmount(poolData.trifectaPoolTotal)}`
             : '—'}
         </div>
 
@@ -125,8 +123,12 @@ export const PoolsResultsGrid: React.FC<Props> = ({
             ? `$${formatPoolAmount(poolData.placePoolTotal)}`
             : '—'}
         </div>
-        <div className="text-xs text-gray-600">FirstFour (pool)</div>
+        <div className="text-xs text-gray-600">Total</div>
         <div className="text-sm font-bold text-gray-900">
+          {poolData ? `$${formatPoolAmount(poolData.totalRacePool)}` : '—'}
+        </div>
+        <div className="text-xs text-gray-600">FirstFour (pool)</div>
+        <div className="text-sm font-bold text-gray-900 justify-self-end text-right">
           {poolData && poolData.first4PoolTotal
             ? `$${formatPoolAmount(poolData.first4PoolTotal)}`
             : '—'}
