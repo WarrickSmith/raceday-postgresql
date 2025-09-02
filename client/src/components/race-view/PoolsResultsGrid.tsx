@@ -125,10 +125,10 @@ export const PoolsResultsGrid: React.FC<Props> = ({
             ? `$${formatPoolAmount(poolData.placePoolTotal)}`
             : '—'}
         </div>
-        <div className="text-xs text-gray-600">Exacta (pool)</div>
+        <div className="text-xs text-gray-600">FirstFour (pool)</div>
         <div className="text-sm font-bold text-gray-900">
-          {poolData && poolData.exactaPoolTotal
-            ? `$${formatPoolAmount(poolData.exactaPoolTotal)}`
+          {poolData && poolData.first4PoolTotal
+            ? `$${formatPoolAmount(poolData.first4PoolTotal)}`
             : '—'}
         </div>
 

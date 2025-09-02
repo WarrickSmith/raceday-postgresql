@@ -61,7 +61,7 @@ export const RacePoolsSection = memo(function RacePoolsSection({
   }
 
   // Build layout: Total row will include Trifecta on the right.
-  // Then two paired rows: Win <-> Quinella, Place <-> Exacta.
+  // Then two paired rows: Win <-> Quinella, Place <-> FirstFour.
   const leftTypes: { key: string; label: string; value?: number }[] = [
     { key: 'win', label: 'Win', value: currentPoolData.winPoolTotal },
     { key: 'place', label: 'Place', value: currentPoolData.placePoolTotal },
@@ -73,7 +73,7 @@ export const RacePoolsSection = memo(function RacePoolsSection({
       label: 'Quinella',
       value: currentPoolData.quinellaPoolTotal,
     },
-    { key: 'exacta', label: 'Exacta', value: currentPoolData.exactaPoolTotal },
+    { key: 'first4', label: 'FirstFour', value: currentPoolData.first4PoolTotal },
   ]
 
   // Build explicit pairs matching left/right rows (no trimming; labels always show)
