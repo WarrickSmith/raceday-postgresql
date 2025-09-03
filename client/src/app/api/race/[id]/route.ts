@@ -140,6 +140,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       raceNumber: raceData.raceNumber,
       name: raceData.name,
       startTime: raceData.startTime,
+      actualStart: raceData.actualStart, // Include actual start time from database
       meeting: raceData.meeting.meetingId, // Extract the meetingId for the Race interface
       status: raceData.status,
       distance: raceData.distance,
@@ -470,6 +471,7 @@ async function getNavigationRaceData(raceId: string): Promise<{
       raceNumber: raceData.raceNumber,
       name: raceData.name,
       startTime: raceData.startTime,
+      actualStart: raceData.actualStart, // Include actual start time from database
       meeting: raceData.meeting.meetingId,
       status: raceData.status,
       distance: raceData.distance,
