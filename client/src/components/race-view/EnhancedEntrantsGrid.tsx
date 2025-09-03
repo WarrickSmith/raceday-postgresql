@@ -39,7 +39,7 @@ const WinOddsCell = memo(function WinOddsCell({
         backgroundColor: flashClasses.includes('bg-') ? undefined : 'white',
       }}
     >
-      <div className="flex items-center justify-end h-full">
+      <div className="flex items-center justify-end h-full pr-2">
         <span className="text-sm font-medium text-gray-900">
           {entrant.isScratched ? '—' : formatOdds(entrant.winOdds)}
         </span>
@@ -60,14 +60,14 @@ const PlaceOddsCell = memo(function PlaceOddsCell({
 
   return (
     <td
-      className={`px-2 py-1 whitespace-nowrap text-right border-r-2 border-gray-300 sticky left-[280px] z-20 ${flashClasses}`}
+      className={`px-2 py-1 whitespace-nowrap text-right border-r-2 border-gray-300 sticky left-[270px] z-20 ${flashClasses}`}
       style={{
         verticalAlign: 'middle',
         height: '30px',
         backgroundColor: flashClasses.includes('bg-') ? undefined : 'white',
       }}
     >
-      <div className="flex items-center justify-end h-full">
+      <div className="flex items-center justify-end h-full pr-2">
         <span className="text-sm font-medium text-gray-900">
           {entrant.isScratched ? '—' : formatOdds(entrant.placeOdds)}
         </span>
@@ -1170,20 +1170,20 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
               <colgroup>
                 {/* Fixed Left Columns */}
                 <col style={{ width: '200px' }} />
-                <col style={{ width: '80px' }} />
-                <col style={{ width: '80px' }} />
+                <col style={{ width: '70px' }} />
+                <col style={{ width: '70px' }} />
 
                 {/* Timeline Columns */}
                 {timelineColumns.map((column) => (
                   <col
                     key={`col_${column.interval}`}
-                    style={{ width: '80px' }}
+                    style={{ width: '60px' }}
                   />
                 ))}
 
                 {/* Fixed Right Columns */}
-                <col style={{ width: '100px' }} />
-                <col style={{ width: '80px' }} />
+                <col style={{ width: '70px' }} />
+                <col style={{ width: '70px' }} />
               </colgroup>
 
               {/* Unified Header */}
@@ -1217,7 +1217,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     </div>
                   </th>
                   <th
-                    className="px-2 py-1 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r-2 border-gray-300 sticky left-[280px] top-0 z-30"
+                    className="px-2 py-1 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r-2 border-gray-300 sticky left-[270px] top-0 z-30"
                     style={{ backgroundColor: '#f9fafb' }}
                   >
                     Place
@@ -1271,7 +1271,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
                   {/* Right Fixed Headers - Sticky */}
                   <th
-                    className="px-2 py-1 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-l-2 border-l-gray-300 border-r border-r-gray-200 sticky right-[80px] top-0 z-30"
+                    className="px-2 py-1 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-l-2 border-l-gray-300 border-r border-r-gray-200 sticky right-[70px] top-0 z-30"
                     style={{ backgroundColor: '#f9fafb' }}
                   >
                     Pool
@@ -1389,7 +1389,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
                     {/* Right Fixed Columns */}
                     <td
-                      className="px-2 py-1 whitespace-nowrap text-right border-l-2 border-l-gray-300 border-r border-r-gray-200 sticky right-[80px] bg-white z-20"
+                      className="px-2 py-1 whitespace-nowrap text-right border-l-2 border-l-gray-300 border-r border-r-gray-200 sticky right-[70px] bg-white z-20"
                       style={{ verticalAlign: 'middle', height: '30px' }}
                     >
                       <div className="flex items-center justify-end h-full">
