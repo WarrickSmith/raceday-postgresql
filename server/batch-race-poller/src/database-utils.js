@@ -1333,6 +1333,11 @@ export async function batchProcessRaces(
               status: data.race.status,
               lastStatusChange: statusChangeTimestamp,
             }
+            
+            // Add actualStart time if available
+            if (data.race.actual_start_string) {
+              updateData.actualStart = data.race.actual_start_string;
+            }
 
             // Add specific finalization timestamp for Final status
             if (

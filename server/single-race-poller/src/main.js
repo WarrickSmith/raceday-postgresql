@@ -141,6 +141,11 @@ export default async function main(context) {
                   lastStatusChange: statusChangeTimestamp
                 };
                 
+                // Add actualStart time if available
+                if (raceEventData.race.actual_start_string) {
+                  updateData.actualStart = raceEventData.race.actual_start_string;
+                }
+                
                 // Add specific finalization timestamp for Final status
                 if (raceEventData.race.status === 'Final' || raceEventData.race.status === 'Finalized') {
                   updateData.finalizedAt = statusChangeTimestamp;
