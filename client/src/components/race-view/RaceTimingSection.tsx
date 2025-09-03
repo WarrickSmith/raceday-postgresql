@@ -50,8 +50,7 @@ export const RaceTimingSection = memo(function RaceTimingSection({
   const currentStartTime = liveRace?.startTime || raceStartTime
   const currentStatus =
     (liveRace?.status?.toLowerCase() as RaceStatus) || raceStatus
-  const actualStartTime = (liveRace as unknown as { actualStart?: string })
-    ?.actualStart
+  const actualStartTime = liveRace?.actualStart
 
   const calculateTimeRemaining = useCallback(() => {
     if (!currentStartTime) return
@@ -143,9 +142,6 @@ export const RaceTimingSection = memo(function RaceTimingSection({
       {/* Countdown Timer - large */}
       {showTimer && (
         <div>
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Time to Start
-          </div>
           <div
             className={`text-3xl lg:text-4xl font-extrabold ${urgencyClass}`}
           >
@@ -157,45 +153,45 @@ export const RaceTimingSection = memo(function RaceTimingSection({
       {/* Delayed Time Display - prominent red */}
       {delayedTime && currentStatus === 'open' && (
         <div>
-          <div className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-1">
-            Status
-          </div>
           <div className="text-xl font-extrabold text-red-600 animate-pulse">
             {delayedTime}
           </div>
         </div>
       )}
 
-      {/* Actual Start Time (Closed Time) */}
-      {actualStartTime &&
-        (currentStatus === 'closed' ||
-          currentStatus === 'interim' ||
-          currentStatus === 'final') && (
-          <div>
-            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+      {/* Actual Start Time (Closed Time) - side-by-side layout with matching blue font */}
+      {(currentStatus === 'closed' ||
+        currentStatus === 'interim' ||
+        currentStatus === 'final') && (
+        <div>
+          <div className="flex items-center justify-center space-x-2">
+            <div className="text-lg font-extrabold text-blue-600 uppercase tracking-wide">
               Closed
             </div>
-            <div className="text-sm font-bold text-gray-900">
-              {new Date(actualStartTime).toLocaleTimeString('en-US', {
+            <div className="text-lg font-extrabold text-blue-600">
+              {new Date(actualStartTime || currentStartTime).toLocaleTimeString('en-US', {
                 hour12: true,
                 hour: 'numeric',
                 minute: '2-digit',
               })}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-      {/* Scheduled Start Time - compact */}
+      {/* Scheduled Start Time - side-by-side layout */}
       {currentStartTime && (
-        <div className="text-xs text-gray-500">
-          <div className="text-xs text-gray-400 mb-1">Scheduled</div>
-          <time dateTime={currentStartTime}>
-            {new Date(currentStartTime).toLocaleTimeString('en-US', {
-              hour12: true,
-              hour: 'numeric',
-              minute: '2-digit',
-            })}
-          </time>
+        <div>
+          <div className="flex items-center justify-center space-x-2">
+            <div className="text-lg font-extrabold text-gray-500 uppercase tracking-wide">Scheduled</div>
+            <time dateTime={currentStartTime} className="text-lg font-extrabold text-gray-500">
+              {new Date(currentStartTime).toLocaleTimeString('en-US', {
+                hour12: true,
+                hour: 'numeric',
+                minute: '2-digit',
+              })}
+            </time>
+          </div>
         </div>
       )}
     </div>
