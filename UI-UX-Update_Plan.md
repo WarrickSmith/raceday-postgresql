@@ -9,11 +9,13 @@ Based on the UI-UX Brief analysis, current codebase architecture, and **Australi
 The sample application screenshot (`/BT Main Screen2.jpg`) serves as the **primary design reference** and demonstrates:
 
 ### **Layout Structure:**
+
 - **Top Section**: Race information, navigation controls, and system status
-- **Middle Section**: Main data grid (money flow/entrants grid) 
+- **Middle Section**: Main data grid (money flow/entrants grid)
 - **Bottom Section**: Three distinct groupings - Pools, Results, and Timing/Status
 
 ### **Key Design Elements to Adapt:**
+
 - **Header Layout**: Race title, navigation buttons, race details in organized sections
 - **Information Density**: Efficient use of space without overwhelming the interface
 - **Footer Groupings**: Clear visual separation between Pools, Results, and Status sections
@@ -21,6 +23,7 @@ The sample application screenshot (`/BT Main Screen2.jpg`) serves as the **prima
 - **Typography Hierarchy**: Bold headers, clear data presentation
 
 ### **NZ Adaptations Required:**
+
 - **Single Totalizer**: Unlike the Australian version showing VIC/NSW/QLD, NZ version shows single NZTAB data
 - **Pool Structure**: Simplified pool breakdown for New Zealand racing format
 - **Results Format**: Adapt exotic results display for NZ racing types
@@ -44,11 +47,13 @@ The sample application screenshot (`/BT Main Screen2.jpg`) serves as the **prima
 ## Implementation Plan
 
 ### Phase Status Overview
+
 - **🔴 Not Started**: Phase has not begun
 - **🟡 In Progress**: Phase is currently being worked on
 - **🟢 Completed**: Phase is fully implemented and tested
 
 ### Phase 1: Component Architecture Restructuring
+
 **Status**: 🟢 Completed
 
 **Files to Modify:**
@@ -68,6 +73,7 @@ The sample application screenshot (`/BT Main Screen2.jpg`) serves as the **prima
 - `RaceTimingSection.tsx` - Countdown timer and closed time
 
 ### Phase 2: Header Component Enhancement
+
 **Status**: 🟢 Completed
 
 **Reference the Australian TAB screenshot for header layout inspiration:**
@@ -88,17 +94,25 @@ The sample application screenshot (`/BT Main Screen2.jpg`) serves as the **prima
 - Include performance metrics display in dedicated status area
 
 ### Phase 3: Body Component Simplification
+
 **Status**: 🔴 Not Started
 
 **Objectives:**
 
-- Display only the money flow grid component
-- Remove Win/Place selector (move to footer)
-- Remove Stats expandable component
 - Maintain all existing EnhancedEntrantsGrid functionality
-- Ensure proper real-time data connection
+- Do Not modify the Race Page header or footer components, this is changes to the page body area only.
+- Display only the money flow grid component
+- Directly above the money flow grid remove the label 'Enhanced Race Entrants' and value counting Entrants
+- Directly above the money flow grid remove the 'Data' lable and its value eg'14min ago'
+- Directly above the money flow grid move the 'Live' status indicator and icon down to the money flow grid title row right hand side to the right of the 'auto' scroll toggle button.
+- Move the 'Last update: xx:xx:xx am' label and value from directly below the Money flow Grid to the money flow grid title row right hand side to the left of the 'auto' scroll toggle button.
+- Move the Win/Place selectors to the Money flow grid title row replacing the title 'Money Flow Timeline (18 points)' on the left side.
+- Add and additional selector to the win/place selector for 'Odds'.
+- In the Moeny Flow Grid, Runner column, each entrant has a runner name, jockey and trainer - Remove the trainer.
+- In the Money flow grid, make the grid rows 'half' their current height condensing the vertical size of the grid.
 
 ### Phase 4: Footer Component Enhancement
+
 **Status**: 🟢 Completed
 
 **Follow the Australian TAB screenshot's bottom section organization:**
@@ -106,11 +120,13 @@ The sample application screenshot (`/BT Main Screen2.jpg`) serves as the **prima
 **Three Main Sections (mirroring screenshot layout):**
 
 1. **Timing/Status Section** (left side of footer, like "PAYING 00:00" area):
+
    - Race status (big, bold, colorful) - similar to "LIVE TRADING" indicator
    - Countdown timer with delay tracking - replicate the countdown display
    - Race closed time display - match the timing information format
 
 2. **Pool Section** (center area, like the pools breakdown):
+
    - Race pools breakdown (NZ single totalizer format) - adapt from VIC/NSW/QLD to single NZ format
    - Last updated timestamp - maintain data freshness indicators
    - Real-time pool data integration - mirror the pool totals display
@@ -122,6 +138,7 @@ The sample application screenshot (`/BT Main Screen2.jpg`) serves as the **prima
    - Show '-' until interim/final results available - maintain the placeholder approach
 
 ### Phase 5: Styling and Responsiveness
+
 **Status**: 🔴 Not Started
 
 **CSS Grid Layout:**
@@ -141,6 +158,7 @@ The sample application screenshot (`/BT Main Screen2.jpg`) serves as the **prima
 - Implement proper memoization for expensive calculations
 
 ### Phase 6: Real-time Data Integration
+
 **Status**: 🔴 Not Started
 
 **Connection Monitoring:**
@@ -157,6 +175,7 @@ The sample application screenshot (`/BT Main Screen2.jpg`) serves as the **prima
 - Implement proper error handling for disconnected states
 
 ### Phase 7: Testing and Validation
+
 **Status**: 🔴 Not Started
 
 **Component Testing:**
@@ -233,6 +252,7 @@ This plan provides a comprehensive roadmap for implementing the UI-UX requiremen
 - [CLAUDE.md Project Instructions](/CLAUDE.md)
 
 **Design Reference Usage:**
+
 - **Use the screenshot as the primary visual guide** for component layout and information hierarchy
 - **Adapt the three-section layout** (top/middle/bottom) for Header/Body/Footer structure
 - **Follow the visual groupings** shown in the footer area for organizing components
