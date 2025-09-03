@@ -43,6 +43,7 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
           const hasSignificantChange = (
             changes.status && changes.status !== currentRace.status ||
             changes.startTime && changes.startTime !== currentRace.startTime ||
+            changes.actualStart && changes.actualStart !== currentRace.actualStart ||
             changes.distance && changes.distance !== currentRace.distance ||
             changes.trackCondition && changes.trackCondition !== currentRace.trackCondition
           );
