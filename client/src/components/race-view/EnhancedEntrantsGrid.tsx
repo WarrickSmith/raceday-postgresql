@@ -19,10 +19,6 @@ import { screenReader, AriaLabels } from '@/utils/accessibility'
 import { useRenderTracking, useMemoryOptimization } from '@/utils/performance'
 import { useValueFlash } from '@/hooks/useValueFlash'
 import { JockeySilks } from './JockeySilks'
-import {
-  getStatusConfig,
-  getStatusBadgeClasses,
-} from '@/utils/raceStatusConfig'
 
 // Flash-enabled Win Odds Cell Component
 const WinOddsCell = memo(function WinOddsCell({
@@ -113,7 +109,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   initialEntrants,
   raceId,
   raceStartTime,
-  dataFreshness,
   className = '',
   enableMoneyFlowTimeline = true,
   enableJockeySilks = true,
@@ -223,12 +218,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const {
     entrants: realtimeEntrants,
     isConnected,
-    connectionAttempts,
     lastUpdate,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     updateLatency,
     totalUpdates,
-    reconnect,
   } = realtimeResult
 
   // IMPORTANT: Use currentEntrants (from context) as base to preserve data flow
@@ -1087,52 +1080,68 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
   return (
     <div
-      className={`enhanced-entrants-grid bg-white rounded-lg shadow-md h-full flex flex-col ${className}`}
+      className={`enhanced-entrants-grid bg-white rounded-lg shadow-md flex-1 flex flex-col ${className}`}
+      style={{ minHeight: 0 }}
     >
 
       {/* Enhanced Single-Table Grid Architecture with Perfect Row Alignment */}
-      <div className="flex-1 overflow-hidden bg-white border border-gray-200 rounded-lg flex flex-col">
+      <div className="flex-1 overflow-hidden bg-white border border-gray-200 rounded-lg flex flex-col" style={{ minHeight: 0 }}>
         {/* Consolidated Title Row */}
         <div className="flex items-center justify-between p-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
-          {/* LEFT: Win/Place/Odds Selector */}
-          <div className="flex bg-gray-100 rounded p-0.5 text-xs">
-            <button
-              onClick={() => setSelectedView('win')}
-              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                selectedView === 'win'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Win
-            </button>
-            <button
-              onClick={() => setSelectedView('place')}
-              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                selectedView === 'place'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Place
-            </button>
-            <button
-              onClick={() => setSelectedView('odds')}
-              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                selectedView === 'odds'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Odds
-            </button>
-          </div>
-
-          {/* CENTER: Last Update and Auto Scroll */}
+          {/* LEFT: Win/Place/Odds Selector + Last Update */}
           <div className="flex items-center space-x-3">
+            <div className="flex bg-gray-100 rounded p-0.5 text-xs">
+              <button
+                onClick={() => setSelectedView('win')}
+                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  selectedView === 'win'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Win
+              </button>
+              <button
+                onClick={() => setSelectedView('place')}
+                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  selectedView === 'place'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Place
+              </button>
+              <button
+                onClick={() => setSelectedView('odds')}
+                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  selectedView === 'odds'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Odds
+              </button>
+            </div>
+            
             <span className="text-xs text-gray-500">
               Last update: {lastUpdate ? lastUpdate.toLocaleTimeString() : 'No updates yet'}
             </span>
+          </div>
+
+          {/* RIGHT: Audio Toggle and Auto Scroll */}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setUpdateNotifications(!updateNotifications)}
+              className={`text-xs px-2 py-1 rounded transition-colors ${
+                updateNotifications
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-gray-200 text-gray-600'
+              }`}
+              title={updateNotifications ? 'Disable audio notifications' : 'Enable audio notifications'}
+            >
+              {updateNotifications ? '🔊' : '🔇'}
+            </button>
+            
             <button
               onClick={() => setAutoScroll(!autoScroll)}
               className={`text-xs px-2 py-1 rounded transition-colors ${
@@ -1144,33 +1153,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
             >
               {autoScroll ? '🔄 Auto' : '⏸️ Manual'}
             </button>
-          </div>
-
-          {/* RIGHT: Live Status and Race Status */}
-          <div className="flex items-center space-x-2">
-            <span
-              className={`text-xs px-2 py-1 rounded-full transition-colors ${
-                isConnected
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-red-100 text-red-700'
-              }`}
-              aria-live="polite"
-            >
-              {isConnected ? '🔄 Live' : '📶 Disconnected'}
-            </span>
-
-            {!isConnected && connectionAttempts > 0 && (
-              <button
-                onClick={reconnect}
-                className="text-xs px-2 py-1 rounded bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"
-              >
-                🔄 Retry
-              </button>
-            )}
-
-            <span className={getStatusBadgeClasses(liveRace?.status, 'small')}>
-              {getStatusConfig(liveRace?.status).label}
-            </span>
           </div>
         </div>
 
@@ -1492,19 +1474,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                 {sortedEntrants.find((e) => e.$id === selectedEntrant)?.name}
               </span>
             )}
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setUpdateNotifications(!updateNotifications)}
-              className={`px-2 py-1 rounded text-xs transition-colors ${
-                updateNotifications
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-gray-200 text-gray-600'
-              }`}
-            >
-              {updateNotifications ? '🔊' : '🔇'}
-            </button>
           </div>
         </div>
       </div>
