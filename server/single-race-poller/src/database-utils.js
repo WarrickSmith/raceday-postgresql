@@ -49,6 +49,7 @@ function extractPoolTotals(tote_pools, context) {
         break
       case 'First 4':
       case 'First Four':
+      case 'FirstFour':
         pools.first4PoolTotal = total
         break
       default:
@@ -1156,7 +1157,8 @@ export async function processEntrants(
       if (entrant.form_comment) entrantDoc.formComment = entrant.form_comment
 
       // Silk and visual information
-      if (entrant.silk_colours) entrantDoc.silkColours = entrant.silk_colours
+      if (entrant.silk_colours)
+        entrantDoc.silkColours = safeStringField(entrant.silk_colours, 100)
       if (entrant.silk_url_64x64) entrantDoc.silkUrl64 = entrant.silk_url_64x64
       if (entrant.silk_url_128x128)
         entrantDoc.silkUrl128 = entrant.silk_url_128x128
