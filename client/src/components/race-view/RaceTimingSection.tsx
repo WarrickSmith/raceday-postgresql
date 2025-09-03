@@ -169,7 +169,7 @@ export const RaceTimingSection = memo(function RaceTimingSection({
               Closed
             </div>
             <div className="text-lg font-extrabold text-blue-600">
-              {new Date(actualStartTime || currentStartTime).toLocaleTimeString('en-US', {
+              {new Date(actualStartTime || currentStartTime || new Date()).toLocaleTimeString('en-US', {
                 hour12: true,
                 hour: 'numeric',
                 minute: '2-digit',
@@ -185,7 +185,7 @@ export const RaceTimingSection = memo(function RaceTimingSection({
           <div className="flex items-center justify-center space-x-2">
             <div className="text-lg font-extrabold text-gray-500 uppercase tracking-wide">Scheduled</div>
             <time dateTime={currentStartTime} className="text-lg font-extrabold text-gray-500">
-              {new Date(currentStartTime).toLocaleTimeString('en-US', {
+              {new Date(currentStartTime || new Date()).toLocaleTimeString('en-US', {
                 hour12: true,
                 hour: 'numeric',
                 minute: '2-digit',

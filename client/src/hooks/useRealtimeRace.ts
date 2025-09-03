@@ -68,7 +68,7 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
               
               // If race status changed to a results state but we don't have results data yet,
               // trigger a background fetch to get the latest race data including results
-              if (['Interim', 'Final', 'Finalized'].includes(changes.status) && 
+              if (changes.status && ['Interim', 'Final', 'Finalized'].includes(changes.status) && 
                   !updatedRace.resultsData && !updatedRace.dividendsData) {
                 console.log('🔄 Status suggests results should be available, triggering background fetch');
                 
