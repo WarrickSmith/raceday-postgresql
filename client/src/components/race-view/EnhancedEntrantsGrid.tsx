@@ -36,10 +36,10 @@ const WinOddsCell = memo(function WinOddsCell({
 
   return (
     <td
-      className={`px-3 py-3 whitespace-nowrap text-right border-r border-gray-200 sticky left-[200px] z-20 ${flashClasses}`}
+      className={`px-2 py-1 whitespace-nowrap text-right border-r border-gray-200 sticky left-[200px] z-20 ${flashClasses}`}
       style={{
         verticalAlign: 'middle',
-        height: '60px',
+        height: '30px',
         backgroundColor: flashClasses.includes('bg-') ? undefined : 'white',
       }}
     >
@@ -64,10 +64,10 @@ const PlaceOddsCell = memo(function PlaceOddsCell({
 
   return (
     <td
-      className={`px-3 py-3 whitespace-nowrap text-right border-r-2 border-gray-300 sticky left-[280px] z-20 ${flashClasses}`}
+      className={`px-2 py-1 whitespace-nowrap text-right border-r-2 border-gray-300 sticky left-[280px] z-20 ${flashClasses}`}
       style={{
         verticalAlign: 'middle',
-        height: '60px',
+        height: '30px',
         backgroundColor: flashClasses.includes('bg-') ? undefined : 'white',
       }}
     >
@@ -142,7 +142,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const currentRaceId = raceData?.race.$id || raceId
   const currentRaceStartTime =
     liveRace?.startTime || raceData?.race.startTime || raceStartTime
-  const currentDataFreshness = raceData?.dataFreshness || dataFreshness
 
   // Get actual race pool data
   const { poolData: racePoolData } = useRacePoolData(currentRaceId)
@@ -204,8 +203,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     isLoading: false,
   })
 
-  // Local selection for Win/Place selector in header
-  const [selectedView, setSelectedView] = useState<'win' | 'place'>('win')
+  // Local selection for Win/Place/Odds selector
+  const [selectedView, setSelectedView] = useState<'win' | 'place' | 'odds'>('win')
 
   // Performance and memory optimization
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1090,79 +1089,50 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     <div
       className={`enhanced-entrants-grid bg-white rounded-lg shadow-md h-full flex flex-col ${className}`}
     >
-      {/* Enhanced Header with Pool Toggle */}
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Enhanced Race Entrants ({sortedEntrants.length})
-          </h2>
-          <div className="flex items-center space-x-3">
-            {currentDataFreshness && (
-              <div className="text-xs text-gray-500">
-                Data: {Math.round(currentDataFreshness.entrantsDataAge / 60)}min
-                ago
-              </div>
-            )}
-
-            <div className="flex items-center space-x-2">
-              <span
-                className={`text-xs px-2 py-1 rounded-full transition-colors ${
-                  isConnected
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-red-100 text-red-700'
-                }`}
-                aria-live="polite"
-              >
-                {isConnected ? '🔄 Live' : '📶 Disconnected'}
-              </span>
-
-              {!isConnected && connectionAttempts > 0 && (
-                <button
-                  onClick={reconnect}
-                  className="text-xs px-2 py-1 rounded bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"
-                >
-                  🔄 Retry
-                </button>
-              )}
-            </div>
-
-            {/* Win/Place compact selector moved here from results section */}
-            <div className="ml-2">
-              <div className="flex bg-gray-100 rounded p-0.5 text-xs">
-                <button
-                  onClick={() => setSelectedView('win')}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                    selectedView === 'win'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Win
-                </button>
-                <button
-                  onClick={() => setSelectedView('place')}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                    selectedView === 'place'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Place
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Enhanced Single-Table Grid Architecture with Perfect Row Alignment */}
       <div className="flex-1 overflow-hidden bg-white border border-gray-200 rounded-lg flex flex-col">
-        {/* Timeline Controls */}
+        {/* Consolidated Title Row */}
         <div className="flex items-center justify-between p-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
-          <h3 className="text-sm font-medium text-gray-900">
-            Money Flow Timeline ({timelineColumns.length} points)
-          </h3>
-          <div className="flex items-center space-x-2">
+          {/* LEFT: Win/Place/Odds Selector */}
+          <div className="flex bg-gray-100 rounded p-0.5 text-xs">
+            <button
+              onClick={() => setSelectedView('win')}
+              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                selectedView === 'win'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Win
+            </button>
+            <button
+              onClick={() => setSelectedView('place')}
+              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                selectedView === 'place'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Place
+            </button>
+            <button
+              onClick={() => setSelectedView('odds')}
+              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                selectedView === 'odds'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Odds
+            </button>
+          </div>
+
+          {/* CENTER: Last Update and Auto Scroll */}
+          <div className="flex items-center space-x-3">
+            <span className="text-xs text-gray-500">
+              Last update: {lastUpdate ? lastUpdate.toLocaleTimeString() : 'No updates yet'}
+            </span>
             <button
               onClick={() => setAutoScroll(!autoScroll)}
               className={`text-xs px-2 py-1 rounded transition-colors ${
@@ -1174,6 +1144,30 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
             >
               {autoScroll ? '🔄 Auto' : '⏸️ Manual'}
             </button>
+          </div>
+
+          {/* RIGHT: Live Status and Race Status */}
+          <div className="flex items-center space-x-2">
+            <span
+              className={`text-xs px-2 py-1 rounded-full transition-colors ${
+                isConnected
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-red-100 text-red-700'
+              }`}
+              aria-live="polite"
+            >
+              {isConnected ? '🔄 Live' : '📶 Disconnected'}
+            </span>
+
+            {!isConnected && connectionAttempts > 0 && (
+              <button
+                onClick={reconnect}
+                className="text-xs px-2 py-1 rounded bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"
+              >
+                🔄 Retry
+              </button>
+            )}
+
             <span className={getStatusBadgeClasses(liveRace?.status, 'small')}>
               {getStatusConfig(liveRace?.status).label}
             </span>
@@ -1212,16 +1206,16 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
               {/* Unified Header */}
               <thead className="bg-gray-50">
-                <tr style={{ height: '60px' }}>
+                <tr style={{ height: '30px' }}>
                   {/* Left Fixed Headers - Sticky */}
                   <th
-                    className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 sticky left-0 top-0 z-30"
+                    className="px-3 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 sticky left-0 top-0 z-30"
                     style={{ backgroundColor: '#f9fafb' }}
                   >
                     Runner
                   </th>
                   <th
-                    className={`px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 border-r border-gray-200 sticky left-[200px] top-0 z-30 ${
+                    className={`px-2 py-1 text-right text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 border-r border-gray-200 sticky left-[200px] top-0 z-30 ${
                       sortState?.column === 'winOdds' ? 'bg-blue-50' : ''
                     }`}
                     style={{
@@ -1241,7 +1235,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     </div>
                   </th>
                   <th
-                    className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r-2 border-gray-300 sticky left-[280px] top-0 z-30"
+                    className="px-2 py-1 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r-2 border-gray-300 sticky left-[280px] top-0 z-30"
                     style={{ backgroundColor: '#f9fafb' }}
                   >
                     Place
@@ -1251,7 +1245,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                   {timelineColumns.map((column) => (
                     <th
                       key={`header_${column.interval}`}
-                      className={`px-2 py-2 text-xs font-medium text-gray-700 text-center border-r border-gray-200 sticky top-0 z-20 ${
+                      className={`px-1 py-1 text-xs font-medium text-gray-700 text-center border-r border-gray-200 sticky top-0 z-20 ${
                         isCurrentTimeColumn(column.interval)
                           ? 'border-green-300 shadow-sm'
                           : column.isScheduledStart
@@ -1273,7 +1267,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     >
                       <div
                         className="flex flex-col items-center justify-center"
-                        style={{ height: '60px' }}
+                        style={{ height: '30px' }}
                       >
                         <span className="font-medium text-xs">
                           {column.label}
@@ -1295,13 +1289,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
                   {/* Right Fixed Headers - Sticky */}
                   <th
-                    className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-l-2 border-l-gray-300 border-r border-r-gray-200 sticky right-[80px] top-0 z-30"
+                    className="px-2 py-1 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-l-2 border-l-gray-300 border-r border-r-gray-200 sticky right-[80px] top-0 z-30"
                     style={{ backgroundColor: '#f9fafb' }}
                   >
                     Pool
                   </th>
                   <th
-                    className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider sticky right-0 top-0 z-30"
+                    className="px-2 py-1 text-right text-xs font-medium text-gray-700 uppercase tracking-wider sticky right-0 top-0 z-30"
                     style={{ backgroundColor: '#f9fafb' }}
                   >
                     Pool %
@@ -1323,9 +1317,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     onKeyDown={(e) => handleKeyDown(e, entrant.$id)}
                     tabIndex={0}
                     style={{
-                      height: '60px',
-                      minHeight: '60px',
-                      maxHeight: '60px',
+                      height: '30px',
+                      minHeight: '30px',
+                      maxHeight: '30px',
                     }}
                     aria-label={AriaLabels.generateRunnerRowLabel(
                       entrant.runnerNumber,
@@ -1339,8 +1333,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                   >
                     {/* Left Fixed Columns - Sticky */}
                     <td
-                      className="px-3 py-3 whitespace-nowrap border-r border-gray-200 sticky left-0 bg-white z-20"
-                      style={{ verticalAlign: 'middle', height: '60px' }}
+                      className="px-2 py-1 whitespace-nowrap border-r border-gray-200 sticky left-0 bg-white z-20"
+                      style={{ verticalAlign: 'middle', height: '30px' }}
                     >
                       <div className="flex items-center space-x-3 h-full">
                         <div className="flex items-center space-x-2">
@@ -1378,11 +1372,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                               {entrant.jockey}
                             </div>
                           )}
-                          {entrant.trainerName && (
-                            <div className="text-xs text-gray-500 truncate">
-                              {entrant.trainerName}
-                            </div>
-                          )}
                         </div>
                       </div>
                     </td>
@@ -1394,7 +1383,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     {timelineColumns.map((column) => (
                       <td
                         key={`${entrant.$id}_${column.interval}`}
-                        className={`px-3 py-3 text-xs text-center border-r border-gray-100 ${
+                        className={`px-2 py-1 text-xs text-center border-r border-gray-100 ${
                           entrant.isScratched
                             ? 'bg-pink-50'
                             : column.isScheduledStart
@@ -1408,7 +1397,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                             ? 'bg-green-50 border-green-200 font-medium'
                             : ''
                         }`}
-                        style={{ verticalAlign: 'middle', height: '60px' }}
+                        style={{ verticalAlign: 'middle', height: '30px' }}
                       >
                         <div className="text-gray-900 flex items-center justify-center h-full">
                           {getTimelineData(entrant.$id, column.interval)}
@@ -1418,8 +1407,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
                     {/* Right Fixed Columns */}
                     <td
-                      className="px-3 py-3 whitespace-nowrap text-right border-l-2 border-l-gray-300 border-r border-r-gray-200 sticky right-[80px] bg-white z-20"
-                      style={{ verticalAlign: 'middle', height: '60px' }}
+                      className="px-2 py-1 whitespace-nowrap text-right border-l-2 border-l-gray-300 border-r border-r-gray-200 sticky right-[80px] bg-white z-20"
+                      style={{ verticalAlign: 'middle', height: '30px' }}
                     >
                       <div className="flex items-center justify-end h-full">
                         <span className="text-sm font-medium text-gray-900">
@@ -1436,8 +1425,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     </td>
 
                     <td
-                      className="px-3 py-3 whitespace-nowrap text-right sticky right-0 bg-white z-20"
-                      style={{ verticalAlign: 'middle', height: '60px' }}
+                      className="px-2 py-1 whitespace-nowrap text-right sticky right-0 bg-white z-20"
+                      style={{ verticalAlign: 'middle', height: '30px' }}
                     >
                       <div className="flex items-center justify-end h-full">
                         <span className="text-sm font-medium text-gray-900">
@@ -1497,10 +1486,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       <div className="p-3 border-t border-gray-100 bg-gray-50 flex-shrink-0">
         <div className="flex justify-between items-center text-xs">
           <div className="flex items-center space-x-4">
-            <span className="text-gray-500">
-              Last update:{' '}
-              {lastUpdate ? lastUpdate.toLocaleTimeString() : 'No updates yet'}
-            </span>
             {selectedEntrant && (
               <span className="text-blue-600">
                 Selected:{' '}
