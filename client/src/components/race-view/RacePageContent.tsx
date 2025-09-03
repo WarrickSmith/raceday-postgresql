@@ -150,7 +150,7 @@ export function RacePageContent() {
             'footer';
           height: 100vh;
           width: 100vw;
-          gap: 1rem;
+          gap: 0.5rem;
           padding: 1rem;
           background-color: #f8fafc;
           box-sizing: border-box;
@@ -158,8 +158,8 @@ export function RacePageContent() {
 
         .race-layout-header {
           grid-area: header;
-          min-height: 160px;
-          max-height: 240px;
+          min-height: 140px;
+          max-height: 160px;
           overflow: visible;
         }
 
@@ -186,13 +186,13 @@ export function RacePageContent() {
         /* Responsive adjustments */
         @media (max-width: 768px) {
           .race-page-layout {
-            gap: 0.75rem;
+            gap: 0.375rem;
             padding: 0.75rem;
           }
 
           .race-layout-header {
-            min-height: 140px;
-            max-height: 200px;
+            min-height: 120px;
+            max-height: 140px;
           }
 
           .race-layout-footer {
@@ -203,20 +203,20 @@ export function RacePageContent() {
 
         @media (max-width: 480px) {
           .race-page-layout {
-            gap: 0.5rem;
+            gap: 0.25rem;
             padding: 0.5rem;
           }
         }
 
         @media (max-height: 600px) {
           .race-page-layout {
-            gap: 0.5rem;
+            gap: 0.25rem;
             padding: 0.5rem;
           }
 
           .race-layout-header {
-            min-height: 120px;
-            max-height: 160px;
+            min-height: 100px;
+            max-height: 120px;
           }
 
           .race-layout-content {
@@ -231,13 +231,13 @@ export function RacePageContent() {
 
         @media (max-height: 500px) {
           .race-page-layout {
-            gap: 0.25rem;
+            gap: 0.125rem;
             padding: 0.25rem;
           }
 
           .race-layout-header {
-            min-height: 100px;
-            max-height: 140px;
+            min-height: 80px;
+            max-height: 100px;
           }
 
           .race-layout-content {
@@ -245,8 +245,8 @@ export function RacePageContent() {
           }
 
           .race-layout-footer {
-            min-height: 80px;
-            max-height: 120px;
+            min-height: 60px;
+            max-height: 100px;
           }
         }
       `}</style>

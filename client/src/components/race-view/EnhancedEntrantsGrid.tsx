@@ -1450,7 +1450,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         </div>
 
         {/* Timeline Footer */}
-        <div className="p-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-600 flex-shrink-0">
+        <div className="px-2 py-1 bg-gray-50 border-t border-gray-200 text-xs text-gray-600 flex-shrink-0">
           <div className="flex justify-between items-center">
             <span>
               Scroll to see full timeline • Blue: Scheduled start • Yellow: Live
@@ -1465,7 +1465,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       </div>
 
       {/* Enhanced Footer */}
-      <div className="p-3 border-t border-gray-100 bg-gray-50 flex-shrink-0">
+      <div className="px-2 py-1 border-t border-gray-100 bg-gray-50 flex-shrink-0">
         <div className="flex justify-between items-center text-xs">
           <div className="flex items-center space-x-4">
             {selectedEntrant && (

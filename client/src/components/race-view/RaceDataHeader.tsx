@@ -121,8 +121,8 @@ export const RaceDataHeader = memo(function RaceDataHeader({
         </div>
 
         {/* Row 2, Col 1: Race Title */}
-        <div className="flex flex-col justify-start">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1 leading-tight">
+        <div className="flex flex-col justify-start overflow-hidden">
+          <h1 className="text-2xl font-bold text-gray-900 mb-1 leading-tight truncate whitespace-nowrap">
             Race {race.raceNumber}: {race.name}
           </h1>
         </div>
