@@ -96,13 +96,14 @@ export const RaceFooter = memo(function RaceFooter({
   // Build results data from live race data if available
   const currentResultsData: RaceResultsData | undefined = 
     liveRace?.resultsData && liveRace?.dividendsData ? {
+      raceId,
       results: liveRace.resultsData,
       dividends: liveRace.dividendsData,
       status: liveRace.resultStatus || 'final',
       photoFinish: liveRace.photoFinish || false,
       stewardsInquiry: liveRace.stewardsInquiry || false,
       protestLodged: liveRace.protestLodged || false,
-      declaredAt: liveRace.resultTime || new Date().toISOString()
+      resultTime: liveRace.resultTime || new Date().toISOString()
     } : resultsData
 
   // Get fixed odds data from live race if available
