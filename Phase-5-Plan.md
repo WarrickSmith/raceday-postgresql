@@ -1,5 +1,11 @@
 # Phase 5 Implementation Plan: Real-Time Data Flow Enhancement
 
+## Backgrond Knowledge Required for Context
+
+- Ensure you review the background Money Flow Architecture document at docs/Money-Flow-Timeline-System-Architecture.md to understand the concepts of how data is polled, and aggrigated into 'buckets' for display on the client in timeline colums.
+- Ensure you review the Brief document at /home/warrick/Dev/raceday/UI-UX Brief.txt to understand the current issues and deficiencies with the current implementation.
+- Review this current plan document to understand how the issues from the brief are being addressed.
+
 ## Problem Statement
 
 The Race Page money flow grid is not receiving and displaying enough real-time data regularly enough to be effective in its primary purpose to rapidly display changes in entrant (runner) money pool amounts and odds at regular enough frequency periods to properly populate the defined timeline columns.
