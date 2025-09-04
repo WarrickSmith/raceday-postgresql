@@ -1,0 +1,51 @@
+We will now be implementing phase 5 of the /home/warrick/Dev/raceday/UI-UX-Update_Plan.md plan.
+
+Note the following requirements changes to phase 5:
+
+Do not make any UI changes so ignore the **CSS Grid Layout:** and **Tailwind Classes:** sections and move on to **Performance Optimizations:**
+
+The **Performance Optimizations:** should now be removed and replaced with a plan to address the followin:
+
+Problem Statement: The Race Page money flow grid is not receiving and displaying enough real-time data regularly enough to be effective in it primary purpose to rapidly display changes in entrant (runner) money pool amounts and odds at regular enough frequency periods to properly populate the defined timeline columns.
+
+You will see from screen shots, that the data updated is often 10 minutes apart and we probably need data to be being polled twice at the backend by Appwrite functions from the NZTAB API source data within each defined client side grid column time line period. Often there is no polling between 5m and 0s and for delayed starts beyond the 0s for -30s etc. The basic data strategy is to initially fetch data (for persistence reasons such as review later, navigation, switching between active races etc), then subscribe the active displayed race to the Appwrite Db for real-time data updates and take these subscriptions down if navigating away from a race. The screenshots show a race that was watched and then refreshed. You can see there seems to be an issue with subscribed data not correctly refreshing. For example, the race said delayed for 63:44 and when refreshed it had actually started (CLOSED) at the scheduled start time. There are issues with he dynamic columns also not updating correctly after the scheduled start time, but this is secondary priority. 
+
+The screen shots for reference:
+/home/warrick/Dev/raceday/Screenshot 2025-09-04 135555.png
+/home/warrick/Dev/raceday/Screenshot 2025-09-04 135635.png
+
+Observations in application (race Money Flow) behaviour:
+
+- Infrequent update of data in the grid.
+- The active column seems to often take ~14 seconds or more to 'switch' to the current active column when the timeline advances closer to the scheduled start time and beyond with dynamic updates.
+- There is excessive terminal logging in the client application which will effect client side performance. This should all be removed and only essential logging to diagnose this issue should be shown if and when required.
+
+I have looked at the executions of the three main race polling Appwrite server side functions and notice that these do not seem to be working effectively in conjunction with the client side visual data update and display requirements. The pooling schedule and strategy will need review. Due to limitations with Appwrite functions this uses a master scheduler to coordinate Appwrite functions execution acknowledging a limit with Appwrite functions where the minimal auto schedule time for repeated execution of a function using CRON seems to be 1 minute so granularity of function execution uses looping inside a function. 
+
+I am not sure of there needs to be three separate race polling functions or if the master scheduler just needs better logic to execute a single function, noting that there can often be several races nearing scheduled start time at 0s on a busy day. It is unclear what the performance advantage of a batch processing function would be? This also complicates maintenance of multiple duplicate Appwrite functions as outlined in the notes below. 
+
+I often do not see the single or batch race processors executing at all nearing a race start time and often wonder of the scheduling logic or logic wining the executed functions is working correctly. I am currently monitoring the first race of the day and only see the race-data-poller executing on a scheduled basis unless executions called from the master scheduler do not show in the Appwrite console.
+
+As every race fetched from the API by Appwrite race functions has complete data, one thought may be for the scheduler to just be executing a batch race processor and a single race processor. It would execute the batch processor for all races say every 30 minutes (excluding races within the active 1 hour window from 60m till race close) then the master scheduler could execute the batch processor for ecery race which has a start time within the active window every 2.5 minutes, until 5m, where it could rune a single race processor every 30s for every race within 5m of start time until closed, the every 1m until final. This single race processor, although it fetches all a rave data, it would only need to process critical race information to up-sert and update specific information needed at the critical 5m to final time window, such as race pools, odds, race status and race times such as actual_start. This would in theory reduce the processing time and allow for quicker updates to subscribed clients.
+
+I need you to review how this is currently working and look at alternative options to address the problem statement, including my suggestions.
+
+
+Notes:
+The client application was recently audited for best practise application of the client side data subscription to live events and changes/updates in the Appwrite database collections. I believe this resulted in a main subscription for the Race page with channels to specific collections. This may need to be verified.
+
+The daily-meetings appwrite server function is used to create and update databse structure and changes, specifically in the /home/warrick/Dev/raceday/server/daily-meetings/src/database-setup.js file. As the client will be eventually connecting the selector buttons for Win/Place and Odds to be displayed in the moneyflow timeline grid columns, it would be good to ensure the persistent data for all three of these is correctly saved in the database for to be saved for each timeline bucket much like I know the Win pool information is. This may already be being saved, but I suspect not for the Odds or not yest with enough additional bucket information for the odds. There is a OddsHistory collection, but as this will need to be displayed in timeline buckets, it may be work consolidating all the win, place and odds data into the moneyflowhistory collection?
+
+If Technology documentation needs to be referenced, use context 7 MCP server and web Search.
+
+Follow this projects technology and coding standards defined in the /docs folder ad also reference this for more information on the money flow logic at /home/warrick/Dev/raceday/docs/Money-Flow-Timeline-System-Architecture.md
+
+Make sure that you understand that any updates to Appwrite server functions are duplicated where necessary as these functions are deployed self-contained. There are a number of functions fetching the same data and populating it in the same way in the Appwrite database, so these functions must maintain identical functionality. Make sure you cheek the Appwrite functions for this, specifically, there are at least three functions updating race data independently.  
+
+
+
+Actions required:
+
+Create a plan to address review the potential issues that could relate to the problem statement and address these issues to resolve the problem statement. The plan should be broken down into logically grouped tasks, likely starting with the backend data management then the client side data presentation issues.
+
+Document the plan as 'Phase-5-Plan.md' in the project root as a properly formatted markdown file.
