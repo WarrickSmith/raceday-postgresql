@@ -174,6 +174,13 @@ else return null // Stop polling Final/Abandoned races
 - Comprehensive logging for debugging polling gaps
 - Race completion detection to stop unnecessary polling
 
+**Notes**
+
+- Existing Appwrite server race-data-poller correctly processes race and moneyflow data (older DB schema) and should be used as a reference.
+- The existing Appwrite race-data-poller uses utility functions in utils.js to help manage Appwrite MariaDB limitation in some attrin=bute types and collection attribute number limitations. You should research these limitations and reference the working functions.
+- Always test the new unified polling archihitecture function by running it in the local terminal and verify correct DB data for money flow, before deploying the new function.
+- There are fields returned from the NZTAB API for races that include local new zealand times such as 'raceDateNx' and 'startTimeNz', negating the need to convert times from UTC when determining the race schedule for polling specific races.
+
 #### Task A4: Daily Initialization Functions Review
 
 **Current Functions Analysis**:
