@@ -194,8 +194,8 @@ export const RaceNavigation = memo(function RaceNavigation({
     }
   }, []);
 
-  // Enhanced button classes with better focus indicators
-  const buttonClasses = "flex items-center justify-center gap-2 px-4 py-2 min-w-[120px] text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-opacity-75 focus:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 ease-in-out";
+  // Enhanced button classes with consistent sizing, shadows, and better hover effects
+  const buttonClasses = "flex items-center justify-center gap-2 px-4 py-2.5 min-w-[120px] h-10 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 hover:shadow-md hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-opacity-75 focus:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm disabled:hover:bg-white transition-all duration-200 ease-in-out";
 
   return (
     <div 
@@ -204,7 +204,7 @@ export const RaceNavigation = memo(function RaceNavigation({
       aria-label="Race navigation"
       onKeyDown={handleKeyDown}
     >
-      {/* Back to Meetings Button */}
+      {/* Meetings Button */}
       <button
         onClick={handleBackToMeetingsClick}
         disabled={navigationStates.backToMeetings.disabled}
@@ -214,67 +214,8 @@ export const RaceNavigation = memo(function RaceNavigation({
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" />
         </svg>
         <span>Meetings</span>
-        {navigationStates.backToMeetings.isLoading && (
-          <svg className="animate-spin w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-          </svg>
-        )}
-      </button>
-
-      {/* Previous Race Button */}
-      <button
-        onClick={handlePreviousClick}
-        disabled={navigationStates.previous.disabled}
-        className={buttonClasses}
-        aria-label={AriaLabels.generateNavigationLabel(
-          'previous',
-          navigationData.previousRace?.name,
-          navigationData.previousRace?.meetingName,
-          navigationData.previousRace?.startTime
-        )}
-        title={navigationStates.previous.disabledReason}
-        aria-describedby={navigationStates.previous.disabledReason ? 'previous-race-desc' : undefined}
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        <span>Previous</span>
-        {navigationStates.previous.isLoading && (
-          <svg className="animate-spin w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-          </svg>
-        )}
-      </button>
-
-      {/* Next Race Button */}
-      <button
-        onClick={handleNextClick}
-        disabled={navigationStates.next.disabled}
-        className={buttonClasses}
-        aria-label={AriaLabels.generateNavigationLabel(
-          'next',
-          navigationData.nextRace?.name,
-          navigationData.nextRace?.meetingName,
-          navigationData.nextRace?.startTime
-        )}
-        title={navigationStates.next.disabledReason}
-        aria-describedby={navigationStates.next.disabledReason ? 'next-race-desc' : undefined}
-      >
-        <span>Next</span>
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        {navigationStates.next.isLoading && (
-          <svg className="animate-spin w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-          </svg>
-        )}
       </button>
 
       {/* Next Scheduled Button */}
@@ -295,13 +236,50 @@ export const RaceNavigation = memo(function RaceNavigation({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <span>Next Scheduled</span>
-        {navigationStates.nextScheduled.isLoading && (
-          <svg className="animate-spin w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-          </svg>
-        )}
       </button>
+
+      {/* Previous/Next Button Pair - wrappable as a unit with consistent gap */}
+      <div className="flex items-center gap-3">
+        {/* Previous Race Button */}
+        <button
+          onClick={handlePreviousClick}
+          disabled={navigationStates.previous.disabled}
+          className={buttonClasses}
+          aria-label={AriaLabels.generateNavigationLabel(
+            'previous',
+            navigationData.previousRace?.name,
+            navigationData.previousRace?.meetingName,
+            navigationData.previousRace?.startTime
+          )}
+          title={navigationStates.previous.disabledReason}
+          aria-describedby={navigationStates.previous.disabledReason ? 'previous-race-desc' : undefined}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          <span>Previous</span>
+        </button>
+
+        {/* Next Race Button */}
+        <button
+          onClick={handleNextClick}
+          disabled={navigationStates.next.disabled}
+          className={buttonClasses}
+          aria-label={AriaLabels.generateNavigationLabel(
+            'next',
+            navigationData.nextRace?.name,
+            navigationData.nextRace?.meetingName,
+            navigationData.nextRace?.startTime
+          )}
+          title={navigationStates.next.disabledReason}
+          aria-describedby={navigationStates.next.disabledReason ? 'next-race-desc' : undefined}
+        >
+          <span>Next</span>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
       
       {/* Hidden descriptions for screen readers */}
       {navigationStates.previous.disabledReason && (

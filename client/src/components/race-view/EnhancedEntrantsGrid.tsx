@@ -14,30 +14,32 @@ import { useAppwriteRealtime } from '@/hooks/useAppwriteRealtime'
 import { useRealtimeRace } from '@/hooks/useRealtimeRace'
 import { useRacePoolData } from '@/hooks/useRacePoolData'
 import { useMoneyFlowTimeline } from '@/hooks/useMoneyFlowTimeline'
-import { PoolToggle } from './PoolToggle'
 import { useRace } from '@/contexts/RaceContext'
 import { screenReader, AriaLabels } from '@/utils/accessibility'
 import { useRenderTracking, useMemoryOptimization } from '@/utils/performance'
 import { useValueFlash } from '@/hooks/useValueFlash'
 import { JockeySilks } from './JockeySilks'
-import { getStatusConfig, getStatusBadgeClasses } from '@/utils/raceStatusConfig'
 
 // Flash-enabled Win Odds Cell Component
-const WinOddsCell = memo(function WinOddsCell({ 
-  entrant, 
-  formatOdds 
-}: { 
-  entrant: Entrant; 
-  formatOdds: (odds?: number) => string;
+const WinOddsCell = memo(function WinOddsCell({
+  entrant,
+  formatOdds,
+}: {
+  entrant: Entrant
+  formatOdds: (odds?: number) => string
 }) {
   const { flashClasses } = useValueFlash(entrant.winOdds)
-  
+
   return (
-    <td 
-      className={`px-3 py-3 whitespace-nowrap text-right border-r border-gray-200 sticky left-[200px] z-20 ${flashClasses}`} 
-      style={{ verticalAlign: 'middle', height: '60px', backgroundColor: flashClasses.includes('bg-') ? undefined : 'white' }}
+    <td
+      className={`px-2 py-1 whitespace-nowrap text-right border-r border-gray-200 sticky left-[200px] z-20 ${flashClasses}`}
+      style={{
+        verticalAlign: 'middle',
+        height: '30px',
+        backgroundColor: flashClasses.includes('bg-') ? undefined : 'white',
+      }}
     >
-      <div className="flex items-center justify-end h-full">
+      <div className="flex items-center justify-end h-full pr-2">
         <span className="text-sm font-medium text-gray-900">
           {entrant.isScratched ? '—' : formatOdds(entrant.winOdds)}
         </span>
@@ -46,22 +48,26 @@ const WinOddsCell = memo(function WinOddsCell({
   )
 })
 
-// Flash-enabled Place Odds Cell Component  
-const PlaceOddsCell = memo(function PlaceOddsCell({ 
-  entrant, 
-  formatOdds 
-}: { 
-  entrant: Entrant; 
-  formatOdds: (odds?: number) => string;
+// Flash-enabled Place Odds Cell Component
+const PlaceOddsCell = memo(function PlaceOddsCell({
+  entrant,
+  formatOdds,
+}: {
+  entrant: Entrant
+  formatOdds: (odds?: number) => string
 }) {
   const { flashClasses } = useValueFlash(entrant.placeOdds)
-  
+
   return (
-    <td 
-      className={`px-3 py-3 whitespace-nowrap text-right border-r-2 border-gray-300 sticky left-[280px] z-20 ${flashClasses}`} 
-      style={{ verticalAlign: 'middle', height: '60px', backgroundColor: flashClasses.includes('bg-') ? undefined : 'white' }}
+    <td
+      className={`px-2 py-1 whitespace-nowrap text-right border-r-2 border-gray-300 sticky left-[270px] z-20 ${flashClasses}`}
+      style={{
+        verticalAlign: 'middle',
+        height: '30px',
+        backgroundColor: flashClasses.includes('bg-') ? undefined : 'white',
+      }}
     >
-      <div className="flex items-center justify-end h-full">
+      <div className="flex items-center justify-end h-full pr-2">
         <span className="text-sm font-medium text-gray-900">
           {entrant.isScratched ? '—' : formatOdds(entrant.placeOdds)}
         </span>
@@ -95,7 +101,7 @@ interface EnhancedEntrantsGridProps {
 
 // Enhanced single-component architecture with integrated timeline:
 // - Fixed left columns: Runner, Win, Place
-// - Scrollable center timeline: Dynamic time-based columns  
+// - Scrollable center timeline: Dynamic time-based columns
 // - Fixed right columns: Pool amount and percentage
 // All using a single table structure for perfect row alignment
 
@@ -103,7 +109,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   initialEntrants,
   raceId,
   raceStartTime,
-  dataFreshness,
   className = '',
   enableMoneyFlowTimeline = true,
   enableJockeySilks = true,
@@ -111,10 +116,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const { raceData } = useRace()
 
   // Use live race data for status synchronization (same as header and footer)
-  const { race: liveRace } = useRealtimeRace({ 
+  const { race: liveRace } = useRealtimeRace({
     initialRace: raceData?.race || {
       $id: raceId || 'fallback',
-      raceId: raceId || 'fallback', 
+      raceId: raceId || 'fallback',
       startTime: raceStartTime,
       status: 'open',
       name: '',
@@ -123,40 +128,45 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       distance: undefined,
       trackCondition: undefined,
       $createdAt: '',
-      $updatedAt: ''
-    }
+      $updatedAt: '',
+    },
   })
 
   // Use context data if available, fallback to props for initial render
   const currentEntrants = raceData?.entrants || initialEntrants
   const currentRaceId = raceData?.race.$id || raceId
-  const currentRaceStartTime = liveRace?.startTime || raceData?.race.startTime || raceStartTime
-  const currentDataFreshness = raceData?.dataFreshness || dataFreshness
+  const currentRaceStartTime =
+    liveRace?.startTime || raceData?.race.startTime || raceStartTime
 
-  // Get actual race pool data 
+  // Get actual race pool data
   const { poolData: racePoolData } = useRacePoolData(currentRaceId)
-  
-  // Pool view state - must be declared before money flow timeline hook
-  const [poolViewState, setPoolViewState] = useState<PoolViewState>(
-    DEFAULT_POOL_VIEW_STATE
-  )
-  
+
+  // Pool view state - fixed to win pool since toggle is removed
+  const poolViewState: PoolViewState = {
+    ...DEFAULT_POOL_VIEW_STATE,
+    activePool: 'win', // Fixed to win pool as per Phase 1 requirements
+  }
+
   // Get money flow timeline data for all entrants
-  const entrantIds = useMemo(() => currentEntrants.map(e => e.$id), [currentEntrants])
-  
+  const entrantIds = useMemo(
+    () => currentEntrants.map((e) => e.$id),
+    [currentEntrants]
+  )
+
   // Debug: Log entrant IDs being passed to timeline hook
   console.log('🔍 Timeline hook parameters:', {
     raceId: currentRaceId,
     entrantIds: entrantIds,
     entrantCount: entrantIds.length,
-    activePool: poolViewState.activePool
+    activePool: poolViewState.activePool,
   })
-  
-  const { timelineData, isLoading: timelineLoading, error: timelineError, getEntrantDataForInterval } = useMoneyFlowTimeline(
-    currentRaceId,
-    entrantIds,
-    poolViewState.activePool
-  )
+
+  const {
+    timelineData,
+    isLoading: timelineLoading,
+    error: timelineError,
+    getEntrantDataForInterval,
+  } = useMoneyFlowTimeline(currentRaceId, entrantIds, poolViewState.activePool)
 
   // Debug logging for entrants updates (can be removed in production)
   // console.log('🏃 EnhancedEntrantsGrid render:', {
@@ -166,10 +176,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   //   currentEntrantsCount: currentEntrants.length,
   //   raceId: currentRaceId
   // });
-  const [showPerformancePanel, setShowPerformancePanel] = useState(false)
   const [updateNotifications, setUpdateNotifications] = useState(true)
   const [selectedEntrant, setSelectedEntrant] = useState<string | undefined>()
-  
+
   // Timeline-related state
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
@@ -189,9 +198,14 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     isLoading: false,
   })
 
+  // Local selection for Win/Place/Odds selector
+  const [selectedView, setSelectedView] = useState<'win' | 'place' | 'odds'>('win')
+
   // Performance and memory optimization
-  const renderCount = useRenderTracking('EnhancedEntrantsGrid')
-  const { triggerCleanup, getMemoryReport } = useMemoryOptimization()
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _renderCount = useRenderTracking('EnhancedEntrantsGrid')
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _memory = useMemoryOptimization()
 
   const realtimeResult = useAppwriteRealtime({
     raceId: currentRaceId,
@@ -204,37 +218,38 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const {
     entrants: realtimeEntrants,
     isConnected,
-    connectionAttempts,
     lastUpdate,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     updateLatency,
     totalUpdates,
-    reconnect,
-    clearHistory,
   } = realtimeResult
 
   // IMPORTANT: Use currentEntrants (from context) as base to preserve data flow
   // Real-time entrants are used only for updating live fields (odds, scratch status) in calculations
   // This prevents calculated pool data from being overwritten by real-time updates
-  const baseEntrants = currentEntrants && currentEntrants.length > 0 ? currentEntrants : initialEntrants
-  
+  const baseEntrants =
+    currentEntrants && currentEntrants.length > 0
+      ? currentEntrants
+      : initialEntrants
+
   // Merge real-time updates into base entrants for live odds data
   const entrants = useMemo(() => {
     if (!realtimeEntrants || realtimeEntrants.length === 0) {
       console.log('📡 Using base entrants (no real-time data)')
       return baseEntrants
     }
-    
+
     console.log('🔄 Merging real-time data:', {
       baseEntrantsCount: baseEntrants.length,
       realtimeEntrantsCount: realtimeEntrants.length,
-      totalUpdates
+      totalUpdates,
     })
-    
+
     // Create a map of real-time entrants for quick lookup
-    const realtimeMap = new Map(realtimeEntrants.map(e => [e.$id, e]))
-    
+    const realtimeMap = new Map(realtimeEntrants.map((e) => [e.$id, e]))
+
     // Merge real-time data with base entrants, prioritizing live odds data
-    return baseEntrants.map(baseEntrant => {
+    return baseEntrants.map((baseEntrant) => {
       const realtimeEntrant = realtimeMap.get(baseEntrant.$id)
       if (realtimeEntrant) {
         // Merge real-time fields while preserving base entrant structure
@@ -243,11 +258,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           winOdds: realtimeEntrant.winOdds ?? baseEntrant.winOdds,
           placeOdds: realtimeEntrant.placeOdds ?? baseEntrant.placeOdds,
           isScratched: realtimeEntrant.isScratched ?? baseEntrant.isScratched,
-          holdPercentage: realtimeEntrant.holdPercentage ?? baseEntrant.holdPercentage,
-          moneyFlowTrend: realtimeEntrant.moneyFlowTrend ?? baseEntrant.moneyFlowTrend,
+          holdPercentage:
+            realtimeEntrant.holdPercentage ?? baseEntrant.holdPercentage,
+          moneyFlowTrend:
+            realtimeEntrant.moneyFlowTrend ?? baseEntrant.moneyFlowTrend,
           // Preserve any calculated fields that might exist
           poolMoney: baseEntrant.poolMoney,
-          moneyFlowTimeline: baseEntrant.moneyFlowTimeline
+          moneyFlowTimeline: baseEntrant.moneyFlowTimeline,
         }
       }
       return baseEntrant
@@ -256,124 +273,159 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
   // Validation function to check if timeline amounts sum to total pool
   const validateTimelineSummation = useCallback((entrant: Entrant) => {
-    if (!entrant.moneyFlowTimeline || !entrant.poolMoney) return true;
-    
-    const timeline = entrant.moneyFlowTimeline;
-    if (!timeline.dataPoints || timeline.dataPoints.length === 0) return true;
-    
+    if (!entrant.moneyFlowTimeline || !entrant.poolMoney) return true
+
+    const timeline = entrant.moneyFlowTimeline
+    if (!timeline.dataPoints || timeline.dataPoints.length === 0) return true
+
     // Sum all incremental amounts for this entrant
-    const timelineSum = timeline.dataPoints.reduce((sum: number, point: {incrementalAmount?: number}) => {
-      return sum + (point.incrementalAmount || 0);
-    }, 0);
-    
+    const timelineSum = timeline.dataPoints.reduce(
+      (sum: number, point: { incrementalAmount?: number }) => {
+        return sum + (point.incrementalAmount || 0)
+      },
+      0
+    )
+
     // Compare with current pool total for this entrant
-    const poolTotal = entrant.poolMoney.total || 0;
-    const difference = Math.abs(timelineSum - poolTotal);
-    const tolerance = poolTotal * 0.05; // 5% tolerance
-    
-    if (difference > tolerance && poolTotal > 100) { // Only flag significant discrepancies
-      console.warn(`⚠️ Timeline summation mismatch for ${entrant.name}: timeline sum=${timelineSum}, pool total=${poolTotal}, difference=${difference}`);
-      return false;
+    const poolTotal = entrant.poolMoney.total || 0
+    const difference = Math.abs(timelineSum - poolTotal)
+    const tolerance = poolTotal * 0.05 // 5% tolerance
+
+    if (difference > tolerance && poolTotal > 100) {
+      // Only flag significant discrepancies
+      console.warn(
+        `⚠️ Timeline summation mismatch for ${entrant.name}: timeline sum=${timelineSum}, pool total=${poolTotal}, difference=${difference}`
+      )
+      return false
     }
-    
-    return true;
-  }, []);
+
+    return true
+  }, [])
 
   // Calculate pool money for each entrant using actual timeline data and pool data
   const entrantsWithPoolData = useMemo(() => {
     if (!entrants || entrants.length === 0) return []
-    
+
     console.log('🔍 Pool calculation debug:', {
       entrantsCount: entrants.length,
       timelineDataAvailable: timelineData?.size > 0,
       timelineDataSize: timelineData?.size || 0,
       racePoolDataAvailable: !!racePoolData,
-      racePoolData: racePoolData ? {
-        winPoolTotal: racePoolData.winPoolTotal,
-        placePoolTotal: racePoolData.placePoolTotal
-      } : null,
-      sampleEntrant: entrants[0] ? {
-        id: entrants[0].$id,
-        name: entrants[0].name,
-        holdPercentage: entrants[0].holdPercentage,
-        isScratched: entrants[0].isScratched
-      } : null
+      racePoolData: racePoolData
+        ? {
+            winPoolTotal: racePoolData.winPoolTotal,
+            placePoolTotal: racePoolData.placePoolTotal,
+          }
+        : null,
+      sampleEntrant: entrants[0]
+        ? {
+            id: entrants[0].$id,
+            name: entrants[0].name,
+            holdPercentage: entrants[0].holdPercentage,
+            isScratched: entrants[0].isScratched,
+          }
+        : null,
     })
-    
-    return entrants.map(entrant => {
+
+    return entrants.map((entrant) => {
       if (entrant.isScratched) {
-        console.log(`🐴 Scratched entrant ${entrant.name} (${entrant.runnerNumber}) - returning unchanged`)
+        console.log(
+          `🐴 Scratched entrant ${entrant.name} (${entrant.runnerNumber}) - returning unchanged`
+        )
         return {
           ...entrant,
-          moneyFlowTimeline: undefined // No timeline for scratched entrants
+          moneyFlowTimeline: undefined, // No timeline for scratched entrants
         }
       }
-      
+
       // NEW PRIORITY HIERARCHY (FIXED):
       // Priority 1: Real entrant holdPercentage (must be > 0)
       let poolPercentage: number | undefined = undefined
       let dataSource = 'none'
-      
+
       if (entrant.holdPercentage && entrant.holdPercentage > 0) {
         poolPercentage = entrant.holdPercentage
         dataSource = 'entrant_real_data'
-        console.log(`✅ Using real entrant data for ${entrant.name}: ${poolPercentage}%`)
+        console.log(
+          `✅ Using real entrant data for ${entrant.name}: ${poolPercentage}%`
+        )
       }
-      
+
       // Priority 2: Timeline latest percentage (only if entrant data missing)
       const entrantTimeline = timelineData?.get(entrant.$id)
-      if (!poolPercentage && entrantTimeline && entrantTimeline.dataPoints.length > 0) {
+      if (
+        !poolPercentage &&
+        entrantTimeline &&
+        entrantTimeline.dataPoints.length > 0
+      ) {
         const latestPercentage = entrantTimeline.latestPercentage
         if (latestPercentage && latestPercentage > 0) {
           poolPercentage = latestPercentage
           dataSource = 'timeline_data'
-          console.log(`✅ Using timeline data for ${entrant.name}: ${poolPercentage}%`)
+          console.log(
+            `✅ Using timeline data for ${entrant.name}: ${poolPercentage}%`
+          )
         }
       }
-      
+
       // Priority 3: Calculate from odds if we have pool data and odds
-      if (!poolPercentage && racePoolData && entrant.winOdds && entrant.winOdds > 0) {
+      if (
+        !poolPercentage &&
+        racePoolData &&
+        entrant.winOdds &&
+        entrant.winOdds > 0
+      ) {
         // Calculate implied probability from odds (odds = 1/probability)
         // Add small margin for house edge estimation
         const impliedProbability = 1 / entrant.winOdds
         const estimatedPercentage = impliedProbability * 100 * 0.85 // Adjust for house edge
-        
+
         if (estimatedPercentage > 0 && estimatedPercentage < 100) {
           poolPercentage = estimatedPercentage
           dataSource = 'calculated_from_odds'
-          console.log(`📊 Calculated from odds for ${entrant.name}: ${poolPercentage.toFixed(2)}% (odds: ${entrant.winOdds})`)
+          console.log(
+            `📊 Calculated from odds for ${
+              entrant.name
+            }: ${poolPercentage.toFixed(2)}% (odds: ${entrant.winOdds})`
+          )
         }
       }
-      
+
       // Priority 4: Fallback to dummy data temporarily to ensure display works
       if (!poolPercentage) {
-        console.log(`⚠️ No calculable data for ${entrant.name}, using fallback percentage`)
+        console.log(
+          `⚠️ No calculable data for ${entrant.name}, using fallback percentage`
+        )
         // Use a fallback percentage based on entrant position for testing
-        poolPercentage = Math.max(1, 15 - entrant.runnerNumber); // Simple fallback
+        poolPercentage = Math.max(1, 15 - entrant.runnerNumber) // Simple fallback
         dataSource = 'fallback_for_testing'
       }
-      
+
       // Calculate individual pool contributions based on pool percentage
       const holdPercentageDecimal = poolPercentage / 100
-      
+
       // Use fallback pool totals if no race pool data (for testing)
-      const fallbackWinPool = 5000000; // $50k in cents
-      const fallbackPlacePool = 2000000; // $20k in cents
-      
-      const winPoolInDollars = Math.round((racePoolData?.winPoolTotal || fallbackWinPool) / 100) 
-      const placePoolInDollars = Math.round((racePoolData?.placePoolTotal || fallbackPlacePool) / 100)
+      const fallbackWinPool = 5000000 // $50k in cents
+      const fallbackPlacePool = 2000000 // $20k in cents
+
+      const winPoolInDollars = Math.round(
+        (racePoolData?.winPoolTotal || fallbackWinPool) / 100
+      )
+      const placePoolInDollars = Math.round(
+        (racePoolData?.placePoolTotal || fallbackPlacePool) / 100
+      )
       const winPoolContribution = winPoolInDollars * holdPercentageDecimal
       const placePoolContribution = placePoolInDollars * holdPercentageDecimal
       const totalPoolContribution = winPoolContribution + placePoolContribution
-      
+
       console.log(`💰 Real calculation for ${entrant.name}:`, {
         poolPercentage,
         winPoolContribution: winPoolContribution.toFixed(0),
         placePoolContribution: placePoolContribution.toFixed(0),
         totalPoolContribution: totalPoolContribution.toFixed(0),
-        dataSource
+        dataSource,
       })
-      
+
       const entrantWithPoolData = {
         ...entrant,
         moneyFlowTimeline: entrantTimeline, // Add timeline data to entrant
@@ -381,13 +433,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           win: winPoolContribution,
           place: placePoolContribution,
           total: totalPoolContribution,
-          percentage: poolPercentage
-        }
-      };
-      
+          percentage: poolPercentage,
+        },
+      }
+
       // Validate timeline summation for debugging
-      validateTimelineSummation(entrantWithPoolData);
-      
+      validateTimelineSummation(entrantWithPoolData)
+
       // Special debugging for "Wal" entrant
       if (entrant.name.toLowerCase().includes('wal')) {
         console.log(`🔍 DEBUG "Wal" entrant:`, {
@@ -397,11 +449,11 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           poolMoney: entrantWithPoolData.poolMoney,
           timelineDataPoints: entrantTimeline?.dataPoints?.length || 0,
           sampleTimelinePoint: entrantTimeline?.dataPoints?.[0] || null,
-          timelineTrend: entrantTimeline?.trend || 'none'
-        });
+          timelineTrend: entrantTimeline?.trend || 'none',
+        })
       }
-      
-      return entrantWithPoolData;
+
+      return entrantWithPoolData
     })
   }, [entrants, racePoolData, timelineData, validateTimelineSummation])
 
@@ -475,24 +527,24 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     timelineLoading,
     timelineError: timelineError ? timelineError : null,
     entrantIdsPreview: entrantIds.slice(0, 3),
-    sampleEntrantData: sortedEntrants.slice(0, 2).map(e => ({
+    sampleEntrantData: sortedEntrants.slice(0, 2).map((e) => ({
       id: e.$id,
       name: e.name,
-      runnerNumber: e.runnerNumber
-    }))
+      runnerNumber: e.runnerNumber,
+    })),
   })
 
   // Update current time for dynamic timeline updates
   // More frequent updates near race start time, but pause for final races
   useEffect(() => {
     const raceStatus = liveRace?.status || 'Open'
-    
+
     // Don't update time frequently for completed races
     if (['Final', 'Closed'].includes(raceStatus)) {
       const timer = setInterval(() => {
         setCurrentTime(new Date())
       }, 300000) // Update every 5 minutes for completed races
-      
+
       return () => clearInterval(timer)
     }
 
@@ -522,46 +574,53 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     const timeToRaceMs = raceStart.getTime() - current.getTime()
     const timeToRaceMinutes = Math.floor(timeToRaceMs / (1000 * 60))
     const raceStatus = liveRace?.status || 'Open'
-    
+
     // FIXED: Declare these variables at the top to avoid "before initialization" errors
     const raceHasStarted = timeToRaceMinutes < 0
-    const raceIsCompleted = ['Final', 'Interim', 'Closed', 'Abandoned'].includes(raceStatus)
-    
+    const raceIsCompleted = [
+      'Final',
+      'Interim',
+      'Closed',
+      'Abandoned',
+    ].includes(raceStatus)
+
     // Calculate actual post-start minutes
-    const actualPostStartMinutes = timeToRaceMinutes < 0 ? Math.abs(timeToRaceMinutes) : 0
-    
+    const actualPostStartMinutes =
+      timeToRaceMinutes < 0 ? Math.abs(timeToRaceMinutes) : 0
+
     // Calculate max post-start from existing timeline data (DATA-DRIVEN)
     let maxPostStartFromData = 0
     if (timelineData && timelineData.size > 0) {
       for (const [, entrantData] of timelineData) {
         if (entrantData.dataPoints && entrantData.dataPoints.length > 0) {
-          const maxTimeToStart = Math.max(...entrantData.dataPoints.map(p => Math.abs(p.timeToStart || 0)))
+          const maxTimeToStart = Math.max(
+            ...entrantData.dataPoints.map((p) => Math.abs(p.timeToStart || 0))
+          )
           maxPostStartFromData = Math.max(maxPostStartFromData, maxTimeToStart)
         }
       }
     }
-    
+
     // Use maximum of actual time or data-driven max for persistence
     // const effectiveMaxPostStart = Math.max(actualPostStartMinutes, maxPostStartFromData) // Currently unused
-    
+
     // Pre-scheduled timeline milestones (CORRECTED: positive = before start, negative = after start)
     // Backend uses: timeToStart: 60 = 60min before start, timeToStart: -2 = 2min after start
     const preScheduledMilestones = [
-      60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 4, 3, 2, 1, 0.5, 0
+      60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 4, 3, 2, 1, 0.5, 0,
     ]
-    
+
     const columns: TimelineColumn[] = []
-    
+
     // Add pre-scheduled milestones (FIXED: Always show standard columns by default)
     preScheduledMilestones.forEach((interval) => {
       // FIXED: Standard pre-race columns (60m-0m) should always be visible by default
       // Progressive display logic only applies to post-race delayed columns
       // For pre-race intervals (>= 0): Always show
-      // For completed/delayed races: show all columns for historical review  
-      const shouldShowColumn = interval >= 0 || 
-                              raceIsCompleted || 
-                              timeToRaceMinutes <= 0
-      
+      // For completed/delayed races: show all columns for historical review
+      const shouldShowColumn =
+        interval >= 0 || raceIsCompleted || timeToRaceMinutes <= 0
+
       if (shouldShowColumn) {
         // CORRECTED: interval is now positive for before-start times
         const timestamp = new Date(raceStart.getTime() - interval * 60 * 1000)
@@ -583,37 +642,42 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         })
       }
     })
-    
-    // Add post-scheduled columns when appropriate - FIXED to be time-driven, not data-driven  
+
+    // Add post-scheduled columns when appropriate - FIXED to be time-driven, not data-driven
     // FIXED: Base delayed column visibility on actual elapsed time, not existing data
     // This ensures columns appear progressively as time elapses, not all at once
-    const shouldShowPostStartColumns = 
+    const shouldShowPostStartColumns =
       (raceStatus === 'Open' && raceHasStarted && actualPostStartMinutes > 0) ||
-      (raceIsCompleted) // Always show for completed races to preserve review capability
-    
+      raceIsCompleted // Always show for completed races to preserve review capability
+
     console.log('🕐 Post-start column logic:', {
       raceStatus,
       timeToRaceMinutes,
       raceHasStarted,
       actualPostStartMinutes,
-      shouldShowPostStartColumns
-    });
-    
+      shouldShowPostStartColumns,
+    })
+
     if (shouldShowPostStartColumns) {
       const dynamicIntervals: number[] = []
-      
+
       if (raceStatus === 'Open') {
         // FIXED: For open races, show delayed columns progressively based on actual elapsed time
         // Only show columns for time periods that have actually been reached
         const postStartMinutes = actualPostStartMinutes
-        
+
         // Standard post-start progression: -30s, -1m, -1:30s, -2m, -2:30s, -3m, -4m, etc.
-        const standardPostStartIntervals = [-0.5, -1.0, -1.5, -2.0, -2.5, -3.0, -4.0, -5.0, -6.0, -7.0, -8.0, -9.0, -10.0]
-        
+        const standardPostStartIntervals = [
+          -0.5, -1.0, -1.5, -2.0, -2.5, -3.0, -4.0, -5.0, -6.0, -7.0, -8.0,
+          -9.0, -10.0,
+        ]
+
         // FIXED: Only show intervals that have been reached by actual elapsed time
         // Show columns progressively: only add the NEXT interval when time is reached
-        const sortedPostStartIntervals = [...standardPostStartIntervals].sort((a, b) => Math.abs(a) - Math.abs(b))
-        
+        const sortedPostStartIntervals = [...standardPostStartIntervals].sort(
+          (a, b) => Math.abs(a) - Math.abs(b)
+        )
+
         // FIXED: Show all intervals that have been reached progressively
         // This shows columns as they become available during delayed periods
         for (const interval of sortedPostStartIntervals) {
@@ -626,10 +690,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
             break
           }
         }
-        
+
         // Only log when intervals change to reduce verbosity
         if (dynamicIntervals.length > 0 && postStartMinutes % 0.5 === 0) {
-          console.log('🕐 Intervals updated:', { postStartMinutes, intervals: dynamicIntervals.length })
+          console.log('🕐 Intervals updated:', {
+            postStartMinutes,
+            intervals: dynamicIntervals.length,
+          })
         }
       } else {
         // For closed/final/interim/abandoned races, show all columns based on existing data points
@@ -638,10 +705,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         if (timelineData && timelineData.size > 0) {
           for (const [, entrantData] of timelineData) {
             if (entrantData.dataPoints && entrantData.dataPoints.length > 0) {
-              entrantData.dataPoints.forEach(point => {
+              entrantData.dataPoints.forEach((point) => {
                 // FIXED: Use timeInterval when available (server-calculated), fallback to timeToStart
                 const interval = point.timeInterval ?? point.timeToStart
-                
+
                 if (interval !== undefined) {
                   // Add post-race intervals to dynamic columns (negative intervals = post-start)
                   if (interval < 0) {
@@ -653,24 +720,30 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
             }
           }
         }
-        
+
         // Add intervals from data if available
         if (dataIntervals.size > 0) {
-          dynamicIntervals.push(...Array.from(dataIntervals).sort((a, b) => a - b))
+          dynamicIntervals.push(
+            ...Array.from(dataIntervals).sort((a, b) => a - b)
+          )
         } else {
           // Fallback: Show standard post-race intervals for completed races even without data
           // FIXED: Use standard progression that matches server-side
-          const standardPostRaceIntervals = [-0.5, -1.0, -1.5, -2.0, -2.5, -3.0, -4.0, -5.0]
+          const standardPostRaceIntervals = [
+            -0.5, -1.0, -1.5, -2.0, -2.5, -3.0, -4.0, -5.0,
+          ]
           dynamicIntervals.push(...standardPostRaceIntervals)
         }
       }
-      
+
       // Add post-start columns (CORRECTED: negative intervals are post-start)
       dynamicIntervals.forEach((interval) => {
         // For negative intervals (post-start), add the absolute time to get correct timestamp
-        const timestamp = new Date(raceStart.getTime() + Math.abs(interval) * 60 * 1000)
+        const timestamp = new Date(
+          raceStart.getTime() + Math.abs(interval) * 60 * 1000
+        )
         const absInterval = Math.abs(interval)
-        
+
         // REQUIREMENT: Show labels like "-30s, -1m, -1:30s, -2m" for delayed starts
         let label: string
         if (absInterval < 1) {
@@ -684,126 +757,130 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           // Full minute intervals: -1m, -2m, -3m
           label = `-${absInterval}m`
         }
-        
+
         columns.push({
           label,
           interval,
           timestamp: timestamp.toISOString(),
           isScheduledStart: false,
-          isDynamic: raceStatus === 'Open' // Only mark as dynamic for open races
+          isDynamic: raceStatus === 'Open', // Only mark as dynamic for open races
         })
       })
     }
-    
+
     // Sort columns chronologically: highest positive → 0 → lowest negative
     // Example: 60m, 50m, 40m, ..., 2m, 1m, 0 (Start), +1m, +2m, +4m
     return columns.sort((a, b) => b.interval - a.interval)
   }, [currentRaceStartTime, currentTime, liveRace?.status, timelineData])
 
   // Determine if column should be highlighted (current time) - FIXED to highlight only ONE column
-  const isCurrentTimeColumn = useCallback((interval: number): boolean => {
-    const raceStart = new Date(currentRaceStartTime)
-    const timeToRaceMs = raceStart.getTime() - currentTime.getTime()
-    const timeToRaceMinutes = timeToRaceMs / (1000 * 60)
-    const raceStatus = liveRace?.status || 'Open'
+  const isCurrentTimeColumn = useCallback(
+    (interval: number): boolean => {
+      const raceStart = new Date(currentRaceStartTime)
+      const timeToRaceMs = raceStart.getTime() - currentTime.getTime()
+      const timeToRaceMinutes = timeToRaceMs / (1000 * 60)
+      const raceStatus = liveRace?.status || 'Open'
 
-    // Only highlight and follow current time while race status is 'Open'
-    if (raceStatus === 'Open') {
-      if (timeToRaceMinutes > 0) {
-        // Race hasn't started yet - find the SINGLE active polling interval
-        const sortedIntervals = timelineColumns
-          .filter(col => col.interval > 0) // Only pre-race intervals
-          .map(col => col.interval)
-          .sort((a, b) => b - a) // Descending: [60, 55, 50, ..., 1, 0.5]
-        
-        // FIXED: Find the active column - largest interval that is <= current time
-        // Examples: 10.5min → 10m column, 9.9min → 5m column, 0.3min → 0.5m column
-        let activeInterval = null
-        
-        // Handle edge case for times > 60 minutes first
-        if (timeToRaceMinutes > 60) {
-          activeInterval = 60
-        } else {
-          // Find the largest interval that is <= current time to race
-          for (const intervalMinutes of sortedIntervals) {
-            if (timeToRaceMinutes >= intervalMinutes) {
-              activeInterval = intervalMinutes
-              break // Found the largest interval <= current time
+      // Only highlight and follow current time while race status is 'Open'
+      if (raceStatus === 'Open') {
+        if (timeToRaceMinutes > 0) {
+          // Race hasn't started yet - find the SINGLE active polling interval
+          const sortedIntervals = timelineColumns
+            .filter((col) => col.interval > 0) // Only pre-race intervals
+            .map((col) => col.interval)
+            .sort((a, b) => b - a) // Descending: [60, 55, 50, ..., 1, 0.5]
+
+          // FIXED: Find the active column - largest interval that is <= current time
+          // Examples: 10.5min → 10m column, 9.9min → 5m column, 0.3min → 0.5m column
+          let activeInterval = null
+
+          // Handle edge case for times > 60 minutes first
+          if (timeToRaceMinutes > 60) {
+            activeInterval = 60
+          } else {
+            // Find the largest interval that is <= current time to race
+            for (const intervalMinutes of sortedIntervals) {
+              if (timeToRaceMinutes >= intervalMinutes) {
+                activeInterval = intervalMinutes
+                break // Found the largest interval <= current time
+              }
+            }
+
+            // If no interval found (time < 0.5), use the smallest interval (0.5)
+            if (!activeInterval && sortedIntervals.length > 0) {
+              activeInterval = sortedIntervals[sortedIntervals.length - 1] // 0.5
             }
           }
-          
-          // If no interval found (time < 0.5), use the smallest interval (0.5)
-          if (!activeInterval && sortedIntervals.length > 0) {
-            activeInterval = sortedIntervals[sortedIntervals.length - 1] // 0.5
+
+          return interval === activeInterval
+        } else {
+          // Past scheduled start but race status still 'Open' (delayed start)
+          const timeAfterStartMinutes = Math.abs(timeToRaceMinutes)
+
+          // FIXED: Find active post-start column - largest interval <= elapsed time
+          // Examples: 0.1min elapsed → 0 (Start), 0.6min elapsed → -30s, 1.2min elapsed → -1m
+
+          // Get all available post-start intervals sorted by absolute value ascending: [0.5, 1, 1.5, 2, ...]
+          const postStartIntervals = timelineColumns
+            .filter((col) => col.interval < 0)
+            .map((col) => Math.abs(col.interval))
+            .sort((a, b) => a - b)
+
+          // If no post-start columns exist, highlight the 0 (Start) column
+          if (postStartIntervals.length === 0) {
+            return interval === 0
           }
-        }
-        
-        return interval === activeInterval
-      } else {
-        // Past scheduled start but race status still 'Open' (delayed start)
-        const timeAfterStartMinutes = Math.abs(timeToRaceMinutes)
-        
-        // FIXED: Find active post-start column - largest interval <= elapsed time
-        // Examples: 0.1min elapsed → 0 (Start), 0.6min elapsed → -30s, 1.2min elapsed → -1m
-        
-        // Get all available post-start intervals sorted by absolute value ascending: [0.5, 1, 1.5, 2, ...]
-        const postStartIntervals = timelineColumns
-          .filter(col => col.interval < 0)
-          .map(col => Math.abs(col.interval))
-          .sort((a, b) => a - b)
-        
-        // If no post-start columns exist, highlight the 0 (Start) column
-        if (postStartIntervals.length === 0) {
-          return interval === 0
-        }
-        
-        // Find the largest post-start interval that has been reached
-        let activePostStartInterval = null
-        for (const postInterval of postStartIntervals) {
-          if (timeAfterStartMinutes >= postInterval) {
-            activePostStartInterval = postInterval
-          } else {
-            break // Stop at first interval we haven't reached
+
+          // Find the largest post-start interval that has been reached
+          let activePostStartInterval = null
+          for (const postInterval of postStartIntervals) {
+            if (timeAfterStartMinutes >= postInterval) {
+              activePostStartInterval = postInterval
+            } else {
+              break // Stop at first interval we haven't reached
+            }
           }
-        }
-        
-        // If we haven't reached any post-start interval yet, highlight "0 (Start)"
-        if (activePostStartInterval === null) {
-          return interval === 0
-        }
-        
-        // Check if this column matches the active post-start interval
-        if (interval < 0) {
-          return Math.abs(interval) === activePostStartInterval
-        } else if (interval === 0) {
-          // Don't highlight start column if we've moved past it
+
+          // If we haven't reached any post-start interval yet, highlight "0 (Start)"
+          if (activePostStartInterval === null) {
+            return interval === 0
+          }
+
+          // Check if this column matches the active post-start interval
+          if (interval < 0) {
+            return Math.abs(interval) === activePostStartInterval
+          } else if (interval === 0) {
+            // Don't highlight start column if we've moved past it
+            return false
+          }
+
           return false
         }
-        
-        return false
       }
-    }
-    
-    // Race status is no longer 'Open' - stop highlighting, race has actually started
-    return false
-  }, [currentRaceStartTime, currentTime, timelineColumns, liveRace?.status])
+
+      // Race status is no longer 'Open' - stop highlighting, race has actually started
+      return false
+    },
+    [currentRaceStartTime, currentTime, timelineColumns, liveRace?.status]
+  )
 
   // Auto-scroll to show current time position
   useEffect(() => {
     if (!autoScroll || !scrollContainerRef.current) return
 
     const container = scrollContainerRef.current
-    
+
     // Find the currently highlighted (active) column using the same logic
-    const activeColumnIndex = timelineColumns.findIndex(col => 
+    const activeColumnIndex = timelineColumns.findIndex((col) =>
       isCurrentTimeColumn(col.interval)
     )
 
     console.log('🔄 Auto-scroll update:', {
       activeColumnIndex,
       totalColumns: timelineColumns.length,
-      activeColumn: activeColumnIndex >= 0 ? timelineColumns[activeColumnIndex] : null,
-      autoScroll
+      activeColumn:
+        activeColumnIndex >= 0 ? timelineColumns[activeColumnIndex] : null,
+      autoScroll,
     })
 
     if (activeColumnIndex >= 0) {
@@ -815,38 +892,64 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         left: scrollPosition,
         behavior: 'smooth',
       })
-      
-      console.log('📍 Auto-scrolled to active column at position:', scrollPosition)
+
+      console.log(
+        '📍 Auto-scrolled to active column at position:',
+        scrollPosition
+      )
     }
-  }, [timelineColumns, currentRaceStartTime, autoScroll, currentTime, isCurrentTimeColumn])
+  }, [
+    timelineColumns,
+    currentRaceStartTime,
+    autoScroll,
+    currentTime,
+    isCurrentTimeColumn,
+  ])
 
   // Get data for specific timeline point - shows incremental money amounts since previous time point
-  const getTimelineData = useCallback((entrantId: string, interval: number): string => {
-    const entrant = sortedEntrants.find((e) => e.$id === entrantId)
-    if (!entrant || entrant.isScratched) return '—'
+  const getTimelineData = useCallback(
+    (entrantId: string, interval: number): string => {
+      const entrant = sortedEntrants.find((e) => e.$id === entrantId)
+      if (!entrant || entrant.isScratched) return '—'
 
-    // Use the simplified getEntrantDataForInterval from the timeline hook 
-    // This eliminates the complex manual calculation logic
-    if (getEntrantDataForInterval) {
-      const result = getEntrantDataForInterval(entrant.$id, interval, poolViewState.activePool as 'win' | 'place');
-      
-      // Debug logging to help troubleshoot data issues
-      if (interval === 60) {
-        console.log(`📊 Timeline data for ${entrant.name || entrant.$id} at ${interval}m:`, {
-          entrantId: entrant.$id,
+      // Use the simplified getEntrantDataForInterval from the timeline hook
+      // This eliminates the complex manual calculation logic
+      if (getEntrantDataForInterval) {
+        const result = getEntrantDataForInterval(
+          entrant.$id,
           interval,
-          poolType: poolViewState.activePool,
-          result,
-          timelineDataSize: timelineData?.size || 0,
-          hasTimelineData: timelineData?.has(entrant.$id) || false
-        });
-      }
-      
-      return result;
-    }
+          poolViewState.activePool as 'win' | 'place'
+        )
 
-    return '—'
-  }, [sortedEntrants, timelineData, poolViewState.activePool, getEntrantDataForInterval])
+        // Debug logging to help troubleshoot data issues
+        if (interval === 60) {
+          console.log(
+            `📊 Timeline data for ${
+              entrant.name || entrant.$id
+            } at ${interval}m:`,
+            {
+              entrantId: entrant.$id,
+              interval,
+              poolType: poolViewState.activePool,
+              result,
+              timelineDataSize: timelineData?.size || 0,
+              hasTimelineData: timelineData?.has(entrant.$id) || false,
+            }
+          )
+        }
+
+        return result
+      }
+
+      return '—'
+    },
+    [
+      sortedEntrants,
+      timelineData,
+      poolViewState.activePool,
+      getEntrantDataForInterval,
+    ]
+  )
 
   // Utility functions
   const formatOdds = useCallback((odds?: number) => {
@@ -867,79 +970,80 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   }, [])
 
   // Get pool amount for the currently selected pool type
-  const getPoolAmount = useCallback((entrant: Entrant): number | undefined => {
-    if (!entrant.poolMoney) return undefined // Return undefined when no real data yet
-    
-    switch (poolViewState.activePool) {
-      case 'win':
-        return entrant.poolMoney.win || 0
-      case 'place':
-        return entrant.poolMoney.place || 0
-      default:
-        return entrant.poolMoney.total || 0
-    }
-  }, [poolViewState.activePool])
+  const getPoolAmount = useCallback(
+    (entrant: Entrant): number | undefined => {
+      if (!entrant.poolMoney) return undefined // Return undefined when no real data yet
 
-  // Get pool percentage for the currently selected pool type
-  const getPoolPercentage = useCallback((entrant: Entrant): number | undefined => {
-    if (entrant.isScratched) return 0
-    
-    // Return undefined if no pool money data available yet (avoid showing dummy percentages)
-    if (!entrant.poolMoney) return undefined
-    
-    // Calculate percentage based on selected pool type
-    switch (poolViewState.activePool) {
-      case 'win':
-        // Calculate percentage of win pool
-        const totalWinPool = entrantsWithPoolData.reduce((sum, e) => 
-          !e.isScratched && e.poolMoney ? sum + (e.poolMoney.win || 0) : sum, 0)
-        return totalWinPool > 0 ? ((entrant.poolMoney.win || 0) / totalWinPool) * 100 : 0
-      
-      case 'place':
-        // Calculate percentage of place pool
-        const totalPlacePool = entrantsWithPoolData.reduce((sum, e) => 
-          !e.isScratched && e.poolMoney ? sum + (e.poolMoney.place || 0) : sum, 0)
-        return totalPlacePool > 0 ? ((entrant.poolMoney.place || 0) / totalPlacePool) * 100 : 0
-      
-      default:
-        // Default to existing percentage calculation
-        return entrant.poolMoney.percentage || 0
-    }
-  }, [poolViewState.activePool, entrantsWithPoolData])
-
-
-  // Handle pool toggle changes
-  const handlePoolChange = useCallback(
-    (pool: typeof poolViewState.activePool) => {
-      setPoolViewState((prev) => ({
-        ...prev,
-        activePool: pool,
-      }))
+      switch (poolViewState.activePool) {
+        case 'win':
+          return entrant.poolMoney.win || 0
+        case 'place':
+          return entrant.poolMoney.place || 0
+        default:
+          return entrant.poolMoney.total || 0
+      }
     },
-    [poolViewState]
+    [poolViewState.activePool]
   )
 
-  const handleDisplayModeChange = useCallback(
-    (mode: typeof poolViewState.displayMode) => {
-      setPoolViewState((prev) => ({
-        ...prev,
-        displayMode: mode,
-      }))
+  // Get pool percentage for the currently selected pool type
+  const getPoolPercentage = useCallback(
+    (entrant: Entrant): number | undefined => {
+      if (entrant.isScratched) return 0
+
+      // Return undefined if no pool money data available yet (avoid showing dummy percentages)
+      if (!entrant.poolMoney) return undefined
+
+      // Calculate percentage based on selected pool type
+      switch (poolViewState.activePool) {
+        case 'win':
+          // Calculate percentage of win pool
+          const totalWinPool = entrantsWithPoolData.reduce(
+            (sum, e) =>
+              !e.isScratched && e.poolMoney
+                ? sum + (e.poolMoney.win || 0)
+                : sum,
+            0
+          )
+          return totalWinPool > 0
+            ? ((entrant.poolMoney.win || 0) / totalWinPool) * 100
+            : 0
+
+        case 'place':
+          // Calculate percentage of place pool
+          const totalPlacePool = entrantsWithPoolData.reduce(
+            (sum, e) =>
+              !e.isScratched && e.poolMoney
+                ? sum + (e.poolMoney.place || 0)
+                : sum,
+            0
+          )
+          return totalPlacePool > 0
+            ? ((entrant.poolMoney.place || 0) / totalPlacePool) * 100
+            : 0
+
+        default:
+          // Default to existing percentage calculation
+          return entrant.poolMoney.percentage || 0
+      }
     },
-    [poolViewState]
+    [poolViewState.activePool, entrantsWithPoolData]
   )
 
   // Handle entrant selection
-  const handleEntrantClick = useCallback((entrantId: string) => {
-    setSelectedEntrant((prev) => (prev === entrantId ? undefined : entrantId))
-    const entrant = sortedEntrants.find((e) => e.$id === entrantId)
-    if (entrant) {
-      screenReader?.announce(
-        `Selected ${entrant.name}, runner number ${entrant.runnerNumber}`,
-        'polite'
-      )
-    }
-  }, [sortedEntrants])
+  const handleEntrantClick = useCallback(
+    (entrantId: string) => {
+      setSelectedEntrant((prev) => (prev === entrantId ? undefined : entrantId))
+      const entrant = sortedEntrants.find((e) => e.$id === entrantId)
+      if (entrant) {
+        screenReader?.announce(
+          `Selected ${entrant.name}, runner number ${entrant.runnerNumber}`,
+          'polite'
+        )
+      }
+    },
+    [sortedEntrants]
+  )
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent, entrantId: string) => {
@@ -950,10 +1054,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     },
     [handleEntrantClick]
   )
-
-  const togglePerformancePanel = useCallback(() => {
-    setShowPerformancePanel((prev) => !prev)
-  }, [])
 
   // Handle column sorting
   const handleSort = useCallback((column: SortableColumn) => {
@@ -980,164 +1080,68 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
   return (
     <div
-      className={`enhanced-entrants-grid bg-white rounded-lg shadow-md h-full flex flex-col ${className}`}
+      className={`enhanced-entrants-grid bg-white rounded-lg shadow-md flex-1 flex flex-col ${className}`}
+      style={{ minHeight: 0 }}
     >
-      {/* Enhanced Header with Pool Toggle */}
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Enhanced Race Entrants ({sortedEntrants.length})
-          </h2>
-          <div className="flex items-center space-x-3">
-            {currentDataFreshness && (
-              <div className="text-xs text-gray-500">
-                Data: {Math.round(currentDataFreshness.entrantsDataAge / 60)}min
-                ago
-              </div>
-            )}
-
-            <button
-              onClick={togglePerformancePanel}
-              className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
-            >
-              📊 Stats
-            </button>
-
-            <div className="flex items-center space-x-2">
-              <span
-                className={`text-xs px-2 py-1 rounded-full transition-colors ${
-                  isConnected
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-red-100 text-red-700'
-                }`}
-                aria-live="polite"
-              >
-                {isConnected ? '🔄 Live' : '📶 Disconnected'}
-              </span>
-
-              {!isConnected && connectionAttempts > 0 && (
-                <button
-                  onClick={reconnect}
-                  className="text-xs px-2 py-1 rounded bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"
-                >
-                  🔄 Retry
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Pool Toggle Controls */}
-        <PoolToggle
-          poolViewState={poolViewState}
-          onPoolChange={handlePoolChange}
-          onDisplayModeChange={handleDisplayModeChange}
-          className="mb-4"
-        />
-
-        {/* Performance Panel */}
-        {showPerformancePanel && (
-          <div className="bg-gray-50 rounded-lg p-4 text-sm space-y-3 border border-gray-200 mb-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-medium text-gray-900">
-                Enhanced Performance
-              </h3>
-              <div className="flex space-x-2">
-                <button
-                  onClick={clearHistory}
-                  className="text-xs px-2 py-1 rounded bg-gray-200 text-gray-600 hover:bg-gray-300 transition-colors"
-                >
-                  Clear History
-                </button>
-                <button
-                  onClick={() => {
-                    const report = getMemoryReport()
-                    console.log('📊 Memory Report:', report)
-                    alert(
-                      `Memory Report:\n\nMemory Usage: ${
-                        report.memory.currentMemory
-                          ? (
-                              report.memory.currentMemory
-                                .memoryUsagePercentage * 100
-                            ).toFixed(1) + '%'
-                          : 'N/A'
-                      }\n\nRecommendations:\n${report.recommendations.join(
-                        '\n'
-                      )}`
-                    )
-                  }}
-                  className="text-xs px-2 py-1 rounded bg-blue-200 text-blue-700 hover:bg-blue-300 transition-colors"
-                >
-                  Memory Report
-                </button>
-                <button
-                  onClick={triggerCleanup}
-                  className="text-xs px-2 py-1 rounded bg-orange-200 text-orange-700 hover:bg-orange-300 transition-colors"
-                >
-                  Cleanup
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <div className="text-xs text-gray-500">Connection</div>
-                <div
-                  className={`font-medium ${
-                    isConnected ? 'text-green-600' : 'text-red-600'
-                  }`}
-                >
-                  {isConnected ? 'Connected' : 'Disconnected'}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs text-gray-500">Updates</div>
-                <div className="font-medium text-blue-600">
-                  {totalUpdates} total
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs text-gray-500">Latency</div>
-                <div className="font-medium text-blue-600">
-                  {updateLatency.toFixed(1)}ms
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs text-gray-500">Grid State</div>
-                <div className="font-medium text-purple-600">
-                  Sort: {sortState.column} {sortState.direction}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs text-gray-500">Renders</div>
-                <div className="font-medium text-indigo-600">
-                  #{renderCount}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs text-gray-500">Pool View</div>
-                <div className="font-medium text-indigo-600">
-                  {poolViewState.activePool} / {poolViewState.displayMode}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* Enhanced Single-Table Grid Architecture with Perfect Row Alignment */}
-      <div className="flex-1 overflow-hidden bg-white border border-gray-200 rounded-lg flex flex-col">
-        {/* Timeline Controls */}
+      <div className="flex-1 overflow-hidden bg-white border border-gray-200 rounded-lg flex flex-col" style={{ minHeight: 0 }}>
+        {/* Consolidated Title Row */}
         <div className="flex items-center justify-between p-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
-          <h3 className="text-sm font-medium text-gray-900">
-            Money Flow Timeline ({timelineColumns.length} points)
-          </h3>
+          {/* LEFT: Win/Place/Odds Selector + Last Update */}
+          <div className="flex items-center space-x-3">
+            <div className="flex bg-gray-100 rounded p-0.5 text-xs">
+              <button
+                onClick={() => setSelectedView('win')}
+                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  selectedView === 'win'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Win
+              </button>
+              <button
+                onClick={() => setSelectedView('place')}
+                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  selectedView === 'place'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Place
+              </button>
+              <button
+                onClick={() => setSelectedView('odds')}
+                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  selectedView === 'odds'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Odds
+              </button>
+            </div>
+            
+            <span className="text-xs text-gray-500">
+              Last update: {lastUpdate ? lastUpdate.toLocaleTimeString() : 'No updates yet'}
+            </span>
+          </div>
+
+          {/* RIGHT: Audio Toggle and Auto Scroll */}
           <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setUpdateNotifications(!updateNotifications)}
+              className={`text-xs px-2 py-1 rounded transition-colors ${
+                updateNotifications
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-gray-200 text-gray-600'
+              }`}
+              title={updateNotifications ? 'Disable audio notifications' : 'Enable audio notifications'}
+            >
+              {updateNotifications ? '🔊' : '🔇'}
+            </button>
+            
             <button
               onClick={() => setAutoScroll(!autoScroll)}
               className={`text-xs px-2 py-1 rounded transition-colors ${
@@ -1149,48 +1153,57 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
             >
               {autoScroll ? '🔄 Auto' : '⏸️ Manual'}
             </button>
-            <span className={getStatusBadgeClasses(liveRace?.status, 'small')}>
-              {getStatusConfig(liveRace?.status).label}
-            </span>
           </div>
         </div>
 
         {/* Single Table with Combined Horizontal and Vertical Scrolling */}
         <div className="flex-1 relative min-h-0">
-          <div 
+          <div
             ref={scrollContainerRef}
             className="absolute inset-0 overflow-auto"
           >
-            <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+            <table
+              className="w-full border-collapse"
+              style={{ tableLayout: 'fixed' }}
+            >
               {/* Column Groups for Layout Control */}
               <colgroup>
                 {/* Fixed Left Columns */}
                 <col style={{ width: '200px' }} />
-                <col style={{ width: '80px' }} />
-                <col style={{ width: '80px' }} />
-                
+                <col style={{ width: '70px' }} />
+                <col style={{ width: '70px' }} />
+
                 {/* Timeline Columns */}
                 {timelineColumns.map((column) => (
-                  <col key={`col_${column.interval}`} style={{ width: '80px' }} />
+                  <col
+                    key={`col_${column.interval}`}
+                    style={{ width: '60px' }}
+                  />
                 ))}
-                
+
                 {/* Fixed Right Columns */}
-                <col style={{ width: '100px' }} />
-                <col style={{ width: '80px' }} />
+                <col style={{ width: '70px' }} />
+                <col style={{ width: '70px' }} />
               </colgroup>
 
               {/* Unified Header */}
               <thead className="bg-gray-50">
-                <tr style={{ height: '60px' }}>
+                <tr style={{ height: '30px' }}>
                   {/* Left Fixed Headers - Sticky */}
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 sticky left-0 top-0 z-30" style={{ backgroundColor: '#f9fafb' }}>
+                  <th
+                    className="px-3 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 sticky left-0 top-0 z-30"
+                    style={{ backgroundColor: '#f9fafb' }}
+                  >
                     Runner
                   </th>
                   <th
-                    className={`px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 border-r border-gray-200 sticky left-[200px] top-0 z-30 ${
+                    className={`px-2 py-1 text-right text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 border-r border-gray-200 sticky left-[200px] top-0 z-30 ${
                       sortState?.column === 'winOdds' ? 'bg-blue-50' : ''
                     }`}
-                    style={{ backgroundColor: sortState?.column === 'winOdds' ? '#eff6ff' : '#f9fafb' }}
+                    style={{
+                      backgroundColor:
+                        sortState?.column === 'winOdds' ? '#eff6ff' : '#f9fafb',
+                    }}
                     onClick={() => handleSort('winOdds')}
                     title="Click to sort by Win odds"
                   >
@@ -1203,7 +1216,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                       )}
                     </div>
                   </th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r-2 border-gray-300 sticky left-[280px] top-0 z-30" style={{ backgroundColor: '#f9fafb' }}>
+                  <th
+                    className="px-2 py-1 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-r-2 border-gray-300 sticky left-[270px] top-0 z-30"
+                    style={{ backgroundColor: '#f9fafb' }}
+                  >
                     Place
                   </th>
 
@@ -1211,7 +1227,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                   {timelineColumns.map((column) => (
                     <th
                       key={`header_${column.interval}`}
-                      className={`px-2 py-2 text-xs font-medium text-gray-700 text-center border-r border-gray-200 sticky top-0 z-20 ${
+                      className={`px-1 py-1 text-xs font-medium text-gray-700 text-center border-r border-gray-200 sticky top-0 z-20 ${
                         isCurrentTimeColumn(column.interval)
                           ? 'border-green-300 shadow-sm'
                           : column.isScheduledStart
@@ -1225,12 +1241,19 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                           ? '#dbeafe'
                           : column.isDynamic
                           ? '#fefce8'
-                          : '#f9fafb'
+                          : '#f9fafb',
                       }}
-                      title={`${column.label} - ${new Date(column.timestamp).toLocaleTimeString()}`}
+                      title={`${column.label} - ${new Date(
+                        column.timestamp
+                      ).toLocaleTimeString()}`}
                     >
-                      <div className="flex flex-col items-center justify-center" style={{ height: '60px' }}>
-                        <span className="font-medium text-xs">{column.label}</span>
+                      <div
+                        className="flex flex-col items-center justify-center"
+                        style={{ height: '30px' }}
+                      >
+                        <span className="font-medium text-xs">
+                          {column.label}
+                        </span>
                         <span className="text-[9px] text-gray-500">
                           {new Date(column.timestamp).toLocaleTimeString([], {
                             hour: '2-digit',
@@ -1238,17 +1261,25 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                           })}
                         </span>
                         {column.isDynamic && (
-                          <span className="text-[8px] text-yellow-600 font-medium">LIVE</span>
+                          <span className="text-[8px] text-yellow-600 font-medium">
+                            LIVE
+                          </span>
                         )}
                       </div>
                     </th>
                   ))}
 
                   {/* Right Fixed Headers - Sticky */}
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-l-2 border-l-gray-300 border-r border-r-gray-200 sticky right-[80px] top-0 z-30" style={{ backgroundColor: '#f9fafb' }}>
+                  <th
+                    className="px-2 py-1 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-l-2 border-l-gray-300 border-r border-r-gray-200 sticky right-[70px] top-0 z-30"
+                    style={{ backgroundColor: '#f9fafb' }}
+                  >
                     Pool
                   </th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase tracking-wider sticky right-0 top-0 z-30" style={{ backgroundColor: '#f9fafb' }}>
+                  <th
+                    className="px-2 py-1 text-right text-xs font-medium text-gray-700 uppercase tracking-wider sticky right-0 top-0 z-30"
+                    style={{ backgroundColor: '#f9fafb' }}
+                  >
                     Pool %
                   </th>
                 </tr>
@@ -1261,11 +1292,17 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     key={entrant.$id}
                     className={`hover:bg-gray-50 focus-within:bg-blue-50 transition-colors ${
                       entrant.isScratched ? 'opacity-50 bg-pink-50' : ''
-                    } ${selectedEntrant === entrant.$id ? 'bg-blue-100' : ''} cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset`}
+                    } ${
+                      selectedEntrant === entrant.$id ? 'bg-blue-100' : ''
+                    } cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset`}
                     onClick={() => handleEntrantClick(entrant.$id)}
                     onKeyDown={(e) => handleKeyDown(e, entrant.$id)}
                     tabIndex={0}
-                    style={{ height: '60px', minHeight: '60px', maxHeight: '60px' }}
+                    style={{
+                      height: '30px',
+                      minHeight: '30px',
+                      maxHeight: '30px',
+                    }}
                     aria-label={AriaLabels.generateRunnerRowLabel(
                       entrant.runnerNumber,
                       entrant.name,
@@ -1277,7 +1314,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     )}
                   >
                     {/* Left Fixed Columns - Sticky */}
-                    <td className="px-3 py-3 whitespace-nowrap border-r border-gray-200 sticky left-0 bg-white z-20" style={{ verticalAlign: 'middle', height: '60px' }}>
+                    <td
+                      className="px-2 py-1 whitespace-nowrap border-r border-gray-200 sticky left-0 bg-white z-20"
+                      style={{ verticalAlign: 'middle', height: '30px' }}
+                    >
                       <div className="flex items-center space-x-3 h-full">
                         <div className="flex items-center space-x-2">
                           {displayConfig.showJockeySilks && (
@@ -1286,7 +1326,11 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                               runnerNumber={entrant.runnerNumber}
                               runnerName={entrant.name}
                               jockey={entrant.jockey}
-                              fallbackUrl={entrant.silkUrl128 || entrant.silkUrl64 || entrant.silkUrl}
+                              fallbackUrl={
+                                entrant.silkUrl128 ||
+                                entrant.silkUrl64 ||
+                                entrant.silkUrl
+                              }
                               config={{ size: 'small' }}
                             />
                           )}
@@ -1295,7 +1339,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                               {entrant.runnerNumber}
                             </span>
                             {entrant.isScratched && (
-                              <span className="text-xs text-red-600 font-medium">SCR</span>
+                              <span className="text-xs text-red-600 font-medium">
+                                SCR
+                              </span>
                             )}
                           </div>
                         </div>
@@ -1306,11 +1352,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                           {entrant.jockey && (
                             <div className="text-xs text-gray-600 truncate">
                               {entrant.jockey}
-                            </div>
-                          )}
-                          {entrant.trainerName && (
-                            <div className="text-xs text-gray-500 truncate">
-                              {entrant.trainerName}
                             </div>
                           )}
                         </div>
@@ -1324,7 +1365,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     {timelineColumns.map((column) => (
                       <td
                         key={`${entrant.$id}_${column.interval}`}
-                        className={`px-3 py-3 text-xs text-center border-r border-gray-100 ${
+                        className={`px-2 py-1 text-xs text-center border-r border-gray-100 ${
                           entrant.isScratched
                             ? 'bg-pink-50'
                             : column.isScheduledStart
@@ -1333,11 +1374,12 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                             ? 'bg-yellow-50'
                             : ''
                         } ${
-                          !entrant.isScratched && isCurrentTimeColumn(column.interval)
+                          !entrant.isScratched &&
+                          isCurrentTimeColumn(column.interval)
                             ? 'bg-green-50 border-green-200 font-medium'
                             : ''
                         }`}
-                        style={{ verticalAlign: 'middle', height: '60px' }}
+                        style={{ verticalAlign: 'middle', height: '30px' }}
                       >
                         <div className="text-gray-900 flex items-center justify-center h-full">
                           {getTimelineData(entrant.$id, column.interval)}
@@ -1346,42 +1388,58 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     ))}
 
                     {/* Right Fixed Columns */}
-                    <td className="px-3 py-3 whitespace-nowrap text-right border-l-2 border-l-gray-300 border-r border-r-gray-200 sticky right-[80px] bg-white z-20" style={{ verticalAlign: 'middle', height: '60px' }}>
+                    <td
+                      className="px-2 py-1 whitespace-nowrap text-right border-l-2 border-l-gray-300 border-r border-r-gray-200 sticky right-[70px] bg-white z-20"
+                      style={{ verticalAlign: 'middle', height: '30px' }}
+                    >
                       <div className="flex items-center justify-end h-full">
                         <span className="text-sm font-medium text-gray-900">
-                          {entrant.isScratched ? '—' : (() => {
-                            const amount = getPoolAmount(entrant);
-                            return amount !== undefined ? formatMoney(amount) : '...';
-                          })()}
+                          {entrant.isScratched
+                            ? '—'
+                            : (() => {
+                                const amount = getPoolAmount(entrant)
+                                return amount !== undefined
+                                  ? formatMoney(amount)
+                                  : '...'
+                              })()}
                         </span>
                       </div>
                     </td>
 
-                    <td className="px-3 py-3 whitespace-nowrap text-right sticky right-0 bg-white z-20" style={{ verticalAlign: 'middle', height: '60px' }}>
+                    <td
+                      className="px-2 py-1 whitespace-nowrap text-right sticky right-0 bg-white z-20"
+                      style={{ verticalAlign: 'middle', height: '30px' }}
+                    >
                       <div className="flex items-center justify-end h-full">
                         <span className="text-sm font-medium text-gray-900">
-                          {entrant.isScratched ? '—' : (() => {
-                            const percentage = getPoolPercentage(entrant);
-                            return percentage !== undefined ? formatPercentage(percentage) : '...';
-                          })()}
+                          {entrant.isScratched
+                            ? '—'
+                            : (() => {
+                                const percentage = getPoolPercentage(entrant)
+                                return percentage !== undefined
+                                  ? formatPercentage(percentage)
+                                  : '...'
+                              })()}
                         </span>
-                        {!entrant.isScratched && entrant.moneyFlowTrend && entrant.moneyFlowTrend !== 'neutral' && (
-                          <span
-                            className={`ml-1 text-xs ${
-                              entrant.moneyFlowTrend === 'up'
-                                ? 'text-red-600'
+                        {!entrant.isScratched &&
+                          entrant.moneyFlowTrend &&
+                          entrant.moneyFlowTrend !== 'neutral' && (
+                            <span
+                              className={`ml-1 text-xs ${
+                                entrant.moneyFlowTrend === 'up'
+                                  ? 'text-red-600'
+                                  : entrant.moneyFlowTrend === 'down'
+                                  ? 'text-blue-600'
+                                  : 'text-gray-400'
+                              }`}
+                            >
+                              {entrant.moneyFlowTrend === 'up'
+                                ? '↑'
                                 : entrant.moneyFlowTrend === 'down'
-                                ? 'text-blue-600'
-                                : 'text-gray-400'
-                            }`}
-                          >
-                            {entrant.moneyFlowTrend === 'up'
-                              ? '↑'
-                              : entrant.moneyFlowTrend === 'down'
-                              ? '↓'
-                              : ''}
-                          </span>
-                        )}
+                                ? '↓'
+                                : ''}
+                            </span>
+                          )}
                       </div>
                     </td>
                   </tr>
@@ -1392,45 +1450,30 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         </div>
 
         {/* Timeline Footer */}
-        <div className="p-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-600 flex-shrink-0">
+        <div className="px-2 py-1 bg-gray-50 border-t border-gray-200 text-xs text-gray-600 flex-shrink-0">
           <div className="flex justify-between items-center">
             <span>
-              Scroll to see full timeline • Blue: Scheduled start • Yellow: Live data • Green: Current time
+              Scroll to see full timeline • Blue: Scheduled start • Yellow: Live
+              data • Green: Current time
             </span>
             <span>
-              {timelineColumns.filter((col) => col.isDynamic).length} live columns
+              {timelineColumns.filter((col) => col.isDynamic).length} live
+              columns
             </span>
           </div>
         </div>
       </div>
 
       {/* Enhanced Footer */}
-      <div className="p-3 border-t border-gray-100 bg-gray-50 flex-shrink-0">
+      <div className="px-2 py-1 border-t border-gray-100 bg-gray-50 flex-shrink-0">
         <div className="flex justify-between items-center text-xs">
           <div className="flex items-center space-x-4">
-            <span className="text-gray-500">
-              Last update:{' '}
-              {lastUpdate ? lastUpdate.toLocaleTimeString() : 'No updates yet'}
-            </span>
             {selectedEntrant && (
               <span className="text-blue-600">
                 Selected:{' '}
                 {sortedEntrants.find((e) => e.$id === selectedEntrant)?.name}
               </span>
             )}
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setUpdateNotifications(!updateNotifications)}
-              className={`px-2 py-1 rounded text-xs transition-colors ${
-                updateNotifications
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-gray-200 text-gray-600'
-              }`}
-            >
-              {updateNotifications ? '🔊' : '🔇'}
-            </button>
           </div>
         </div>
       </div>

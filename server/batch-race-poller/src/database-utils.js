@@ -49,6 +49,7 @@ function extractPoolTotals(tote_pools, context) {
         break
       case 'First 4':
       case 'First Four':
+      case 'FirstFour':
         pools.first4PoolTotal = total
         break
       default:
@@ -1156,7 +1157,8 @@ export async function processEntrants(
       if (entrant.form_comment) entrantDoc.formComment = entrant.form_comment
 
       // Silk and visual information
-      if (entrant.silk_colours) entrantDoc.silkColours = entrant.silk_colours
+      if (entrant.silk_colours)
+        entrantDoc.silkColours = safeStringField(entrant.silk_colours, 100)
       if (entrant.silk_url_64x64) entrantDoc.silkUrl64 = entrant.silk_url_64x64
       if (entrant.silk_url_128x128)
         entrantDoc.silkUrl128 = entrant.silk_url_128x128
@@ -1233,25 +1235,32 @@ export async function processEntrants(
  * @param {Object} context - Appwrite function context for logging
  * @returns {Object} Processing summary
  */
-export async function batchProcessRaces(databases, databaseId, raceResults, context) {
+export async function batchProcessRaces(
+  databases,
+  databaseId,
+  raceResults,
+  context
+) {
   const summary = {
     successfulRaces: 0,
     failedRaces: 0,
     totalEntrantsProcessed: 0,
     totalMoneyFlowProcessed: 0,
-    totalErrors: 0
+    totalErrors: 0,
   }
 
   context.log('Starting batch race processing', {
     totalRaces: raceResults.length,
-    successfulFetches: raceResults.filter(r => r.success).length,
-    failedFetches: raceResults.filter(r => !r.success).length
+    successfulFetches: raceResults.filter((r) => r.success).length,
+    failedFetches: raceResults.filter((r) => !r.success).length,
   })
 
   for (const result of raceResults) {
     if (!result.success || !result.data) {
       summary.failedRaces++
-      context.log('Skipping race due to failed API fetch', { raceId: result.raceId })
+      context.log('Skipping race due to failed API fetch', {
+        raceId: result.raceId,
+      })
       continue
     }
 
@@ -1262,52 +1271,303 @@ export async function batchProcessRaces(databases, databaseId, raceResults, cont
       let moneyFlowProcessed = 0
 
       // Process tote pools data FIRST to get pool totals for money flow calculations
-      let racePoolData = null;
+      let racePoolData = null
       if (data.tote_pools && Array.isArray(data.tote_pools)) {
         try {
           // Process the tote_pools array from NZTAB API
-          const poolsSuccess = await processToteTrendsData(databases, databaseId, raceId, data.tote_pools, context)
+          const poolsSuccess = await processToteTrendsData(
+            databases,
+            databaseId,
+            raceId,
+            data.tote_pools,
+            context
+          )
           if (poolsSuccess) raceProcessed = true
-          
+
           // Extract pool data for money flow processing using same structure as other functions
-          racePoolData = { winPoolTotal: 0, placePoolTotal: 0, totalRacePool: 0 };
-          
-          data.tote_pools.forEach(pool => {
-            const total = pool.total || 0;
-            racePoolData.totalRacePool += total;
-            
-            switch(pool.product_type) {
-              case "Win":
-                racePoolData.winPoolTotal = total;
-                break;
-              case "Place":
-                racePoolData.placePoolTotal = total;
-                break;
+          racePoolData = {
+            winPoolTotal: 0,
+            placePoolTotal: 0,
+            totalRacePool: 0,
+          }
+
+          data.tote_pools.forEach((pool) => {
+            const total = pool.total || 0
+            racePoolData.totalRacePool += total
+
+            switch (pool.product_type) {
+              case 'Win':
+                racePoolData.winPoolTotal = total
+                break
+              case 'Place':
+                racePoolData.placePoolTotal = total
+                break
             }
-          });
-          
+          })
+
           context.log(`Processed tote pools data for race ${raceId}`, {
             poolsCount: data.tote_pools.length,
             racePoolData,
-          });
+          })
         } catch (error) {
           context.error('Failed to process tote trends data', {
             raceId,
-            error: error instanceof Error ? error.message : 'Unknown error'
-          });
+            error: error instanceof Error ? error.message : 'Unknown error',
+          })
+        }
+      }
+
+      // Update race status and results data if available
+      if (data.race && data.race.status) {
+        try {
+          // Get current race status to compare
+          const currentRace = await databases.getDocument(
+            databaseId,
+            'races',
+            raceId
+          )
+
+          if (currentRace.status !== data.race.status) {
+            const statusChangeTimestamp = new Date().toISOString()
+            const updateData = {
+              status: data.race.status,
+              lastStatusChange: statusChangeTimestamp,
+            }
+            
+            // Add actualStart time if available
+            if (data.race.actual_start_string) {
+              updateData.actualStart = data.race.actual_start_string;
+            }
+
+            // Add specific finalization timestamp for Final status
+            if (
+              data.race.status === 'Final' ||
+              data.race.status === 'Finalized'
+            ) {
+              updateData.finalizedAt = statusChangeTimestamp
+            }
+
+            // Add specific abandonment timestamp for Abandoned status
+            if (data.race.status === 'Abandoned') {
+              updateData.abandonedAt = statusChangeTimestamp
+            }
+
+            // Update race status (without results data)
+            await databases.updateDocument(
+              databaseId,
+              'races',
+              raceId,
+              updateData
+            )
+
+            // Handle results data separately in race-results collection
+            if (
+              (data.results &&
+                Array.isArray(data.results) &&
+                data.results.length > 0) ||
+              (data.dividends &&
+                Array.isArray(data.dividends) &&
+                data.dividends.length > 0)
+            ) {
+              const resultsData = {
+                race: currentRace.$id, // Relationship to races collection
+                resultTime: statusChangeTimestamp,
+              }
+
+              // Add results data if present
+              if (
+                data.results &&
+                Array.isArray(data.results) &&
+                data.results.length > 0
+              ) {
+                resultsData.resultsAvailable = true
+                resultsData.resultsData = JSON.stringify(data.results)
+
+                // Determine result status based on race status
+                if (data.race.status === 'Final') {
+                  resultsData.resultStatus = 'final'
+                } else if (data.race.status === 'Interim') {
+                  resultsData.resultStatus = 'interim'
+                } else {
+                  resultsData.resultStatus = 'interim' // Default for races with results
+                }
+              }
+
+              // Add dividends data if present
+              if (
+                data.dividends &&
+                Array.isArray(data.dividends) &&
+                data.dividends.length > 0
+              ) {
+                resultsData.dividendsData = JSON.stringify(data.dividends)
+
+                // Extract flags from dividend data
+                const dividendStatuses = data.dividends.map((d) =>
+                  d.status?.toLowerCase()
+                )
+                resultsData.photoFinish = dividendStatuses.includes('photo')
+                resultsData.stewardsInquiry =
+                  dividendStatuses.includes('inquiry')
+                resultsData.protestLodged = dividendStatuses.includes('protest')
+              }
+
+              // Capture fixed odds data from entrants/runners at the time results become available
+              if (
+                data.runners &&
+                Array.isArray(data.runners) &&
+                data.runners.length > 0
+              ) {
+                try {
+                  const fixedOddsData = {}
+
+                  data.runners.forEach((runner) => {
+                    if (runner.runner_number && runner.odds) {
+                      fixedOddsData[runner.runner_number] = {
+                        fixed_win: runner.odds.fixed_win || null,
+                        fixed_place: runner.odds.fixed_place || null,
+                        runner_name: runner.name || null,
+                        entrant_id: runner.entrant_id || null,
+                      }
+                    }
+                  })
+
+                  if (Object.keys(fixedOddsData).length > 0) {
+                    resultsData.fixedOddsData = JSON.stringify(fixedOddsData)
+                    context.log(
+                      `Captured fixed odds for ${
+                        Object.keys(fixedOddsData).length
+                      } runners`,
+                      { raceId }
+                    )
+                  }
+                } catch (oddsError) {
+                  context.error('Failed to capture fixed odds data', {
+                    raceId,
+                    error:
+                      oddsError instanceof Error
+                        ? oddsError.message
+                        : 'Unknown error',
+                  })
+                }
+              } else if (
+                data.entrants &&
+                Array.isArray(data.entrants) &&
+                data.entrants.length > 0
+              ) {
+                // Fallback to entrants array if runners not available
+                try {
+                  const fixedOddsData = {}
+
+                  data.entrants.forEach((entrant) => {
+                    if (entrant.runner_number && entrant.odds) {
+                      fixedOddsData[entrant.runner_number] = {
+                        fixed_win: entrant.odds.fixed_win || null,
+                        fixed_place: entrant.odds.fixed_place || null,
+                        runner_name: entrant.name || null,
+                        entrant_id: entrant.entrant_id || null,
+                      }
+                    }
+                  })
+
+                  if (Object.keys(fixedOddsData).length > 0) {
+                    resultsData.fixedOddsData = JSON.stringify(fixedOddsData)
+                    context.log(
+                      `Captured fixed odds from entrants for ${
+                        Object.keys(fixedOddsData).length
+                      } runners`,
+                      { raceId }
+                    )
+                  }
+                } catch (oddsError) {
+                  context.error(
+                    'Failed to capture fixed odds data from entrants',
+                    {
+                      raceId,
+                      error:
+                        oddsError instanceof Error
+                          ? oddsError.message
+                          : 'Unknown error',
+                    }
+                  )
+                }
+              }
+
+              // Try to update existing race-results document first, create if doesn't exist
+              try {
+                // Query for existing race-results document for this race
+                const existingResultsQuery = await databases.listDocuments(
+                  databaseId,
+                  'race-results',
+                  [Query.equal('race', currentRace.$id), Query.limit(1)]
+                )
+
+                if (existingResultsQuery.documents.length > 0) {
+                  // Update existing race-results document
+                  await databases.updateDocument(
+                    databaseId,
+                    'race-results',
+                    existingResultsQuery.documents[0].$id,
+                    resultsData
+                  )
+                  context.log(`Updated race-results document`, { raceId })
+                } else {
+                  // Create new race-results document
+                  await databases.createDocument(
+                    databaseId,
+                    'race-results',
+                    'unique()',
+                    resultsData
+                  )
+                  context.log(`Created race-results document`, { raceId })
+                }
+              } catch (resultsError) {
+                context.error('Failed to save race results data', {
+                  raceId,
+                  error:
+                    resultsError instanceof Error
+                      ? resultsError.message
+                      : 'Unknown error',
+                })
+              }
+            }
+            raceProcessed = true
+            context.log(`Updated race status`, {
+              raceId,
+              oldStatus: currentRace.status,
+              newStatus: data.race.status,
+              hasResults: !!(data.results && data.results.length > 0),
+              hasDividends: !!(data.dividends && data.dividends.length > 0),
+            })
+          }
+        } catch (error) {
+          context.error('Failed to update race status in batch', {
+            raceId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          })
         }
       }
 
       // Process entrants data
       if (data.entrants && Array.isArray(data.entrants)) {
-        entrantsProcessed = await processEntrants(databases, databaseId, raceId, data.entrants, context)
+        entrantsProcessed = await processEntrants(
+          databases,
+          databaseId,
+          raceId,
+          data.entrants,
+          context
+        )
         summary.totalEntrantsProcessed += entrantsProcessed
-        raceProcessed = entrantsProcessed > 0
+        raceProcessed = entrantsProcessed > 0 || raceProcessed
       }
 
       // Process money tracker data with pool data if available (corrected parameter order and added missing params)
-      if (data.money_tracker && data.money_tracker.entrants && Array.isArray(data.money_tracker.entrants)) {
-        const raceStatus = data.race && data.race.status ? data.race.status : null;
+      if (
+        data.money_tracker &&
+        data.money_tracker.entrants &&
+        Array.isArray(data.money_tracker.entrants)
+      ) {
+        const raceStatus =
+          data.race && data.race.status ? data.race.status : null
         moneyFlowProcessed = await processMoneyTrackerData(
           databases,
           databaseId,
@@ -1319,12 +1579,12 @@ export async function batchProcessRaces(databases, databaseId, raceResults, cont
         )
         summary.totalMoneyFlowProcessed += moneyFlowProcessed
         if (moneyFlowProcessed > 0) raceProcessed = true
-        
+
         context.log(`Processed money tracker data for race ${raceId}`, {
           entrantsProcessed: moneyFlowProcessed,
           racePoolDataAvailable: !!racePoolData,
-          raceStatus: raceStatus
-        });
+          raceStatus: raceStatus,
+        })
       }
 
       if (raceProcessed) {
@@ -1332,19 +1592,18 @@ export async function batchProcessRaces(databases, databaseId, raceResults, cont
         context.log('Successfully processed race in batch', {
           raceId,
           entrantsProcessed,
-          moneyFlowProcessed
+          moneyFlowProcessed,
         })
       } else {
         summary.failedRaces++
         context.log('No data processed for race', { raceId })
       }
-
     } catch (error) {
       summary.failedRaces++
       summary.totalErrors++
       context.error('Failed to process race in batch', {
         raceId: result.raceId,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       })
     }
   }

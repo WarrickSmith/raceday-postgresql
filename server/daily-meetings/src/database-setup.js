@@ -9,6 +9,7 @@ import { Client, Databases, Permission, Role, RelationshipType, IndexType } from
 const collections = {
     meetings: 'meetings',
     races: 'races',
+    raceResults: 'race-results',
     entrants: 'entrants',
     oddsHistory: 'odds-history',
     moneyFlowHistory: 'money-flow-history',
@@ -172,6 +173,7 @@ export async function ensureDatabaseSetup(config, context) {
         const collectionsStart = Date.now();
         await ensureMeetingsCollection(databases, config, context);
         await ensureRacesCollection(databases, config, context);
+        await ensureRaceResultsCollection(databases, config, context);
         
         // Entrants collection is the most complex - track it separately
         const entrantsStart = Date.now();
@@ -445,6 +447,52 @@ async function ensureRacesCollection(databases, config, context) {
         }
     }
 }
+
+async function ensureRaceResultsCollection(databases, config, context) {
+    const collectionId = collections.raceResults;
+    const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
+    
+    if (!exists) {
+        context.log('Creating race-results collection...');
+        await databases.createCollection(config.databaseId, collectionId, 'Race Results', [
+            Permission.read(Role.any()),
+            Permission.create(Role.any()),
+            Permission.update(Role.any()),
+            Permission.delete(Role.users()),
+        ]);
+    }
+    
+    // Race results collection - stores race results and dividends data
+    const requiredAttributes = [
+        // Core identifiers and status
+        { key: 'resultsAvailable', type: 'boolean', required: false, default: false }, // Whether results data is available
+        { key: 'resultStatus', type: 'string', size: 20, required: false }, // 'interim', 'final', 'protest'
+        { key: 'resultTime', type: 'datetime', required: false }, // Time when results were declared
+        
+        // Results and dividends data (JSON strings) - sizes >16383 to store as pointers not in row
+        { key: 'resultsData', type: 'string', size: 20000, required: false }, // JSON string of race results array
+        { key: 'dividendsData', type: 'string', size: 30000, required: false }, // JSON string of dividends array
+        { key: 'fixedOddsData', type: 'string', size: 20000, required: false }, // JSON string of fixed odds per runner at result time
+        
+        // Result flags and indicators
+        { key: 'photoFinish', type: 'boolean', required: false, default: false }, // Photo finish flag
+        { key: 'stewardsInquiry', type: 'boolean', required: false, default: false }, // Stewards inquiry flag
+        { key: 'protestLodged', type: 'boolean', required: false, default: false }, // Protest lodged flag
+    ];
+    
+    // Create attributes in parallel for improved performance
+    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
+    
+    // Create relationship to races collection
+    if (!(await attributeExists(databases, config.databaseId, collectionId, 'race'))) {
+        context.log('Creating race-results->races relationship...');
+        await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.races, RelationshipType.ManyToOne, true, 'race', 'raceResults');
+    }
+    
+    // Note: Cannot create indexes on relationship attributes in Appwrite
+    // The relationship itself provides efficient lookups via the relationship system
+}
+
 async function ensureEntrantsCollection(databases, config, context) {
     const collectionId = collections.entrants;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));

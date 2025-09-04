@@ -20,7 +20,7 @@ export const STATUS_CONFIG: Record<RaceStatus, RaceStatusConfig> = {
   closed: {
     label: 'Closed',
     color: 'text-yellow-700',
-    bgColor: 'bg-yellow-100',
+    bgColor: 'bg-yellow-200',
     icon: '🟡',
     description: 'Betting has closed'
   },
@@ -33,9 +33,9 @@ export const STATUS_CONFIG: Record<RaceStatus, RaceStatusConfig> = {
   },
   final: {
     label: 'Final',
-    color: 'text-white',
-    bgColor: 'bg-purple-500',
-    icon: '🏁',
+    color: 'text-purple-700',
+    bgColor: 'bg-purple-100',
+    icon: '🟣',
     description: 'Final results confirmed'
   },
   abandoned: {

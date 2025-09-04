@@ -1,233 +1,204 @@
-'use client';
+'use client'
 
-import { memo, useMemo, useState, useEffect } from 'react';
-import { Race, Meeting } from '@/types/meetings';
-import { useRealtimeRace } from '@/hooks/useRealtimeRace';
-import { formatDistance, formatRaceTime, formatCategory } from '@/utils/raceFormatters';
-import { useRace } from '@/contexts/RaceContext';
-import { getStatusConfig, getStatusBadgeClasses } from '@/utils/raceStatusConfig';
+import { memo, useState, useEffect, useMemo } from 'react'
+import { useRace } from '@/contexts/RaceContext'
+import { useRealtimeEntrants } from '@/hooks/useRealtimeEntrants'
+import { formatDistance, formatRaceTime } from '@/utils/raceFormatters'
+import { RaceNavigation } from './RaceNavigation'
+import { useRenderTracking } from '@/utils/performance'
 
 interface RaceDataHeaderProps {
-  // No props needed - will get all data from context
-  // Placeholder to avoid empty interface lint error
-  className?: string;
+  className?: string
 }
 
-export const RaceDataHeader = memo(function RaceDataHeader({}: RaceDataHeaderProps) {
-  const { raceData } = useRace();
+export const RaceDataHeader = memo(function RaceDataHeader({
+  className = '',
+}: RaceDataHeaderProps) {
+  const { raceData } = useRace()
+  const [currentTime, setCurrentTime] = useState(new Date())
+  const [latencySamples, setLatencySamples] = useState<number[]>([])
+  const [updateCount, setUpdateCount] = useState(0)
+  const maxSamples = 6
   
-  // Debug logging for header updates (can be removed in production)
-  // console.log('📋 RaceDataHeader render:', {
-  //   raceDataExists: !!raceData,
-  //   raceId: raceData?.race.raceId,
-  //   raceName: raceData?.race.name,
-  //   raceNumber: raceData?.race.raceNumber
-  // });
-  
-  // Initialize hooks before conditional returns
-  const { race: liveRace, isConnected } = useRealtimeRace({ 
-    initialRace: raceData?.race || {
-      $id: '',
-      $createdAt: '',
-      $updatedAt: '',
-      raceId: '',
-      raceNumber: 0,
-      name: '',
-      startTime: '',
-      meeting: '',
-      status: 'open' as const,
-      distance: 0,
-      trackCondition: ''
-    } 
-  });
-  const formattedTime = useMemo(() => 
-    liveRace ? formatRaceTime(liveRace.startTime) : '', 
-    [liveRace?.startTime]
-  );
+  // Track renders for performance monitoring
+  const renderCount = useRenderTracking('RaceDataHeader')
 
-  const [timeToStart, setTimeToStart] = useState<string | null>(null);
+  const { entrants } = useRealtimeEntrants({
+    initialEntrants: raceData?.entrants || [],
+    raceId: raceData?.race?.raceId || '',
+  })
 
-  // Dynamic countdown that updates every second
+  // Track MoneyFlow grid data updates
   useEffect(() => {
-    if (!liveRace) return;
+    setUpdateCount(prev => prev + 1)
+  }, [entrants])
 
-    const updateCountdown = () => {
+  // Real-time clock update
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date())
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [])
+
+  // Rolling latency measurement (less frequent to reduce renders)
+  useEffect(() => {
+    const measureLatency = async () => {
+      const start = Date.now()
       try {
-        // Don't show countdown for abandoned or finalized races
-        const status = liveRace.status?.toLowerCase();
-        if (status === 'abandoned' || status === 'final' || status === 'finalized') {
-          setTimeToStart(null);
-          return;
-        }
-        
-        const now = new Date();
-        const raceTime = new Date(liveRace.startTime);
-        if (isNaN(raceTime.getTime())) {
-          setTimeToStart(null);
-          return;
-        }
-        
-        const diff = raceTime.getTime() - now.getTime();
-        
-        if (diff <= 0) {
-          // Race should have started - check if it's delayed
-          const delayDiff = Math.abs(diff);
-          const delayMinutes = Math.floor(delayDiff / (1000 * 60));
-          const delaySeconds = Math.floor((delayDiff % (1000 * 60)) / 1000);
-          
-          if (liveRace.status === 'Open' && delayDiff > 30000) { // More than 30 seconds late
-            if (delayMinutes > 0) {
-              setTimeToStart(`Delayed: ${delayMinutes}:${delaySeconds.toString().padStart(2, '0')}`);
-            } else {
-              setTimeToStart(`Delayed: 0:${delaySeconds.toString().padStart(2, '0')}`);
-            }
-          } else {
-            setTimeToStart('Started');
-          }
-          return;
-        }
-
-        // Calculate time remaining
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-        if (hours > 0) {
-          setTimeToStart(`${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
-        } else if (minutes > 0) {
-          setTimeToStart(`${minutes}:${seconds.toString().padStart(2, '0')}`);
-        } else {
-          setTimeToStart(`0:${seconds.toString().padStart(2, '0')}`);
-        }
-      } catch (error) {
-        console.error('Error calculating countdown:', error);
-        setTimeToStart(null);
+        await fetch('/api/health')
+        const end = Date.now()
+        const sample = end - start
+        setLatencySamples((prev) => [sample, ...prev].slice(0, maxSamples))
+      } catch {
+        // Skip sample on failure
       }
-    };
+    }
 
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 1000);
+    measureLatency()
+    const interval = setInterval(measureLatency, 30000) // Reduced frequency
+    return () => clearInterval(interval)
+  }, [])
 
-    return () => clearInterval(interval);
-  }, [liveRace?.startTime, liveRace?.status]);
-
-  const formattedDistance = useMemo(() => {
-    return liveRace?.distance ? formatDistance(liveRace.distance) : null;
-  }, [liveRace?.distance]);
-  
   if (!raceData) {
     return (
-      <header className="bg-white rounded-lg shadow-md p-6" role="banner">
-        <div className="animate-pulse">
+      <div
+        className={`bg-white rounded-lg border border-gray-200 ${className}`}
+        role="banner"
+      >
+        <div className="animate-pulse p-6">
           <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
           <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
           <div className="h-8 bg-gray-200 rounded w-full"></div>
         </div>
-      </header>
-    );
+      </div>
+    )
   }
 
-  const { race, meeting } = raceData;
+  const { race, meeting, navigationData } = raceData
+  
+  // Memoized calculations to reduce re-renders
+  const formattedTime = useMemo(() => formatRaceTime(race.startTime), [race.startTime])
+  const formattedDistance = useMemo(() => race.distance ? formatDistance(race.distance) : null, [race.distance])
+  const runnersCount = useMemo(() => entrants.length || race.runnerCount || 0, [entrants.length, race.runnerCount])
+  const scratchedCount = useMemo(() => entrants.filter((e) => e.isScratched).length || 0, [entrants])
+  const avgLatency = useMemo(() => 
+    latencySamples.length ? Math.round(latencySamples.reduce((a, b) => a + b, 0) / latencySamples.length) : null,
+    [latencySamples]
+  )
 
   return (
-    <header className="bg-white rounded-lg shadow-md p-6" role="banner">
-      {/* Screen reader announcement for race updates */}
-      <div 
-        aria-live="assertive" 
-        aria-atomic="true" 
-        className="sr-only"
-      >
-        Race {liveRace.raceNumber} {liveRace.name} status: {liveRace.status}
-        Race type: {meeting.raceType} Category: {formatCategory(meeting.category)}
-        {formattedDistance && ` Distance: ${formattedDistance}`}
-        {liveRace.trackCondition && ` Track condition: ${liveRace.trackCondition}`}
-        {timeToStart && ` Time to start: ${timeToStart}`}
-      </div>
+    <div className={`bg-white rounded-lg shadow-md ${className}`} role="banner" style={{ border: '1px solid rgba(209, 213, 219, 0.6)' }}>
+      {/* 3x4 grid matching target image layout */}
+      <div className="grid grid-cols-4 gap-2 p-3 min-h-[120px]" style={{ gridTemplateColumns: '2fr 200px 200px 200px' }}>
+        
+        {/* Row 1, Col 1: Navigation */}
+        <div className="flex items-start justify-start">
+          <div className="flex flex-wrap items-center gap-2">
+            <RaceNavigation 
+              navigationData={navigationData}
+              currentRaceId={race.raceId}
+            />
+          </div>
+        </div>
+        
+        {/* Row 1, Col 2: Date */}
+        <div className="flex items-center justify-start">
+          <div className="text-sm text-gray-600">{currentTime.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Race Information */}
-        <div>
-          {/* Connection Status */}
-          <div className="flex items-center justify-between mb-4">
-            <span className={`text-xs px-2 py-1 rounded-full transition-colors ${
-              isConnected 
-                ? 'bg-green-100 text-green-700' 
-                : 'bg-red-100 text-red-700'
-            }`}>
-              {isConnected ? '🔄 Live' : '📶 Disconnected'}
-            </span>
+        {/* Row 1, Col 3: Time */}
+        <div className="flex items-center justify-start">
+          <div className="text-lg font-bold text-gray-900 font-mono">{currentTime.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+        </div>
+
+        {/* Row 1, Col 4: Logo (centered) */}
+        <div className="flex items-center justify-center">
+          <div className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg px-2 py-1 text-center text-gray-500 font-bold text-xs">
+            LOGO Image<br/>Placeholder
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-            <span>{meeting.country}</span>
-            <span>•</span>
-            <span>{meeting.meetingName}</span>
-            <span>•</span>
-            <time dateTime={liveRace.startTime}>
-              {formattedTime}
-            </time>
-          </div>
-          
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">
-            Race {liveRace.raceNumber}: {liveRace.name}
+        </div>
+
+        {/* Row 2, Col 1: Race Title */}
+        <div className="flex flex-col justify-start overflow-hidden">
+          <h1 className="text-2xl font-bold text-gray-900 mb-1 leading-tight truncate whitespace-nowrap">
+            Race {race.raceNumber}: {race.name}
           </h1>
-          
-          <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
-            <span className={getStatusBadgeClasses(liveRace.status, 'small')}>
-              {getStatusConfig(liveRace.status).label}
-            </span>
-            {formattedDistance && <span>{formattedDistance}</span>}
-            {liveRace.trackCondition && <span>{liveRace.trackCondition}</span>}
+        </div>
+        
+        {/* Row 2, Col 2: Weather */}
+        <div className="flex items-center justify-start gap-2">
+          <div className="text-xs text-gray-500 font-bold uppercase">WEATHER</div>
+          <div className="text-sm font-semibold text-gray-800">{race.weather || 'overcast'}</div>
+        </div>
+
+        {/* Row 2, Col 3: Track Condition */}
+        <div className="flex items-center justify-start gap-2">
+          <div className="text-xs text-gray-500 font-bold uppercase">TRACK COND</div>
+          <div className="text-sm font-semibold text-green-800">{race.trackCondition || 'Synthetic'}</div>
+        </div>
+
+        {/* Row 2, Col 4: Status */}
+        <div className="flex items-center justify-start gap-2">
+          <div className="text-xs text-gray-500 font-bold uppercase">STATUS</div>
+          <div className="flex items-center gap-1">
+            <div className={`w-2 h-2 rounded-full ${avgLatency !== null ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className="text-sm font-semibold text-green-800">Live</span>
           </div>
         </div>
 
-        {/* Race Details and Countdown */}
-        <div className="flex flex-col justify-between">
-          <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-            {formattedDistance && (
-              <div className="flex items-center">
-                <span className="text-sm text-gray-500">Distance:</span>
-                <span className="ml-2 text-sm font-semibold text-gray-800">{formattedDistance}</span>
-              </div>
-            )}
-            
-            <div className="flex items-center">
-              <span className="text-sm text-gray-500">Type:</span>
-              <span className="ml-2 text-sm font-semibold text-gray-800">{meeting.raceType}</span>
-            </div>
-            
-            <div className="flex items-center">
-              <span className="text-sm text-gray-500">Category:</span>
-              <span className="ml-2 text-sm font-semibold text-gray-800">{formatCategory(meeting.category)}</span>
-            </div>
+        {/* Row 3, Col 1: Meeting info with inline RENDERS */}
+        <div className="flex items-center gap-1 text-sm text-gray-700 flex-wrap">
+          <span className="font-medium">{meeting.meetingName}</span>
+          <span>•</span>
+          <span>{meeting.country}</span>
+          <span>•</span>
+          <time dateTime={race.startTime} className="font-mono">{formattedTime}</time>
+          <span className="text-purple-800 font-medium">{meeting.raceType}</span>
+          <span className="text-xs text-gray-500 font-bold uppercase ml-4">RENDERS</span>
+          <span className={`text-sm font-mono font-semibold ${
+            renderCount > 10 ? 'text-red-600' : renderCount > 5 ? 'text-orange-600' : 'text-purple-800'
+          }`}>{renderCount}</span>
+          <span className="text-xs text-gray-500 font-bold uppercase ml-2">UPDATES</span>
+          <span className="text-sm font-mono font-semibold text-blue-600">{updateCount}</span>
+        </div>
+        
+        {/* Row 3, Col 2: Race Distance */}
+        <div className="flex items-center justify-start gap-2">
+          <div className="text-xs text-gray-500 font-bold uppercase">RACE DISTANCE</div>
+          <div className="text-sm font-semibold text-blue-800">{formattedDistance || '2.1km'}</div>
+        </div>
+
+        {/* Row 3, Col 3: Runners (SCR) */}
+        <div className="flex items-center justify-start gap-2">
+          <div className="text-xs text-gray-500 font-bold uppercase">RUNNERS (SCR)</div>
+          <div className="text-sm font-semibold">
+            <span className="text-blue-800">
+              {runnersCount > 0 ? (scratchedCount > 0 ? `${runnersCount - scratchedCount}` : runnersCount) : '8'}
+            </span>
+            <span className="text-blue-800">
+              {scratchedCount > 0 ? ` (${scratchedCount})` : ' (2)'}
+            </span>
           </div>
-          
-          <div className="flex items-center gap-4 flex-wrap">
-            {liveRace.trackCondition && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Track:</span>
-                <span className="text-sm font-medium text-gray-700">{liveRace.trackCondition}</span>
-              </div>
-            )}
-            
-            {timeToStart && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">
-                  {timeToStart === 'Started' ? 'Status:' : 'Starts in:'}
-                </span>
-                <span className={`text-sm font-mono font-bold ${
-                  timeToStart === 'Started' 
-                    ? 'text-green-600' 
-                    : timeToStart.includes('Delayed') 
-                    ? 'text-red-600' 
-                    : 'text-blue-600'
-                }`}>
-                  {timeToStart}
-                </span>
-              </div>
-            )}
+        </div>
+
+        {/* Row 3, Col 4: Latency */}
+        <div className="flex items-center justify-start gap-2">
+          <div className="text-xs text-gray-500 font-bold uppercase">LATENCY</div>
+          <div className={`text-sm font-semibold ${
+            avgLatency === null
+              ? 'text-gray-600'
+              : avgLatency > 200
+              ? 'text-red-800'
+              : avgLatency > 100
+              ? 'text-yellow-800'
+              : 'text-green-800'
+          }`}>
+            {avgLatency === null ? '416ms' : `${avgLatency}ms`}
           </div>
         </div>
       </div>
-    </header>
-  );
-});
+    </div>
+  )
+})

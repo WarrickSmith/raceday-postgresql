@@ -62,7 +62,7 @@ describe('useRealtimeRace', () => {
     expect(result.current.isConnected).toBe(true); // True after successful subscription setup
   });
 
-  it('sets up subscription with correct channel', () => {
+  it('sets up subscription with correct channels', () => {
     renderHook(() =>
       useRealtimeRace({
         initialRace: mockInitialRace,
@@ -70,7 +70,10 @@ describe('useRealtimeRace', () => {
     );
 
     expect(mockClient.subscribe).toHaveBeenCalledWith(
-      `databases.raceday-db.collections.races.documents.${mockInitialRace.$id}`,
+      [
+        `databases.raceday-db.collections.races.documents.${mockInitialRace.$id}`,
+        `databases.raceday-db.collections.race-results.documents`
+      ],
       expect.any(Function)
     );
   });
@@ -101,7 +104,7 @@ describe('useRealtimeRace', () => {
     act(() => {
       subscriptionCallback!({
         payload: updatedData,
-        events: ['databases.*.collections.*.documents.*.update'],
+        events: [`databases.*.collections.races.${mockInitialRace.$id}.*.update`],
         channels: [`databases.raceday-db.collections.races.documents.${mockInitialRace.$id}`],
         timestamp: Date.now(),
       });

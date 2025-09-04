@@ -91,13 +91,152 @@ export default async function main(context) {
         // Update race status if available and different
         if (raceEventData.race && raceEventData.race.status && raceEventData.race.status !== race.status) {
           try {
-            await databases.updateDocument(databaseId, 'races', race.raceId, {
-              status: raceEventData.race.status
-            });
+            const statusChangeTimestamp = new Date().toISOString();
+            const updateData = {
+              status: raceEventData.race.status,
+              lastStatusChange: statusChangeTimestamp
+            };
+            
+            // Add actualStart time if available
+            if (raceEventData.race.actual_start_string) {
+              updateData.actualStart = raceEventData.race.actual_start_string;
+            }
+            
+            // Add specific finalization timestamp for Final status
+            if (raceEventData.race.status === 'Final' || raceEventData.race.status === 'Finalized') {
+              updateData.finalizedAt = statusChangeTimestamp;
+            }
+            
+            // Add specific abandonment timestamp for Abandoned status
+            if (raceEventData.race.status === 'Abandoned') {
+              updateData.abandonedAt = statusChangeTimestamp;
+            }
+            
+            // Update race status (without results data)
+            await databases.updateDocument(databaseId, 'races', race.raceId, updateData);
+            
+            // Handle results data separately in race-results collection
+            if ((raceEventData.results && Array.isArray(raceEventData.results) && raceEventData.results.length > 0) || 
+                (raceEventData.dividends && Array.isArray(raceEventData.dividends) && raceEventData.dividends.length > 0)) {
+              
+              const resultsData = {
+                race: race.$id, // Relationship to races collection
+                resultTime: statusChangeTimestamp
+              };
+              
+              // Add results data if present
+              if (raceEventData.results && Array.isArray(raceEventData.results) && raceEventData.results.length > 0) {
+                resultsData.resultsAvailable = true;
+                resultsData.resultsData = JSON.stringify(raceEventData.results);
+                
+                // Determine result status based on race status
+                if (raceEventData.race.status === 'Final') {
+                  resultsData.resultStatus = 'final';
+                } else if (raceEventData.race.status === 'Interim') {
+                  resultsData.resultStatus = 'interim';
+                } else {
+                  resultsData.resultStatus = 'interim'; // Default for races with results
+                }
+              }
+              
+              // Add dividends data if present
+              if (raceEventData.dividends && Array.isArray(raceEventData.dividends) && raceEventData.dividends.length > 0) {
+                resultsData.dividendsData = JSON.stringify(raceEventData.dividends);
+                
+                // Extract flags from dividend data
+                const dividendStatuses = raceEventData.dividends.map(d => d.status?.toLowerCase());
+                resultsData.photoFinish = dividendStatuses.includes('photo');
+                resultsData.stewardsInquiry = dividendStatuses.includes('inquiry');
+                resultsData.protestLodged = dividendStatuses.includes('protest');
+              }
+              
+              // Capture fixed odds data from entrants/runners at the time results become available
+              if (raceEventData.runners && Array.isArray(raceEventData.runners) && raceEventData.runners.length > 0) {
+                try {
+                  const fixedOddsData = {};
+                  
+                  raceEventData.runners.forEach(runner => {
+                    if (runner.runner_number && runner.odds) {
+                      fixedOddsData[runner.runner_number] = {
+                        fixed_win: runner.odds.fixed_win || null,
+                        fixed_place: runner.odds.fixed_place || null,
+                        runner_name: runner.name || null,
+                        entrant_id: runner.entrant_id || null
+                      };
+                    }
+                  });
+                  
+                  if (Object.keys(fixedOddsData).length > 0) {
+                    resultsData.fixedOddsData = JSON.stringify(fixedOddsData);
+                    context.log(`Captured fixed odds for ${Object.keys(fixedOddsData).length} runners`, { raceId: race.raceId });
+                  }
+                } catch (oddsError) {
+                  context.error('Failed to capture fixed odds data', {
+                    raceId: race.raceId,
+                    error: oddsError instanceof Error ? oddsError.message : 'Unknown error'
+                  });
+                }
+              } else if (raceEventData.entrants && Array.isArray(raceEventData.entrants) && raceEventData.entrants.length > 0) {
+                // Fallback to entrants array if runners not available
+                try {
+                  const fixedOddsData = {};
+                  
+                  raceEventData.entrants.forEach(entrant => {
+                    if (entrant.runner_number && entrant.odds) {
+                      fixedOddsData[entrant.runner_number] = {
+                        fixed_win: entrant.odds.fixed_win || null,
+                        fixed_place: entrant.odds.fixed_place || null,
+                        runner_name: entrant.name || null,
+                        entrant_id: entrant.entrant_id || null
+                      };
+                    }
+                  });
+                  
+                  if (Object.keys(fixedOddsData).length > 0) {
+                    resultsData.fixedOddsData = JSON.stringify(fixedOddsData);
+                    context.log(`Captured fixed odds from entrants for ${Object.keys(fixedOddsData).length} runners`, { raceId: race.raceId });
+                  }
+                } catch (oddsError) {
+                  context.error('Failed to capture fixed odds data from entrants', {
+                    raceId: race.raceId,
+                    error: oddsError instanceof Error ? oddsError.message : 'Unknown error'
+                  });
+                }
+              }
+              
+              // Try to update existing race-results document first, create if doesn't exist
+              try {
+                // Query for existing race-results document for this race
+                const existingResultsQuery = await databases.listDocuments(databaseId, 'race-results', [
+                  Query.equal('race', race.$id),
+                  Query.limit(1)
+                ]);
+                
+                if (existingResultsQuery.documents.length > 0) {
+                  // Update existing race-results document
+                  await databases.updateDocument(databaseId, 'race-results', existingResultsQuery.documents[0].$id, resultsData);
+                  context.log(`Updated race-results document`, { raceId: race.raceId });
+                } else {
+                  // Create new race-results document
+                  await databases.createDocument(databaseId, 'race-results', 'unique()', resultsData);
+                  context.log(`Created race-results document`, { raceId: race.raceId });
+                }
+              } catch (resultsError) {
+                context.error('Failed to save race results data', {
+                  raceId: race.raceId,
+                  error: resultsError instanceof Error ? resultsError.message : 'Unknown error'
+                });
+              }
+            }
             context.log(`Updated race status`, { 
               raceId: race.raceId, 
               oldStatus: race.status, 
-              newStatus: raceEventData.race.status 
+              newStatus: raceEventData.race.status,
+              statusChangeTimestamp,
+              finalizedAt: updateData.finalizedAt,
+              abandonedAt: updateData.abandonedAt,
+              hasResults: !!(raceEventData.results && raceEventData.results.length > 0),
+              hasDividends: !!(raceEventData.dividends && raceEventData.dividends.length > 0)
             });
           } catch (error) {
             context.error('Failed to update race status', {
