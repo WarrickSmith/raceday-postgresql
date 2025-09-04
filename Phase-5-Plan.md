@@ -36,7 +36,7 @@ The Race Page money flow grid is not receiving and displaying enough real-time d
 
 | Task ID | Status | Priority | Task Name                             | Dependencies | Description                                                  |
 | ------- | ------ | -------- | ------------------------------------- | ------------ | ------------------------------------------------------------ |
-| **A1**  | 🟡     | HIGH     | Database Schema Enhancements          | None         | Add missing fields and indexes for timeline calculations     |
+| **A1**  | 🟢     | HIGH     | Database Schema Enhancements          | None         | Add missing fields and indexes for timeline calculations     |
 | **A2**  | 🟡     | HIGH     | Unified Polling Architecture          | A1           | Replace 3 separate functions with enhanced-race-poller       |
 | **A3**  | 🟡     | HIGH     | Enhanced Master Scheduler             | A2           | Fix 30s gaps with 2.5min intervals during critical periods   |
 | **A4**  | 🟡     | LOW      | Daily Initialization Functions Review | A1           | Review timing and compatibility with new schema              |
