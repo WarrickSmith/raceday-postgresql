@@ -18,6 +18,55 @@ The Race Page money flow grid is not receiving and displaying enough real-time d
 - **Screenshot 2**: After refresh, race shows "CLOSED" with results, indicating subscription didn't update in real-time
 - Timeline columns show significant gaps with no data between intervals despite active betting periods
 
+## Task Summary & Progress Tracking
+
+### Status Legend
+- 🟡 **Pending** - Not started
+- 🔵 **In Progress** - Currently being worked on  
+- 🟢 **Complete** - Finished successfully
+
+### Current Phase 5 Tasks
+
+| Task ID | Status | Priority | Task Name | Dependencies | Description |
+|---------|--------|----------|-----------|--------------|-------------|
+| **A1** | 🟡 | HIGH | Database Schema Enhancements | None | Add missing fields and indexes for timeline calculations |
+| **A2** | 🟡 | HIGH | Unified Polling Architecture | A1 | Replace 3 separate functions with enhanced-race-poller |
+| **A3** | 🟡 | HIGH | Enhanced Master Scheduler | A2 | Fix 30s gaps with 2.5min intervals during critical periods |
+| **A4** | 🟡 | LOW | Daily Initialization Functions Review | A1 | Review timing and compatibility with new schema |
+| **A5** | 🟡 | MEDIUM | Server-Side Incremental Calculations | A1, A2 | Add mathematical validation and consistency checks |
+| **B1** | 🟡 | HIGH | Subscription Architecture Fix | A2 | Fix real-time status updates not reaching UI |
+| **B2** | 🟡 | MEDIUM | Timeline Processing Optimization | B1 | Reduce 14+ second active column switching delays |
+| **B3** | 🟡 | LOW | Performance & Logging Cleanup | B2 | Remove excessive console logging, add performance monitoring |
+| **B4** | 🟡 | LOW | Data Display Enhancements | B1, B2 | Add loading states and data freshness indicators |
+| **C1** | 🟡 | MEDIUM | Race Status Coordination | A2, B1 | Ensure status changes propagate properly across system |
+| **C2** | 🟡 | MEDIUM | Data Validation & Quality Assurance | A5 | Add comprehensive data quality validation and monitoring |
+
+### Developer Instructions
+
+#### 🎯 **Next Task Recommendation**: Start with **Task A1** (Database Schema Enhancements)
+- **Why**: Foundation task - other tasks depend on these database changes
+- **Files**: `/server/daily-meetings/src/database-setup.js`
+- **Estimated Time**: 2-3 hours
+- **Validation**: Schema changes deployed and indexes created successfully
+
+#### 📋 **Current Status Summary**
+- **Total Tasks**: 11
+- **Pending**: 11 (100%)
+- **In Progress**: 0 (0%)  
+- **Complete**: 0 (0%)
+
+#### 🔄 **Recommended Task Order**
+1. **Phase A (Backend)**: A1 → A2 → A3 → A5 → A4
+2. **Phase B (Client)**: B1 → B2 → B4 → B3  
+3. **Phase C (Integration)**: C1 → C2
+
+#### ⚠️ **Critical Dependencies**
+- A1 must be completed before A2, A5, B1
+- A2 must be completed before A3, B1, C1
+- B1 must be completed before B2, B4, C1
+
+---
+
 ## Implementation Strategy
 
 ### Part A: Backend Data Management Enhancement
