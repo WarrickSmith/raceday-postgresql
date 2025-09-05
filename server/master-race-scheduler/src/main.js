@@ -97,18 +97,66 @@ async function runSchedulerLogic(context) {
     // Dynamic racing hours based on actual race schedule
     // Active from 65 minutes before first race until all NZ/AUS races are finalized
     const now = new Date()
-    const nzTime = new Date(
-      now.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' })
-    )
-    // Compute NZ 09:00 for today's date as a lower bound for meeting-status refresh activity
-    const nzNineAM = new Date(nzTime)
-    nzNineAM.setHours(9, 0, 0, 0)
+    
+    // Proper NZ timezone calculation
+    // Get current time in Pacific/Auckland and extract the timezone offset
+    const nzTimeString = now.toLocaleString('en-US', { 
+      timeZone: 'Pacific/Auckland',
+      year: 'numeric',
+      month: '2-digit', 
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    })
+    
+    // Parse the NZ time string properly  
+    const [nzDatePart, nzTimePart] = nzTimeString.split(', ')
+    const [nzMonth, nzDay, nzYear] = nzDatePart.split('/')
+    const [nzHour, nzMinute, nzSecond] = nzTimePart.split(':')
+    
+    // Create proper NZ time representation (this is what NZ time looks like)
+    const nzTimeDisplay = new Date(nzYear, nzMonth - 1, nzDay, nzHour, nzMinute, nzSecond)
+    
+    // For UTC calculations, we need to work backwards from NZ time to get UTC equivalents
+    // Create a UTC timestamp that represents 9:00 AM in NZ today
+    const nzTodayUTC = new Date(nzYear, nzMonth - 1, nzDay) // NZ date at midnight
+    const nz9AmLocal = new Date(nzYear, nzMonth - 1, nzDay, 9, 0, 0) // 9 AM NZ time
+    
+    // Calculate the offset between what JavaScript thinks the NZ time is vs actual UTC
+    const nzOffsetTest = new Date().toLocaleString('en-US', { timeZone: 'Pacific/Auckland' })
+    const utcTest = new Date().toLocaleString('en-US', { timeZone: 'UTC' })  
+    
+    // More reliable approach: Create UTC timestamp for 9 AM NZ by using known conversions
+    // Pacific/Auckland is typically UTC+12 (NZST) or UTC+13 (NZDT)
+    // Instead of guessing, we'll calculate it directly
+    const tempNzDate = new Date()
+    tempNzDate.setUTCFullYear(nzYear)
+    tempNzDate.setUTCMonth(nzMonth - 1) 
+    tempNzDate.setUTCDate(nzDay)
+    tempNzDate.setUTCHours(9, 0, 0, 0) // 9 AM UTC temporarily
+    
+    // Get what this time looks like in NZ timezone
+    const testNzTime = tempNzDate.toLocaleString('en-US', { 
+      timeZone: 'Pacific/Auckland',
+      hour: '2-digit',
+      minute: '2-digit', 
+      hour12: false
+    })
+    
+    // Calculate offset needed to make it 9:00 AM NZ time
+    const [testHour] = testNzTime.split(':')
+    const hourDiff = 9 - parseInt(testHour)
+    
+    // Create proper UTC timestamp for 9 AM NZ time
+    const nzNineAM = new Date(tempNzDate.getTime() + (hourDiff * 60 * 60 * 1000))
 
     // meeting-status-poller trigger logic moved below (after active-period check)
 
     // Query today's races to determine active period
     // Generate today's date in NZ timezone for filtering
-    const nzToday = nzTime.toISOString().split('T')[0] // YYYY-MM-DD format
+    const nzToday = `${nzYear}-${nzMonth.padStart(2, '0')}-${nzDay.padStart(2, '0')}` // YYYY-MM-DD format
 
     const todaysRaces = await databases.listDocuments(databaseId, 'races', [
       Query.equal('raceDateNz', nzToday),
@@ -135,13 +183,17 @@ async function runSchedulerLogic(context) {
 
     if (racesToday.length === 0) {
       context.log('No races found for today, scheduler dormant', {
-        nzTime: nzTime.toISOString(),
+        nowUTC: now.toISOString(),
+        nzTimeDisplay: nzTimeDisplay.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
+        nzToday: nzToday,
       })
 
       return {
         success: true,
         message: 'No races scheduled today',
-        nzTime: nzTime.toISOString(),
+        nowUTC: now.toISOString(),
+        nzTimeDisplay: nzTimeDisplay.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
+        nzToday: nzToday,
       }
     }
 
@@ -149,14 +201,16 @@ async function runSchedulerLogic(context) {
     const racesWithStartTime = racesToday.filter((race) => race.startTime)
     if (racesWithStartTime.length === 0) {
       context.log('No races with start times found, scheduler dormant', {
-        nzTime: nzTime.toISOString(),
+        nowUTC: now.toISOString(),
+        nzTimeDisplay: nzTimeDisplay.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
         racesTodayCount: racesToday.length,
       })
 
       return {
         success: true,
         message: 'No races with start times found',
-        nzTime: nzTime.toISOString(),
+        nowUTC: now.toISOString(),
+        nzTimeDisplay: nzTimeDisplay.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
       }
     }
 
@@ -179,12 +233,21 @@ async function runSchedulerLogic(context) {
     const isCurrentlyActive = now >= activePeriodStart && !allFinalized
 
     context.log('Dynamic racing schedule check', {
-      nzTime: nzTime.toISOString(),
+      nowUTC: now.toISOString(),
+      nzTimeDisplay: nzTimeDisplay.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
+      nzToday: nzToday,
       racesTodayCount: racesToday.length,
       earliestRace: earliestStartTime.toISOString(),
       activePeriodStart: activePeriodStart.toISOString(),
+      nzNineAM: nzNineAM.toISOString(),
       allFinalized,
       isCurrentlyActive,
+      timezoneDebug: {
+        nzTimeString,
+        testNzTime,
+        hourDiff,
+        nowVsActivePeriod: `${now.toISOString()} >= ${activePeriodStart.toISOString()} = ${now >= activePeriodStart}`
+      }
     })
 
     if (!isCurrentlyActive) {
@@ -192,7 +255,8 @@ async function runSchedulerLogic(context) {
         now < activePeriodStart ? 'before active period' : 'all races finalized'
 
       context.log('Outside dynamic racing period, scheduler sleeping', {
-        nzTime: nzTime.toISOString(),
+        nowUTC: now.toISOString(),
+        nzTimeDisplay: nzTimeDisplay.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
         reason,
         activePeriodStart: activePeriodStart.toISOString(),
         allFinalized,
@@ -201,7 +265,8 @@ async function runSchedulerLogic(context) {
       return {
         success: true,
         message: `Scheduler dormant: ${reason}`,
-        nzTime: nzTime.toISOString(),
+        nowUTC: now.toISOString(),
+        nzTimeDisplay: nzTimeDisplay.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
         activePeriodStart: activePeriodStart.toISOString(),
         allRacesFinalized: allFinalized,
       }
@@ -331,62 +396,62 @@ async function runSchedulerLogic(context) {
       }
     }
 
-    // Determine polling strategy: batch vs individual
+    // Enhanced polling strategy using unified enhanced-race-poller
     let pollingStrategy
     let functionTriggered = false
 
     if (racesDueForPolling.length === 1) {
-      // Single race - use individual poller
-      pollingStrategy = 'individual'
+      // Single race - use enhanced poller in single mode
+      pollingStrategy = 'enhanced_single'
       const race = racesDueForPolling[0]
 
       try {
         await functions.createExecution(
-          'single-race-poller',
+          'enhanced-race-poller',
           JSON.stringify({ raceId: race.raceId }),
           false // async flag
         )
 
         functionTriggered = true
-        context.log('Triggered single race poller', {
+        context.log('Triggered enhanced race poller (single)', {
           raceId: race.raceId,
           raceName: race.raceName,
           status: race.status,
           timeToStart: race.timeToStartMinutes,
         })
       } catch (error) {
-        context.error('Failed to trigger single race poller', {
+        context.error('Failed to trigger enhanced race poller (single)', {
           raceId: race.raceId,
           error: error.message,
         })
       }
     } else if (racesDueForPolling.length <= 10) {
-      // Multiple races - use batch poller (max 10 for performance)
-      pollingStrategy = 'batch'
+      // Multiple races - use enhanced poller in batch mode (max 10 for performance)
+      pollingStrategy = 'enhanced_batch'
       const raceIds = racesDueForPolling.map((r) => r.raceId)
 
       try {
         await functions.createExecution(
-          'batch-race-poller',
+          'enhanced-race-poller',
           JSON.stringify({ raceIds }),
           false // async flag
         )
 
         functionTriggered = true
-        context.log('Triggered batch race poller', {
+        context.log('Triggered enhanced race poller (batch)', {
           raceCount: raceIds.length,
           raceIds: raceIds.slice(0, 3), // Log first 3 for reference
           totalRaces: raceIds.length,
         })
       } catch (error) {
-        context.error('Failed to trigger batch race poller', {
+        context.error('Failed to trigger enhanced race poller (batch)', {
           raceIds,
           error: error.message,
         })
       }
     } else {
-      // Too many races - split into multiple batches
-      pollingStrategy = 'multiple-batches'
+      // Too many races - split into multiple batches using enhanced poller
+      pollingStrategy = 'enhanced_multiple_batches'
       const batchSize = 10
       const batches = []
 
@@ -401,19 +466,19 @@ async function runSchedulerLogic(context) {
 
         try {
           await functions.createExecution(
-            'batch-race-poller',
+            'enhanced-race-poller',
             JSON.stringify({ raceIds }),
             false // async flag
           )
 
           successfulBatches++
-          context.log(`Triggered batch ${index + 1}/${batches.length}`, {
+          context.log(`Triggered enhanced poller batch ${index + 1}/${batches.length}`, {
             batchSize: raceIds.length,
             raceIds: raceIds.slice(0, 3), // Log first 3 for reference
           })
         } catch (error) {
           context.error(
-            `Failed to trigger batch ${index + 1}/${batches.length}`,
+            `Failed to trigger enhanced poller batch ${index + 1}/${batches.length}`,
             {
               raceIds,
               error: error.message,
@@ -424,7 +489,7 @@ async function runSchedulerLogic(context) {
 
       functionTriggered = successfulBatches > 0
 
-      context.log('Multiple batch polling completed', {
+      context.log('Enhanced multiple batch polling completed', {
         totalBatches: batches.length,
         successfulBatches,
         totalRaces: racesDueForPolling.length,
@@ -462,7 +527,8 @@ async function runSchedulerLogic(context) {
       analysis: analysisResults,
       executionTimeMs: Date.now() - startTime,
       nextCheckIn: '15 seconds',
-      nzTime: nzTime.toISOString(),
+      nowUTC: now.toISOString(),
+      nzTimeDisplay: nzTimeDisplay.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
     }
 
     context.log('Master scheduler execution completed', executionSummary)
