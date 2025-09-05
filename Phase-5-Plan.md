@@ -224,23 +224,27 @@ else return null // Stop polling Final/Abandoned races
 **✅ Implementation Status**: Server-side incremental calculations and mathematical validation have been successfully implemented in the enhanced-race-poller function.
 
 **Completed Implementation**:
+
 - **Location**: `/server/enhanced-race-poller/src/database-utils.js`
 - **Functions**: `saveTimeBucketedMoneyFlowHistory()` and `validateRacePoolData()`
 
 **✅ Implemented Features**:
 
-1. **Incremental Calculations**: 
+1. **Incremental Calculations**:
+
    - Previous bucket lookup with chronological queries
    - Separate Win/Place increment calculations (`incrementalWinAmount`, `incrementalPlaceAmount`)
    - Baseline vs incremental handling (60m baseline, others incremental)
    - Fallback logic for missing previous buckets
 
 2. **Mathematical Validation**:
+
    - Pool consistency validation (sum of entrants vs total pool)
    - Consistency scoring (0-100 with 5% tolerance threshold)
    - Win/Place pool sum mismatch detection
 
 3. **Server-Side Pre-calculation**:
+
    - `bucketed_aggregation` documents with pre-calculated incremental amounts
    - `dataQualityScore` and `mathematicallyConsistent` fields
    - Client consumes server calculations directly (no client-side math)
@@ -257,41 +261,20 @@ else return null // Stop polling Final/Abandoned races
 **Current Problem**: Race status changes not reaching UI in real-time
 **File to Modify**: `/client/src/hooks/useAppwriteRealtime.ts`
 
-**Key Fixes**:
+**context and Key Fixes Required**:
+The Race Page has a Header, Body (money flow grid) and Footer section. There is currently multiple data client subscriptions to Appwrite. There is also a need to fetch and display existing data for a 'fast paint' and data persistence requirement so data can be reviewed later, after a race and also allow navigating between live races. Current live updates are not working reliably, such as race status updates in the client.
 
-```typescript
-// Enhanced subscription channels with proper filtering
-const setupSubscriptions = () => {
-  // Race-specific subscription with better event filtering
-  const raceChannel = `databases.raceday-db.collections.races.documents.${raceId}`
-  const moneyFlowChannel = `databases.raceday-db.collections.money-flow-history.documents`
+Review the Appwrite realtime best practise document at [text](appwrite_realtime_guide.md) and then iplement appwrite realtime best practice subcriptions for the race page. This will likely be one main subscription with multiple channels to collections and documents.
 
-  const unsubscribe = client.subscribe(
-    [raceChannel, moneyFlowChannel],
-    (response) => {
-      // Enhanced event processing with race filtering
-      const isRaceEvent = response.events?.some(
-        (event) =>
-          event.includes(`races.${raceId}`) ||
-          (event.includes('races') && response.payload?.$id === raceId)
-      )
+Ensure data persistence is mainteined with the new realtime subscription architecture.
 
-      const isMoneyFlowEvent = response.events?.some(
-        (event) =>
-          event.includes('money-flow-history') &&
-          (response.payload?.raceId === raceId ||
-            entrantIds.includes(response.payload?.entrant))
-      )
+Ensure that after initial data fetch, that all components needing realtime updates are subscribed through the 'one' main subscription.
 
-      if (isRaceEvent) {
-        processRaceUpdate(response.payload)
-      } else if (isMoneyFlowEvent) {
-        processMoneyFlowUpdate(response.payload)
-      }
-    }
-  )
-}
-```
+Ensure footer components like the Pools total, Race Results and live status components are connected for realtime updates and many of these componenets are not at the moment.
+
+Ensure the Header components are reviewed and live status components are connected for realtime updates.
+
+I should see 'Uppdated at' components reflecting the last live subscription update based on a updated at or last updated at paramenter from the Database. current implemented DB attributes are documented in the DB setup file at [text](server/daily-meetings/src/database-setup.js)
 
 **Additional Improvements**:
 
