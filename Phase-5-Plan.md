@@ -39,7 +39,7 @@ The Race Page money flow grid is not receiving and displaying enough real-time d
 | **A1**  | 🟢     | HIGH     | Database Schema Enhancements          | None         | Add missing fields and indexes for timeline calculations     |
 | **A2**  | 🟢     | HIGH     | Unified Polling Architecture          | A1           | Replace 3 separate functions with enhanced-race-poller       |
 | **A3**  | 🟢     | HIGH     | Enhanced Master Scheduler             | A2           | Fix 30s gaps with 2.5min intervals during critical periods   |
-| **A4**  | 🟡     | LOW      | Daily Initialization Functions Review | A1           | Review timing and compatibility with new schema              |
+| **A4**  | 🟢     | LOW      | Daily Initialization Functions Review | A1           | Review timing and compatibility with new schema              |
 | **A5**  | 🟡     | MEDIUM   | Server-Side Incremental Calculations  | A1, A2       | Add mathematical validation and consistency checks           |
 | **B1**  | 🟡     | HIGH     | Subscription Architecture Fix         | A2           | Fix real-time status updates not reaching UI                 |
 | **B2**  | 🟡     | MEDIUM   | Timeline Processing Optimization      | B1           | Reduce 14+ second active column switching delays             |
