@@ -266,15 +266,17 @@ The Race Page has a Header, Body (money flow grid) and Footer section. There is 
 
 Review the Appwrite realtime best practise document at [text](appwrite_realtime_guide.md) and then iplement appwrite realtime best practice subcriptions for the race page. This will likely be one main subscription with multiple channels to collections and documents.
 
-Ensure data persistence is mainteined with the new realtime subscription architecture.
+Ensure data persistence is maintained with the new realtime subscription architecture.
 
 Ensure that after initial data fetch, that all components needing realtime updates are subscribed through the 'one' main subscription.
+
+Effectively, our solution for realtime is a hybrid of initially rendering fetched persistent data, then maintaining that data through the realtime subscription and channels.
 
 Ensure footer components like the Pools total, Race Results and live status components are connected for realtime updates and many of these componenets are not at the moment.
 
 Ensure the Header components are reviewed and live status components are connected for realtime updates.
 
-I should see 'Uppdated at' components reflecting the last live subscription update based on a updated at or last updated at paramenter from the Database. current implemented DB attributes are documented in the DB setup file at [text](server/daily-meetings/src/database-setup.js)
+I should see 'Uppdated at' components reflecting the last live subscription update based on a updated at or last updated at paramenter from the Database. Current implemented DB attributes are documented in the DB setup file at [text](server/daily-meetings/src/database-setup.js)
 
 **Additional Improvements**:
 
