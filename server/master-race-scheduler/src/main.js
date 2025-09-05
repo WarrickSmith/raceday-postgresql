@@ -264,14 +264,19 @@ async function runSchedulerLogic(context) {
         race.status
       )
 
-      // Enhanced logging for critical race periods (within 10 minutes)
+      // Enhanced logging for different polling phases
       const isCriticalPeriod = Math.abs(timeToStartMinutes) <= 10
-      if (isCriticalPeriod) {
-        context.log(`Critical race analysis: ${race.name?.substring(0, 40) || 'Unknown'}`, {
+      const isEarlyMorningPhase = timeToStartMinutes > 65
+      const pollingPhase = isEarlyMorningPhase ? 'EARLY_MORNING_BASELINE' : 
+                          timeToStartMinutes > 5 ? 'PROXIMITY_ACTIVE' : 'PROXIMITY_CRITICAL'
+      
+      if (isCriticalPeriod || isEarlyMorningPhase) {
+        context.log(`${pollingPhase} race analysis: ${race.name?.substring(0, 40) || 'Unknown'}`, {
           raceId: race.$id.slice(-8),
           status: race.status,
           timeToStartMinutes: Math.round(timeToStartMinutes * 100) / 100, // 2 decimal precision
           requiredInterval,
+          pollingPhase,
           startTime: race.startTime,
           lastPollTime: race.last_poll_time,
         })
@@ -289,8 +294,11 @@ async function runSchedulerLogic(context) {
         continue
       }
 
-      // Enhanced window check - now supports 65+ minutes for baseline capture
-      const isWithinPollingWindow = timeToStartMinutes <= 65 && timeToStartMinutes >= -60
+      // Enhanced window check - support early morning baseline + proximity polling
+      // Early morning: Poll all Open races from 9 AM NZ regardless of start time
+      // Proximity: Enhanced strategy within 65 minutes of start time  
+      // Post-race: Continue until 60 minutes after start for final data
+      const isWithinPollingWindow = timeToStartMinutes >= -60 // Only exclude races >60min after start
       if (!isWithinPollingWindow) {
         analysisResults.notDueYet++
         continue
@@ -306,14 +314,15 @@ async function runSchedulerLogic(context) {
       const isFirstPoll = !race.last_poll_time
       const shouldPoll = isFirstPoll || timeSinceLastPollMinutes >= requiredInterval
 
-      // Enhanced logging for polling decisions
-      if (isCriticalPeriod) {
-        context.log(`Polling decision for critical race`, {
+      // Enhanced logging for polling decisions (critical races and early morning phase)
+      if (isCriticalPeriod || isEarlyMorningPhase) {
+        context.log(`Polling decision for ${pollingPhase.toLowerCase()} race`, {
           raceId: race.$id.slice(-8),
           shouldPoll,
           isFirstPoll,
           timeSinceLastPollMinutes: Math.round(timeSinceLastPollMinutes * 100) / 100,
           requiredInterval,
+          pollingPhase,
           reason: shouldPoll
             ? isFirstPoll
               ? 'first_poll'
@@ -555,15 +564,16 @@ async function runSchedulerLogic(context) {
     const totalExecutionTime = Date.now() - startTime
     const criticalRacesPolled = racesDueForPolling.filter(r => r.isCriticalPeriod).length
     
-    // Mathematical polling coverage analysis
+    // Dual-phase polling coverage analysis
     const pollingCoverageAnalysis = {
       criticalPeriodRaces: criticalRaces.length,
       criticalRacesPolled,
       coveragePercentage: criticalRaces.length > 0 ? Math.round((criticalRacesPolled / criticalRaces.length) * 100) : 100,
-      enhancedIntervals: {
-        baseline_60m_plus: racesDueForPolling.filter(r => r.timeToStartMinutes > 60 && r.requiredInterval === 30).length,
-        active_5_to_60m: racesDueForPolling.filter(r => r.timeToStartMinutes > 5 && r.timeToStartMinutes <= 60 && r.requiredInterval === 2.5).length,
-        critical_0_to_5m: racesDueForPolling.filter(r => r.timeToStartMinutes >= 0 && r.timeToStartMinutes <= 5 && r.requiredInterval === 0.5).length,
+      dualPhaseIntervals: {
+        early_morning_baseline_65m_plus: racesDueForPolling.filter(r => r.timeToStartMinutes > 65 && r.requiredInterval === 30).length,
+        proximity_active_5_to_60m: racesDueForPolling.filter(r => r.timeToStartMinutes > 5 && r.timeToStartMinutes <= 60 && r.requiredInterval === 2.5).length,
+        proximity_critical_0_to_5m: racesDueForPolling.filter(r => r.timeToStartMinutes >= 0 && r.timeToStartMinutes <= 5 && r.requiredInterval === 0.5).length,
+        transition_60_to_65m: racesDueForPolling.filter(r => r.timeToStartMinutes > 60 && r.timeToStartMinutes <= 65 && r.requiredInterval === 2.5).length,
       },
     }
 
@@ -581,6 +591,8 @@ async function runSchedulerLogic(context) {
       nzTimeDisplay,
       isAfterNz9AM,
       enhancedFeatures: {
+        dualPhasePollingStrategy: true,
+        earlyMorningBaselineCollection: true,
         mathematicalIntervalGuarantees: true,
         simplifiedTimezoneHandling: true,
         criticalPeriodMonitoring: true,
@@ -598,7 +610,9 @@ async function runSchedulerLogic(context) {
       nextPollingPrediction: {
         expectedCriticalRaces: criticalRaces.length,
         nextCriticalPolling: '30 seconds (if critical races remain)',
-        nextRegularPolling: '2.5 minutes (active period) or 30 minutes (baseline)',
+        nextProximityPolling: '2.5 minutes (active period 5-60m before race)',
+        nextBaselinePolling: '30 minutes (early morning phase >65m before race)',
+        dualPhaseStrategy: 'Early morning baseline (30min) → Proximity enhanced (2.5min/30s)',
       },
     })
 
@@ -623,15 +637,18 @@ async function runSchedulerLogic(context) {
 }
 
 /**
- * Calculate required polling interval with MATHEMATICAL TIMELINE COVERAGE GUARANTEES
+ * Calculate required polling interval with DUAL-PHASE STRATEGY
  *
- * Enhanced polling strategy to ensure every timeline column gets populated:
- * - 60m+: 30 minutes (baseline capture for 60m column) 
+ * PHASE 1 - Early Morning Baseline (9 AM NZ - 65min before race):
+ * - All Open races: 30 minutes (ensures 60m baseline data from early morning)
+ *
+ * PHASE 2 - Enhanced Proximity Polling (65min before - race end):
  * - 5-60m: 2.5 minutes (guarantees every 5m column gets ≥1 data point)
  * - 0-5m: 30 seconds (guarantees every 1m column gets ≥1 data point) 
  * - Post-start: Continue until Final status
  *
  * Mathematical proof:
+ * - 30min early polling ensures 60m baseline available from 9:30 AM onward
  * - 2.5min interval + 5min column = worst case: poll at 0s, 2.5m, 5m → covers all 5m boundaries
  * - 30s interval + 1min column = worst case: poll at 0s, 30s, 60s → covers all 1m boundaries
  *
@@ -642,16 +659,22 @@ async function runSchedulerLogic(context) {
 function getPollingInterval(timeToStartMinutes, raceStatus) {
   // STATUS-DRIVEN POLLING: Primary logic based on race status, not time
 
-  // Open status: Keep polling until race actually closes
+  // Open status: Dual-phase strategy
   if (raceStatus === 'Open') {
-    if (timeToStartMinutes <= 0) {
+    // PHASE 1: Early Morning Baseline Collection (>65 minutes before race)
+    if (timeToStartMinutes > 65) {
+      return 30 // 30 minutes - early morning baseline polling for 60m column data
+    }
+    // PHASE 2: Enhanced Proximity Polling (≤65 minutes before race)
+    else if (timeToStartMinutes <= 0) {
       return 0.5 // 30 seconds - critical period until actually closed (0s to start)
     } else if (timeToStartMinutes <= 5) {
       return 0.5 // 30 seconds - critical approach period (5m to 0s) - guarantees 1m column coverage
     } else if (timeToStartMinutes <= 60) {
       return 2.5 // 2.5 minutes - active period (60m to 5m) - guarantees 5m column coverage
     } else {
-      return 30 // 30 minutes - baseline capture for early races (60m+ before start)
+      // This case (60 < timeToStartMinutes <= 65) uses enhanced strategy
+      return 2.5 // 2.5 minutes - transition to enhanced proximity polling
     }
   }
 
@@ -669,13 +692,15 @@ function getPollingInterval(timeToStartMinutes, raceStatus) {
   ) {
     return null // Stop polling - race is final
   } else {
-    // Fallback for unknown statuses - treat as active based on time
-    if (timeToStartMinutes <= 5) {
+    // Fallback for unknown statuses - treat as active based on time and phase
+    if (timeToStartMinutes > 65) {
+      return 30 // 30 minutes - early morning baseline phase
+    } else if (timeToStartMinutes <= 5) {
       return 0.5 // 30 seconds for critical period
     } else if (timeToStartMinutes <= 60) {
       return 2.5 // 2.5 minutes for active period
     } else {
-      return 30 // 30 minutes for early period
+      return 2.5 // 2.5 minutes for transition period (60-65m)
     }
   }
 }
