@@ -1,0 +1,23 @@
+{
+  "name": "enhanced-race-poller",
+  "version": "1.0.0",
+  "description": "Unified race polling function that consolidates race-data-poller, single-race-poller, and batch-race-poller with intelligent filtering and enhanced validation",
+  "type": "module",
+  "main": "src/main.js",
+  "dependencies": {
+    "node-appwrite": "^17.0.0"
+  },
+  "scripts": {
+    "start": "node src/main.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "appwrite",
+    "race-polling",
+    "nztab",
+    "real-time",
+    "horse-racing"
+  ],
+  "author": "RaceDay Development Team",
+  "license": "MIT"
+}
