@@ -40,7 +40,7 @@ The Race Page money flow grid is not receiving and displaying enough real-time d
 | **A2**  | 🟢     | HIGH     | Unified Polling Architecture          | A1           | Replace 3 separate functions with enhanced-race-poller       |
 | **A3**  | 🟢     | HIGH     | Enhanced Master Scheduler             | A2           | Fix 30s gaps with 2.5min intervals during critical periods   |
 | **A4**  | 🟢     | LOW      | Daily Initialization Functions Review | A1           | Review timing and compatibility with new schema              |
-| **A5**  | 🟡     | MEDIUM   | Server-Side Incremental Calculations  | A1, A2       | Add mathematical validation and consistency checks           |
+| **A5**  | 🟢     | MEDIUM   | Server-Side Incremental Calculations  | A1, A2       | Add mathematical validation and consistency checks           |
 | **B1**  | 🟡     | HIGH     | Subscription Architecture Fix         | A2           | Fix real-time status updates not reaching UI                 |
 | **B2**  | 🟡     | MEDIUM   | Timeline Processing Optimization      | B1           | Reduce 14+ second active column switching delays             |
 | **B3**  | 🟡     | LOW      | Performance & Logging Cleanup         | B2           | Remove excessive console logging, add performance monitoring |
@@ -219,60 +219,36 @@ else return null // Stop polling Final/Abandoned races
 - `/server/daily-initial-data/src/main.js`: Ensure it creates proper baseline data for 60m columns
 - Database schema updates will automatically be available to all daily functions via shared database-setup.js
 
-#### Task A5: Server-Side Incremental Calculations
+#### Task A5: Server-Side Incremental Calculations ✅ **COMPLETE**
 
-**Current Problem**: Inconsistent client-side calculations and missing mathematical validation
-**Files to Enhance**:
+**✅ Implementation Status**: Server-side incremental calculations and mathematical validation have been successfully implemented in the enhanced-race-poller function.
 
-- `/server/enhanced-race-poller/src/database-utils.js`
-- All existing polling function database-utils.js files (maintain consistency)
+**Completed Implementation**:
+- **Location**: `/server/enhanced-race-poller/src/database-utils.js`
+- **Functions**: `saveTimeBucketedMoneyFlowHistory()` and `validateRacePoolData()`
 
-**Key Improvements**:
+**✅ Implemented Features**:
 
-```javascript
-// Enhanced bucket calculation logic
-const calculateIncrementalAmounts = async (
-  entrantId,
-  currentData,
-  databases
-) => {
-  // Query for previous bucket
-  const previousBucket = await findPreviousBucket(
-    entrantId,
-    currentData.timeInterval
-  )
+1. **Incremental Calculations**: 
+   - Previous bucket lookup with chronological queries
+   - Separate Win/Place increment calculations (`incrementalWinAmount`, `incrementalPlaceAmount`)
+   - Baseline vs incremental handling (60m baseline, others incremental)
+   - Fallback logic for missing previous buckets
 
-  // Calculate Win and Place increments separately
-  const incrementalWin =
-    currentData.winPoolAmount - (previousBucket?.winPoolAmount || 0)
-  const incrementalPlace =
-    currentData.placePoolAmount - (previousBucket?.placePoolAmount || 0)
+2. **Mathematical Validation**:
+   - Pool consistency validation (sum of entrants vs total pool)
+   - Consistency scoring (0-100 with 5% tolerance threshold)
+   - Win/Place pool sum mismatch detection
 
-  // Validate increments (should not be negative)
-  if (incrementalWin < 0 || incrementalPlace < 0) {
-    logger.warn('Negative increment detected', {
-      entrantId,
-      incrementalWin,
-      incrementalPlace,
-    })
-  }
+3. **Server-Side Pre-calculation**:
+   - `bucketed_aggregation` documents with pre-calculated incremental amounts
+   - `dataQualityScore` and `mathematicallyConsistent` fields
+   - Client consumes server calculations directly (no client-side math)
 
-  return { incrementalWin, incrementalPlace }
-}
-
-// Mathematical consistency validation
-const validatePoolConsistency = (entrantIncrements, totalPoolGrowth) => {
-  const sumOfIncrements = entrantIncrements.reduce((sum, inc) => sum + inc, 0)
-  const difference = Math.abs(sumOfIncrements - totalPoolGrowth)
-  const isConsistent = difference / totalPoolGrowth < 0.01 // Within 1%
-
-  return {
-    isConsistent,
-    difference,
-    consistencyScore: Math.max(0, 100 - (difference / totalPoolGrowth) * 100),
-  }
-}
-```
+4. **Data Quality Monitoring**:
+   - Negative increment detection and logging
+   - Processing latency tracking (`pollingLatencyMs`)
+   - Data freshness indicators (`isStale`)
 
 ### Part B: Client-Side Real-Time Improvements
 
