@@ -1,16 +1,17 @@
 'use client'
 
 import { memo, useState, useEffect, useCallback, useMemo } from 'react'
-import { useRace } from '@/contexts/RaceContext'
-import { useRealtimeRace } from '@/hooks/useRealtimeRace'
 import { getStatusConfig } from '@/utils/raceStatusConfig'
 import type { RaceStatus } from '@/types/racePools'
+import type { Race } from '@/types/meetings'
 
 interface RaceTimingSectionProps {
   raceStartTime?: string
   raceStatus?: RaceStatus
   className?: string
   showCountdown?: boolean
+  // Real-time race data from unified subscription
+  race?: Race | null
 }
 
 export const RaceTimingSection = memo(function RaceTimingSection({
@@ -18,26 +19,8 @@ export const RaceTimingSection = memo(function RaceTimingSection({
   raceStatus,
   className = '',
   showCountdown = true,
+  race = null,
 }: RaceTimingSectionProps) {
-  const { raceData } = useRace()
-
-  const { race: liveRace } = useRealtimeRace({
-    initialRace: raceData?.race || {
-      $id: '',
-      $createdAt: '',
-      $updatedAt: '',
-      raceId: '',
-      raceNumber: 0,
-      name: '',
-      startTime: raceStartTime || '',
-      meeting: '',
-      status: raceStatus || ('open' as const),
-      distance: 0,
-      trackCondition: '',
-      actualStart: undefined,
-    },
-  })
-
   const [timeRemaining, setTimeRemaining] = useState<{
     total: number
     hours: number
@@ -47,10 +30,10 @@ export const RaceTimingSection = memo(function RaceTimingSection({
 
   const [delayedTime, setDelayedTime] = useState<string | null>(null)
 
-  const currentStartTime = liveRace?.startTime || raceStartTime
-  const currentStatus =
-    (liveRace?.status?.toLowerCase() as RaceStatus) || raceStatus
-  const actualStartTime = liveRace?.actualStart
+  // Use real-time race data from unified subscription with fallbacks
+  const currentStartTime = race?.startTime || raceStartTime
+  const currentStatus = (race?.status?.toLowerCase() as RaceStatus) || raceStatus || 'open'
+  const actualStartTime = race?.actualStart
 
   const calculateTimeRemaining = useCallback(() => {
     if (!currentStartTime) return
