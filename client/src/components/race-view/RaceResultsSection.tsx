@@ -5,24 +5,23 @@ import type { RaceResultsData } from '@/types/racePools'
 
 interface RaceResultsSectionProps {
   resultsData?: RaceResultsData
-  fixedOddsData?: Record<
-    string,
-    {
-      fixed_win: number | null
-      fixed_place: number | null
-      runner_name: string | null
-      entrant_id: string | null
-    }
-  >
   className?: string
   lastUpdate?: Date | null
+  // Add entrants data to lookup actual odds for finishing runners
+  entrants?: Array<{
+    $id: string
+    runnerNumber: number
+    name: string
+    winOdds?: number
+    placeOdds?: number
+  }>
 }
 
 export const RaceResultsSection = memo(function RaceResultsSection({
   resultsData,
-  fixedOddsData,
   className = '',
   lastUpdate,
+  entrants = [],
 }: RaceResultsSectionProps) {
   // Helper function to format runner names to proper case
   const formatRunnerName = (name: string) => {
@@ -110,9 +109,18 @@ export const RaceResultsSection = memo(function RaceResultsSection({
     )
   }
 
+  // Helper function to get win/place odds for a specific runner number from entrants data
+  const getRunnerOdds = (runnerNumber: number, oddsType: 'win' | 'place') => {
+    const entrant = entrants.find(e => e.runnerNumber === runnerNumber)
+    if (!entrant) return null
+    
+    const odds = oddsType === 'win' ? entrant.winOdds : entrant.placeOdds
+    return odds || null
+  }
+
   // Helper function to find dividend by poolType - handles NZTAB product_name format
-  const findDividend = (type: string) =>
-    resultsData?.dividends.find((d) => {
+  const findDividend = (type: string) => {
+    return resultsData?.dividends.find((d) => {
       // Handle different possible field names from NZTAB API
       const poolTypeField =
         d.poolType || d.product_name || d.product_type || d.pool_type || d.type
@@ -141,37 +149,8 @@ export const RaceResultsSection = memo(function RaceResultsSection({
       const expectedFormats = nztabMappings[typeLower] || [typeLower]
       return expectedFormats.some((format: string) => fieldLower === format)
     })
-
-  // Helper function to find place dividend for a specific runner number
-  const findPlaceDividend = (runnerNumber: number) =>
-    resultsData?.dividends.find((d) => {
-      // Check if it's a place dividend
-      const poolTypeField =
-        d.poolType || d.product_name || d.product_type || d.pool_type || d.type
-      if (!poolTypeField) return false
-
-      const fieldLower = poolTypeField.toLowerCase()
-      const isPlace = fieldLower === 'pool place' || fieldLower === 'place'
-
-      if (!isPlace) return false
-
-      // Check if this dividend is for the specific runner number
-      return d.positions?.some((pos) => pos.runner_number === runnerNumber)
-    })
-
-  // Helper function to get fixed odds for a specific runner number
-  const getFixedWinOdds = (runnerNumber: number): number | null => {
-    if (!fixedOddsData) return null
-    const runnerOdds = fixedOddsData[runnerNumber.toString()]
-    return runnerOdds?.fixed_win || null
   }
 
-  // Helper function to get fixed place odds for a specific runner number
-  const getFixedPlaceOdds = (runnerNumber: number): number | null => {
-    if (!fixedOddsData) return null
-    const runnerOdds = fixedOddsData[runnerNumber.toString()]
-    return runnerOdds?.fixed_place || null
-  }
 
   return (
     <div className={`${className}`}>
@@ -222,11 +201,9 @@ export const RaceResultsSection = memo(function RaceResultsSection({
                 const runnerNumber =
                   resultsData.results[0].runner_number ||
                   resultsData.results[0].runnerNumber
-                const fixedWinOdds = runnerNumber
-                  ? getFixedWinOdds(runnerNumber)
-                  : null
-                if (fixedWinOdds) {
-                  return `$${fixedWinOdds.toFixed(2)}`
+                const winOdds = runnerNumber ? getRunnerOdds(runnerNumber, 'win') : null
+                if (winOdds) {
+                  return `$${winOdds.toFixed(2)}`
                 }
               }
               return '—'
@@ -238,11 +215,9 @@ export const RaceResultsSection = memo(function RaceResultsSection({
                 const runnerNumber =
                   resultsData.results[0].runner_number ||
                   resultsData.results[0].runnerNumber
-                const fixedPlaceOdds = runnerNumber
-                  ? getFixedPlaceOdds(runnerNumber)
-                  : null
-                if (fixedPlaceOdds) {
-                  return `$${fixedPlaceOdds.toFixed(2)}`
+                const placeOdds = runnerNumber ? getRunnerOdds(runnerNumber, 'place') : null
+                if (placeOdds) {
+                  return `$${placeOdds.toFixed(2)}`
                 }
               }
               return '—'
@@ -281,11 +256,9 @@ export const RaceResultsSection = memo(function RaceResultsSection({
                 const runnerNumber =
                   resultsData.results[1].runner_number ||
                   resultsData.results[1].runnerNumber
-                const fixedPlaceOdds = runnerNumber
-                  ? getFixedPlaceOdds(runnerNumber)
-                  : null
-                if (fixedPlaceOdds) {
-                  return `$${fixedPlaceOdds.toFixed(2)}`
+                const placeOdds = runnerNumber ? getRunnerOdds(runnerNumber, 'place') : null
+                if (placeOdds) {
+                  return `$${placeOdds.toFixed(2)}`
                 }
               }
               return '—'
@@ -324,11 +297,9 @@ export const RaceResultsSection = memo(function RaceResultsSection({
                 const runnerNumber =
                   resultsData.results[2].runner_number ||
                   resultsData.results[2].runnerNumber
-                const fixedPlaceOdds = runnerNumber
-                  ? getFixedPlaceOdds(runnerNumber)
-                  : null
-                if (fixedPlaceOdds) {
-                  return `$${fixedPlaceOdds.toFixed(2)}`
+                const placeOdds = runnerNumber ? getRunnerOdds(runnerNumber, 'place') : null
+                if (placeOdds) {
+                  return `$${placeOdds.toFixed(2)}`
                 }
               }
               return '—'

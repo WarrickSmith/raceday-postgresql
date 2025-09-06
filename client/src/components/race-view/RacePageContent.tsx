@@ -168,6 +168,7 @@ export function RacePageContent() {
           raceStatus={raceStatus}
           poolData={currentPoolData || undefined}
           resultsData={currentResultsData || undefined}
+          entrants={currentEntrants}
           showCountdown={true}
           showResults={true}
           lastPoolUpdate={realtimeData.lastPoolUpdate}
