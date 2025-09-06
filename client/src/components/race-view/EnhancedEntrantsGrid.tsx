@@ -10,9 +10,7 @@ import {
   DEFAULT_GRID_DISPLAY_CONFIG,
   DEFAULT_POOL_VIEW_STATE,
 } from '@/types/enhancedGrid'
-import { useAppwriteRealtime } from '@/hooks/useAppwriteRealtime'
-import { useRealtimeRace } from '@/hooks/useRealtimeRace'
-import { useRacePoolData } from '@/hooks/useRacePoolData'
+import type { RacePoolData } from '@/types/racePools'
 import { useMoneyFlowTimeline } from '@/hooks/useMoneyFlowTimeline'
 import { useRace } from '@/contexts/RaceContext'
 import { screenReader, AriaLabels } from '@/utils/accessibility'
@@ -97,6 +95,10 @@ interface EnhancedEntrantsGridProps {
   className?: string
   enableMoneyFlowTimeline?: boolean
   enableJockeySilks?: boolean
+  realtimeEntrants?: Entrant[]
+  lastUpdate?: Date | null
+  // Real-time pool data from unified subscription
+  poolData?: RacePoolData | null
 }
 
 // Enhanced single-component architecture with integrated timeline:
@@ -112,34 +114,21 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   className = '',
   enableMoneyFlowTimeline = true,
   enableJockeySilks = true,
+  realtimeEntrants,
+  lastUpdate,
+  poolData = null,
 }: EnhancedEntrantsGridProps) {
   const { raceData } = useRace()
 
-  // Use live race data for status synchronization (same as header and footer)
-  const { race: liveRace } = useRealtimeRace({
-    initialRace: raceData?.race || {
-      $id: raceId || 'fallback',
-      raceId: raceId || 'fallback',
-      startTime: raceStartTime,
-      status: 'open',
-      name: '',
-      raceNumber: 0,
-      meeting: '',
-      distance: undefined,
-      trackCondition: undefined,
-      $createdAt: '',
-      $updatedAt: '',
-    },
-  })
-
-  // Use context data if available, fallback to props for initial render
-  const currentEntrants = raceData?.entrants || initialEntrants
+  // Use real-time entrants data from unified subscription if available
+  const currentEntrants = realtimeEntrants || raceData?.entrants || initialEntrants
   const currentRaceId = raceData?.race.$id || raceId
-  const currentRaceStartTime =
-    liveRace?.startTime || raceData?.race.startTime || raceStartTime
+  const currentRaceStartTime = raceData?.race.startTime || raceStartTime
+  const currentRace = raceData?.race
 
   // Get actual race pool data
-  const { poolData: racePoolData } = useRacePoolData(currentRaceId)
+  // Use real-time pool data from unified subscription with fallback for persistence
+  const racePoolData = poolData
 
   // Pool view state - fixed to win pool since toggle is removed
   const poolViewState: PoolViewState = {
@@ -153,13 +142,15 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     [currentEntrants]
   )
 
-  // Debug: Log entrant IDs being passed to timeline hook
-  console.log('🔍 Timeline hook parameters:', {
-    raceId: currentRaceId,
-    entrantIds: entrantIds,
-    entrantCount: entrantIds.length,
-    activePool: poolViewState.activePool,
-  })
+  // Debug: Log entrant IDs being passed to timeline hook (development only)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔍 Timeline hook parameters:', {
+      raceId: currentRaceId,
+      entrantIds: entrantIds.length,
+      entrantCount: entrantIds.length,
+      activePool: poolViewState.activePool,
+    })
+  }
 
   const {
     timelineData,
@@ -168,14 +159,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     getEntrantDataForInterval,
   } = useMoneyFlowTimeline(currentRaceId, entrantIds, poolViewState.activePool)
 
-  // Debug logging for entrants updates (can be removed in production)
-  // console.log('🏃 EnhancedEntrantsGrid render:', {
-  //   raceDataExists: !!raceData,
-  //   contextEntrantsCount: raceData?.entrants?.length,
-  //   initialEntrantsCount: initialEntrants.length,
-  //   currentEntrantsCount: currentEntrants.length,
-  //   raceId: currentRaceId
-  // });
   const [updateNotifications, setUpdateNotifications] = useState(true)
   const [selectedEntrant, setSelectedEntrant] = useState<string | undefined>()
 
@@ -207,69 +190,24 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _memory = useMemoryOptimization()
 
-  const realtimeResult = useAppwriteRealtime({
-    raceId: currentRaceId,
-    initialEntrants:
-      currentEntrants && currentEntrants.length > 0
-        ? currentEntrants
-        : initialEntrants,
-  })
-
-  const {
-    entrants: realtimeEntrants,
-    isConnected,
-    lastUpdate,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    updateLatency,
-    totalUpdates,
-  } = realtimeResult
-
-  // IMPORTANT: Use currentEntrants (from context) as base to preserve data flow
-  // Real-time entrants are used only for updating live fields (odds, scratch status) in calculations
-  // This prevents calculated pool data from being overwritten by real-time updates
-  const baseEntrants =
-    currentEntrants && currentEntrants.length > 0
-      ? currentEntrants
+  // Use entrants data directly (real-time updates come from unified subscription)
+  const entrants = useMemo(() => {
+    // Use current entrants which includes real-time updates from unified subscription
+    const finalEntrants = currentEntrants && currentEntrants.length > 0 
+      ? currentEntrants 
       : initialEntrants
 
-  // Merge real-time updates into base entrants for live odds data
-  const entrants = useMemo(() => {
-    if (!realtimeEntrants || realtimeEntrants.length === 0) {
-      console.log('📡 Using base entrants (no real-time data)')
-      return baseEntrants
+    // Debug logging (can be simplified in production)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔄 EnhancedEntrantsGrid entrants:', {
+        entrantsCount: finalEntrants.length,
+        hasRealtimeData: !!realtimeEntrants,
+        lastUpdateTime: lastUpdate?.toISOString()
+      })
     }
 
-    console.log('🔄 Merging real-time data:', {
-      baseEntrantsCount: baseEntrants.length,
-      realtimeEntrantsCount: realtimeEntrants.length,
-      totalUpdates,
-    })
-
-    // Create a map of real-time entrants for quick lookup
-    const realtimeMap = new Map(realtimeEntrants.map((e) => [e.$id, e]))
-
-    // Merge real-time data with base entrants, prioritizing live odds data
-    return baseEntrants.map((baseEntrant) => {
-      const realtimeEntrant = realtimeMap.get(baseEntrant.$id)
-      if (realtimeEntrant) {
-        // Merge real-time fields while preserving base entrant structure
-        return {
-          ...baseEntrant,
-          winOdds: realtimeEntrant.winOdds ?? baseEntrant.winOdds,
-          placeOdds: realtimeEntrant.placeOdds ?? baseEntrant.placeOdds,
-          isScratched: realtimeEntrant.isScratched ?? baseEntrant.isScratched,
-          holdPercentage:
-            realtimeEntrant.holdPercentage ?? baseEntrant.holdPercentage,
-          moneyFlowTrend:
-            realtimeEntrant.moneyFlowTrend ?? baseEntrant.moneyFlowTrend,
-          // Preserve any calculated fields that might exist
-          poolMoney: baseEntrant.poolMoney,
-          moneyFlowTimeline: baseEntrant.moneyFlowTimeline,
-        }
-      }
-      return baseEntrant
-    })
-  }, [baseEntrants, realtimeEntrants, totalUpdates])
+    return finalEntrants
+  }, [currentEntrants, initialEntrants, realtimeEntrants, lastUpdate])
 
   // Validation function to check if timeline amounts sum to total pool
   const validateTimelineSummation = useCallback((entrant: Entrant) => {
@@ -537,7 +475,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   // Update current time for dynamic timeline updates
   // More frequent updates near race start time, but pause for final races
   useEffect(() => {
-    const raceStatus = liveRace?.status || 'Open'
+    const raceStatus = currentRace?.status || 'Open'
 
     // Don't update time frequently for completed races
     if (['Final', 'Closed'].includes(raceStatus)) {
@@ -565,7 +503,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     }, updateInterval)
 
     return () => clearInterval(timer)
-  }, [currentRaceStartTime, liveRace?.status])
+  }, [currentRaceStartTime, currentRace?.status])
 
   // Generate timeline columns using data-driven approach for persistence
   const timelineColumns = useMemo(() => {
@@ -573,7 +511,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     const current = currentTime
     const timeToRaceMs = raceStart.getTime() - current.getTime()
     const timeToRaceMinutes = Math.floor(timeToRaceMs / (1000 * 60))
-    const raceStatus = liveRace?.status || 'Open'
+    const raceStatus = currentRace?.status || 'Open'
 
     // FIXED: Declare these variables at the top to avoid "before initialization" errors
     const raceHasStarted = timeToRaceMinutes < 0
@@ -771,7 +709,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     // Sort columns chronologically: highest positive → 0 → lowest negative
     // Example: 60m, 50m, 40m, ..., 2m, 1m, 0 (Start), +1m, +2m, +4m
     return columns.sort((a, b) => b.interval - a.interval)
-  }, [currentRaceStartTime, currentTime, liveRace?.status, timelineData])
+  }, [currentRaceStartTime, currentTime, currentRace?.status, timelineData])
 
   // Determine if column should be highlighted (current time) - FIXED to highlight only ONE column
   const isCurrentTimeColumn = useCallback(
@@ -779,7 +717,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       const raceStart = new Date(currentRaceStartTime)
       const timeToRaceMs = raceStart.getTime() - currentTime.getTime()
       const timeToRaceMinutes = timeToRaceMs / (1000 * 60)
-      const raceStatus = liveRace?.status || 'Open'
+      const raceStatus = currentRace?.status || 'Open'
 
       // Only highlight and follow current time while race status is 'Open'
       if (raceStatus === 'Open') {
@@ -861,7 +799,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       // Race status is no longer 'Open' - stop highlighting, race has actually started
       return false
     },
-    [currentRaceStartTime, currentTime, timelineColumns, liveRace?.status]
+    [currentRaceStartTime, currentTime, timelineColumns, currentRace?.status]
   )
 
   // Auto-scroll to show current time position
@@ -1506,7 +1444,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       <div className="sr-only" aria-live="polite" id="grid-status">
         Showing {sortedEntrants.length} runners. Last update:{' '}
         {lastUpdate ? lastUpdate.toLocaleTimeString() : 'No updates yet'}.
-        Connection status: {isConnected ? 'Connected' : 'Disconnected'}.
       </div>
     </div>
   )

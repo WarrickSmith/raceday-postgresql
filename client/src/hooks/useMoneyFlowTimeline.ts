@@ -67,7 +67,9 @@ export function useMoneyFlowTimeline(
     const isRaceComplete = raceStatus && ['Final', 'Finalized', 'Abandoned', 'Cancelled'].includes(raceStatus);
     
     if (isRaceComplete && timelineData.size > 0) {
-      console.log(`🏁 Race ${raceId} is complete (status: ${raceStatus}), skipping timeline data fetch to preserve final state`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`🏁 Race ${raceId} is complete (status: ${raceStatus}), skipping timeline data fetch to preserve final state`);
+      }
       return;
     }
 
@@ -87,7 +89,9 @@ export function useMoneyFlowTimeline(
       
       // Log interval coverage analysis if available
       if (data.intervalCoverage) {
-        console.log('📊 Timeline interval coverage:', data.intervalCoverage);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('📊 Timeline interval coverage:', data.intervalCoverage);
+        }
         if (data.intervalCoverage.criticalPeriodGaps.length > 0) {
           console.warn('⚠️ Gaps detected in critical 5m-0s period:', data.intervalCoverage.criticalPeriodGaps);
         }
@@ -95,31 +99,39 @@ export function useMoneyFlowTimeline(
 
       // Log the API response for debugging
       if (data.message) {
-        console.log('📊 API Message:', data.message);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('📊 API Message:', data.message);
+        }
       }
 
       // Handle empty data gracefully
       if (documents.length === 0) {
-        console.log('📊 No timeline data available - displaying empty state');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('📊 No timeline data available - displaying empty state');
+        }
         setTimelineData(new Map());
         setLastUpdate(new Date());
         return;
       }
 
       // Use unified processing for both bucketed and legacy data
-      console.log('📊 Processing money flow data with unified algorithm');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📊 Processing money flow data with unified algorithm');
+      }
       const entrantDataMap = processTimelineData(documents, entrantIds, poolType, data.bucketedData);
       setTimelineData(entrantDataMap);
       setLastUpdate(new Date());
       
-      console.log('📊 Money flow timeline data processed:', {
-        raceId,
-        totalDocuments: documents.length,
-        entrantsRequested: entrantIds.length,
-        entrantsWithData: Array.from(entrantDataMap.values()).filter(d => d.dataPoints.length > 0).length,
-        dataType: data.bucketedData ? 'bucketed' : 'legacy',
-        optimizations: data.queryOptimizations || []
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📊 Money flow timeline data processed:', {
+          raceId,
+          totalDocuments: documents.length,
+          entrantsRequested: entrantIds.length,
+          entrantsWithData: Array.from(entrantDataMap.values()).filter(d => d.dataPoints.length > 0).length,
+          dataType: data.bucketedData ? 'bucketed' : 'legacy',
+          optimizations: data.queryOptimizations || []
+        });
+      }
       
       return;
       // This code path should no longer be reached due to unified processing above
@@ -137,20 +149,26 @@ export function useMoneyFlowTimeline(
   const gridData = useMemo(() => {
     const grid: TimelineGridData = {};
     
-    console.log('🔍 Grid generation - starting with:', {
-      timelineDataSize: timelineData.size,
-      poolType,
-      sampleEntrantData: Array.from(timelineData.values())[0]
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Grid generation - starting with:', {
+        timelineDataSize: timelineData.size,
+        poolType,
+        sampleEntrantData: Array.from(timelineData.values())[0]
+      });
+    }
     
     for (const [entrantId, entrantData] of timelineData) {
       // Skip if no data points
       if (entrantData.dataPoints.length === 0) {
-        console.log(`⚠️ No data points for entrant ${entrantId}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`⚠️ No data points for entrant ${entrantId}`);
+        }
         continue;
       }
       
-      console.log(`📊 Processing entrant ${entrantId}: ${entrantData.dataPoints.length} data points`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`📊 Processing entrant ${entrantId}: ${entrantData.dataPoints.length} data points`);
+      }
       
       // Use the already calculated incremental amounts from dataPoints
       // The data points are already sorted chronologically and have incremental amounts calculated
@@ -159,7 +177,9 @@ export function useMoneyFlowTimeline(
         
         // Skip if no timeToStart data
         if (typeof dataPoint.timeToStart !== 'number') {
-          console.log(`⚠️ Skipping data point - no timeToStart:`, dataPoint);
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`⚠️ Skipping data point - no timeToStart:`, dataPoint);
+          }
           continue;
         }
         
@@ -184,7 +204,9 @@ export function useMoneyFlowTimeline(
         // This ensures compatibility with both data structures
         const interval = (dataPoint as any).timeInterval ?? dataPoint.timeToStart;
         
-        console.log(`✅ Adding grid data: entrant ${entrantId}, interval ${interval}, amount ${incrementalAmount}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`✅ Adding grid data: entrant ${entrantId}, interval ${interval}, amount ${incrementalAmount}`);
+        }
         
         // Add grid data for this interval
         if (!grid[interval]) {
@@ -199,11 +221,13 @@ export function useMoneyFlowTimeline(
       }
     }
     
-    console.log('🔍 Grid generation complete:', {
-      totalIntervals: Object.keys(grid).length,
-      intervals: Object.keys(grid).sort((a, b) => Number(b) - Number(a)).slice(0, 5),
-      sampleGridEntry: Object.values(grid)[0]
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Grid generation complete:', {
+        totalIntervals: Object.keys(grid).length,
+        intervals: Object.keys(grid).sort((a, b) => Number(b) - Number(a)).slice(0, 5),
+        sampleGridEntry: Object.values(grid)[0]
+      });
+    }
     
     return grid;
   }, [timelineData, poolType]);
@@ -242,14 +266,16 @@ export function useMoneyFlowTimeline(
     const amountInDollars = Math.round(displayAmount / 100);
     
     // Debug logging to verify server calculations
-    console.log(`💰 SIMPLIFIED display for entrant ${entrantId}, interval ${interval}:`, {
-      displayAmount,
-      amountInDollars,
-      incrementalWinAmount: dataPoint.incrementalWinAmount,
-      incrementalPlaceAmount: dataPoint.incrementalPlaceAmount,
-      requestedPoolType,
-      timeInterval: dataPoint.timeInterval
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`💰 SIMPLIFIED display for entrant ${entrantId}, interval ${interval}:`, {
+        displayAmount,
+        amountInDollars,
+        incrementalWinAmount: dataPoint.incrementalWinAmount,
+        incrementalPlaceAmount: dataPoint.incrementalPlaceAmount,
+        requestedPoolType,
+        timeInterval: dataPoint.timeInterval
+      });
+    }
     
     // Format for display: 60m shows baseline ($2,341), others show increment (+$344)
     if (amountInDollars <= 0) {
@@ -275,7 +301,9 @@ export function useMoneyFlowTimeline(
     // Skip real-time subscriptions for completed races to preserve final state
     const isRaceComplete = raceStatus && ['Final', 'Finalized', 'Abandoned', 'Cancelled'].includes(raceStatus);
     if (isRaceComplete) {
-      console.log(`🏁 Race ${raceId} is complete (status: ${raceStatus}), skipping real-time subscription`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`🏁 Race ${raceId} is complete (status: ${raceStatus}), skipping real-time subscription`);
+      }
       return;
     }
 
@@ -287,7 +315,9 @@ export function useMoneyFlowTimeline(
       const channels = [`databases.raceday-db.collections.money-flow-history.documents`];
       
       unsubscribe = client.subscribe(channels, (response: any) => {
-        console.log('💰 Money flow real-time update received:', response);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('💰 Money flow real-time update received:', response);
+        }
         
         // Check if this update affects our entrants
         const updatedEntrant = response.payload?.entrant;
@@ -298,7 +328,9 @@ export function useMoneyFlowTimeline(
         );
         
         if (isRelevantUpdate) {
-          console.log('📊 Relevant money flow update for entrant:', updatedEntrant);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('📊 Relevant money flow update for entrant:', updatedEntrant);
+          }
           
           // Debounce rapid updates with a small delay
           setTimeout(() => {
@@ -307,7 +339,9 @@ export function useMoneyFlowTimeline(
         }
       });
 
-      console.log('🔔 Money flow timeline subscription established for channels:', channels);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔔 Money flow timeline subscription established for channels:', channels);
+      }
 
     } catch (subscriptionError) {
       console.error('❌ Failed to establish money flow timeline subscription:', subscriptionError);
@@ -318,7 +352,9 @@ export function useMoneyFlowTimeline(
       if (unsubscribe) {
         try {
           unsubscribe();
-          console.log('🔕 Money flow timeline subscription closed');
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔕 Money flow timeline subscription closed');
+          }
         } catch (error) {
           console.warn('Error unsubscribing from money flow timeline updates:', error);
         }
@@ -342,7 +378,8 @@ export function useMoneyFlowTimeline(
  * Standardizes incremental calculation logic to eliminate inconsistencies
  */
 function processTimelineData(documents: ServerMoneyFlowPoint[], entrantIds: string[], poolType: string, isBucketed: boolean = false): Map<string, EntrantMoneyFlowTimeline> {
-  console.log('📊 Processing timeline data (unified approach):', {
+  if (process.env.NODE_ENV === 'development') {
+    console.log('📊 Processing timeline data (unified approach):', {
     documentsCount: documents.length,
     entrantIds: entrantIds.length,
     poolType,
@@ -364,7 +401,9 @@ function processTimelineData(documents: ServerMoneyFlowPoint[], entrantIds: stri
       return acc;
     }, {} as Record<string, number>);
     
-    console.log('📊 Document distribution by interval:', intervalDistribution);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📊 Document distribution by interval:', intervalDistribution);
+    }
     
     // Identify critical period coverage
     const criticalIntervals = [5, 4, 3, 2, 1, 0];
@@ -375,11 +414,13 @@ function processTimelineData(documents: ServerMoneyFlowPoint[], entrantIds: stri
       console.warn('⚠️ Missing critical intervals (5m-0s period):', missingCritical);
     }
     
-    console.log('🎯 Critical period (5m-0s) coverage:', {
-      covered: criticalCoverage,
-      missing: missingCritical,
-      coveragePercent: Math.round((criticalCoverage.length / criticalIntervals.length) * 100)
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🎯 Critical period (5m-0s) coverage:', {
+        covered: criticalCoverage,
+        missing: missingCritical,
+        coveragePercent: Math.round((criticalCoverage.length / criticalIntervals.length) * 100)
+      });
+    }
   }
   
   const entrantDataMap = new Map<string, EntrantMoneyFlowTimeline>();
@@ -392,7 +433,9 @@ function processTimelineData(documents: ServerMoneyFlowPoint[], entrantIds: stri
     });
     
     if (entrantDocs.length === 0) {
-      console.log(`⚠️ No documents found for entrant ${entrantId}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`⚠️ No documents found for entrant ${entrantId}`);
+      }
       // Create empty entry to maintain consistency
       entrantDataMap.set(entrantId, {
         entrantId,
@@ -404,7 +447,9 @@ function processTimelineData(documents: ServerMoneyFlowPoint[], entrantIds: stri
       continue;
     }
     
-    console.log(`📊 Processing entrant ${entrantId}: ${entrantDocs.length} documents`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📊 Processing entrant ${entrantId}: ${entrantDocs.length} documents`);
+    }
     
     // Group documents by time interval to handle duplicates
     const intervalMap = new Map<number, ServerMoneyFlowPoint[]>();
@@ -486,13 +531,17 @@ function processTimelineData(documents: ServerMoneyFlowPoint[], entrantIds: stri
       significantChange
     });
     
-    console.log(`✅ Processed entrant ${entrantId}: ${timelinePoints.length} timeline points using server pre-calculated data`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`✅ Processed entrant ${entrantId}: ${timelinePoints.length} timeline points using server pre-calculated data`);
+    }
   }
   
-  console.log('📊 Timeline processing complete:', {
-    entrantsProcessed: entrantDataMap.size,
-    totalDataPoints: Array.from(entrantDataMap.values()).reduce((sum, data) => sum + data.dataPoints.length, 0)
-  });
+  if (process.env.NODE_ENV === 'development') {
+    console.log('📊 Timeline processing complete:', {
+      entrantsProcessed: entrantDataMap.size,
+      totalDataPoints: Array.from(entrantDataMap.values()).reduce((sum, data) => sum + data.dataPoints.length, 0)
+    });
+  }
   
   return entrantDataMap;
 }
@@ -522,3 +571,5 @@ function getPollingIntervalFromType(intervalType?: string): number {
   }
 }
 
+// Close the main useMoneyFlowTimeline function
+}
