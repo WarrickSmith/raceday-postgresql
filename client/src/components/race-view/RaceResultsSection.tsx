@@ -15,12 +15,14 @@ interface RaceResultsSectionProps {
     }
   >
   className?: string
+  lastUpdate?: Date | null
 }
 
 export const RaceResultsSection = memo(function RaceResultsSection({
   resultsData,
   fixedOddsData,
   className = '',
+  lastUpdate,
 }: RaceResultsSectionProps) {
   // Helper function to format runner names to proper case
   const formatRunnerName = (name: string) => {
@@ -340,6 +342,31 @@ export const RaceResultsSection = memo(function RaceResultsSection({
           </div>
         </div>
       </div>
+
+      {/* Last updated from real-time subscription */}
+      {(lastUpdate || resultsData?.resultTime) && (
+        <div className="mt-2 text-xs text-gray-400">
+          Updated:{' '}
+          {lastUpdate ? 
+            lastUpdate.toLocaleTimeString('en-US', {
+              hour12: false,
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            })
+            : resultsData?.resultTime ? 
+              new Date(resultsData.resultTime).toLocaleTimeString('en-US', {
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+              : '—'
+          }
+          {lastUpdate && (
+            <span className="ml-1 text-green-500">●</span>
+          )}
+        </div>
+      )}
     </div>
   )
 })
