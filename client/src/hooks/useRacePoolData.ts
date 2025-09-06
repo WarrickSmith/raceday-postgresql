@@ -22,7 +22,7 @@ export function useRacePoolData(raceId: string): UseRacePoolDataResult {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // Fetch pool data from API
+  // Fetch pool data from Appwrite database
   const fetchPoolData = useCallback(async () => {
     if (!raceId) return;
 
@@ -30,14 +30,34 @@ export function useRacePoolData(raceId: string): UseRacePoolDataResult {
     setError(null);
 
     try {
-      const response = await fetch(`/api/race/${raceId}/pools`);
+      const { databases } = await import('@/lib/appwrite-client');
+      const { Query } = await import('appwrite');
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch pool data: ${response.statusText}`);
+      const response = await databases.listDocuments(
+        'raceday-db',
+        'race-pools',
+        [Query.equal('raceId', raceId), Query.limit(1)]
+      );
+      
+      if (response.documents.length > 0) {
+        const poolDoc = response.documents[0];
+        const poolData: RacePoolData = {
+          raceId: poolDoc.raceId,
+          winPoolTotal: poolDoc.winPoolTotal || 0,
+          placePoolTotal: poolDoc.placePoolTotal || 0,
+          quinellaPoolTotal: poolDoc.quinellaPoolTotal || 0,
+          trifectaPoolTotal: poolDoc.trifectaPoolTotal || 0,
+          exactaPoolTotal: poolDoc.exactaPoolTotal || 0,
+          first4PoolTotal: poolDoc.first4PoolTotal || 0,
+          totalRacePool: poolDoc.totalRacePool || 0,
+          currency: poolDoc.currency || '$',
+          lastUpdated: poolDoc.$updatedAt,
+        };
+        setPoolData(poolData);
+      } else {
+        setPoolData(null);
       }
-
-      const data = await response.json();
-      setPoolData(data);
+      
       setLastUpdate(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error occurred');
