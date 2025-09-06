@@ -5,8 +5,9 @@ import type { RacePoolData } from '@/types/racePools'
 
 interface RacePoolsSectionProps {
   raceId: string
-  poolData?: RacePoolData
+  poolData?: RacePoolData | null
   className?: string
+  lastUpdate?: Date | null
 }
 
 const formatPoolAmount = (cents: number): string => {
@@ -21,12 +22,13 @@ export const RacePoolsSection = memo(function RacePoolsSection({
   raceId,
   poolData,
   className = '',
+  lastUpdate,
 }: RacePoolsSectionProps) {
-  const { poolData: livePoolData, isLoading, error } = useRacePoolData(raceId)
+  // Use poolData from unified subscription if available, otherwise use fallback hook for data persistence
+  const { poolData: fallbackPoolData, isLoading, error } = useRacePoolData(poolData ? '' : raceId)
+  const currentPoolData = poolData || fallbackPoolData
 
-  const currentPoolData = livePoolData || poolData
-
-  if (isLoading) {
+  if (isLoading && !poolData) {
     return (
       <div className={`${className}`}>
         <div className="animate-pulse">
@@ -42,7 +44,7 @@ export const RacePoolsSection = memo(function RacePoolsSection({
     )
   }
 
-  if (error) {
+  if (error && !poolData) {
     return (
       <div className={`text-red-600 text-sm ${className}`}>
         <div className="text-xs text-gray-500 mb-1">Pool Data</div>
@@ -135,14 +137,27 @@ export const RacePoolsSection = memo(function RacePoolsSection({
         ))}
       </div>
 
-      {/* Last updated small */}
+      {/* Last updated from real-time subscription */}
       <div className="mt-2 text-xs text-gray-400">
         Updated:{' '}
-        {new Date(currentPoolData.lastUpdated).toLocaleTimeString('en-US', {
-          hour12: true,
-          hour: 'numeric',
-          minute: '2-digit',
-        })}
+        {lastUpdate ? 
+          lastUpdate.toLocaleTimeString('en-US', {
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          })
+          : currentPoolData?.lastUpdated ? 
+            new Date(currentPoolData.lastUpdated).toLocaleTimeString('en-US', {
+              hour12: false,
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+            : '—'
+        }
+        {lastUpdate && (
+          <span className="ml-1 text-green-500">●</span>
+        )}
       </div>
     </div>
   )
