@@ -138,6 +138,84 @@ export function useRacePageRealtime({
   const pendingUpdates = useRef<AppwriteRealtimeMessage[]>([]);
   const updateThrottleTimer = useRef<NodeJS.Timeout | null>(null);
   const THROTTLE_DELAY = 100; // 100ms for critical periods as per requirements
+  
+  // Subscription recreation functionality for dynamic channel updates
+  const subscriptionRecreationInProgress = useRef<boolean>(false);
+  const processRealtimeMessageRef = useRef<((message: AppwriteRealtimeMessage) => void) | null>(null);
+  
+  const recreateSubscriptionWithNewChannels = useCallback(async () => {
+    if (subscriptionRecreationInProgress.current) {
+      debugLog('Subscription recreation already in progress, skipping');
+      return;
+    }
+    
+    subscriptionRecreationInProgress.current = true;
+    
+    try {
+      debugLog('🔄 RECREATING subscription with race-results document-specific channel', {
+        raceId,
+        raceDocumentId: state.raceDocumentId,
+        raceResultsDocumentId: state.raceResultsDocumentId
+      });
+      
+      // Clear existing subscription
+      if (unsubscribeFunction.current) {
+        unsubscribeFunction.current();
+        unsubscribeFunction.current = null;
+      }
+      
+      // Rebuild channels with document-specific race-results channel
+      const channels = [
+        `databases.raceday-db.collections.races.documents.${state.raceDocumentId || raceId}`,
+        'databases.raceday-db.collections.race-pools.documents',
+        'databases.raceday-db.collections.race-results.documents',
+      ];
+
+      // Add entrant-specific subscriptions if available
+      if (state.entrants && state.entrants.length > 0) {
+        state.entrants.forEach(entrant => {
+          if (entrant.$id) {
+            channels.push(`databases.raceday-db.collections.entrants.documents.${entrant.$id}`);
+          }
+        });
+      } else {
+        channels.push('databases.raceday-db.collections.entrants.documents');
+      }
+
+      channels.push('databases.raceday-db.collections.money-flow-history.documents');
+      channels.push('databases.raceday-db.collections.odds-history.documents');
+
+      // CRITICAL: Add race-results document-specific channel if we now have the ID
+      if (state.raceResultsDocumentId) {
+        channels.push(`databases.raceday-db.collections.race-results.documents.${state.raceResultsDocumentId}`);
+        debugLog('✅ Added document-specific race-results channel', { documentId: state.raceResultsDocumentId });
+      }
+
+      // Create new subscription using the ref to avoid circular dependency
+      unsubscribeFunction.current = client.subscribe(
+        channels,
+        (response: any) => {
+          debugLog('📡 RECREATED subscription event received', {
+            channels: response.channels?.length || 0,
+            events: response.events
+          });
+          if (processRealtimeMessageRef.current) {
+            processRealtimeMessageRef.current(response);
+          }
+        }
+      );
+      
+      debugLog('🎯 Subscription recreated successfully with enhanced channels', {
+        totalChannels: channels.length,
+        hasRaceResultsSpecific: !!state.raceResultsDocumentId
+      });
+      
+    } catch (error) {
+      errorLog('Failed to recreate subscription', error);
+    } finally {
+      subscriptionRecreationInProgress.current = false;
+    }
+  }, [raceId, state.raceDocumentId, state.raceResultsDocumentId, state.entrants]);
 
   // Fetch initial data if not provided - use API endpoint for complete race data
   const fetchInitialData = useCallback(async () => {
@@ -546,9 +624,17 @@ export function useRacePageRealtime({
         }
         
         else if (channels.some(ch => ch.includes('collections.race-results.documents'))) {
-          // ENHANCED DEBUG: Detailed race-results event analysis
-          debugLog('Race-results event received', {
+          // ENHANCED EVENT TYPE DETECTION: Analyze CREATE vs UPDATE vs DELETE events
+          const eventTypes = events || [];
+          const isCreateEvent = eventTypes.some(event => event.includes('.create'));
+          const isUpdateEvent = eventTypes.some(event => event.includes('.update'));
+          const isDeleteEvent = eventTypes.some(event => event.includes('.delete'));
+          
+          // ENHANCED DEBUG: Detailed race-results event analysis with event type detection
+          debugLog('Race-results event received with event type analysis', {
             channels: channels,
+            events: events,
+            eventType: isCreateEvent ? 'CREATE' : isUpdateEvent ? 'UPDATE' : isDeleteEvent ? 'DELETE' : 'UNKNOWN',
             raceId: raceId,
             currentRaceDocumentId: newState.raceDocumentId,
             currentRaceResultsDocumentId: newState.raceResultsDocumentId,
@@ -559,7 +645,8 @@ export function useRacePageRealtime({
             payloadResultsAvailable: payload?.resultsAvailable,
             hasResultsData: !!payload?.resultsData,
             hasDividendsData: !!payload?.dividendsData,
-            payloadKeys: payload ? Object.keys(payload) : []
+            payloadKeys: payload ? Object.keys(payload) : [],
+            isLikelyFinalResultsUpdate: isUpdateEvent && payload?.resultStatus === 'final'
           });
           
           // Determine if this is a specific race-results document update or generic collection update
@@ -586,11 +673,47 @@ export function useRacePageRealtime({
           });
 
           if (isMatchingRace) {
-            // Check if this is a new race-results document creation
-            if (!newState.raceResultsDocumentId && payload.$id && payload.race === newState.raceDocumentId) {
-              // Update state with new document ID to enable specific subscriptions
-              newState.raceResultsDocumentId = payload.$id;
-              hasUpdates = true;
+            // ENHANCED: Handle both CREATE and UPDATE events differently
+            if (isCreateEvent) {
+              // Handle document creation - learn document ID for future subscriptions
+              if (!newState.raceResultsDocumentId && payload.$id && payload.race === newState.raceDocumentId) {
+                // Update state with new document ID to enable specific subscriptions
+                newState.raceResultsDocumentId = payload.$id;
+                hasUpdates = true;
+
+                debugLog('🎯 RACE-RESULTS DOCUMENT CREATED - Learning ID and triggering subscription recreation', {
+                  newRaceResultsDocumentId: payload.$id,
+                  eventType: 'CREATE',
+                  willRecreateSubscription: true
+                });
+
+                // CRITICAL FIX: Immediately recreate subscription to include document-specific channel
+                // This ensures that final results (UPDATE events) to this document are properly captured
+                setTimeout(() => {
+                  recreateSubscriptionWithNewChannels();
+                }, 100); // Small delay to allow current state update to complete
+              }
+            } else if (isUpdateEvent) {
+              // ENHANCED UPDATE PROCESSING: Handle updates to existing race-results documents
+              debugLog('📝 RACE-RESULTS DOCUMENT UPDATE DETECTED', {
+                documentId: payload.$id,
+                eventType: 'UPDATE',
+                currentRaceResultsDocId: newState.raceResultsDocumentId,
+                isSpecificDocumentUpdate,
+                resultStatus: payload.resultStatus,
+                hasResultsData: !!payload.resultsData,
+                hasDividendsData: !!payload.dividendsData,
+                updateType: payload.resultStatus === 'final' ? 'INTERIM_TO_FINAL' : 'GENERAL_UPDATE'
+              });
+              
+              // Special handling for interim to final transition
+              if (payload.resultStatus === 'final' && newState.resultsData?.status === 'interim') {
+                debugLog('🏁 INTERIM TO FINAL RESULTS TRANSITION DETECTED', {
+                  previousStatus: newState.resultsData?.status,
+                  newStatus: payload.resultStatus,
+                  documentId: payload.$id
+                });
+              }
             }
             
             // Enhanced results processing - handle interim results without requiring all data
@@ -625,11 +748,30 @@ export function useRacePageRealtime({
                   }
                 }
 
+                // ENHANCED RESULT STATUS CHANGE DETECTION
+                const currentStatus = newState.resultsData?.status;
+                const newStatus = payload.resultStatus?.toLowerCase();
+                const statusChanged = currentStatus && newStatus && currentStatus !== newStatus;
+                
+                if (statusChanged) {
+                  debugLog('🔄 RESULT STATUS CHANGE DETECTED', {
+                    previousStatus: currentStatus,
+                    newStatus: newStatus,
+                    transitionType: currentStatus === 'interim' && newStatus === 'final' ? 'INTERIM_TO_FINAL' : 'OTHER',
+                    documentId: payload.$id
+                  });
+                }
+                
                 // Create results data if we have results or if status indicates results should be available
                 const hasValidResults = Array.isArray(results) && results.length > 0;
                 const isResultStatus = payload.resultStatus && ['interim', 'final'].includes(payload.resultStatus.toLowerCase());
                 
-                if (hasValidResults || (isResultStatus && payload.resultsAvailable)) {
+                // FALLBACK STRATEGY: If status changed but no new data provided, try to preserve existing data
+                const shouldCreateResultsData = hasValidResults || 
+                  (isResultStatus && payload.resultsAvailable) || 
+                  (statusChanged && newState.resultsData); // Status change with existing data
+                
+                if (shouldCreateResultsData) {
                   // Use existing results if no new results provided but status updated
                   const finalResults = hasValidResults ? results : (newState.resultsData?.results || []);
                   
@@ -638,26 +780,38 @@ export function useRacePageRealtime({
                     ? fixedOddsData 
                     : (newState.resultsData?.fixedOddsData || {});
                   
+                  // FALLBACK: Preserve existing dividends if not provided in update
+                  const finalDividends = dividends.length > 0 
+                    ? dividends 
+                    : (newState.resultsData?.dividends || []);
+                  
                   const newResultsData = {
                     raceId,
                     results: finalResults,
-                    dividends,
+                    dividends: finalDividends,
                     fixedOddsData: finalFixedOddsData,
-                    status: payload.resultStatus?.toLowerCase() || 'interim',
-                    photoFinish: payload.photoFinish || false,
-                    stewardsInquiry: payload.stewardsInquiry || false,
-                    protestLodged: payload.protestLodged || false,
-                    resultTime: payload.resultTime || now.toISOString(),
+                    status: newStatus || currentStatus || 'interim',
+                    photoFinish: payload.photoFinish !== undefined ? payload.photoFinish : (newState.resultsData?.photoFinish || false),
+                    stewardsInquiry: payload.stewardsInquiry !== undefined ? payload.stewardsInquiry : (newState.resultsData?.stewardsInquiry || false),
+                    protestLodged: payload.protestLodged !== undefined ? payload.protestLodged : (newState.resultsData?.protestLodged || false),
+                    resultTime: payload.resultTime || (newState.resultsData?.resultTime) || now.toISOString(),
                   };
                   
                   debugLog('🏆 CREATING RESULTS DATA for UI', {
                     raceId,
                     resultsCount: finalResults.length,
-                    dividendsCount: dividends.length,
+                    dividendsCount: finalDividends.length,
                     fixedOddsCount: Object.keys(finalFixedOddsData).length,
                     status: newResultsData.status,
                     resultTime: newResultsData.resultTime,
-                    previousResultsData: !!newState.resultsData
+                    previousResultsData: !!newState.resultsData,
+                    statusChanged: statusChanged,
+                    eventType: isCreateEvent ? 'CREATE' : isUpdateEvent ? 'UPDATE' : 'UNKNOWN',
+                    preservedData: {
+                      preservedResults: !hasValidResults && finalResults.length > 0,
+                      preservedDividends: dividends.length === 0 && finalDividends.length > 0,
+                      preservedFixedOdds: Object.keys(fixedOddsData).length === 0 && Object.keys(finalFixedOddsData).length > 0
+                    }
                   });
                   
                   newState.resultsData = newResultsData;
@@ -670,13 +824,13 @@ export function useRacePageRealtime({
                       ...newState.race,
                       resultsAvailable: true,
                       resultsData: finalResults,
-                      dividendsData: dividends,
+                      dividendsData: finalDividends,
                       fixedOddsData: finalFixedOddsData,
-                      resultStatus: payload.resultStatus?.toLowerCase() || 'interim',
-                      photoFinish: payload.photoFinish || false,
-                      stewardsInquiry: payload.stewardsInquiry || false,
-                      protestLodged: payload.protestLodged || false,
-                      resultTime: payload.resultTime || now.toISOString(),
+                      resultStatus: newStatus || currentStatus || 'interim',
+                      photoFinish: payload.photoFinish !== undefined ? payload.photoFinish : (newState.resultsData?.photoFinish || false),
+                      stewardsInquiry: payload.stewardsInquiry !== undefined ? payload.stewardsInquiry : (newState.resultsData?.stewardsInquiry || false),
+                      protestLodged: payload.protestLodged !== undefined ? payload.protestLodged : (newState.resultsData?.protestLodged || false),
+                      resultTime: payload.resultTime || (newState.resultsData?.resultTime) || now.toISOString(),
                     };
                     
                     debugLog('🏁 RACE OBJECT UPDATED with results data for consistency', {
@@ -684,6 +838,69 @@ export function useRacePageRealtime({
                       resultsAvailable: newState.race.resultsAvailable,
                       resultStatus: newState.race.resultStatus
                     });
+                  }
+                  
+                  // PROACTIVE FALLBACK STRATEGY: Set up polling for final results if still interim
+                  if (isUpdateEvent && newResultsData.status === 'interim') {
+                    debugLog('⚠️ SETTING UP FALLBACK POLLING for potential final results', {
+                      currentStatus: newResultsData.status,
+                      documentId: payload.$id,
+                      raceResultsDocumentId: newState.raceResultsDocumentId
+                    });
+                    
+                    // Set up delayed polling to check for final results in case UPDATE event is missed
+                    setTimeout(async () => {
+                      try {
+                        const { databases } = await import('@/lib/appwrite-client');
+                        const { Query } = await import('appwrite');
+                        
+                        const documentIdToCheck = payload.$id || newState.raceResultsDocumentId;
+                        if (documentIdToCheck) {
+                          const docResponse = await databases.getDocument(
+                            'raceday-db',
+                            'race-results',
+                            documentIdToCheck
+                          );
+                          
+                          if (docResponse.resultStatus === 'final') {
+                            debugLog('🔄 FALLBACK POLLING found final results - triggering update', {
+                              documentId: documentIdToCheck,
+                              foundStatus: docResponse.resultStatus
+                            });
+                            
+                            // Simulate a real-time UPDATE event with final results
+                            setState(fallbackState => {
+                              if (fallbackState.resultsData?.status === 'interim') {
+                                const updatedResultsData = {
+                                  ...fallbackState.resultsData,
+                                  status: 'final' as const,
+                                  dividends: docResponse.dividendsData ? 
+                                    (typeof docResponse.dividendsData === 'string' ? 
+                                      JSON.parse(docResponse.dividendsData) : docResponse.dividendsData) : 
+                                    fallbackState.resultsData.dividends,
+                                  resultTime: docResponse.resultTime || fallbackState.resultsData.resultTime
+                                };
+                                
+                                return {
+                                  ...fallbackState,
+                                  resultsData: updatedResultsData,
+                                  lastResultsUpdate: new Date(),
+                                  race: fallbackState.race ? {
+                                    ...fallbackState.race,
+                                    resultStatus: 'final',
+                                    dividendsData: updatedResultsData.dividends,
+                                    resultTime: updatedResultsData.resultTime
+                                  } : fallbackState.race
+                                };
+                              }
+                              return fallbackState;
+                            });
+                          }
+                        }
+                      } catch (fallbackError) {
+                        errorLog('Fallback polling for final results failed', fallbackError);
+                      }
+                    }, 30000); // Poll after 30 seconds for final results
                   }
                 }
               } catch (error) {
@@ -746,6 +963,9 @@ export function useRacePageRealtime({
       errorLog('Error processing real-time message', error);
     }
   }, [applyPendingUpdates]);
+
+  // Update the ref with the current function
+  processRealtimeMessageRef.current = processRealtimeMessage;
 
   // Setup unified Appwrite real-time subscription
   useEffect(() => {
@@ -838,7 +1058,9 @@ export function useRacePageRealtime({
                 events: response.events?.length || 0
               });
             }
-            processRealtimeMessage(response);
+            if (processRealtimeMessageRef.current) {
+              processRealtimeMessageRef.current(response);
+            }
           }
         );
 
