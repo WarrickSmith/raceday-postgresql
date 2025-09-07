@@ -23,6 +23,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
   lastUpdate,
   entrants = [],
 }: RaceResultsSectionProps) {
+  
   // Helper function to format runner names to proper case
   const formatRunnerName = (name: string) => {
     return name
@@ -30,6 +31,40 @@ export const RaceResultsSection = memo(function RaceResultsSection({
       .split(' ')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ')
+  }
+
+  // Enhanced helper function to extract runner number from various API field formats
+  const getRunnerNumber = (result: any): number | undefined => {
+    return result.runner_number || result.runnerNumber || result.number || result.no;
+  }
+
+  // Enhanced helper function to extract runner name from various API field formats
+  const getRunnerName = (result: any): string => {
+    return result.name || result.runnerName || result.horse_name || result.horseName || '';
+  }
+
+  // Helper function to determine if results are complete (final vs interim)
+  const areResultsComplete = (): boolean => {
+    if (!resultsData) return false;
+    
+    // Check if status explicitly indicates final results
+    if (resultsData.status === 'final') return true;
+    if (resultsData.status === 'interim') return false;
+    
+    // Fall back to checking if dividends are available (indicates final results)
+    return resultsData.dividends && resultsData.dividends.length > 0;
+  }
+
+  // Status indicator for result type
+  const getResultStatusIndicator = () => {
+    if (!resultsData) return '';
+    
+    const isComplete = areResultsComplete();
+    if (isComplete) {
+      return <span className="ml-2 text-xs text-green-600 font-semibold">FINAL</span>;
+    } else {
+      return <span className="ml-2 text-xs text-yellow-600 font-semibold">INTERIM</span>;
+    }
   }
 
   if (!resultsData || resultsData.results.length === 0) {
@@ -109,14 +144,6 @@ export const RaceResultsSection = memo(function RaceResultsSection({
     )
   }
 
-  // Helper function to get win/place odds for a specific runner number from entrants data
-  const getRunnerOdds = (runnerNumber: number, oddsType: 'win' | 'place') => {
-    const entrant = entrants.find(e => e.runnerNumber === runnerNumber)
-    if (!entrant) return null
-    
-    const odds = oddsType === 'win' ? entrant.winOdds : entrant.placeOdds
-    return odds || null
-  }
 
   // Helper function to find dividend by poolType - handles NZTAB product_name format
   const findDividend = (type: string) => {
@@ -151,11 +178,42 @@ export const RaceResultsSection = memo(function RaceResultsSection({
     })
   }
 
+  // Helper function to get fixed odds for a specific position and bet type
+  const getFixedOdds = (position: number, type: 'win' | 'place'): string => {
+    if (!resultsData || !resultsData.results || resultsData.results.length === 0) {
+      return '—'
+    }
+    
+    if (!resultsData.results[position - 1] || !resultsData.fixedOddsData) {
+      return '—'
+    }
+
+    const result = resultsData.results[position - 1]
+    const runnerNumber = getRunnerNumber(result)?.toString()
+    
+    if (!runnerNumber || !resultsData.fixedOddsData[runnerNumber]) {
+      return '—'
+    }
+
+    const fixedOdds = resultsData.fixedOddsData[runnerNumber]
+    const oddsValue = type === 'win' ? fixedOdds.fixed_win : fixedOdds.fixed_place
+    
+    if (typeof oddsValue === 'number' && oddsValue > 0) {
+      // Fixed odds data is already in dollar format - no conversion needed
+      return `$${oddsValue.toFixed(2)}`;
+    }
+
+    return '—'
+  }
+
 
   return (
     <div className={`${className}`}>
-      <div className="text-sm text-gray-500 uppercase tracking-wide font-semibold mb-1">
-        Results
+      <div className="flex items-center mb-1">
+        <div className="text-sm text-gray-500 uppercase tracking-wide font-semibold">
+          Results
+        </div>
+        {getResultStatusIndicator()}
       </div>
 
       {/* Column Headers - Pos, No, Runner, Win, Place + blank columns for bet types */}
@@ -181,47 +239,18 @@ export const RaceResultsSection = memo(function RaceResultsSection({
         <div className="grid grid-cols-8 gap-2 items-baseline text-sm">
           <div className="col-span-1 text-blue-500 font-bold">1st</div>
           <div className="col-span-1 text-gray-900 font-bold">
-            {resultsData?.results[0]
-              ? resultsData.results[0].runner_number ||
-                resultsData.results[0].runnerNumber
-              : '—'}
+            {resultsData?.results[0] ? getRunnerNumber(resultsData.results[0]) || '—' : '—'}
           </div>
           <div className="col-span-2 text-gray-900">
             {resultsData?.results[0]
-              ? formatRunnerName(
-                  resultsData.results[0].name ||
-                    resultsData.results[0].runnerName ||
-                    ''
-                )
+              ? formatRunnerName(getRunnerName(resultsData.results[0]))
               : '—'}
           </div>
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
-            {(() => {
-              if (resultsData?.results[0]) {
-                const runnerNumber =
-                  resultsData.results[0].runner_number ||
-                  resultsData.results[0].runnerNumber
-                const winOdds = runnerNumber ? getRunnerOdds(runnerNumber, 'win') : null
-                if (winOdds) {
-                  return `$${winOdds.toFixed(2)}`
-                }
-              }
-              return '—'
-            })()}
+            {getFixedOdds(1, 'win')}
           </div>
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
-            {(() => {
-              if (resultsData?.results[0]) {
-                const runnerNumber =
-                  resultsData.results[0].runner_number ||
-                  resultsData.results[0].runnerNumber
-                const placeOdds = runnerNumber ? getRunnerOdds(runnerNumber, 'place') : null
-                if (placeOdds) {
-                  return `$${placeOdds.toFixed(2)}`
-                }
-              }
-              return '—'
-            })()}
+            {getFixedOdds(1, 'place')}
           </div>
           <div className="col-span-1 text-gray-600">Quinella</div>
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
@@ -235,34 +264,16 @@ export const RaceResultsSection = memo(function RaceResultsSection({
         <div className="grid grid-cols-8 gap-2 items-baseline text-sm">
           <div className="col-span-1 text-blue-500 font-bold">2nd</div>
           <div className="col-span-1 text-gray-900 font-bold">
-            {resultsData?.results[1]
-              ? resultsData.results[1].runner_number ||
-                resultsData.results[1].runnerNumber
-              : '—'}
+            {resultsData?.results[1] ? getRunnerNumber(resultsData.results[1]) || '—' : '—'}
           </div>
           <div className="col-span-2 text-gray-900">
             {resultsData?.results[1]
-              ? formatRunnerName(
-                  resultsData.results[1].name ||
-                    resultsData.results[1].runnerName ||
-                    ''
-                )
+              ? formatRunnerName(getRunnerName(resultsData.results[1]))
               : '—'}
           </div>
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum"></div>
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
-            {(() => {
-              if (resultsData?.results[1]) {
-                const runnerNumber =
-                  resultsData.results[1].runner_number ||
-                  resultsData.results[1].runnerNumber
-                const placeOdds = runnerNumber ? getRunnerOdds(runnerNumber, 'place') : null
-                if (placeOdds) {
-                  return `$${placeOdds.toFixed(2)}`
-                }
-              }
-              return '—'
-            })()}
+            {getFixedOdds(2, 'place')}
           </div>
           <div className="col-span-1 text-gray-600">Trifecta</div>
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
@@ -276,34 +287,16 @@ export const RaceResultsSection = memo(function RaceResultsSection({
         <div className="grid grid-cols-8 gap-2 items-baseline text-sm">
           <div className="col-span-1 text-blue-500 font-bold">3rd</div>
           <div className="col-span-1 text-gray-900 font-bold">
-            {resultsData?.results[2]
-              ? resultsData.results[2].runner_number ||
-                resultsData.results[2].runnerNumber
-              : '—'}
+            {resultsData?.results[2] ? getRunnerNumber(resultsData.results[2]) || '—' : '—'}
           </div>
           <div className="col-span-2 text-gray-900">
             {resultsData?.results[2]
-              ? formatRunnerName(
-                  resultsData.results[2].name ||
-                    resultsData.results[2].runnerName ||
-                    ''
-                )
+              ? formatRunnerName(getRunnerName(resultsData.results[2]))
               : '—'}
           </div>
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum"></div>
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
-            {(() => {
-              if (resultsData?.results[2]) {
-                const runnerNumber =
-                  resultsData.results[2].runner_number ||
-                  resultsData.results[2].runnerNumber
-                const placeOdds = runnerNumber ? getRunnerOdds(runnerNumber, 'place') : null
-                if (placeOdds) {
-                  return `$${placeOdds.toFixed(2)}`
-                }
-              }
-              return '—'
-            })()}
+            {getFixedOdds(3, 'place')}
           </div>
           <div className="col-span-1 text-gray-600">FirstFour</div>
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">

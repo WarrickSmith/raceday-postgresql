@@ -48,6 +48,12 @@ export function RacePageContent() {
       raceId: currentRace.raceId,
       results: currentRace.resultsData,
       dividends: currentRace.dividendsData || [], // Dividends optional for interim results
+      // Parse fixedOddsData from race data (critical for win/place display)
+      fixedOddsData: currentRace.fixedOddsData 
+        ? (typeof currentRace.fixedOddsData === 'string' 
+            ? JSON.parse(currentRace.fixedOddsData) 
+            : currentRace.fixedOddsData)
+        : {},
       status: currentRace.resultStatus || 'interim', // Default to interim for early results
       photoFinish: currentRace.photoFinish || false,
       stewardsInquiry: currentRace.stewardsInquiry || false,
