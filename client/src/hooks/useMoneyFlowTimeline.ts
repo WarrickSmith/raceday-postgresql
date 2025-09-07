@@ -380,18 +380,18 @@ export function useMoneyFlowTimeline(
 function processTimelineData(documents: ServerMoneyFlowPoint[], entrantIds: string[], poolType: string, isBucketed: boolean = false): Map<string, EntrantMoneyFlowTimeline> {
   if (process.env.NODE_ENV === 'development') {
     console.log('📊 Processing timeline data (unified approach):', {
-    documentsCount: documents.length,
-    entrantIds: entrantIds.length,
-    poolType,
-    isBucketed,
-    sampleDoc: documents[0] ? {
-      entrant: documents[0].entrant,
-      timeInterval: (documents[0] as any).timeInterval,
-      timeToStart: documents[0].timeToStart,
-      winPoolAmount: documents[0].winPoolAmount,
-      incrementalWinAmount: (documents[0] as any).incrementalWinAmount
-    } : null
-  });
+      documentsCount: documents.length,
+      entrantIds: entrantIds.length,
+      poolType,
+      isBucketed,
+      sampleDoc: documents[0] ? {
+        entrant: documents[0].entrant,
+        timeInterval: (documents[0] as any).timeInterval,
+        timeToStart: documents[0].timeToStart,
+        winPoolAmount: documents[0].winPoolAmount,
+        incrementalWinAmount: (documents[0] as any).incrementalWinAmount
+      } : null
+    });
   
   // Enhanced debugging: analyze document distribution by time interval
   if (documents.length > 0) {
@@ -571,5 +571,4 @@ function getPollingIntervalFromType(intervalType?: string): number {
   }
 }
 
-// Close the main useMoneyFlowTimeline function
-}
+// End of file

@@ -61,6 +61,21 @@ export function RacePageContent() {
       resultTime: currentRace.resultTime || new Date().toISOString()
     } : undefined)
 
+  // CRITICAL DEBUG: Log results data flow to UI
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🏆 RACE PAGE CONTENT - Results Data Analysis:', {
+      raceId: currentRace.raceId,
+      raceStatus: currentRace.status,
+      raceResultStatus: currentRace.resultStatus,
+      raceResultsAvailable: currentRace.resultsAvailable,
+      hasRaceResultsData: !!currentRace.resultsData,
+      hasRealtimeResultsData: !!realtimeData.resultsData,
+      finalResultsData: !!currentResultsData,
+      realtimeLastUpdate: realtimeData.lastResultsUpdate,
+      resultDataSource: realtimeData.resultsData ? 'REALTIME' : currentRace.resultsAvailable ? 'PERSISTENT' : 'NONE'
+    });
+  }
+
   // Safely cast race status with fallback - case insensitive
   const validStatuses: RaceStatus[] = [
     'open',

@@ -351,6 +351,77 @@ export function useRacePageRealtime({
             newState.lastRaceUpdate = now;
             hasUpdates = true;
 
+            // CRITICAL: If race status changed to 'Interim' or 'Final', trigger race-results lookup
+            if (payload.status && ['Interim', 'Final', 'Finalized'].includes(payload.status) && 
+                (!newState.resultsData || newState.resultsData.results.length === 0)) {
+              debugLog('🔄 Race status indicates results available, triggering race-results lookup', {
+                newStatus: payload.status,
+                hasExistingResults: !!newState.resultsData
+              });
+
+              // Query race-results collection directly
+              setTimeout(async () => {
+                try {
+                  const { databases } = await import('@/lib/appwrite-client');
+                  const { Query } = await import('appwrite');
+                  
+                  const raceResultsResponse = await databases.listDocuments(
+                    'raceday-db',
+                    'race-results',
+                    [Query.equal('race', newState.raceDocumentId || raceId)]
+                  );
+                  
+                  if (raceResultsResponse.documents.length > 0) {
+                    const raceResults = raceResultsResponse.documents[0];
+                    debugLog('🏆 Found race-results via status-triggered lookup', {
+                      documentId: raceResults.$id,
+                      resultStatus: raceResults.resultStatus,
+                      hasResults: !!raceResults.resultsData
+                    });
+
+                    // Process the race-results data as if received via subscription
+                    setState(prevState => {
+                      const updatedState = { ...prevState };
+                      if (raceResults.resultsData) {
+                        const results = JSON.parse(raceResults.resultsData);
+                        const dividends = raceResults.dividendsData ? JSON.parse(raceResults.dividendsData) : [];
+                        const fixedOddsData = raceResults.fixedOddsData ? JSON.parse(raceResults.fixedOddsData) : {};
+
+                        updatedState.resultsData = {
+                          raceId,
+                          results,
+                          dividends,
+                          fixedOddsData,
+                          status: raceResults.resultStatus?.toLowerCase() || 'interim',
+                          photoFinish: raceResults.photoFinish || false,
+                          stewardsInquiry: raceResults.stewardsInquiry || false,
+                          protestLodged: raceResults.protestLodged || false,
+                          resultTime: raceResults.resultTime || new Date().toISOString(),
+                        };
+                        
+                        // Also update race object for consistency
+                        if (updatedState.race) {
+                          updatedState.race = {
+                            ...updatedState.race,
+                            resultsAvailable: true,
+                            resultsData: results,
+                            dividendsData: dividends,
+                            fixedOddsData,
+                            resultStatus: raceResults.resultStatus?.toLowerCase() || 'interim'
+                          };
+                        }
+
+                        updatedState.lastResultsUpdate = new Date();
+                      }
+                      return updatedState;
+                    });
+                  }
+                } catch (error) {
+                  errorLog('Status-triggered race-results lookup failed', error);
+                }
+              }, 500); // Short delay to allow subscription to arrive first
+            }
+
             // Build results data from race document when results become available
             if (payload.resultsAvailable && payload.resultsData) {
               try {
@@ -426,19 +497,29 @@ export function useRacePageRealtime({
         }
         
         else if (channels.some(ch => ch.includes('collections.money-flow-history.documents'))) {
-          if (payload && payload.entrant) {
-            // Only process money flow updates for entrants in this race
-            const isRelevantEntrant = newState.entrants.some(e => e.$id === payload.entrant);
-            if (isRelevantEntrant) {
-              debugLog('Money flow update received', { 
-                entrant: payload.entrant, 
-                type: payload.type,
-                timeInterval: payload.timeInterval 
-              });
-              
-              newState.entrants = updateEntrantMoneyFlow(newState.entrants, payload);
-              hasUpdates = true;
-            }
+          // ENHANCED FILTERING: Check both raceId field and entrant relationship
+          const isForThisRace = (payload?.raceId === raceId) || 
+            (payload?.entrant && newState.entrants.some(e => e.$id === payload.entrant));
+            
+          if (payload && isForThisRace) {
+            debugLog('Money flow update received for current race', { 
+              entrant: payload.entrant, 
+              raceId: payload.raceId,
+              type: payload.type,
+              timeInterval: payload.timeInterval,
+              matchedBy: payload.raceId === raceId ? 'raceId' : 'entrant'
+            });
+            
+            newState.entrants = updateEntrantMoneyFlow(newState.entrants, payload);
+            hasUpdates = true;
+          } else if (payload) {
+            // Debug: Log why money flow update was skipped
+            debugLog('Money flow update skipped - not for current race', {
+              payloadRaceId: payload.raceId,
+              currentRaceId: raceId,
+              payloadEntrant: payload.entrant,
+              hasMatchingEntrant: payload.entrant ? newState.entrants.some(e => e.$id === payload.entrant) : false
+            });
           }
         }
         
@@ -465,6 +546,22 @@ export function useRacePageRealtime({
         }
         
         else if (channels.some(ch => ch.includes('collections.race-results.documents'))) {
+          // ENHANCED DEBUG: Detailed race-results event analysis
+          debugLog('Race-results event received', {
+            channels: channels,
+            raceId: raceId,
+            currentRaceDocumentId: newState.raceDocumentId,
+            currentRaceResultsDocumentId: newState.raceResultsDocumentId,
+            payloadRace: payload?.race,
+            payloadRaceId: payload?.raceId,
+            payloadDocumentId: payload?.$id,
+            payloadResultStatus: payload?.resultStatus,
+            payloadResultsAvailable: payload?.resultsAvailable,
+            hasResultsData: !!payload?.resultsData,
+            hasDividendsData: !!payload?.dividendsData,
+            payloadKeys: payload ? Object.keys(payload) : []
+          });
+          
           // Determine if this is a specific race-results document update or generic collection update
           const isSpecificDocumentUpdate = channels.some(ch => 
             ch.includes(`collections.race-results.documents.${newState.raceResultsDocumentId}`)
@@ -477,6 +574,16 @@ export function useRacePageRealtime({
             payload.raceId === raceId ||                 // Fallback 2: raceId field (shouldn't happen but kept for safety)
             payload.raceId === newState.raceDocumentId   // Fallback 3: raceId to document ID (shouldn't happen but kept for safety)
           ));
+
+          debugLog('Race-results matching analysis', {
+            isSpecificDocumentUpdate,
+            isMatchingRace,
+            matchingStrategy: isSpecificDocumentUpdate ? 'SPECIFIC_DOCUMENT' : 
+              payload?.race === newState.raceDocumentId ? 'RACE_DOCUMENT_ID' :
+              payload?.race === raceId ? 'RACE_ID_STRING' :
+              payload?.raceId === raceId ? 'RACE_ID_FIELD' :
+              payload?.raceId === newState.raceDocumentId ? 'RACE_ID_TO_DOC_ID' : 'NO_MATCH'
+          });
 
           if (isMatchingRace) {
             // Check if this is a new race-results document creation
@@ -531,7 +638,7 @@ export function useRacePageRealtime({
                     ? fixedOddsData 
                     : (newState.resultsData?.fixedOddsData || {});
                   
-                  newState.resultsData = {
+                  const newResultsData = {
                     raceId,
                     results: finalResults,
                     dividends,
@@ -542,8 +649,42 @@ export function useRacePageRealtime({
                     protestLodged: payload.protestLodged || false,
                     resultTime: payload.resultTime || now.toISOString(),
                   };
+                  
+                  debugLog('🏆 CREATING RESULTS DATA for UI', {
+                    raceId,
+                    resultsCount: finalResults.length,
+                    dividendsCount: dividends.length,
+                    fixedOddsCount: Object.keys(finalFixedOddsData).length,
+                    status: newResultsData.status,
+                    resultTime: newResultsData.resultTime,
+                    previousResultsData: !!newState.resultsData
+                  });
+                  
+                  newState.resultsData = newResultsData;
                   newState.lastResultsUpdate = now;
                   hasUpdates = true;
+
+                  // CRITICAL: Also update the race object with results flags for UI consistency
+                  if (newState.race) {
+                    newState.race = {
+                      ...newState.race,
+                      resultsAvailable: true,
+                      resultsData: finalResults,
+                      dividendsData: dividends,
+                      fixedOddsData: finalFixedOddsData,
+                      resultStatus: payload.resultStatus?.toLowerCase() || 'interim',
+                      photoFinish: payload.photoFinish || false,
+                      stewardsInquiry: payload.stewardsInquiry || false,
+                      protestLodged: payload.protestLodged || false,
+                      resultTime: payload.resultTime || now.toISOString(),
+                    };
+                    
+                    debugLog('🏁 RACE OBJECT UPDATED with results data for consistency', {
+                      raceId: newState.race.raceId,
+                      resultsAvailable: newState.race.resultsAvailable,
+                      resultStatus: newState.race.resultStatus
+                    });
+                  }
                 }
               } catch (error) {
                 errorLog('Failed to parse results data', error);
@@ -623,23 +764,63 @@ export function useRacePageRealtime({
 
         debugLog('Setting up unified real-time subscription', { 
           raceId,
-          raceResultsDocumentId: state.raceResultsDocumentId 
+          raceDocumentId: state.raceDocumentId,
+          raceResultsDocumentId: state.raceResultsDocumentId,
+          entrantCount: state.entrants?.length || 0
         });
 
-        // Define all channels for unified subscription
+        // CRITICAL: Ensure we have the correct race document ID for subscription
+        if (!state.raceDocumentId) {
+          debugLog('WARNING: No race document ID available for subscription, using raceId as fallback');
+        }
+
+        // OPTIMIZED CHANNELS: Use document-specific subscriptions where possible
         const channels = [
-          `databases.raceday-db.collections.races.documents.${raceId}`,
-          'databases.raceday-db.collections.entrants.documents',
-          'databases.raceday-db.collections.money-flow-history.documents',
+          // Race document - specific document subscription using race document $id
+          `databases.raceday-db.collections.races.documents.${state.raceDocumentId || raceId}`,
+          
+          // Race pools - specific to this race by raceId (but using collection-level for document creation detection)
           'databases.raceday-db.collections.race-pools.documents',
-          'databases.raceday-db.collections.race-results.documents', // Collection-level subscription for document creation detection
-          'databases.raceday-db.collections.odds-history.documents',
+          
+          // Race results - collection-level for document creation detection, plus specific document if available
+          'databases.raceday-db.collections.race-results.documents',
         ];
+
+        // Add entrant-specific subscriptions if we have entrant data
+        if (state.entrants && state.entrants.length > 0) {
+          debugLog('Adding entrant-specific subscriptions', { entrantCount: state.entrants.length });
+          
+          // Subscribe to individual entrant documents instead of entire collection
+          state.entrants.forEach(entrant => {
+            if (entrant.$id) {
+              channels.push(`databases.raceday-db.collections.entrants.documents.${entrant.$id}`);
+            }
+          });
+          
+          debugLog('Entrant channels added', { totalChannels: channels.length });
+        } else {
+          // Fallback: Collection-level subscription with client-side filtering
+          // This will be less efficient but handles race initialization
+          debugLog('Using collection-level entrants subscription (fallback)');
+          channels.push('databases.raceday-db.collections.entrants.documents');
+        }
+
+        // Money flow and odds history: Still need collection-level due to complex relationships
+        // but we'll improve client-side filtering
+        channels.push('databases.raceday-db.collections.money-flow-history.documents');
+        channels.push('databases.raceday-db.collections.odds-history.documents');
 
         // Add specific race-results document subscription if available
         if (state.raceResultsDocumentId) {
           channels.push(`databases.raceday-db.collections.race-results.documents.${state.raceResultsDocumentId}`);
         }
+
+        debugLog('Final subscription channels', { 
+          channelCount: channels.length,
+          channels,
+          hasEntrantSpecificChannels: channels.some(c => c.includes('entrants.documents.') && c.split('.').length > 6),
+          hasRaceResultsSpecific: !!state.raceResultsDocumentId
+        });
 
         // Create single subscription with all channels
         unsubscribeFunction.current = client.subscribe(

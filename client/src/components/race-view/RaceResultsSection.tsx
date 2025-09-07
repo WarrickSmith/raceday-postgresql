@@ -24,6 +24,19 @@ export const RaceResultsSection = memo(function RaceResultsSection({
   entrants = [],
 }: RaceResultsSectionProps) {
   
+  // CRITICAL DEBUG: Log what results data is received by the component
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🏆 RACE RESULTS SECTION - Received Props:', {
+      hasResultsData: !!resultsData,
+      resultsCount: resultsData?.results?.length || 0,
+      dividendsCount: resultsData?.dividends?.length || 0,
+      status: resultsData?.status,
+      resultTime: resultsData?.resultTime,
+      lastUpdate: lastUpdate?.toISOString(),
+      entrantsCount: entrants.length
+    });
+  }
+  
   // Helper function to format runner names to proper case
   const formatRunnerName = (name: string) => {
     return name

@@ -66,20 +66,68 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
             if (shouldForceUpdate) {
               console.log('🔄 Force updating due to important status change:', changes.status);
               
-              // If race status changed to a results state but we don't have results data yet,
-              // trigger a background fetch to get the latest race data including results
+              // ENHANCED FALLBACK: If race status changed to a results state but we don't have results data yet,
+              // trigger multiple strategies to get the latest race data including results
               if (changes.status && ['Interim', 'Final', 'Finalized'].includes(changes.status) && 
                   !updatedRace.resultsData && !updatedRace.dividendsData) {
-                console.log('🔄 Status suggests results should be available, triggering background fetch');
+                console.log('🔄 Status suggests results should be available, triggering enhanced fallback fetch');
                 
-                // Fetch latest race data in the background to get results
+                // Strategy 1: Query race-results collection directly using race relationship
+                // Strategy 2: Fallback to full race API if race-results query fails
                 setTimeout(async () => {
+                  try {
+                    console.log('🔄 Attempting direct race-results fetch for race:', initialRace.$id);
+                    
+                    // Import Appwrite client and Query for direct race-results query
+                    const { client, databases } = await import('@/lib/appwrite-client');
+                    const { Query } = await import('appwrite');
+                    
+                    // Query race-results collection by race relationship
+                    const raceResultsResponse = await databases.listDocuments(
+                      'raceday-db',
+                      'race-results',
+                      [Query.equal('race', initialRace.$id)]
+                    );
+                    
+                    if (raceResultsResponse.documents.length > 0) {
+                      const raceResults = raceResultsResponse.documents[0];
+                      console.log('🔄 Direct race-results query found results:', {
+                        documentId: raceResults.$id,
+                        resultsAvailable: raceResults.resultsAvailable,
+                        resultStatus: raceResults.resultStatus,
+                        hasResults: !!raceResults.resultsData,
+                        hasDividends: !!raceResults.dividendsData
+                      });
+                      
+                      // Apply race-results data to race state
+                      setRace(currentRace => ({
+                        ...currentRace,
+                        resultsAvailable: raceResults.resultsAvailable || false,
+                        resultsData: raceResults.resultsData ? JSON.parse(raceResults.resultsData) : null,
+                        dividendsData: raceResults.dividendsData ? JSON.parse(raceResults.dividendsData) : null,
+                        fixedOddsData: raceResults.fixedOddsData ? JSON.parse(raceResults.fixedOddsData) : null,
+                        resultStatus: raceResults.resultStatus,
+                        photoFinish: raceResults.photoFinish || false,
+                        stewardsInquiry: raceResults.stewardsInquiry || false,
+                        protestLodged: raceResults.protestLodged || false,
+                        resultTime: raceResults.resultTime
+                      }));
+                      setLastUpdate(new Date());
+                      return; // Success - no need for API fallback
+                    }
+                    
+                    console.log('🔄 No race-results found in collection, falling back to race API');
+                  } catch (dbError) {
+                    console.error('🔄 Direct race-results query failed, falling back to race API:', dbError);
+                  }
+                  
+                  // Fallback Strategy: Full race API fetch
                   try {
                     const response = await fetch(`/api/race/${currentRace.raceId}`);
                     if (response.ok) {
                       const freshData = await response.json();
                       if (freshData.race && (freshData.race.resultsData || freshData.race.dividendsData)) {
-                        console.log('🔄 Background fetch found results data, updating race');
+                        console.log('🔄 API fallback found results data, updating race');
                         setRace(currentRace => ({
                           ...currentRace,
                           resultsAvailable: freshData.race.resultsAvailable,
@@ -93,12 +141,14 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
                           resultTime: freshData.race.resultTime
                         }));
                         setLastUpdate(new Date());
+                      } else {
+                        console.log('🔄 API fallback did not find results data yet');
                       }
                     }
-                  } catch (error) {
-                    console.error('Background race data fetch failed:', error);
+                  } catch (apiError) {
+                    console.error('🔄 API fallback race data fetch failed:', apiError);
                   }
-                }, 1000); // Wait 1 second to allow race-results subscription to potentially arrive first
+                }, 1500); // Wait 1.5 seconds to allow race-results subscription to potentially arrive first
               }
             }
 
@@ -119,17 +169,34 @@ export function useRealtimeRace({ initialRace }: UseRealtimeRaceProps) {
         payloadRace: resultsChanges.race,
         expectedRace: initialRace.$id,
         isForThisRace: resultsChanges.race === initialRace.$id,
+        // Enhanced matching diagnostics
+        matchStrategy1: resultsChanges.race === initialRace.$id ? 'RACE_RELATIONSHIP' : null,
+        matchStrategy2: ((resultsChanges as any).raceId === initialRace.raceId) ? 'RACE_ID_FIELD' : null,
+        matchStrategy3: (resultsChanges.resultsData && !resultsChanges.race && !((resultsChanges as any).raceId)) ? 'PERMISSIVE_FALLBACK' : null,
         resultsAvailable: resultsChanges.resultsAvailable,
         hasResultsData: !!resultsChanges.resultsData,
         hasDividendsData: !!resultsChanges.dividendsData,
         hasFixedOddsData: !!(resultsChanges as any).fixedOddsData,
-        resultStatus: resultsChanges.resultStatus
+        resultStatus: resultsChanges.resultStatus,
+        // ENHANCED DEBUG: Show complete payload structure
+        fullPayload: resultsChanges,
+        payloadKeys: Object.keys(resultsChanges),
+        raceFieldType: typeof resultsChanges.race,
+        raceFieldValue: resultsChanges.race
       });
 
-      // APPWRITE BEST PRACTICE: More flexible filtering with explicit race relationship check
-      const isForThisRace = resultsChanges.race === initialRace.$id ||
-        // Fallback: if we have results data and are in race context, be permissive
-        (resultsChanges.resultsData && !resultsChanges.race);
+      // ENHANCED APPWRITE FILTERING: Multiple strategies to match race-results to current race
+      const isForThisRace = 
+        // Strategy 1: Direct race relationship match (race field contains races document $id)
+        resultsChanges.race === initialRace.$id ||
+        
+        // Strategy 2: Check if race-results has raceId field that matches our race's raceId
+        // (In case race-results documents also store raceId string for reference)
+        ((resultsChanges as any).raceId === initialRace.raceId) ||
+        
+        // Strategy 3: If we have results data and are in race context, be permissive
+        // This handles cases where subscription payload doesn't include race relationship properly
+        (resultsChanges.resultsData && !resultsChanges.race && !((resultsChanges as any).raceId));
 
       if (isForThisRace) {
         setRace(currentRace => {
