@@ -42,7 +42,7 @@ interface RaceFooterProps {
   lastResultsUpdate?: Date | null
   connectionHealth?: {
     isHealthy: boolean
-    avgLatency: number
+    avgLatency: number | null
     uptime: number
   }
   // Real-time race data from unified subscription
@@ -64,14 +64,19 @@ export const RaceFooter = memo(function RaceFooter({
   race = null,
 }: RaceFooterProps) {
   // Use real-time data from props (from unified subscription) with context fallbacks
-  const currentRaceStartTime = raceStartTime
-  const currentRaceStatus = raceStatus
+  const currentRaceStartTime = race?.startTime || raceStartTime
+  const currentRaceStatus =
+    (race?.status?.toLowerCase() as RaceStatus) || raceStatus
   const currentPoolData = poolData
   const currentResultsData = resultsData
 
   // Announce results availability when they become available
   useEffect(() => {
-    if (currentResultsData && currentResultsData.results.length > 0 && showResults) {
+    if (
+      currentResultsData &&
+      currentResultsData.results.length > 0 &&
+      showResults
+    ) {
       // Announce results availability
       screenReader?.announce(
         `Race results are now available with ${currentResultsData.results.length} positions`,
@@ -97,13 +102,13 @@ export const RaceFooter = memo(function RaceFooter({
         {/* Column 1-2: Separate Pools and Results sections restored */}
         <div className="flex flex-col justify-center col-span-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-            <RacePoolsSection 
-              raceId={raceId} 
-              poolData={currentPoolData} 
+            <RacePoolsSection
+              raceId={raceId}
+              poolData={currentPoolData}
               lastUpdate={lastPoolUpdate}
             />
-            <RaceResultsSection 
-              resultsData={currentResultsData} 
+            <RaceResultsSection
+              resultsData={currentResultsData}
               lastUpdate={lastResultsUpdate}
               entrants={entrants}
             />

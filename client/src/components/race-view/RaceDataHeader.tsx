@@ -5,7 +5,12 @@ import { useRace } from '@/contexts/RaceContext'
 import { formatDistance, formatRaceTime } from '@/utils/raceFormatters'
 import { RaceNavigation } from './RaceNavigation'
 import { useRenderTracking } from '@/utils/performance'
-import type { Race, Entrant, Meeting, RaceNavigationData } from '@/types/meetings'
+import type {
+  Race,
+  Entrant,
+  Meeting,
+  RaceNavigationData,
+} from '@/types/meetings'
 
 interface RaceDataHeaderProps {
   className?: string
@@ -15,7 +20,7 @@ interface RaceDataHeaderProps {
   navigationData?: RaceNavigationData | null
   connectionHealth?: {
     isHealthy: boolean
-    avgLatency: number
+    avgLatency: number | null
     uptime: number
   }
   lastUpdate?: Date | null
@@ -33,7 +38,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
   const { raceData } = useRace()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [updateCount, setUpdateCount] = useState(0)
-  
+
   // Track renders for performance monitoring
   const renderCount = useRenderTracking('RaceDataHeader')
 
@@ -45,7 +50,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
 
   // Track MoneyFlow grid data updates
   useEffect(() => {
-    setUpdateCount(prev => prev + 1)
+    setUpdateCount((prev) => prev + 1)
   }, [entrants])
 
   // Real-time clock update
@@ -60,29 +65,45 @@ export const RaceDataHeader = memo(function RaceDataHeader({
   // Format last update timestamp for display
   const formatLastUpdate = useMemo(() => {
     if (!lastUpdate) return null
-    return lastUpdate.toLocaleTimeString('en-US', { 
-      hour12: false, 
-      hour: '2-digit', 
-      minute: '2-digit', 
-      second: '2-digit' 
+    return lastUpdate.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
     })
   }, [lastUpdate])
 
   // Get connection health status
   const healthStatus = useMemo(() => {
     if (!connectionHealth) return { status: 'unknown', color: 'gray' }
-    
+
     if (connectionHealth.isHealthy) return { status: 'Live', color: 'green' }
-    if (connectionHealth.avgLatency > 0) return { status: 'Slow', color: 'yellow' }
+    if (connectionHealth.avgLatency && connectionHealth.avgLatency > 0)
+      return { status: 'Slow', color: 'yellow' }
     return { status: 'Offline', color: 'red' }
   }, [connectionHealth])
 
   // Memoized calculations to reduce re-renders (move before early return to avoid hook call errors)
-  const formattedTime = useMemo(() => race?.startTime ? formatRaceTime(race.startTime) : '', [race?.startTime])
-  const formattedDistance = useMemo(() => race?.distance ? formatDistance(race.distance) : null, [race?.distance])
-  const runnersCount = useMemo(() => entrants.length || race?.runnerCount || 0, [entrants.length, race?.runnerCount])
-  const scratchedCount = useMemo(() => entrants.filter((e) => e.isScratched).length || 0, [entrants])
-  const avgLatency = useMemo(() => connectionHealth?.avgLatency || null, [connectionHealth])
+  const formattedTime = useMemo(
+    () => (race?.startTime ? formatRaceTime(race.startTime) : ''),
+    [race?.startTime]
+  )
+  const formattedDistance = useMemo(
+    () => (race?.distance ? formatDistance(race.distance) : null),
+    [race?.distance]
+  )
+  const runnersCount = useMemo(
+    () => entrants.length || race?.runnerCount || 0,
+    [entrants.length, race?.runnerCount]
+  )
+  const scratchedCount = useMemo(
+    () => entrants.filter((e) => e.isScratched).length || 0,
+    [entrants]
+  )
+  const avgLatency = useMemo(
+    () => connectionHealth?.avgLatency || null,
+    [connectionHealth]
+  )
 
   if (!race || !meeting) {
     return (
@@ -100,36 +121,58 @@ export const RaceDataHeader = memo(function RaceDataHeader({
   }
 
   return (
-    <div className={`bg-white rounded-lg shadow-md ${className}`} role="banner" style={{ border: '1px solid rgba(209, 213, 219, 0.6)' }}>
+    <div
+      className={`bg-white rounded-lg shadow-md ${className}`}
+      role="banner"
+      style={{ border: '1px solid rgba(209, 213, 219, 0.6)' }}
+    >
       {/* 3x4 grid matching target image layout */}
-      <div className="grid grid-cols-4 gap-2 p-3 min-h-[120px]" style={{ gridTemplateColumns: '2fr 200px 200px 200px' }}>
-        
+      <div
+        className="grid grid-cols-4 gap-2 p-3 min-h-[120px]"
+        style={{ gridTemplateColumns: '2fr 200px 200px 200px' }}
+      >
         {/* Row 1, Col 1: Navigation */}
         <div className="flex items-start justify-start">
           <div className="flex flex-wrap items-center gap-2">
             {navigationData && (
-              <RaceNavigation 
+              <RaceNavigation
                 navigationData={navigationData}
                 currentRaceId={race.raceId}
               />
             )}
           </div>
         </div>
-        
+
         {/* Row 1, Col 2: Date */}
         <div className="flex items-center justify-start">
-          <div className="text-sm text-gray-600">{currentTime.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
+          <div className="text-sm text-gray-600">
+            {currentTime.toLocaleDateString('en-NZ', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })}
+          </div>
         </div>
 
         {/* Row 1, Col 3: Time */}
         <div className="flex items-center justify-start">
-          <div className="text-lg font-bold text-gray-900 font-mono">{currentTime.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+          <div className="text-lg font-bold text-gray-900 font-mono">
+            {currentTime.toLocaleTimeString('en-US', {
+              hour12: false,
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            })}
+          </div>
         </div>
 
         {/* Row 1, Col 4: Logo (centered) */}
         <div className="flex items-center justify-center">
           <div className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg px-2 py-1 text-center text-gray-500 font-bold text-xs">
-            LOGO Image<br/>Placeholder
+            LOGO Image
+            <br />
+            Placeholder
           </div>
         </div>
 
@@ -139,25 +182,39 @@ export const RaceDataHeader = memo(function RaceDataHeader({
             Race {race.raceNumber}: {race.name}
           </h1>
         </div>
-        
+
         {/* Row 2, Col 2: Weather */}
         <div className="flex items-center justify-start gap-2">
-          <div className="text-xs text-gray-500 font-bold uppercase">WEATHER</div>
-          <div className="text-sm font-semibold text-gray-800">{race.weather || 'overcast'}</div>
+          <div className="text-xs text-gray-500 font-bold uppercase">
+            WEATHER
+          </div>
+          <div className="text-sm font-semibold text-gray-800">
+            {race.weather || 'overcast'}
+          </div>
         </div>
 
         {/* Row 2, Col 3: Track Condition */}
         <div className="flex items-center justify-start gap-2">
-          <div className="text-xs text-gray-500 font-bold uppercase">TRACK COND</div>
-          <div className="text-sm font-semibold text-green-800">{race.trackCondition || 'Synthetic'}</div>
+          <div className="text-xs text-gray-500 font-bold uppercase">
+            TRACK COND
+          </div>
+          <div className="text-sm font-semibold text-green-800">
+            {race.trackCondition || 'Synthetic'}
+          </div>
         </div>
 
         {/* Row 2, Col 4: Status with Real-time Health */}
         <div className="flex items-center justify-start gap-2">
-          <div className="text-xs text-gray-500 font-bold uppercase">STATUS</div>
+          <div className="text-xs text-gray-500 font-bold uppercase">
+            STATUS
+          </div>
           <div className="flex items-center gap-1">
-            <div className={`w-2 h-2 rounded-full bg-${healthStatus.color}-500`}></div>
-            <span className={`text-sm font-semibold text-${healthStatus.color}-800`}>
+            <div
+              className={`w-2 h-2 rounded-full bg-${healthStatus.color}-500`}
+            ></div>
+            <span
+              className={`text-sm font-semibold text-${healthStatus.color}-800`}
+            >
               {healthStatus.status}
             </span>
             {formatLastUpdate && (
@@ -174,28 +231,56 @@ export const RaceDataHeader = memo(function RaceDataHeader({
           <span>•</span>
           <span>{meeting.country}</span>
           <span>•</span>
-          <time dateTime={race.startTime} className="font-mono">{formattedTime}</time>
-          <span className="text-purple-800 font-medium">{meeting.raceType}</span>
-          <span className="text-xs text-gray-500 font-bold uppercase ml-4">RENDERS</span>
-          <span className={`text-sm font-mono font-semibold ${
-            renderCount > 10 ? 'text-red-600' : renderCount > 5 ? 'text-orange-600' : 'text-purple-800'
-          }`}>{renderCount}</span>
-          <span className="text-xs text-gray-500 font-bold uppercase ml-2">UPDATES</span>
-          <span className="text-sm font-mono font-semibold text-blue-600">{updateCount}</span>
+          <time dateTime={race.startTime} className="font-mono">
+            {formattedTime}
+          </time>
+          <span className="text-purple-800 font-medium">
+            {meeting.raceType}
+          </span>
+          <span className="text-xs text-gray-500 font-bold uppercase ml-4">
+            RENDERS
+          </span>
+          <span
+            className={`text-sm font-mono font-semibold ${
+              renderCount > 10
+                ? 'text-red-600'
+                : renderCount > 5
+                ? 'text-orange-600'
+                : 'text-purple-800'
+            }`}
+          >
+            {renderCount}
+          </span>
+          <span className="text-xs text-gray-500 font-bold uppercase ml-2">
+            UPDATES
+          </span>
+          <span className="text-sm font-mono font-semibold text-blue-600">
+            {updateCount}
+          </span>
         </div>
-        
+
         {/* Row 3, Col 2: Race Distance */}
         <div className="flex items-center justify-start gap-2">
-          <div className="text-xs text-gray-500 font-bold uppercase">RACE DISTANCE</div>
-          <div className="text-sm font-semibold text-blue-800">{formattedDistance || '2.1km'}</div>
+          <div className="text-xs text-gray-500 font-bold uppercase">
+            RACE DISTANCE
+          </div>
+          <div className="text-sm font-semibold text-blue-800">
+            {formattedDistance || '2.1km'}
+          </div>
         </div>
 
         {/* Row 3, Col 3: Runners (SCR) */}
         <div className="flex items-center justify-start gap-2">
-          <div className="text-xs text-gray-500 font-bold uppercase">RUNNERS (SCR)</div>
+          <div className="text-xs text-gray-500 font-bold uppercase">
+            RUNNERS (SCR)
+          </div>
           <div className="text-sm font-semibold">
             <span className="text-blue-800">
-              {runnersCount > 0 ? (scratchedCount > 0 ? `${runnersCount - scratchedCount}` : runnersCount) : '8'}
+              {runnersCount > 0
+                ? scratchedCount > 0
+                  ? `${runnersCount - scratchedCount}`
+                  : runnersCount
+                : '8'}
             </span>
             <span className="text-blue-800">
               {scratchedCount > 0 ? ` (${scratchedCount})` : ' (2)'}
@@ -205,17 +290,21 @@ export const RaceDataHeader = memo(function RaceDataHeader({
 
         {/* Row 3, Col 4: Real-time Connection Latency */}
         <div className="flex items-center justify-start gap-2">
-          <div className="text-xs text-gray-500 font-bold uppercase">LATENCY</div>
-          <div className={`text-sm font-semibold ${
-            avgLatency === null
-              ? 'text-gray-600'
-              : avgLatency > 200
-              ? 'text-red-800'
-              : avgLatency > 100
-              ? 'text-yellow-800'
-              : 'text-green-800'
-          }`}>
-            {avgLatency === null ? '—' : `${avgLatency}ms`}
+          <div className="text-xs text-gray-500 font-bold uppercase">
+            LATENCY
+          </div>
+          <div
+            className={`text-sm font-semibold ${
+              avgLatency === null
+                ? 'text-gray-600'
+                : avgLatency > 200
+                ? 'text-red-800'
+                : avgLatency > 100
+                ? 'text-yellow-800'
+                : 'text-green-800'
+            }`}
+          >
+            {avgLatency === null ? '—' : `${avgLatency.toFixed(2)}ms`}
           </div>
         </div>
       </div>

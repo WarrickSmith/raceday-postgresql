@@ -5,22 +5,116 @@ import { useRace } from '@/contexts/RaceContext'
 import { RaceDataHeader } from '@/components/race-view/RaceDataHeader'
 import { EnhancedEntrantsGrid } from '@/components/race-view/EnhancedEntrantsGrid'
 import { RaceFooter } from '@/components/race-view/RaceFooter'
-import { useRacePageRealtime } from '@/hooks/useRacePageRealtime'
-import { DebugMessageBox, useDebugMessages } from '@/components/debug/DebugMessageBox'
+import { useUnifiedRaceRealtime } from '@/hooks/useUnifiedRaceRealtime'
+import {
+  DebugMessageBox,
+  useDebugMessages,
+} from '@/components/debug/DebugMessageBox'
 import type { RaceStatus } from '@/types/racePools'
 
 export function RacePageContent() {
   const { raceData, isLoading, error } = useRace()
-  const { messages, addMessage, dismissMessage, clearMessages } = useDebugMessages()
+  const { messages, addMessage, dismissMessage, clearMessages } =
+    useDebugMessages()
 
   // Unified real-time subscription for all race page data
-  const realtimeData = useRacePageRealtime({
+  const realtimeData = useUnifiedRaceRealtime({
     raceId: raceData?.race?.raceId || '',
     initialRace: raceData?.race || null,
     initialEntrants: raceData?.entrants || [],
     initialMeeting: raceData?.meeting || null,
     initialNavigationData: raceData?.navigationData || null,
   })
+
+  // Status synchronization monitoring and debug messaging
+  useEffect(() => {
+    if (!raceData?.race || process.env.NODE_ENV !== 'development') return
+
+    const currentRace = realtimeData.race || raceData.race
+    const currentResultsData =
+      realtimeData.resultsData ||
+      (currentRace.resultsAvailable && currentRace.resultsData
+        ? {
+            raceId: currentRace.raceId,
+            results: currentRace.resultsData,
+            dividends: currentRace.dividendsData || [],
+            fixedOddsData: currentRace.fixedOddsData
+              ? typeof currentRace.fixedOddsData === 'string'
+                ? JSON.parse(currentRace.fixedOddsData)
+                : currentRace.fixedOddsData
+              : {},
+            status: currentRace.resultStatus || 'interim',
+            photoFinish: currentRace.photoFinish || false,
+            stewardsInquiry: currentRace.stewardsInquiry || false,
+            protestLodged: currentRace.protestLodged || false,
+            resultTime: currentRace.resultTime || new Date().toISOString(),
+          }
+        : undefined)
+
+    const statusConflict =
+      currentRace.status?.toLowerCase() !==
+      currentRace.resultStatus?.toLowerCase()
+    const resultDataStatus = currentResultsData?.status
+    const finalStatusUsed =
+      realtimeData.resultsData?.status || currentRace.resultStatus || 'interim'
+
+    // Log detailed analysis to console (reduced frequency)
+    console.log('🏆 RACE PAGE CONTENT - Results Data Analysis:', {
+      raceId: currentRace.raceId,
+      statusAnalysis: {
+        raceStatus: currentRace.status,
+        raceResultStatus: currentRace.resultStatus,
+        realtimeResultsStatus: realtimeData.resultsData?.status,
+        finalStatusUsedInUI: finalStatusUsed,
+        resultDataStatus: resultDataStatus,
+        hasStatusConflict: statusConflict,
+        statusConflictDetails: statusConflict
+          ? `races:'${currentRace.status}' vs results:'${currentRace.resultStatus}'`
+          : 'SYNCHRONIZED',
+      },
+    })
+
+    // CRITICAL: Show status conflicts in debug message box
+    if (statusConflict) {
+      addMessage(
+        'warning',
+        'Status Conflict Detected',
+        `Race status (${currentRace.status}) doesn't match result status (${currentRace.resultStatus})`,
+        {
+          racesCollectionStatus: currentRace.status,
+          raceObjectResultStatus: currentRace.resultStatus,
+          uiWillShow: resultDataStatus,
+          dataSource: realtimeData.resultsData ? 'REALTIME' : 'PERSISTENT',
+          issue: 'Real-time subscription may have missed the status update',
+          solution: 'Check race-results collection directly for latest status',
+        }
+      )
+    }
+
+    // Show successful status transitions
+    if (
+      realtimeData.lastResultsUpdate &&
+      currentResultsData?.status === 'final'
+    ) {
+      addMessage(
+        'success',
+        'Results Status Updated',
+        `Race results status changed to: ${currentResultsData.status.toUpperCase()}`,
+        {
+          raceId: currentRace.raceId,
+          previousStatus: 'interim',
+          newStatus: currentResultsData.status,
+          timestamp: realtimeData.lastResultsUpdate,
+        }
+      )
+    }
+  }, [
+    raceData?.race,
+    realtimeData.race,
+    realtimeData.resultsData,
+    realtimeData.lastResultsUpdate,
+    addMessage,
+  ])
 
   if (!raceData) {
     return (
@@ -43,90 +137,32 @@ export function RacePageContent() {
   const currentEntrants = realtimeData.entrants || raceData.entrants || []
   const currentMeeting = realtimeData.meeting || raceData.meeting
   const currentPoolData = realtimeData.poolData
-  
+
   // Build results data from persistent race data or real-time updates
   // Allow interim results to display even without dividends data
   // CRITICAL FIX: Prioritize real-time results data status over persistent race object status
-  const currentResultsData = realtimeData.resultsData || 
-    (currentRace.resultsAvailable && currentRace.resultsData ? {
-      raceId: currentRace.raceId,
-      results: currentRace.resultsData,
-      dividends: currentRace.dividendsData || [], // Dividends optional for interim results
-      // Parse fixedOddsData from race data (critical for win/place display)
-      fixedOddsData: currentRace.fixedOddsData 
-        ? (typeof currentRace.fixedOddsData === 'string' 
-            ? JSON.parse(currentRace.fixedOddsData) 
-            : currentRace.fixedOddsData)
-        : {},
-      // FIXED: Use real-time updated resultStatus from race object (updated by subscription)
-      // This ensures status changes from race-results collection are reflected in UI
-      status: currentRace.resultStatus || 'interim', // Real-time updated by subscription
-      photoFinish: currentRace.photoFinish || false,
-      stewardsInquiry: currentRace.stewardsInquiry || false,
-      protestLodged: currentRace.protestLodged || false,
-      resultTime: currentRace.resultTime || new Date().toISOString()
-    } : undefined)
-
-  // Status synchronization monitoring and debug messaging
-  useEffect(() => {
-    if (!currentRace || process.env.NODE_ENV !== 'development') return;
-    
-    const statusConflict = currentRace.status?.toLowerCase() !== currentRace.resultStatus?.toLowerCase();
-    const resultDataStatus = currentResultsData?.status;
-    const finalStatusUsed = realtimeData.resultsData?.status || currentRace.resultStatus || 'interim';
-    
-    // Log detailed analysis to console (reduced frequency)
-    console.log('🏆 RACE PAGE CONTENT - Results Data Analysis:', {
-      raceId: currentRace.raceId,
-      statusAnalysis: {
-        raceStatus: currentRace.status,
-        raceResultStatus: currentRace.resultStatus,
-        realtimeResultsStatus: realtimeData.resultsData?.status,
-        finalStatusUsedInUI: finalStatusUsed,
-        resultDataStatus: resultDataStatus,
-        hasStatusConflict: statusConflict,
-        statusConflictDetails: statusConflict ? `races:'${currentRace.status}' vs results:'${currentRace.resultStatus}'` : 'SYNCHRONIZED'
-      }
-    });
-    
-    // CRITICAL: Show status conflicts in debug message box
-    if (statusConflict) {
-      addMessage(
-        'warning',
-        'Status Conflict Detected',
-        `Race status (${currentRace.status}) doesn't match result status (${currentRace.resultStatus})`,
-        {
-          racesCollectionStatus: currentRace.status,
-          raceObjectResultStatus: currentRace.resultStatus,
-          uiWillShow: resultDataStatus,
-          dataSource: realtimeData.resultsData ? 'REALTIME' : 'PERSISTENT',
-          issue: 'Real-time subscription may have missed the status update',
-          solution: 'Check race-results collection directly for latest status'
-        }
-      );
-    }
-    
-    // Show successful status transitions
-    if (realtimeData.lastResultsUpdate && currentResultsData?.status === 'final') {
-      addMessage(
-        'success',
-        'Results Status Updated',
-        `Race results status changed to: ${currentResultsData.status.toUpperCase()}`,
-        {
+  const currentResultsData =
+    realtimeData.resultsData ||
+    (currentRace.resultsAvailable && currentRace.resultsData
+      ? {
           raceId: currentRace.raceId,
-          previousStatus: 'interim',
-          newStatus: currentResultsData.status,
-          timestamp: realtimeData.lastResultsUpdate
+          results: currentRace.resultsData,
+          dividends: currentRace.dividendsData || [], // Dividends optional for interim results
+          // Parse fixedOddsData from race data (critical for win/place display)
+          fixedOddsData: currentRace.fixedOddsData
+            ? typeof currentRace.fixedOddsData === 'string'
+              ? JSON.parse(currentRace.fixedOddsData)
+              : currentRace.fixedOddsData
+            : {},
+          // FIXED: Use real-time updated resultStatus from race object (updated by subscription)
+          // This ensures status changes from race-results collection are reflected in UI
+          status: currentRace.resultStatus || 'interim', // Real-time updated by subscription
+          photoFinish: currentRace.photoFinish || false,
+          stewardsInquiry: currentRace.stewardsInquiry || false,
+          protestLodged: currentRace.protestLodged || false,
+          resultTime: currentRace.resultTime || new Date().toISOString(),
         }
-      );
-    }
-  }, [
-    currentRace?.status, 
-    currentRace?.resultStatus, 
-    currentResultsData?.status, 
-    realtimeData.lastResultsUpdate,
-    addMessage
-  ]);
+      : undefined)
 
   // Safely cast race status with fallback - case insensitive
   const validStatuses: RaceStatus[] = [
@@ -185,7 +221,7 @@ export function RacePageContent() {
 
       {/* Consolidated Header - Single unified header component with real-time data */}
       <header className="race-layout-header">
-        <RaceDataHeader 
+        <RaceDataHeader
           race={currentRace}
           entrants={currentEntrants}
           meeting={currentMeeting}
@@ -237,7 +273,9 @@ export function RacePageContent() {
           enableJockeySilks={true}
           className="h-full"
           realtimeEntrants={currentEntrants}
-          lastUpdate={realtimeData.lastEntrantsUpdate || realtimeData.lastUpdate}
+          lastUpdate={
+            realtimeData.lastEntrantsUpdate || realtimeData.lastUpdate
+          }
           poolData={currentPoolData}
         />
       </main>
@@ -247,7 +285,9 @@ export function RacePageContent() {
         <RaceFooter
           raceId={currentRace.raceId}
           raceStartTime={currentRace.startTime}
-          raceStatus={raceStatus}
+          raceStatus={
+            (currentRace.status?.toLowerCase() as RaceStatus) || raceStatus
+          }
           poolData={currentPoolData || undefined}
           resultsData={currentResultsData || undefined}
           entrants={currentEntrants}
@@ -260,7 +300,7 @@ export function RacePageContent() {
         />
       </footer>
 
-      <style jsx>{`
+      <style jsx global>{`
         .race-page-layout {
           display: grid;
           grid-template-rows: auto 1fr auto;
