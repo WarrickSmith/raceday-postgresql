@@ -270,67 +270,71 @@ export function useUnifiedRaceRealtime({
       // Fetch race-results document ID for specific subscriptions
       if (raceData.race?.$id) {
         try {
-          const raceResultsResponse = await databases.listDocuments(
-            'raceday-db',
-            'race-results',
-            [Query.equal('race', raceData.race.$id), Query.limit(1)]
-          )
-
-          if (raceResultsResponse.documents.length > 0) {
-            const raceResultsDoc = raceResultsResponse.documents[0]
-            const raceResultsDocId = raceResultsDoc.$id
-
-            debugLog('Found existing race-results document', {
-              raceResultsDocId,
-              resultStatus: raceResultsDoc.resultStatus,
-              resultsAvailable: raceResultsDoc.resultsAvailable,
-            })
-
-            // Parse fixedOddsData from race-results document
-            let parsedFixedOddsData = {}
-            if (raceResultsDoc.fixedOddsData) {
-              try {
-                parsedFixedOddsData =
-                  typeof raceResultsDoc.fixedOddsData === 'string'
-                    ? JSON.parse(raceResultsDoc.fixedOddsData)
-                    : raceResultsDoc.fixedOddsData || {}
-              } catch (error) {
-                errorLog('Failed to parse initial fixedOddsData', error)
-                parsedFixedOddsData = {}
-              }
-            }
-
-            const initialResultsData = raceResultsDoc.resultsAvailable
-              ? {
-                  raceId,
-                  results:
-                    typeof raceResultsDoc.resultsData === 'string'
-                      ? JSON.parse(raceResultsDoc.resultsData)
-                      : raceResultsDoc.resultsData || [],
-                  dividends:
-                    typeof raceResultsDoc.dividendsData === 'string'
-                      ? JSON.parse(raceResultsDoc.dividendsData)
-                      : raceResultsDoc.dividendsData || [],
-                  fixedOddsData: parsedFixedOddsData,
-                  status: (raceResultsDoc.resultStatus?.toLowerCase() ||
-                    'interim') as 'interim' | 'final',
-                  photoFinish: raceResultsDoc.photoFinish || false,
-                  stewardsInquiry: raceResultsDoc.stewardsInquiry || false,
-                  protestLodged: raceResultsDoc.protestLodged || false,
-                  resultTime:
-                    raceResultsDoc.resultTime || new Date().toISOString(),
-                }
-              : null
-
-            setState((prev) => ({
-              ...prev,
-              raceResultsDocumentId: raceResultsDocId,
-              resultsData: initialResultsData,
-            }))
-          } else {
-            debugLog(
-              'No race-results document found yet - will use collection-level subscription'
+          // First check if we already have a race-results document ID in state
+          // This prevents unnecessary re-fetching when we already know the document doesn't exist
+          if (!state.raceResultsDocumentId) {
+            const raceResultsResponse = await databases.listDocuments(
+              'raceday-db',
+              'race-results',
+              [Query.equal('race', raceData.race.$id), Query.limit(1)]
             )
+
+            if (raceResultsResponse.documents.length > 0) {
+              const raceResultsDoc = raceResultsResponse.documents[0]
+              const raceResultsDocId = raceResultsDoc.$id
+
+              debugLog('Found existing race-results document', {
+                raceResultsDocId,
+                resultStatus: raceResultsDoc.resultStatus,
+                resultsAvailable: raceResultsDoc.resultsAvailable,
+              })
+
+              // Parse fixedOddsData from race-results document
+              let parsedFixedOddsData = {}
+              if (raceResultsDoc.fixedOddsData) {
+                try {
+                  parsedFixedOddsData =
+                    typeof raceResultsDoc.fixedOddsData === 'string'
+                      ? JSON.parse(raceResultsDoc.fixedOddsData)
+                      : raceResultsDoc.fixedOddsData || {}
+                } catch (error) {
+                  errorLog('Failed to parse initial fixedOddsData', error)
+                  parsedFixedOddsData = {}
+                }
+              }
+
+              const initialResultsData = raceResultsDoc.resultsAvailable
+                ? {
+                    raceId,
+                    results:
+                      typeof raceResultsDoc.resultsData === 'string'
+                        ? JSON.parse(raceResultsDoc.resultsData)
+                        : raceResultsDoc.resultsData || [],
+                    dividends:
+                      typeof raceResultsDoc.dividendsData === 'string'
+                        ? JSON.parse(raceResultsDoc.dividendsData)
+                        : raceResultsDoc.dividendsData || [],
+                    fixedOddsData: parsedFixedOddsData,
+                    status: (raceResultsDoc.resultStatus?.toLowerCase() ||
+                      'interim') as 'interim' | 'final',
+                    photoFinish: raceResultsDoc.photoFinish || false,
+                    stewardsInquiry: raceResultsDoc.stewardsInquiry || false,
+                    protestLodged: raceResultsDoc.protestLodged || false,
+                    resultTime:
+                      raceResultsDoc.resultTime || new Date().toISOString(),
+                  }
+                : null
+
+              setState((prev) => ({
+                ...prev,
+                raceResultsDocumentId: raceResultsDocId,
+                resultsData: initialResultsData,
+              }))
+            } else {
+              debugLog(
+                'No race-results document found yet - will use collection-level subscription and monitor for creation'
+              )
+            }
           }
         } catch (resultsError) {
           errorLog('Failed to fetch race-results document ID', resultsError)
@@ -362,6 +366,55 @@ export function useUnifiedRaceRealtime({
       fetchInitialData()
     }
   }, [raceId, state.race, state.entrants, fetchInitialData])
+
+  // Periodic check for race-results document creation for active races
+  useEffect(() => {
+    if (!raceId || !state.raceDocumentId || state.raceResultsDocumentId) {
+      return // Skip if we don't have race info or already have results document
+    }
+
+    // Only check for races that might be finishing (closed or interim status)
+    const raceStatus = state.race?.status?.toLowerCase()
+    if (!['closed', 'interim', 'final'].includes(raceStatus || '')) {
+      return
+    }
+
+    const checkInterval = setInterval(async () => {
+      try {
+        const raceResultsResponse = await databases.listDocuments(
+          'raceday-db',
+          'race-results',
+          [Query.equal('race', state.raceDocumentId!), Query.limit(1)]
+        )
+
+        if (raceResultsResponse.documents.length > 0) {
+          const raceResultsDoc = raceResultsResponse.documents[0]
+          debugLog('🎯 Race-results document created via periodic check', {
+            raceResultsDocumentId: raceResultsDoc.$id,
+            resultStatus: raceResultsDoc.resultStatus,
+          })
+
+          // Update state with the new document ID
+          setState((prev) => ({
+            ...prev,
+            raceResultsDocumentId: raceResultsDoc.$id,
+          }))
+
+          // Clear the interval since we found the document
+          clearInterval(checkInterval)
+        }
+      } catch (error) {
+        errorLog('Failed to check for race-results document', error)
+      }
+    }, 5000) // Check every 5 seconds
+
+    return () => clearInterval(checkInterval)
+  }, [
+    raceId,
+    state.raceDocumentId,
+    state.raceResultsDocumentId,
+    state.race?.status,
+  ])
 
   // Apply batched updates to state
   const applyPendingUpdates = useCallback(() => {
@@ -440,6 +493,11 @@ export function useUnifiedRaceRealtime({
 
           // Ensure we're updating with the correct race ID
           const payloadRaceId = payload.raceId || payload.race || raceId
+          const previousStatus = newState.race?.status
+          const newStatus =
+            payload.status !== undefined
+              ? payload.status
+              : previousStatus || 'open'
 
           const updatedRace: Race = {
             ...newState.race,
@@ -447,10 +505,7 @@ export function useUnifiedRaceRealtime({
             $id: payload.$id || newState.race?.$id || state.raceDocumentId,
             raceId: payloadRaceId,
             // Critical: Always update status from payload if present
-            status:
-              payload.status !== undefined
-                ? payload.status
-                : newState.race?.status || 'open',
+            status: newStatus,
             startTime:
               payload.startTime ||
               newState.race?.startTime ||
@@ -496,10 +551,121 @@ export function useUnifiedRaceRealtime({
             debugRaceStatus(
               'Real-time status update',
               payloadRaceId,
-              newState.race.status,
-              payload.status,
+              previousStatus,
+              newStatus,
               { source: 'race-event', payload }
             )
+          }
+
+          // When race status changes to interim or final, trigger race-results fetch
+          if (
+            payload.status &&
+            ['interim', 'final'].includes(payload.status.toLowerCase()) &&
+            payload.status.toLowerCase() !==
+              (previousStatus || '').toLowerCase()
+          ) {
+            debugLog(
+              '🏁 Race status changed to results phase, fetching race-results',
+              {
+                raceId: payloadRaceId,
+                newStatus: payload.status,
+                previousStatus,
+              }
+            )
+
+            // Fetch race-results document
+            const fetchRaceResults = async () => {
+              try {
+                const raceResultsResponse = await databases.listDocuments(
+                  'raceday-db',
+                  'race-results',
+                  [Query.equal('race', state.raceDocumentId!), Query.limit(1)]
+                )
+
+                if (raceResultsResponse.documents.length > 0) {
+                  const raceResultsDoc = raceResultsResponse.documents[0]
+                  debugLog(
+                    '🎯 Found race-results document after status change',
+                    {
+                      raceResultsDocumentId: raceResultsDoc.$id,
+                      resultStatus: raceResultsDoc.resultStatus,
+                      resultsAvailable: raceResultsDoc.resultsAvailable,
+                    }
+                  )
+
+                  // Parse fixedOddsData from race-results document
+                  let parsedFixedOddsData = {}
+                  if (raceResultsDoc.fixedOddsData) {
+                    try {
+                      parsedFixedOddsData =
+                        typeof raceResultsDoc.fixedOddsData === 'string'
+                          ? JSON.parse(raceResultsDoc.fixedOddsData)
+                          : raceResultsDoc.fixedOddsData || {}
+                    } catch (error) {
+                      errorLog(
+                        'Failed to parse fixedOddsData after status change',
+                        error
+                      )
+                      parsedFixedOddsData = {}
+                    }
+                  }
+
+                  const resultsData = raceResultsDoc.resultsAvailable
+                    ? {
+                        raceId: payloadRaceId,
+                        results:
+                          typeof raceResultsDoc.resultsData === 'string'
+                            ? JSON.parse(raceResultsDoc.resultsData)
+                            : raceResultsDoc.resultsData || [],
+                        dividends:
+                          typeof raceResultsDoc.dividendsData === 'string'
+                            ? JSON.parse(raceResultsDoc.dividendsData)
+                            : raceResultsDoc.dividendsData || [],
+                        fixedOddsData: parsedFixedOddsData,
+                        status: (raceResultsDoc.resultStatus?.toLowerCase() ||
+                          'interim') as 'interim' | 'final',
+                        photoFinish: raceResultsDoc.photoFinish || false,
+                        stewardsInquiry:
+                          raceResultsDoc.stewardsInquiry || false,
+                        protestLodged: raceResultsDoc.protestLodged || false,
+                        resultTime:
+                          raceResultsDoc.resultTime || new Date().toISOString(),
+                      }
+                    : null
+
+                  // Update state with race-results data
+                  setState((prev) => ({
+                    ...prev,
+                    raceResultsDocumentId: raceResultsDoc.$id,
+                    resultsData,
+                    lastResultsUpdate: new Date(),
+                    race: prev.race
+                      ? {
+                          ...prev.race,
+                          resultsAvailable: true,
+                          resultsData: resultsData?.results,
+                          dividendsData: resultsData?.dividends,
+                          fixedOddsData: resultsData?.fixedOddsData,
+                          resultStatus: resultsData?.status,
+                        }
+                      : prev.race,
+                  }))
+                } else {
+                  debugLog(
+                    'No race-results document found yet after status change to',
+                    payload.status
+                  )
+                }
+              } catch (error) {
+                errorLog(
+                  'Failed to fetch race-results after status change',
+                  error
+                )
+              }
+            }
+
+            // Execute the fetch asynchronously
+            fetchRaceResults()
           }
         } else if (isRaceResultsEvent && payload) {
           debugLog('Race results update received', {
@@ -829,14 +995,35 @@ export function useUnifiedRaceRealtime({
             channels
           )
 
-          unsubscribeFunction.current = client.subscribe(
-            channels,
-            (response: any) => {
-              processRealtimeMessage({
+          // Create a new message processor for the upgraded subscription
+          const handleMessage = (response: any) => {
+            try {
+              // Add to pending updates
+              pendingUpdates.current.push({
                 ...response,
                 channels: response.channels || [],
               })
+
+              // Clear existing timer and set new one for throttling
+              if (updateThrottleTimer.current) {
+                clearTimeout(updateThrottleTimer.current)
+              }
+
+              updateThrottleTimer.current = setTimeout(
+                applyPendingUpdates,
+                THROTTLE_DELAY
+              )
+            } catch (error) {
+              errorLog(
+                'Error processing real-time message in upgraded subscription',
+                error
+              )
             }
+          }
+
+          unsubscribeFunction.current = client.subscribe(
+            channels,
+            handleMessage
           )
         } catch (error) {
           errorLog('Failed to upgrade subscription:', error)
@@ -847,7 +1034,7 @@ export function useUnifiedRaceRealtime({
       const timer = setTimeout(setupSubscription, 100)
       return () => clearTimeout(timer)
     }
-  }, [state.raceResultsDocumentId, getChannels, processRealtimeMessage])
+  }, [state.raceResultsDocumentId, getChannels, applyPendingUpdates])
 
   // Manual reconnection function
   const reconnect = useCallback(() => {
