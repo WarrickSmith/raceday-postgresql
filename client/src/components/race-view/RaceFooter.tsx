@@ -95,12 +95,12 @@ export const RaceFooter = memo(function RaceFooter({
 
   return (
     <div
-      className={`race-footer bg-white border-2 border-gray-300 shadow-lg rounded-lg ${className}`}
+      className={`race-footer bg-white border-2 border-gray-300 shadow-lg rounded-lg h-40 ${className}`}
     >
       {/* Enhanced Three-Column Footer Layout: Pools | Results | Timing/Status */}
-      <div className="flex flex-col sm:flex-row gap-4 p-4 min-h-0 overflow-x-auto">
+      <div className="flex h-full p-4">
         {/* Column 1: Pools Section */}
-        <div className="flex-shrink-0 min-w-0 flex-grow">
+        <div className="w-96 flex-shrink-0 pr-4">
           <RacePoolsSection
             raceId={raceId}
             poolData={currentPoolData}
@@ -109,7 +109,7 @@ export const RaceFooter = memo(function RaceFooter({
         </div>
 
         {/* Column 2: Results Section */}
-        <div className="flex-shrink-0 min-w-0 flex-grow">
+        <div className="w-96 flex-shrink-0 pr-4">
           <RaceResultsSection
             resultsData={currentResultsData}
             lastUpdate={lastResultsUpdate}
@@ -118,7 +118,7 @@ export const RaceFooter = memo(function RaceFooter({
         </div>
 
         {/* Column 3: Timing/Status Section (Right) */}
-        <div className="flex-shrink-0 min-w-0 flex-grow flex items-center justify-center sm:justify-end">
+        <div className="flex-grow flex items-center justify-end">
           <RaceTimingSection
             raceStartTime={currentRaceStartTime}
             raceStatus={currentRaceStatus}

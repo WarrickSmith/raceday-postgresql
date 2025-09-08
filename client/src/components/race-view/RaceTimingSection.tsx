@@ -113,7 +113,7 @@ export const RaceTimingSection = memo(function RaceTimingSection({
 
   return (
     <div
-      className={`text-center space-y-2 h-full flex flex-col justify-center ${className}`}
+      className={`text-left space-y-2 h-full flex flex-col justify-center ${className}`}
     >
       {/* Race Status - prominent */}
       <div
@@ -150,7 +150,7 @@ export const RaceTimingSection = memo(function RaceTimingSection({
         currentStatus === 'interim' ||
         currentStatus === 'final') && (
         <div>
-          <div className="flex items-center justify-center space-x-2">
+          <div className="flex items-center justify-start space-x-2">
             <div className="text-lg font-extrabold text-blue-600 uppercase tracking-wide">
               Closed @
             </div>
@@ -170,7 +170,7 @@ export const RaceTimingSection = memo(function RaceTimingSection({
       {/* Scheduled Start Time - side-by-side layout */}
       {currentStartTime && (
         <div>
-          <div className="flex items-center justify-center space-x-2">
+          <div className="flex items-center justify-start space-x-2">
             <div className="text-lg font-extrabold text-gray-500 uppercase tracking-wide">
               Scheduled
             </div>

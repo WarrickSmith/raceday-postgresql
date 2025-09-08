@@ -121,38 +121,37 @@ export const RacePoolsSection = memo(function RacePoolsSection({
           {lastUpdate && <span className="ml-1 text-green-500">●</span>}
         </div>
       </div>
+      {/* insert a blank line or row above the <Pool breakdown rows> */}
+      <div className="h-6"></div>
 
       {/* Pool breakdown rows rendered as consistent pairs: Win <-> Quinella, Place <-> Trifecta, Total <-> FirstFour */}
 
-      {/* Render all rows with consistent 8-column grid formatting to match Results section */}
-      <div className="space-y-1">
+      {/* Render all rows with consistent 4-column grid formatting */}
+      <div className="space-y-1 mr-8">
         {pairs.map((p, i) => (
           <div
             key={i}
-            className="grid grid-cols-8 gap-1 items-baseline text-sm"
+            className="grid grid-cols-4 gap-1 items-baseline text-sm"
           >
-            {/* Left label - spans 2 columns to match Results layout */}
-            <div className="col-span-2 text-sm text-gray-600">
+            {/* Left label - spans 1 columns */}
+            <div className="col-span-1 text-sm text-gray-600">
               {p.left?.label ?? ''}
             </div>
 
             {/* Left value (bold) - spans 1 column */}
-            <div className="col-span-1 text-sm font-bold text-gray-900 leading-none text-right font-tnum">
+            <div className="col-span-1 text-sm font-bold text-gray-900 leading-none text-right font-tnum pr-6">
               {p.left && p.left.value !== undefined && p.left.value > 0
                 ? `$${formatPoolAmount(p.left.value)}`
                 : '—'}
             </div>
 
-            {/* Spacer columns to align with Results grid */}
-            <div className="col-span-1"></div>
-
-            {/* Right label - spans 1 column to match Results bet type column */}
-            <div className="col-span-2 text-sm text-gray-600 truncate">
+            {/* Right label - spans 1 column  */}
+            <div className="col-span-1 text-sm text-gray-600 truncate">
               {p.right?.label ?? ''}
             </div>
 
-            {/* Right value (bold) - spans 1 column to match Results bet value column */}
-            <div className="col-span-1 text-sm font-bold text-gray-900 leading-none text-right font-tnum">
+            {/* Right value (bold) - spans 1 column */}
+            <div className="col-span-1 text-sm font-bold text-gray-900 leading-none text-right font-tnum pr-6">
               {p.right && p.right.value !== undefined && p.right.value > 0
                 ? `$${formatPoolAmount(p.right.value)}`
                 : '—'}
