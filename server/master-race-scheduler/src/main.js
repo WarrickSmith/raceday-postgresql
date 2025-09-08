@@ -8,11 +8,11 @@ import { Client, Databases, Functions, Query } from 'node-appwrite'
  * When triggered manually, runs a single cycle for testing.
  *
  * Updated polling strategy:
- * - Minimum polling interval is now 30 seconds (was 15 seconds)
- * - -20m to -5m: 5 minute polling (was 2 minutes for -20m to -10m)
- * - -5m to -1m: 1 minute polling (was 1 minute for -10m to -5m)
- * - -1m until Interim status: 30 seconds (was 15 seconds for -5m to start)
- * - After Interim status confirmed: 5 minutes until Final, then stop
+ * - Master scheduler runs every 1 minute (CRON minimum)
+ * - High-frequency polling (30s/15s) delegated to enhanced-race-poller internal loops
+ * - -5m to -3m: 30 second polling (managed by enhanced-race-poller)
+ * - -3m to Final: 15 second polling (managed by enhanced-race-poller)
+ * - After Interim status: 30 second polling until Final, then stop
  *
  * Architecture:
  * - Analyzes all active races for polling requirements every 30 seconds
@@ -32,25 +32,18 @@ export default async function main(context) {
 
   // Check if this is a scheduled run (cron) vs manual run
   if (context.req.headers['x-appwrite-task']) {
-    // Run the polling logic 2 times at 30s intervals for cron-triggered executions
-    // This gives us executions at 0s, 30s (next cron cycle handles 60s)
+    // Run the polling logic once for cron-triggered executions (every 1 minute)
+    // High-frequency polling is now delegated to enhanced-race-poller internal loops
     context.log(
-      'Scheduled execution: Running 2 cycles at 30s intervals within 1-minute window'
+      'Scheduled execution: Running single cycle (high-frequency polling delegated to enhanced-race-poller)'
     )
 
-    for (let i = 0; i < 2; i++) {
-      context.log(`Starting polling cycle ${i + 1}/2 at ${i * 30}s offset`)
-      await runSchedulerLogic(context)
-
-      if (i < 1) {
-        context.log(`Waiting 30 seconds before cycle ${i + 2}/2`)
-        await new Promise((res) => setTimeout(res, 30000)) // wait 30s
-      }
-    }
+    await runSchedulerLogic(context)
 
     return context.res.json({
       success: true,
-      message: 'Scheduler completed 2 cycles at 30s intervals (0s, 30s)',
+      message:
+        'Scheduler completed single cycle (high-frequency polling delegated to enhanced-race-poller)',
       totalExecutionTime: Date.now() - startTime,
     })
   } else {
@@ -97,26 +90,26 @@ async function runSchedulerLogic(context) {
     // Simplified timezone handling using native NZ API fields
     // NZTAB API provides raceDateNz and startTimeNz fields that eliminate complex UTC conversions
     const now = new Date()
-    
+
     // Get current NZ date for race filtering - use simple timezone conversion
-    const nzTimeString = now.toLocaleString('en-US', { 
+    const nzTimeString = now.toLocaleString('en-US', {
       timeZone: 'Pacific/Auckland',
       year: 'numeric',
-      month: '2-digit', 
+      month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-      hour12: false
+      hour12: false,
     })
-    
+
     // Parse NZ date components
     const [nzDatePart, nzTimePart] = nzTimeString.split(', ')
     const [nzMonth, nzDay, nzYear] = nzDatePart.split('/')
     const [nzHour, nzMinute] = nzTimePart.split(':')
-    
+
     // Create NZ time for logging and comparison
     const nzTimeDisplay = `${nzYear}-${nzMonth}-${nzDay} ${nzHour}:${nzMinute} NZST/NZDT`
-    
+
     // Simple 9AM NZ check using current NZ hour (no complex UTC conversion needed)
     const currentNzHour = parseInt(nzHour)
     const isAfterNz9AM = currentNzHour >= 9
@@ -124,7 +117,10 @@ async function runSchedulerLogic(context) {
     // meeting-status-poller trigger logic moved below (after active-period check)
 
     // Query today's races using simplified NZ date
-    const nzToday = `${nzYear}-${nzMonth.padStart(2, '0')}-${nzDay.padStart(2, '0')}` // YYYY-MM-DD format
+    const nzToday = `${nzYear}-${nzMonth.padStart(2, '0')}-${nzDay.padStart(
+      2,
+      '0'
+    )}` // YYYY-MM-DD format
 
     const todaysRaces = await databases.listDocuments(databaseId, 'races', [
       Query.equal('raceDateNz', nzToday),
@@ -165,9 +161,10 @@ async function runSchedulerLogic(context) {
     // Simplified active period logic using NZ time check and race availability
     const racesWithStartTime = racesToday.filter((race) => race.startTime)
     const allFinalized = racesToday.every((race) => race.status === 'Final')
-    
+
     // Active if: after 9AM NZ AND races exist AND not all finalized
-    const isCurrentlyActive = isAfterNz9AM && racesWithStartTime.length > 0 && !allFinalized
+    const isCurrentlyActive =
+      isAfterNz9AM && racesWithStartTime.length > 0 && !allFinalized
 
     if (racesWithStartTime.length === 0) {
       context.log('No races with start times found, scheduler dormant', {
@@ -267,19 +264,27 @@ async function runSchedulerLogic(context) {
       // Enhanced logging for different polling phases
       const isCriticalPeriod = Math.abs(timeToStartMinutes) <= 10
       const isEarlyMorningPhase = timeToStartMinutes > 65
-      const pollingPhase = isEarlyMorningPhase ? 'EARLY_MORNING_BASELINE' : 
-                          timeToStartMinutes > 5 ? 'PROXIMITY_ACTIVE' : 'PROXIMITY_CRITICAL'
-      
+      const pollingPhase = isEarlyMorningPhase
+        ? 'EARLY_MORNING_BASELINE'
+        : timeToStartMinutes > 5
+        ? 'PROXIMITY_ACTIVE'
+        : 'PROXIMITY_CRITICAL'
+
       if (isCriticalPeriod || isEarlyMorningPhase) {
-        context.log(`${pollingPhase} race analysis: ${race.name?.substring(0, 40) || 'Unknown'}`, {
-          raceId: race.$id.slice(-8),
-          status: race.status,
-          timeToStartMinutes: Math.round(timeToStartMinutes * 100) / 100, // 2 decimal precision
-          requiredInterval,
-          pollingPhase,
-          startTime: race.startTime,
-          lastPollTime: race.last_poll_time,
-        })
+        context.log(
+          `${pollingPhase} race analysis: ${
+            race.name?.substring(0, 40) || 'Unknown'
+          }`,
+          {
+            raceId: race.$id.slice(-8),
+            status: race.status,
+            timeToStartMinutes: Math.round(timeToStartMinutes * 100) / 100, // 2 decimal precision
+            requiredInterval,
+            pollingPhase,
+            startTime: race.startTime,
+            lastPollTime: race.last_poll_time,
+          }
+        )
       }
 
       // Skip races where polling should stop (Final status)
@@ -296,7 +301,7 @@ async function runSchedulerLogic(context) {
 
       // Enhanced window check - support early morning baseline + proximity polling
       // Early morning: Poll all Open races from 9 AM NZ regardless of start time
-      // Proximity: Enhanced strategy within 65 minutes of start time  
+      // Proximity: Enhanced strategy within 65 minutes of start time
       // Post-race: Continue until 60 minutes after start for final data
       const isWithinPollingWindow = timeToStartMinutes >= -60 // Only exclude races >60min after start
       if (!isWithinPollingWindow) {
@@ -312,7 +317,8 @@ async function runSchedulerLogic(context) {
       const timeSinceLastPollMinutes = timeSinceLastPoll / (1000 * 60)
 
       const isFirstPoll = !race.last_poll_time
-      const shouldPoll = isFirstPoll || timeSinceLastPollMinutes >= requiredInterval
+      const shouldPoll =
+        isFirstPoll || timeSinceLastPollMinutes >= requiredInterval
 
       // Enhanced logging for polling decisions (critical races and early morning phase)
       if (isCriticalPeriod || isEarlyMorningPhase) {
@@ -320,7 +326,8 @@ async function runSchedulerLogic(context) {
           raceId: race.$id.slice(-8),
           shouldPoll,
           isFirstPoll,
-          timeSinceLastPollMinutes: Math.round(timeSinceLastPollMinutes * 100) / 100,
+          timeSinceLastPollMinutes:
+            Math.round(timeSinceLastPollMinutes * 100) / 100,
           requiredInterval,
           pollingPhase,
           reason: shouldPoll
@@ -378,13 +385,13 @@ async function runSchedulerLogic(context) {
     let pollingStrategy
     let functionTriggered = false
     const executionStartTime = Date.now()
-    
+
     // Detailed pre-execution analysis
-    const criticalRaces = racesDueForPolling.filter(r => r.isCriticalPeriod)
+    const criticalRaces = racesDueForPolling.filter((r) => r.isCriticalPeriod)
     context.log('Function execution analysis', {
       totalRacesDue: racesDueForPolling.length,
       criticalRaces: criticalRaces.length,
-      criticalRaceDetails: criticalRaces.map(r => ({
+      criticalRaceDetails: criticalRaces.map((r) => ({
         id: r.raceId.slice(-8),
         name: r.raceName.substring(0, 30),
         timeToStart: r.timeToStartMinutes,
@@ -437,7 +444,7 @@ async function runSchedulerLogic(context) {
       context.log('Executing batch polling strategy', {
         raceCount: raceIds.length,
         criticalCount: criticalRaces.length,
-        raceDetails: racesDueForPolling.map(r => ({
+        raceDetails: racesDueForPolling.map((r) => ({
           id: r.raceId.slice(-8),
           name: r.raceName.substring(0, 20),
           timeToStart: r.timeToStartMinutes,
@@ -458,11 +465,11 @@ async function runSchedulerLogic(context) {
           raceCount: raceIds.length,
           criticalCount: criticalRaces.length,
           executionId: executionResult.$id,
-          raceIds: raceIds.map(id => id.slice(-8)), // All race IDs for tracking
+          raceIds: raceIds.map((id) => id.slice(-8)), // All race IDs for tracking
         })
       } catch (error) {
         context.error('✗ Failed to trigger enhanced race poller (batch)', {
-          raceIds: raceIds.map(id => id.slice(-8)),
+          raceIds: raceIds.map((id) => id.slice(-8)),
           raceCount: raceIds.length,
           error: error.message,
           stack: error.stack?.split('\n').slice(0, 3).join(' | '),
@@ -490,7 +497,9 @@ async function runSchedulerLogic(context) {
 
       for (const [index, batch] of batches.entries()) {
         const raceIds = batch.map((r) => r.raceId)
-        const batchCriticalCount = batch.filter(r => r.isCriticalPeriod).length
+        const batchCriticalCount = batch.filter(
+          (r) => r.isCriticalPeriod
+        ).length
 
         try {
           const executionResult = await functions.createExecution(
@@ -506,23 +515,29 @@ async function runSchedulerLogic(context) {
             executionId: executionResult.$id,
             raceCount: raceIds.length,
             criticalCount: batchCriticalCount,
-            raceIds: raceIds.map(id => id.slice(-8)),
+            raceIds: raceIds.map((id) => id.slice(-8)),
           }
           batchResults.push(batchResult)
 
-          context.log(`✓ Enhanced poller batch ${index + 1}/${batches.length} triggered`, batchResult)
+          context.log(
+            `✓ Enhanced poller batch ${index + 1}/${batches.length} triggered`,
+            batchResult
+          )
         } catch (error) {
           const batchResult = {
             batchNumber: index + 1,
             success: false,
             raceCount: raceIds.length,
             criticalCount: batchCriticalCount,
-            raceIds: raceIds.map(id => id.slice(-8)),
+            raceIds: raceIds.map((id) => id.slice(-8)),
             error: error.message,
           }
           batchResults.push(batchResult)
 
-          context.error(`✗ Enhanced poller batch ${index + 1}/${batches.length} failed`, batchResult)
+          context.error(
+            `✗ Enhanced poller batch ${index + 1}/${batches.length} failed`,
+            batchResult
+          )
         }
       }
 
@@ -562,18 +577,40 @@ async function runSchedulerLogic(context) {
 
     // Enhanced final execution summary with mathematical polling verification
     const totalExecutionTime = Date.now() - startTime
-    const criticalRacesPolled = racesDueForPolling.filter(r => r.isCriticalPeriod).length
-    
+    const criticalRacesPolled = racesDueForPolling.filter(
+      (r) => r.isCriticalPeriod
+    ).length
+
     // Dual-phase polling coverage analysis
     const pollingCoverageAnalysis = {
       criticalPeriodRaces: criticalRaces.length,
       criticalRacesPolled,
-      coveragePercentage: criticalRaces.length > 0 ? Math.round((criticalRacesPolled / criticalRaces.length) * 100) : 100,
+      coveragePercentage:
+        criticalRaces.length > 0
+          ? Math.round((criticalRacesPolled / criticalRaces.length) * 100)
+          : 100,
       dualPhaseIntervals: {
-        early_morning_baseline_65m_plus: racesDueForPolling.filter(r => r.timeToStartMinutes > 65 && r.requiredInterval === 30).length,
-        proximity_active_5_to_60m: racesDueForPolling.filter(r => r.timeToStartMinutes > 5 && r.timeToStartMinutes <= 60 && r.requiredInterval === 2.5).length,
-        proximity_critical_0_to_5m: racesDueForPolling.filter(r => r.timeToStartMinutes >= 0 && r.timeToStartMinutes <= 5 && r.requiredInterval === 0.5).length,
-        transition_60_to_65m: racesDueForPolling.filter(r => r.timeToStartMinutes > 60 && r.timeToStartMinutes <= 65 && r.requiredInterval === 2.5).length,
+        early_morning_baseline_65m_plus: racesDueForPolling.filter(
+          (r) => r.timeToStartMinutes > 65 && r.requiredInterval === 30
+        ).length,
+        proximity_active_5_to_60m: racesDueForPolling.filter(
+          (r) =>
+            r.timeToStartMinutes > 5 &&
+            r.timeToStartMinutes <= 60 &&
+            r.requiredInterval === 2.5
+        ).length,
+        proximity_critical_0_to_5m: racesDueForPolling.filter(
+          (r) =>
+            r.timeToStartMinutes >= 0 &&
+            r.timeToStartMinutes <= 5 &&
+            r.requiredInterval === 0.5
+        ).length,
+        transition_60_to_65m: racesDueForPolling.filter(
+          (r) =>
+            r.timeToStartMinutes > 60 &&
+            r.timeToStartMinutes <= 65 &&
+            r.requiredInterval === 2.5
+        ).length,
       },
     }
 
@@ -587,7 +624,7 @@ async function runSchedulerLogic(context) {
       analysis: analysisResults,
       executionTimeMs: totalExecutionTime,
       functionTriggered,
-      nextCheckIn: '30 seconds (dual cycle)',
+      nextCheckIn: '1 minute (CRON minimum)',
       nzTimeDisplay,
       isAfterNz9AM,
       enhancedFeatures: {
@@ -604,15 +641,21 @@ async function runSchedulerLogic(context) {
       ...executionSummary,
       performanceMetrics: {
         totalTimeMs: totalExecutionTime,
-        avgTimePerRace: racesDueForPolling.length > 0 ? Math.round(totalExecutionTime / racesDueForPolling.length) : 0,
+        avgTimePerRace:
+          racesDueForPolling.length > 0
+            ? Math.round(totalExecutionTime / racesDueForPolling.length)
+            : 0,
         functionExecutionSuccess: functionTriggered,
       },
       nextPollingPrediction: {
         expectedCriticalRaces: criticalRaces.length,
-        nextCriticalPolling: '30 seconds (if critical races remain)',
-        nextProximityPolling: '2.5 minutes (active period 5-60m before race)',
-        nextBaselinePolling: '30 minutes (early morning phase >65m before race)',
-        dualPhaseStrategy: 'Early morning baseline (30min) → Proximity enhanced (2.5min/30s)',
+        nextCriticalPolling: '15 seconds (managed by enhanced-race-poller)',
+        nextProximityPolling:
+          '2.5 minutes (active period 5-60m before race, 15s for <3m)',
+        nextBaselinePolling:
+          '30 minutes (early morning phase >65m before race)',
+        dualPhaseStrategy:
+          'Early morning baseline (30min) → Proximity enhanced (2.5min/30s)',
       },
     })
 
@@ -644,7 +687,7 @@ async function runSchedulerLogic(context) {
  *
  * PHASE 2 - Enhanced Proximity Polling (65min before - race end):
  * - 5-60m: 2.5 minutes (guarantees every 5m column gets ≥1 data point)
- * - 0-5m: 30 seconds (guarantees every 1m column gets ≥1 data point) 
+ * - 0-5m: 30 seconds (guarantees every 1m column gets ≥1 data point)
  * - Post-start: Continue until Final status
  *
  * Mathematical proof:
@@ -659,7 +702,7 @@ async function runSchedulerLogic(context) {
 function getPollingInterval(timeToStartMinutes, raceStatus) {
   // STATUS-DRIVEN POLLING: Primary logic based on race status, not time
 
-  // Open status: Dual-phase strategy
+  // Open status: Enhanced strategy with delegated high-frequency polling
   if (raceStatus === 'Open') {
     // PHASE 1: Early Morning Baseline Collection (>65 minutes before race)
     if (timeToStartMinutes > 65) {
@@ -667,9 +710,11 @@ function getPollingInterval(timeToStartMinutes, raceStatus) {
     }
     // PHASE 2: Enhanced Proximity Polling (≤65 minutes before race)
     else if (timeToStartMinutes <= 0) {
-      return 0.5 // 30 seconds - critical period until actually closed (0s to start)
+      return 0.25 // 15 seconds - critical period (race start time passed) - delegated to enhanced-race-poller
+    } else if (timeToStartMinutes <= 3) {
+      return 0.25 // 15 seconds - critical approach period (3m to 0s) - delegated to enhanced-race-poller
     } else if (timeToStartMinutes <= 5) {
-      return 0.5 // 30 seconds - critical approach period (5m to 0s) - guarantees 1m column coverage
+      return 0.5 // 30 seconds - pre-critical period (5m to 3m) - delegated to enhanced-race-poller
     } else if (timeToStartMinutes <= 60) {
       return 2.5 // 2.5 minutes - active period (60m to 5m) - guarantees 5m column coverage
     } else {
@@ -680,11 +725,11 @@ function getPollingInterval(timeToStartMinutes, raceStatus) {
 
   // Post-open status polling (race has actually started transitioning)
   if (raceStatus === 'Closed') {
-    return 0.5 // 30 seconds - closed to running transition
+    return 0.25 // 15 seconds - closed to running transition - delegated to enhanced-race-poller
   } else if (raceStatus === 'Running') {
-    return 0.5 // 30 seconds - running to interim transition
+    return 0.25 // 15 seconds - running to interim transition - delegated to enhanced-race-poller
   } else if (raceStatus === 'Interim') {
-    return 2.5 // 2.5 minutes - interim to final transition (less critical)
+    return 0.5 // 30 seconds - interim to final transition - delegated to enhanced-race-poller
   } else if (
     raceStatus === 'Final' ||
     raceStatus === 'Finalized' ||
@@ -695,8 +740,10 @@ function getPollingInterval(timeToStartMinutes, raceStatus) {
     // Fallback for unknown statuses - treat as active based on time and phase
     if (timeToStartMinutes > 65) {
       return 30 // 30 minutes - early morning baseline phase
+    } else if (timeToStartMinutes <= 3) {
+      return 0.25 // 15 seconds for critical period - delegated to enhanced-race-poller
     } else if (timeToStartMinutes <= 5) {
-      return 0.5 // 30 seconds for critical period
+      return 0.5 // 30 seconds for pre-critical period - delegated to enhanced-race-poller
     } else if (timeToStartMinutes <= 60) {
       return 2.5 // 2.5 minutes for active period
     } else {

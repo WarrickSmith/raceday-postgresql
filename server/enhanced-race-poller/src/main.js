@@ -3,45 +3,46 @@
  * - race-data-poller (baseline polling)
  * - single-race-poller (individual race polling)
  * - batch-race-poller (multi-race polling)
- * 
+ *
  * Features:
  * - Intelligent race filtering based on status and timing
  * - Dynamic batch sizing (1-10 races) based on urgency
  * - Enhanced mathematical validation and data quality scoring
  * - Comprehensive error handling and recovery mechanisms
  * - Support for both scheduled and HTTP-triggered execution modes
+ * - INTERNAL HIGH-FREQUENCY POLLING LOOPS for critical race periods
  */
 
 import { Client, Databases, Query } from 'node-appwrite'
 import { fetchRaceEventData, batchFetchRaceEventData } from './api-client.js'
-import { 
-    processEntrants, 
-    processMoneyTrackerData, 
-    processToteTrendsData, 
-    validateRacePoolData,
-    performantUpsert 
+import {
+  processEntrants,
+  processMoneyTrackerData,
+  processToteTrendsData,
+  validateRacePoolData,
+  performantUpsert,
 } from './database-utils.js'
 import {
-    validateEnvironmentVariables,
-    executeApiCallWithTimeout,
-    handleError,
-    rateLimit,
-    summarizeBatchResults,
-    logPerformance,
-    CircuitBreaker
+  validateEnvironmentVariables,
+  executeApiCallWithTimeout,
+  handleError,
+  rateLimit,
+  summarizeBatchResults,
+  logPerformance,
+  CircuitBreaker,
 } from './error-handlers.js'
 
 // Initialize circuit breaker for critical operations
 const apiCircuitBreaker = new CircuitBreaker('nztab-api', {
-    failureThreshold: 3,
-    resetTimeout: 30000,
-    monitoringPeriod: 60000
+  failureThreshold: 3,
+  resetTimeout: 30000,
+  monitoringPeriod: 60000,
 })
 
 const dbCircuitBreaker = new CircuitBreaker('appwrite-db', {
-    failureThreshold: 5,
-    resetTimeout: 15000,
-    monitoringPeriod: 30000
+  failureThreshold: 5,
+  resetTimeout: 15000,
+  monitoringPeriod: 30000,
 })
 
 /**
@@ -52,87 +53,115 @@ const dbCircuitBreaker = new CircuitBreaker('appwrite-db', {
  * 3. HTTP Batch mode: Poll multiple races by IDs
  */
 export default async function main(context) {
-    const executionStartTime = Date.now()
-    
-    try {
-        // Validate environment variables
-        validateEnvironmentVariables([
-            'APPWRITE_ENDPOINT',
-            'APPWRITE_PROJECT_ID', 
-            'APPWRITE_API_KEY'
-        ], context)
+  const executionStartTime = Date.now()
 
-        const endpoint = process.env['APPWRITE_ENDPOINT']
-        const projectId = process.env['APPWRITE_PROJECT_ID']
-        const apiKey = process.env['APPWRITE_API_KEY']
-        const nztabBaseUrl = process.env['NZTAB_API_BASE_URL'] || 'https://api.tab.co.nz'
+  try {
+    // Validate environment variables
+    validateEnvironmentVariables(
+      ['APPWRITE_ENDPOINT', 'APPWRITE_PROJECT_ID', 'APPWRITE_API_KEY'],
+      context
+    )
 
-        // Initialize Appwrite client
-        const client = new Client()
-            .setEndpoint(endpoint)
-            .setProject(projectId)
-            .setKey(apiKey)
-        
-        const databases = new Databases(client)
-        const databaseId = 'raceday-db'
+    const endpoint = process.env['APPWRITE_ENDPOINT']
+    const projectId = process.env['APPWRITE_PROJECT_ID']
+    const apiKey = process.env['APPWRITE_API_KEY']
+    const nztabBaseUrl =
+      process.env['NZTAB_API_BASE_URL'] || 'https://api.tab.co.nz'
 
-        // Determine execution mode based on request type
-        const executionMode = determineExecutionMode(context)
-        
-        context.log('Enhanced race poller started', {
-            executionMode,
-            timestamp: new Date().toISOString(),
-            nztabBaseUrl,
-            circuitBreakers: {
-                api: apiCircuitBreaker.getStatus(),
-                db: dbCircuitBreaker.getStatus()
-            }
-        })
+    // Initialize Appwrite client
+    const client = new Client()
+      .setEndpoint(endpoint)
+      .setProject(projectId)
+      .setKey(apiKey)
 
-        let result
-        switch (executionMode.type) {
-            case 'scheduled':
-                result = await executeScheduledPolling(databases, databaseId, nztabBaseUrl, context)
-                break
-            case 'http_single':
-                result = await executeHttpSinglePolling(databases, databaseId, nztabBaseUrl, executionMode.raceId, context)
-                break
-            case 'http_batch':
-                result = await executeHttpBatchPolling(databases, databaseId, nztabBaseUrl, executionMode.raceIds, context)
-                break
-            default:
-                throw new Error(`Unknown execution mode: ${executionMode.type}`)
-        }
+    const databases = new Databases(client)
+    const databaseId = 'raceday-db'
 
-        const executionTime = logPerformance('Enhanced race poller execution', executionStartTime, context, {
-            executionMode: executionMode.type,
-            success: result.success
-        })
+    // Determine execution mode based on request type
+    const executionMode = determineExecutionMode(context)
 
-        return {
-            ...result,
-            executionTimeMs: executionTime,
-            circuitBreakerStatus: {
-                api: apiCircuitBreaker.getStatus(),
-                db: dbCircuitBreaker.getStatus()
-            }
-        }
+    context.log('Enhanced race poller started', {
+      executionMode,
+      timestamp: new Date().toISOString(),
+      nztabBaseUrl,
+      circuitBreakers: {
+        api: apiCircuitBreaker.getStatus(),
+        db: dbCircuitBreaker.getStatus(),
+      },
+    })
 
-    } catch (error) {
-        const executionTime = Date.now() - executionStartTime
-        
-        handleError(error, 'Enhanced race poller function', context, {
-            executionTimeMs: executionTime,
-            timestamp: new Date().toISOString()
-        }, false, 'critical')
-
-        return {
-            success: false,
-            error: 'Enhanced race poller execution failed',
-            message: error instanceof Error ? error.message : 'Unknown error',
-            executionTimeMs: executionTime
-        }
+    let result
+    switch (executionMode.type) {
+      case 'scheduled':
+        result = await executeScheduledPolling(
+          databases,
+          databaseId,
+          nztabBaseUrl,
+          context
+        )
+        break
+      case 'http_single':
+        result = await executeHttpSinglePolling(
+          databases,
+          databaseId,
+          nztabBaseUrl,
+          executionMode.raceId,
+          context
+        )
+        break
+      case 'http_batch':
+        result = await executeHttpBatchPolling(
+          databases,
+          databaseId,
+          nztabBaseUrl,
+          executionMode.raceIds,
+          context
+        )
+        break
+      default:
+        throw new Error(`Unknown execution mode: ${executionMode.type}`)
     }
+
+    const executionTime = logPerformance(
+      'Enhanced race poller execution',
+      executionStartTime,
+      context,
+      {
+        executionMode: executionMode.type,
+        success: result.success,
+      }
+    )
+
+    return {
+      ...result,
+      executionTimeMs: executionTime,
+      circuitBreakerStatus: {
+        api: apiCircuitBreaker.getStatus(),
+        db: dbCircuitBreaker.getStatus(),
+      },
+    }
+  } catch (error) {
+    const executionTime = Date.now() - executionStartTime
+
+    handleError(
+      error,
+      'Enhanced race poller function',
+      context,
+      {
+        executionTimeMs: executionTime,
+        timestamp: new Date().toISOString(),
+      },
+      false,
+      'critical'
+    )
+
+    return {
+      success: false,
+      error: 'Enhanced race poller execution failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      executionTimeMs: executionTime,
+    }
+  }
 }
 
 /**
@@ -141,44 +170,51 @@ export default async function main(context) {
  * @returns {Object} Execution mode details
  */
 function determineExecutionMode(context) {
-    // Check if this is a scheduled (CRON) execution
-    if (context.req.headers['x-appwrite-task']) {
-        return { type: 'scheduled' }
-    }
-
-    // Parse HTTP request payload
-    let payload = {}
-    try {
-        if (typeof context.req.body === 'string') {
-            payload = JSON.parse(context.req.body)
-        } else if (typeof context.req.body === 'object' && context.req.body !== null) {
-            payload = context.req.body
-        } else if (context.req.query?.raceId) {
-            payload = { raceId: context.req.query.raceId }
-        } else if (context.req.query?.raceIds) {
-            const raceIdsParam = context.req.query.raceIds
-            payload = { raceIds: raceIdsParam.split(',').map(id => id.trim()) }
-        }
-    } catch (error) {
-        context.error('Invalid JSON payload', { 
-            error: error.message,
-            bodyType: typeof context.req.body 
-        })
-        payload = {}
-    }
-
-    // HTTP Single Race mode
-    if (payload.raceId && typeof payload.raceId === 'string') {
-        return { type: 'http_single', raceId: payload.raceId }
-    }
-
-    // HTTP Batch mode
-    if (payload.raceIds && Array.isArray(payload.raceIds) && payload.raceIds.length > 0) {
-        return { type: 'http_batch', raceIds: payload.raceIds }
-    }
-
-    // Default to scheduled mode
+  // Check if this is a scheduled (CRON) execution
+  if (context.req.headers['x-appwrite-task']) {
     return { type: 'scheduled' }
+  }
+
+  // Parse HTTP request payload
+  let payload = {}
+  try {
+    if (typeof context.req.body === 'string') {
+      payload = JSON.parse(context.req.body)
+    } else if (
+      typeof context.req.body === 'object' &&
+      context.req.body !== null
+    ) {
+      payload = context.req.body
+    } else if (context.req.query?.raceId) {
+      payload = { raceId: context.req.query.raceId }
+    } else if (context.req.query?.raceIds) {
+      const raceIdsParam = context.req.query.raceIds
+      payload = { raceIds: raceIdsParam.split(',').map((id) => id.trim()) }
+    }
+  } catch (error) {
+    context.error('Invalid JSON payload', {
+      error: error.message,
+      bodyType: typeof context.req.body,
+    })
+    payload = {}
+  }
+
+  // HTTP Single Race mode
+  if (payload.raceId && typeof payload.raceId === 'string') {
+    return { type: 'http_single', raceId: payload.raceId }
+  }
+
+  // HTTP Batch mode
+  if (
+    payload.raceIds &&
+    Array.isArray(payload.raceIds) &&
+    payload.raceIds.length > 0
+  ) {
+    return { type: 'http_batch', raceIds: payload.raceIds }
+  }
+
+  // Default to scheduled mode
+  return { type: 'scheduled' }
 }
 
 /**
@@ -189,96 +225,113 @@ function determineExecutionMode(context) {
  * @param {Object} context - Appwrite function context
  * @returns {Object} Execution result
  */
-async function executeScheduledPolling(databases, databaseId, nztabBaseUrl, context) {
-    const startTime = Date.now()
-    
-    context.log('Starting scheduled polling for active races')
+async function executeScheduledPolling(
+  databases,
+  databaseId,
+  nztabBaseUrl,
+  context
+) {
+  const startTime = Date.now()
 
-    try {
-        const now = new Date()
-        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000) // 1 hour ago
-        const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000) // 1 hour from now
+  context.log('Starting scheduled polling for active races')
 
-        // Intelligent race filtering - get races within extended window but prioritize critical ones
-        const racesQuery = await databases.listDocuments(databaseId, 'races', [
-            Query.greaterThanEqual('startTime', oneHourAgo.toISOString()),
-            Query.lessThanEqual('startTime', oneHourFromNow.toISOString()),
-            Query.notEqual('status', 'Final'),
-            Query.orderAsc('startTime'),
-            Query.limit(50) // Reasonable limit for scheduled polling
-        ])
+  try {
+    const now = new Date()
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000) // 1 hour ago
+    const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000) // 1 hour from now
 
-        const allRaces = racesQuery.documents
-        context.log(`Found ${allRaces.length} races in extended window for analysis`)
+    // Intelligent race filtering - get races within extended window but prioritize critical ones
+    const racesQuery = await databases.listDocuments(databaseId, 'races', [
+      Query.greaterThanEqual('startTime', oneHourAgo.toISOString()),
+      Query.lessThanEqual('startTime', oneHourFromNow.toISOString()),
+      Query.notEqual('status', 'Final'),
+      Query.orderAsc('startTime'),
+      Query.limit(50), // Reasonable limit for scheduled polling
+    ])
 
-        if (allRaces.length === 0) {
-            return {
-                success: true,
-                message: 'No active races found for scheduled polling',
-                statistics: { racesFound: 0, racesPolled: 0, updatesProcessed: 0 }
-            }
-        }
+    const allRaces = racesQuery.documents
+    context.log(
+      `Found ${allRaces.length} races in extended window for analysis`
+    )
 
-        // Enhanced race prioritization and filtering
-        const racesByPriority = categorizeRacesByUrgency(allRaces, now, context)
-        
-        // Select races for polling based on intelligent criteria
-        const racesToPoll = selectRacesForPolling(racesByPriority, context)
-
-        if (racesToPoll.length === 0) {
-            return {
-                success: true,
-                message: 'No races require polling at this time',
-                statistics: { racesFound: allRaces.length, racesPolled: 0, updatesProcessed: 0 }
-            }
-        }
-
-        context.log(`Selected ${racesToPoll.length} races for scheduled polling`, {
-            critical: racesByPriority.critical.length,
-            urgent: racesByPriority.urgent.length,
-            normal: racesByPriority.normal.length,
-            baseline: racesByPriority.baseline.length
-        })
-
-        // Execute polling with batch optimization
-        const results = await executeIntelligentPolling(
-            databases, 
-            databaseId, 
-            nztabBaseUrl, 
-            racesToPoll, 
-            context,
-            'scheduled'
-        )
-
-        const executionTime = Date.now() - startTime
-
-        return {
-            success: true,
-            message: `Scheduled polling completed: ${results.successfulRaces}/${racesToPoll.length} races processed`,
-            statistics: {
-                racesFound: allRaces.length,
-                racesPolled: racesToPoll.length,
-                successfulRaces: results.successfulRaces,
-                failedRaces: results.failedRaces,
-                updatesProcessed: results.totalUpdatesProcessed,
-                executionTimeMs: executionTime
-            },
-            prioritization: {
-                critical: racesByPriority.critical.length,
-                urgent: racesByPriority.urgent.length,
-                normal: racesByPriority.normal.length,
-                baseline: racesByPriority.baseline.length
-            }
-        }
-
-    } catch (error) {
-        handleError(error, 'Scheduled polling execution', context, {}, false, 'high')
-        return {
-            success: false,
-            error: 'Scheduled polling failed',
-            message: error instanceof Error ? error.message : 'Unknown error'
-        }
+    if (allRaces.length === 0) {
+      return {
+        success: true,
+        message: 'No active races found for scheduled polling',
+        statistics: { racesFound: 0, racesPolled: 0, updatesProcessed: 0 },
+      }
     }
+
+    // Enhanced race prioritization and filtering
+    const racesByPriority = categorizeRacesByUrgency(allRaces, now, context)
+
+    // Select races for polling based on intelligent criteria
+    const racesToPoll = selectRacesForPolling(racesByPriority, context)
+
+    if (racesToPoll.length === 0) {
+      return {
+        success: true,
+        message: 'No races require polling at this time',
+        statistics: {
+          racesFound: allRaces.length,
+          racesPolled: 0,
+          updatesProcessed: 0,
+        },
+      }
+    }
+
+    context.log(`Selected ${racesToPoll.length} races for scheduled polling`, {
+      ultra_critical: racesByPriority.ultra_critical.length,
+      critical: racesByPriority.critical.length,
+      urgent: racesByPriority.urgent.length,
+      normal: racesByPriority.normal.length,
+    })
+
+    // Execute polling with batch optimization
+    const results = await executeIntelligentPolling(
+      databases,
+      databaseId,
+      nztabBaseUrl,
+      racesToPoll,
+      context,
+      'scheduled'
+    )
+
+    const executionTime = Date.now() - startTime
+
+    return {
+      success: true,
+      message: `Scheduled polling completed: ${results.successfulRaces}/${racesToPoll.length} races processed`,
+      statistics: {
+        racesFound: allRaces.length,
+        racesPolled: racesToPoll.length,
+        successfulRaces: results.successfulRaces,
+        failedRaces: results.failedRaces,
+        updatesProcessed: results.totalUpdatesProcessed,
+        executionTimeMs: executionTime,
+      },
+      prioritization: {
+        ultra_critical: racesByPriority.ultra_critical.length,
+        critical: racesByPriority.critical.length,
+        urgent: racesByPriority.urgent.length,
+        normal: racesByPriority.normal.length,
+      },
+    }
+  } catch (error) {
+    handleError(
+      error,
+      'Scheduled polling execution',
+      context,
+      {},
+      false,
+      'high'
+    )
+    return {
+      success: false,
+      error: 'Scheduled polling failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    }
+  }
 }
 
 /**
@@ -290,84 +343,108 @@ async function executeScheduledPolling(databases, databaseId, nztabBaseUrl, cont
  * @param {Object} context - Appwrite function context
  * @returns {Object} Execution result
  */
-async function executeHttpSinglePolling(databases, databaseId, nztabBaseUrl, raceId, context) {
-    const startTime = Date.now()
-    
-    context.log('Starting HTTP single race polling', { raceId })
+async function executeHttpSinglePolling(
+  databases,
+  databaseId,
+  nztabBaseUrl,
+  raceId,
+  context
+) {
+  const startTime = Date.now()
 
-    try {
-        // Quick race validation
-        const race = await databases.getDocument(databaseId, 'races', raceId)
-        
-        if (race.status === 'Final') {
-            return {
-                success: false,
-                message: 'Race is finalized, polling not required',
-                raceId,
-                status: race.status
-            }
-        }
+  context.log('Starting HTTP single race polling', { raceId })
 
-        context.log(`Polling single race: ${race.name} (${race.status})`)
+  try {
+    // Quick race validation
+    const race = await databases.getDocument(databaseId, 'races', raceId)
 
-        // For HTTP requests, return immediate response and process in background
-        if (context.res && context.res.json) {
-            const immediateResponse = {
-                success: true,
-                message: 'Single race polling initiated successfully',
-                raceId,
-                raceName: race.name,
-                status: race.status,
-                note: 'Data processing in progress, check database for updates'
-            }
-
-            // Process in background
-            setImmediate(async () => {
-                await processSingleRaceWithErrorHandling(
-                    databases, databaseId, nztabBaseUrl, raceId, race, context
-                )
-            })
-
-            return context.res.json(immediateResponse, 202) // 202 Accepted
-        } else {
-            // Direct execution (for testing or scheduled calls)
-            const result = await processSingleRaceWithErrorHandling(
-                databases, databaseId, nztabBaseUrl, raceId, race, context
-            )
-            
-            return {
-                success: result.success,
-                message: result.success ? 'Single race polling completed' : 'Single race polling failed',
-                raceId,
-                raceName: race.name,
-                statistics: result.statistics,
-                executionTimeMs: Date.now() - startTime
-            }
-        }
-
-    } catch (error) {
-        if (error.code === 404) {
-            const response = { success: false, error: `Race not found: ${raceId}` }
-            if (context.res && context.res.json) {
-                return context.res.json(response, 404)
-            }
-            return response
-        }
-
-        handleError(error, 'HTTP single race polling', context, { raceId }, false, 'high')
-        
-        const response = {
-            success: false,
-            error: 'Single race polling failed',
-            message: error instanceof Error ? error.message : 'Unknown error',
-            executionTimeMs: Date.now() - startTime
-        }
-
-        if (context.res && context.res.json) {
-            return context.res.json(response, 500)
-        }
-        return response
+    if (race.status === 'Final') {
+      return {
+        success: false,
+        message: 'Race is finalized, polling not required',
+        raceId,
+        status: race.status,
+      }
     }
+
+    context.log(`Polling single race: ${race.name} (${race.status})`)
+
+    // For HTTP requests, return immediate response and process in background
+    if (context.res && context.res.json) {
+      const immediateResponse = {
+        success: true,
+        message: 'Single race polling initiated successfully',
+        raceId,
+        raceName: race.name,
+        status: race.status,
+        note: 'Data processing in progress, check database for updates',
+      }
+
+      // Process in background
+      setImmediate(async () => {
+        await processSingleRaceWithErrorHandling(
+          databases,
+          databaseId,
+          nztabBaseUrl,
+          raceId,
+          race,
+          context
+        )
+      })
+
+      return context.res.json(immediateResponse, 202) // 202 Accepted
+    } else {
+      // Direct execution (for testing or scheduled calls)
+      const result = await processSingleRaceWithErrorHandling(
+        databases,
+        databaseId,
+        nztabBaseUrl,
+        raceId,
+        race,
+        context
+      )
+
+      return {
+        success: result.success,
+        message: result.success
+          ? 'Single race polling completed'
+          : 'Single race polling failed',
+        raceId,
+        raceName: race.name,
+        statistics: result.statistics,
+        executionTimeMs: Date.now() - startTime,
+      }
+    }
+  } catch (error) {
+    if (error.code === 404) {
+      const response = { success: false, error: `Race not found: ${raceId}` }
+      if (context.res && context.res.json) {
+        return context.res.json(response, 404)
+      }
+      return response
+    }
+
+    handleError(
+      error,
+      'HTTP single race polling',
+      context,
+      { raceId },
+      false,
+      'high'
+    )
+
+    const response = {
+      success: false,
+      error: 'Single race polling failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      executionTimeMs: Date.now() - startTime,
+    }
+
+    if (context.res && context.res.json) {
+      return context.res.json(response, 500)
+    }
+    return response
+  }
 }
 
 /**
@@ -379,121 +456,149 @@ async function executeHttpSinglePolling(databases, databaseId, nztabBaseUrl, rac
  * @param {Object} context - Appwrite function context
  * @returns {Object} Execution result
  */
-async function executeHttpBatchPolling(databases, databaseId, nztabBaseUrl, raceIds, context) {
-    const startTime = Date.now()
-    
-    context.log('Starting HTTP batch race polling', { raceCount: raceIds.length })
+async function executeHttpBatchPolling(
+  databases,
+  databaseId,
+  nztabBaseUrl,
+  raceIds,
+  context
+) {
+  const startTime = Date.now()
 
-    try {
-        // Validate batch size
-        if (raceIds.length > 10) {
-            const response = {
-                success: false,
-                error: `Batch size too large: ${raceIds.length} races. Maximum: 10 races`,
-                hint: 'Use multiple smaller batches or single race polling'
-            }
-            
-            if (context.res && context.res.json) {
-                return context.res.json(response, 400)
-            }
-            return response
-        }
+  context.log('Starting HTTP batch race polling', { raceCount: raceIds.length })
 
-        // Quick validation and filter out finalized races
-        const validRaces = []
-        const skippedRaces = []
+  try {
+    // Validate batch size
+    if (raceIds.length > 10) {
+      const response = {
+        success: false,
+        error: `Batch size too large: ${raceIds.length} races. Maximum: 10 races`,
+        hint: 'Use multiple smaller batches or single race polling',
+      }
 
-        for (const raceId of raceIds) {
-            try {
-                const race = await databases.getDocument(databaseId, 'races', raceId)
-                
-                if (race.status === 'Final') {
-                    skippedRaces.push({
-                        raceId,
-                        reason: 'Race already finalized',
-                        status: race.status
-                    })
-                } else {
-                    validRaces.push({ raceId, race })
-                }
-            } catch (error) {
-                skippedRaces.push({
-                    raceId,
-                    reason: 'Race not found',
-                    error: error.message
-                })
-            }
-        }
-
-        if (validRaces.length === 0) {
-            const response = {
-                success: false,
-                message: 'No valid races to process',
-                skippedRaces,
-                totalRequested: raceIds.length
-            }
-            
-            if (context.res && context.res.json) {
-                return context.res.json(response, 200)
-            }
-            return response
-        }
-
-        context.log(`Processing batch of ${validRaces.length} valid races`)
-
-        // For HTTP requests, return immediate response and process in background
-        if (context.res && context.res.json) {
-            const immediateResponse = {
-                success: true,
-                message: `Batch race polling initiated for ${validRaces.length} races`,
-                validRaces: validRaces.length,
-                skippedRaces: skippedRaces.length,
-                totalRequested: raceIds.length,
-                note: 'Data processing in progress, check database for updates'
-            }
-
-            // Process in background
-            setImmediate(async () => {
-                const raceData = validRaces.map(item => ({ raceId: item.raceId, race: item.race }))
-                await executeIntelligentPolling(
-                    databases, databaseId, nztabBaseUrl, raceData, context, 'http_batch'
-                )
-            })
-
-            return context.res.json(immediateResponse, 202) // 202 Accepted
-        } else {
-            // Direct execution (for testing)
-            const raceData = validRaces.map(item => ({ raceId: item.raceId, race: item.race }))
-            const results = await executeIntelligentPolling(
-                databases, databaseId, nztabBaseUrl, raceData, context, 'http_batch'
-            )
-
-            return {
-                success: true,
-                message: `Batch polling completed: ${results.successfulRaces}/${validRaces.length} races processed`,
-                statistics: results,
-                validRaces: validRaces.length,
-                skippedRaces: skippedRaces.length,
-                totalRequested: raceIds.length,
-                executionTimeMs: Date.now() - startTime
-            }
-        }
-
-    } catch (error) {
-        handleError(error, 'HTTP batch race polling', context, { raceIds }, false, 'high')
-        
-        const response = {
-            success: false,
-            error: 'Batch race polling failed',
-            message: error instanceof Error ? error.message : 'Unknown error',
-            executionTimeMs: Date.now() - startTime
-        }
-
-        if (context.res && context.res.json) {
-            return context.res.json(response, 500)
-        }
-        return response
+      if (context.res && context.res.json) {
+        return context.res.json(response, 400)
+      }
+      return response
     }
+
+    // Quick validation and filter out finalized races
+    const validRaces = []
+    const skippedRaces = []
+
+    for (const raceId of raceIds) {
+      try {
+        const race = await databases.getDocument(databaseId, 'races', raceId)
+
+        if (race.status === 'Final') {
+          skippedRaces.push({
+            raceId,
+            reason: 'Race already finalized',
+            status: race.status,
+          })
+        } else {
+          validRaces.push({ raceId, race })
+        }
+      } catch (error) {
+        skippedRaces.push({
+          raceId,
+          reason: 'Race not found',
+          error: error.message,
+        })
+      }
+    }
+
+    if (validRaces.length === 0) {
+      const response = {
+        success: false,
+        message: 'No valid races to process',
+        skippedRaces,
+        totalRequested: raceIds.length,
+      }
+
+      if (context.res && context.res.json) {
+        return context.res.json(response, 200)
+      }
+      return response
+    }
+
+    context.log(`Processing batch of ${validRaces.length} valid races`)
+
+    // For HTTP requests, return immediate response and process in background
+    if (context.res && context.res.json) {
+      const immediateResponse = {
+        success: true,
+        message: `Batch race polling initiated for ${validRaces.length} races`,
+        validRaces: validRaces.length,
+        skippedRaces: skippedRaces.length,
+        totalRequested: raceIds.length,
+        note: 'Data processing in progress, check database for updates',
+      }
+
+      // Process in background
+      setImmediate(async () => {
+        const raceData = validRaces.map((item) => ({
+          raceId: item.raceId,
+          race: item.race,
+        }))
+        await executeIntelligentPolling(
+          databases,
+          databaseId,
+          nztabBaseUrl,
+          raceData,
+          context,
+          'http_batch'
+        )
+      })
+
+      return context.res.json(immediateResponse, 202) // 202 Accepted
+    } else {
+      // Direct execution (for testing)
+      const raceData = validRaces.map((item) => ({
+        raceId: item.raceId,
+        race: item.race,
+      }))
+      const results = await executeIntelligentPolling(
+        databases,
+        databaseId,
+        nztabBaseUrl,
+        raceData,
+        context,
+        'http_batch'
+      )
+
+      return {
+        success: true,
+        message: `Batch polling completed: ${results.successfulRaces}/${validRaces.length} races processed`,
+        statistics: results,
+        validRaces: validRaces.length,
+        skippedRaces: skippedRaces.length,
+        totalRequested: raceIds.length,
+        executionTimeMs: Date.now() - startTime,
+      }
+    }
+  } catch (error) {
+    handleError(
+      error,
+      'HTTP batch race polling',
+      context,
+      { raceIds },
+      false,
+      'high'
+    )
+
+    const response = {
+      success: false,
+      error: 'Batch race polling failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      executionTimeMs: Date.now() - startTime,
+    }
+
+    if (context.res && context.res.json) {
+      return context.res.json(response, 500)
+    }
+    return response
+  }
 }
 
 /**
@@ -504,42 +609,69 @@ async function executeHttpBatchPolling(databases, databaseId, nztabBaseUrl, race
  * @returns {Object} Categorized races by priority
  */
 function categorizeRacesByUrgency(races, now, context) {
-    const categories = {
-        critical: [],   // -1m to +5m (30-second polling)
-        urgent: [],     // -5m to -1m (1-minute polling) 
-        normal: [],     // -20m to -5m (2.5-minute polling)
-        baseline: []    // -60m to -20m (5-minute baseline)
+  const categories = {
+    ultra_critical: [], // -3m to Final (15-second polling) - highest priority
+    critical: [], // -5m to -3m (30-second polling)
+    urgent: [], // -20m to -5m (2.5-minute polling)
+    normal: [], // -60m to -20m (5-minute baseline)
+  }
+
+  for (const race of races) {
+    if (!race.startTime) continue
+
+    const raceStart = new Date(race.startTime)
+    const timeToStartMinutes =
+      (raceStart.getTime() - now.getTime()) / (1000 * 60)
+
+    // Enhanced prioritization based on race status and timing for internal polling loops
+    if (
+      timeToStartMinutes <= 3 ||
+      ['Closed', 'Running', 'Interim'].includes(race.status)
+    ) {
+      categories.ultra_critical.push({
+        raceId: race.$id,
+        race,
+        timeToStart: timeToStartMinutes,
+        priority: 'ultra_critical',
+        pollingInterval: 15, // 15 seconds
+      })
+    } else if (timeToStartMinutes <= 5 && timeToStartMinutes > 3) {
+      categories.critical.push({
+        raceId: race.$id,
+        race,
+        timeToStart: timeToStartMinutes,
+        priority: 'critical',
+        pollingInterval: 30, // 30 seconds
+      })
+    } else if (timeToStartMinutes >= -20 && timeToStartMinutes < -5) {
+      categories.urgent.push({
+        raceId: race.$id,
+        race,
+        timeToStart: timeToStartMinutes,
+        priority: 'urgent',
+        pollingInterval: 150, // 2.5 minutes
+      })
+    } else if (timeToStartMinutes >= -60 && timeToStartMinutes < -20) {
+      categories.normal.push({
+        raceId: race.$id,
+        race,
+        timeToStart: timeToStartMinutes,
+        priority: 'normal',
+        pollingInterval: 300, // 5 minutes
+      })
     }
+    // Races outside the -60m window are ignored
+  }
 
-    for (const race of races) {
-        if (!race.startTime) continue
+  context.log('Enhanced race categorization completed', {
+    ultra_critical: categories.ultra_critical.length,
+    critical: categories.critical.length,
+    urgent: categories.urgent.length,
+    normal: categories.normal.length,
+    total: races.length,
+  })
 
-        const raceStart = new Date(race.startTime)
-        const timeToStartMinutes = (raceStart.getTime() - now.getTime()) / (1000 * 60)
-
-        // Enhanced prioritization based on race status and timing
-        if ((timeToStartMinutes >= -1 && timeToStartMinutes <= 5) || 
-            ['Open', 'Closed', 'Running', 'Interim'].includes(race.status)) {
-            categories.critical.push({ raceId: race.$id, race, timeToStart: timeToStartMinutes, priority: 'critical' })
-        } else if (timeToStartMinutes >= -5 && timeToStartMinutes < -1) {
-            categories.urgent.push({ raceId: race.$id, race, timeToStart: timeToStartMinutes, priority: 'urgent' })
-        } else if (timeToStartMinutes >= -20 && timeToStartMinutes < -5) {
-            categories.normal.push({ raceId: race.$id, race, timeToStart: timeToStartMinutes, priority: 'normal' })
-        } else if (timeToStartMinutes >= -60 && timeToStartMinutes < -20) {
-            categories.baseline.push({ raceId: race.$id, race, timeToStart: timeToStartMinutes, priority: 'baseline' })
-        }
-        // Races outside the -60m to +5m window are ignored
-    }
-
-    context.log('Race categorization completed', {
-        critical: categories.critical.length,
-        urgent: categories.urgent.length,
-        normal: categories.normal.length,
-        baseline: categories.baseline.length,
-        total: races.length
-    })
-
-    return categories
+  return categories
 }
 
 /**
@@ -549,55 +681,58 @@ function categorizeRacesByUrgency(races, now, context) {
  * @returns {Array} Selected races for polling
  */
 function selectRacesForPolling(categorizedRaces, context) {
-    const selectedRaces = []
-    const now = Date.now()
+  const selectedRaces = []
+  const now = Date.now()
 
-    // Always poll critical races (30-second intervals)
-    for (const raceData of categorizedRaces.critical) {
-        selectedRaces.push(raceData)
+  // Always poll ultra-critical races (15-second intervals) - highest priority
+  for (const raceData of categorizedRaces.ultra_critical) {
+    selectedRaces.push(raceData)
+  }
+
+  // Always poll critical races (30-second intervals)
+  for (const raceData of categorizedRaces.critical) {
+    selectedRaces.push(raceData)
+  }
+
+  // Poll urgent races if 2.5+ minutes since last poll
+  for (const raceData of categorizedRaces.urgent) {
+    const lastPoll = raceData.race.last_poll_time
+      ? new Date(raceData.race.last_poll_time).getTime()
+      : 0
+    const timeSinceLastPoll = now - lastPoll
+
+    if (timeSinceLastPoll >= 2.5 * 60 * 1000) {
+      // 2.5 minutes
+      selectedRaces.push(raceData)
     }
+  }
 
-    // Poll urgent races if 1+ minutes since last poll
-    for (const raceData of categorizedRaces.urgent) {
-        const lastPoll = raceData.race.last_poll_time ? new Date(raceData.race.last_poll_time).getTime() : 0
-        const timeSinceLastPoll = now - lastPoll
-        
-        if (timeSinceLastPoll >= 60 * 1000) { // 1 minute
-            selectedRaces.push(raceData)
-        }
+  // Poll normal races if 5+ minutes since last poll
+  for (const raceData of categorizedRaces.normal) {
+    const lastPoll = raceData.race.last_poll_time
+      ? new Date(raceData.race.last_poll_time).getTime()
+      : 0
+    const timeSinceLastPoll = now - lastPoll
+
+    if (timeSinceLastPoll >= 5 * 60 * 1000) {
+      // 5 minutes
+      selectedRaces.push(raceData)
     }
+  }
 
-    // Poll normal races if 2.5+ minutes since last poll
-    for (const raceData of categorizedRaces.normal) {
-        const lastPoll = raceData.race.last_poll_time ? new Date(raceData.race.last_poll_time).getTime() : 0
-        const timeSinceLastPoll = now - lastPoll
-        
-        if (timeSinceLastPoll >= 2.5 * 60 * 1000) { // 2.5 minutes
-            selectedRaces.push(raceData)
-        }
-    }
+  context.log('Enhanced race selection completed', {
+    selected: selectedRaces.length,
+    byCriticality: {
+      ultra_critical: selectedRaces.filter(
+        (r) => r.priority === 'ultra_critical'
+      ).length,
+      critical: selectedRaces.filter((r) => r.priority === 'critical').length,
+      urgent: selectedRaces.filter((r) => r.priority === 'urgent').length,
+      normal: selectedRaces.filter((r) => r.priority === 'normal').length,
+    },
+  })
 
-    // Poll baseline races if 5+ minutes since last poll
-    for (const raceData of categorizedRaces.baseline) {
-        const lastPoll = raceData.race.last_poll_time ? new Date(raceData.race.last_poll_time).getTime() : 0
-        const timeSinceLastPoll = now - lastPoll
-        
-        if (timeSinceLastPoll >= 5 * 60 * 1000) { // 5 minutes
-            selectedRaces.push(raceData)
-        }
-    }
-
-    context.log('Race selection completed', {
-        selected: selectedRaces.length,
-        byCriticality: {
-            critical: selectedRaces.filter(r => r.priority === 'critical').length,
-            urgent: selectedRaces.filter(r => r.priority === 'urgent').length,
-            normal: selectedRaces.filter(r => r.priority === 'normal').length,
-            baseline: selectedRaces.filter(r => r.priority === 'baseline').length
-        }
-    })
-
-    return selectedRaces
+  return selectedRaces
 }
 
 /**
@@ -610,133 +745,128 @@ function selectRacesForPolling(categorizedRaces, context) {
  * @param {string} executionMode - Execution mode for logging
  * @returns {Object} Polling results
  */
-async function executeIntelligentPolling(databases, databaseId, nztabBaseUrl, racesToPoll, context, executionMode) {
-    const startTime = Date.now()
-    
-    // Dynamic batch sizing based on race count and priority
-    const batchSize = Math.min(racesToPoll.length, 5) // Optimal batch size for performance
-    const batches = []
-    
-    for (let i = 0; i < racesToPoll.length; i += batchSize) {
-        batches.push(racesToPoll.slice(i, i + batchSize))
-    }
+async function executeIntelligentPolling(
+  databases,
+  databaseId,
+  nztabBaseUrl,
+  racesToPoll,
+  context,
+  executionMode
+) {
+  const startTime = Date.now()
 
-    let totalSuccessfulRaces = 0
-    let totalFailedRaces = 0
-    let totalUpdatesProcessed = 0
-    let totalMoneyFlowProcessed = 0
+  // Separate races by priority for internal polling loops
+  const ultraCriticalRaces = racesToPoll.filter(
+    (r) => r.priority === 'ultra_critical'
+  )
+  const criticalRaces = racesToPoll.filter((r) => r.priority === 'critical')
+  const otherRaces = racesToPoll.filter(
+    (r) => !['ultra_critical', 'critical'].includes(r.priority)
+  )
 
-    context.log(`Starting intelligent polling with ${batches.length} batches`, {
-        totalRaces: racesToPoll.length,
-        batchSize,
-        executionMode
+  let totalSuccessfulRaces = 0
+  let totalFailedRaces = 0
+  let totalUpdatesProcessed = 0
+  let totalMoneyFlowProcessed = 0
+
+  context.log(`Starting enhanced intelligent polling with internal loops`, {
+    totalRaces: racesToPoll.length,
+    ultraCritical: ultraCriticalRaces.length,
+    critical: criticalRaces.length,
+    other: otherRaces.length,
+    executionMode,
+  })
+
+  // Process ultra-critical races with internal 15-second polling loop
+  if (ultraCriticalRaces.length > 0) {
+    context.log(`Starting ultra-critical polling loop (15-second intervals)`, {
+      raceCount: ultraCriticalRaces.length,
+      duration: '4 minutes maximum',
     })
 
-    // Process batches with rate limiting
-    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-        const batch = batches[batchIndex]
-        const batchStartTime = Date.now()
-        
-        context.log(`Processing batch ${batchIndex + 1}/${batches.length}`, {
-            batchSize: batch.length,
-            races: batch.slice(0, 3).map(r => ({ id: r.raceId.slice(-8), priority: r.priority }))
-        })
+    const ultraCriticalResult = await executeInternalPollingLoop(
+      databases,
+      databaseId,
+      nztabBaseUrl,
+      ultraCriticalRaces,
+      15,
+      240,
+      context,
+      'ultra_critical'
+    )
 
-        try {
-            // Fetch race data for the batch
-            const raceIds = batch.map(r => r.raceId)
-            const raceResults = await apiCircuitBreaker.execute(async () => {
-                return await batchFetchRaceEventData(nztabBaseUrl, raceIds, context, 800) // Reduced delay for efficiency
-            }, context)
+    totalSuccessfulRaces += ultraCriticalResult.successfulRaces
+    totalFailedRaces += ultraCriticalResult.failedRaces
+    totalUpdatesProcessed += ultraCriticalResult.totalUpdatesProcessed
+    totalMoneyFlowProcessed += ultraCriticalResult.totalMoneyFlowProcessed
+  }
 
-            // Process each race in the batch
-            for (const raceData of batch) {
-                const raceId = raceData.raceId
-                const raceEventData = raceResults.get(raceId)
-
-                if (!raceEventData) {
-                    totalFailedRaces++
-                    continue
-                }
-
-                try {
-                    const processingResult = await dbCircuitBreaker.execute(async () => {
-                        return await processSingleRaceData(
-                            databases, databaseId, raceId, raceEventData, context
-                        )
-                    }, context)
-
-                    if (processingResult.success) {
-                        totalSuccessfulRaces++
-                        totalUpdatesProcessed += processingResult.entrantsProcessed || 0
-                        totalMoneyFlowProcessed += processingResult.moneyFlowProcessed || 0
-                    } else {
-                        totalFailedRaces++
-                    }
-
-                } catch (dbError) {
-                    handleError(dbError, `Processing race ${raceId}`, context, { raceId }, false, 'medium')
-                    totalFailedRaces++
-                }
-            }
-
-            const batchTime = Date.now() - batchStartTime
-            context.log(`Batch ${batchIndex + 1}/${batches.length} completed`, {
-                batchSize: batch.length,
-                batchTimeMs: batchTime
-            })
-
-            // Rate limiting between batches
-            if (batchIndex < batches.length - 1) {
-                await rateLimit(500, context, 'Between batch processing', {
-                    adaptive: true,
-                    lastCallDuration: batchTime
-                })
-            }
-
-        } catch (batchError) {
-            handleError(batchError, `Processing batch ${batchIndex + 1}`, context, {
-                batchSize: batch.length
-            }, false, 'medium')
-            
-            totalFailedRaces += batch.length
-        }
-    }
-
-    // Update last_poll_time for all processed races
-    const now = new Date().toISOString()
-    const updatePromises = racesToPoll.map(async (raceData) => {
-        try {
-            await databases.updateDocument(databaseId, 'races', raceData.raceId, {
-                last_poll_time: now
-            })
-        } catch (error) {
-            context.log('Failed to update last_poll_time', {
-                raceId: raceData.raceId,
-                error: error.message
-            })
-        }
+  // Process critical races with internal 30-second polling loop
+  if (criticalRaces.length > 0) {
+    context.log(`Starting critical polling loop (30-second intervals)`, {
+      raceCount: criticalRaces.length,
+      duration: '2 minutes maximum',
     })
 
-    await Promise.allSettled(updatePromises)
+    const criticalResult = await executeInternalPollingLoop(
+      databases,
+      databaseId,
+      nztabBaseUrl,
+      criticalRaces,
+      30,
+      120,
+      context,
+      'critical'
+    )
 
-    const executionTime = Date.now() - startTime
-    const results = {
-        successfulRaces: totalSuccessfulRaces,
-        failedRaces: totalFailedRaces,
-        totalUpdatesProcessed,
-        totalMoneyFlowProcessed,
-        executionTimeMs: executionTime,
-        averageTimePerRace: racesToPoll.length > 0 ? Math.round(executionTime / racesToPoll.length) : 0,
-        batchCount: batches.length
-    }
+    totalSuccessfulRaces += criticalResult.successfulRaces
+    totalFailedRaces += criticalResult.failedRaces
+    totalUpdatesProcessed += criticalResult.totalUpdatesProcessed
+    totalMoneyFlowProcessed += criticalResult.totalMoneyFlowProcessed
+  }
 
-    logPerformance('Intelligent polling execution', startTime, context, {
-        ...results,
-        executionMode
+  // Process other races with standard single polling
+  if (otherRaces.length > 0) {
+    context.log(`Processing standard races (single polling)`, {
+      raceCount: otherRaces.length,
     })
 
-    return results
+    const standardResult = await executeStandardPolling(
+      databases,
+      databaseId,
+      nztabBaseUrl,
+      otherRaces,
+      context
+    )
+
+    totalSuccessfulRaces += standardResult.successfulRaces
+    totalFailedRaces += standardResult.failedRaces
+    totalUpdatesProcessed += standardResult.totalUpdatesProcessed
+    totalMoneyFlowProcessed += standardResult.totalMoneyFlowProcessed
+  }
+
+  const executionTime = Date.now() - startTime
+  const results = {
+    successfulRaces: totalSuccessfulRaces,
+    failedRaces: totalFailedRaces,
+    totalUpdatesProcessed,
+    totalMoneyFlowProcessed,
+    executionTimeMs: executionTime,
+    averageTimePerRace:
+      racesToPoll.length > 0
+        ? Math.round(executionTime / racesToPoll.length)
+        : 0,
+  }
+
+  logPerformance('Enhanced intelligent polling execution', startTime, context, {
+    ...results,
+    executionMode,
+    ultraCriticalProcessed: ultraCriticalRaces.length,
+    criticalProcessed: criticalRaces.length,
+    standardProcessed: otherRaces.length,
+  })
+
+  return results
 }
 
 /**
@@ -749,49 +879,68 @@ async function executeIntelligentPolling(databases, databaseId, nztabBaseUrl, ra
  * @param {Object} context - Appwrite function context
  * @returns {Object} Processing result
  */
-async function processSingleRaceWithErrorHandling(databases, databaseId, nztabBaseUrl, raceId, race, context) {
-    const startTime = Date.now()
-    
-    try {
-        // Fetch race data with timeout protection
-        const raceEventData = await apiCircuitBreaker.execute(async () => {
-            return await executeApiCallWithTimeout(
-                fetchRaceEventData,
-                [nztabBaseUrl, raceId, context],
-                context,
-                12000, // 12-second timeout
-                1      // 1 retry
-            )
-        }, context)
+async function processSingleRaceWithErrorHandling(
+  databases,
+  databaseId,
+  nztabBaseUrl,
+  raceId,
+  race,
+  context
+) {
+  const startTime = Date.now()
 
-        if (!raceEventData) {
-            return {
-                success: false,
-                error: 'Failed to fetch race data from API',
-                executionTimeMs: Date.now() - startTime
-            }
-        }
+  try {
+    // Fetch race data with timeout protection
+    const raceEventData = await apiCircuitBreaker.execute(async () => {
+      return await executeApiCallWithTimeout(
+        fetchRaceEventData,
+        [nztabBaseUrl, raceId, context],
+        context,
+        12000, // 12-second timeout
+        1 // 1 retry
+      )
+    }, context)
 
-        // Process the race data
-        const processingResult = await dbCircuitBreaker.execute(async () => {
-            return await processSingleRaceData(databases, databaseId, raceId, raceEventData, context)
-        }, context)
-
-        return {
-            ...processingResult,
-            executionTimeMs: Date.now() - startTime
-        }
-
-    } catch (error) {
-        handleError(error, `Single race processing for ${raceId}`, context, { raceId }, false, 'medium')
-        
-        return {
-            success: false,
-            error: 'Race processing failed',
-            message: error instanceof Error ? error.message : 'Unknown error',
-            executionTimeMs: Date.now() - startTime
-        }
+    if (!raceEventData) {
+      return {
+        success: false,
+        error: 'Failed to fetch race data from API',
+        executionTimeMs: Date.now() - startTime,
+      }
     }
+
+    // Process the race data
+    const processingResult = await dbCircuitBreaker.execute(async () => {
+      return await processSingleRaceData(
+        databases,
+        databaseId,
+        raceId,
+        raceEventData,
+        context
+      )
+    }, context)
+
+    return {
+      ...processingResult,
+      executionTimeMs: Date.now() - startTime,
+    }
+  } catch (error) {
+    handleError(
+      error,
+      `Single race processing for ${raceId}`,
+      context,
+      { raceId },
+      false,
+      'medium'
+    )
+
+    return {
+      success: false,
+      error: 'Race processing failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      executionTimeMs: Date.now() - startTime,
+    }
+  }
 }
 
 /**
@@ -803,178 +952,255 @@ async function processSingleRaceWithErrorHandling(databases, databaseId, nztabBa
  * @param {Object} context - Appwrite function context
  * @returns {Object} Processing result
  */
-async function processSingleRaceData(databases, databaseId, raceId, raceEventData, context) {
-    const processingStartTime = Date.now()
-    let entrantsProcessed = 0
-    let moneyFlowProcessed = 0
-    let raceStatusUpdated = false
+async function processSingleRaceData(
+  databases,
+  databaseId,
+  raceId,
+  raceEventData,
+  context
+) {
+  const processingStartTime = Date.now()
+  let entrantsProcessed = 0
+  let moneyFlowProcessed = 0
+  let raceStatusUpdated = false
 
-    try {
-        // Enhanced race pool data validation
-        const validationResults = validateRacePoolData(raceEventData, raceEventData.entrants || [], context)
-        
-        // Update race status if changed
-        if (raceEventData.race && raceEventData.race.status) {
-            try {
-                const currentRace = await databases.getDocument(databaseId, 'races', raceId)
-                
-                if (currentRace.status !== raceEventData.race.status) {
-                    const statusUpdateData = {
-                        status: raceEventData.race.status,
-                        lastStatusChange: new Date().toISOString()
-                    }
+  try {
+    // Enhanced race pool data validation
+    const validationResults = validateRacePoolData(
+      raceEventData,
+      raceEventData.entrants || [],
+      context
+    )
 
-                    // Add specific timestamp fields for different statuses
-                    if (raceEventData.race.actual_start_string) {
-                        statusUpdateData.actualStart = raceEventData.race.actual_start_string
-                    }
-                    
-                    if (['Final', 'Finalized'].includes(raceEventData.race.status)) {
-                        statusUpdateData.finalizedAt = statusUpdateData.lastStatusChange
-                    }
-                    
-                    if (raceEventData.race.status === 'Abandoned') {
-                        statusUpdateData.abandonedAt = statusUpdateData.lastStatusChange
-                    }
+    // Update race status if changed
+    if (raceEventData.race && raceEventData.race.status) {
+      try {
+        const currentRace = await databases.getDocument(
+          databaseId,
+          'races',
+          raceId
+        )
 
-                    await databases.updateDocument(databaseId, 'races', raceId, statusUpdateData)
-                    raceStatusUpdated = true
-                    
-                    context.log('Race status updated', {
-                        raceId: raceId.slice(-8),
-                        oldStatus: currentRace.status,
-                        newStatus: raceEventData.race.status
-                    })
+        if (currentRace.status !== raceEventData.race.status) {
+          const statusUpdateData = {
+            status: raceEventData.race.status,
+            lastStatusChange: new Date().toISOString(),
+          }
 
-                    // Handle results data separately
-                    if ((raceEventData.results && raceEventData.results.length > 0) ||
-                        (raceEventData.dividends && raceEventData.dividends.length > 0)) {
-                        
-                        await saveRaceResults(databases, databaseId, currentRace, raceEventData, context)
-                    }
-                }
-            } catch (statusError) {
-                handleError(statusError, 'Race status update', context, { raceId }, false, 'medium')
-            }
-        }
+          // Add specific timestamp fields for different statuses
+          if (raceEventData.race.actual_start_string) {
+            statusUpdateData.actualStart =
+              raceEventData.race.actual_start_string
+          }
 
-        // Process tote pools data first to get pool totals
-        let racePoolData = null
-        if (raceEventData.tote_pools && Array.isArray(raceEventData.tote_pools)) {
-            try {
-                await processToteTrendsData(databases, databaseId, raceId, raceEventData.tote_pools, context)
-                
-                // Extract pool data for money flow processing
-                racePoolData = { winPoolTotal: 0, placePoolTotal: 0, totalRacePool: 0 }
-                
-                raceEventData.tote_pools.forEach(pool => {
-                    const total = pool.total || 0
-                    racePoolData.totalRacePool += total
-                    
-                    if (pool.product_type === 'Win') {
-                        racePoolData.winPoolTotal = total
-                    } else if (pool.product_type === 'Place') {
-                        racePoolData.placePoolTotal = total
-                    }
-                })
-                
-                context.log('Processed tote pools data', {
-                    raceId: raceId.slice(-8),
-                    poolsCount: raceEventData.tote_pools.length,
-                    totalPool: racePoolData.totalRacePool
-                })
-            } catch (poolError) {
-                handleError(poolError, 'Tote pools processing', context, { raceId }, false, 'low')
-            }
-        }
+          if (['Final', 'Finalized'].includes(raceEventData.race.status)) {
+            statusUpdateData.finalizedAt = statusUpdateData.lastStatusChange
+          }
 
-        // Process entrants data
-        if (raceEventData.entrants && raceEventData.entrants.length > 0) {
-            try {
-                entrantsProcessed = await processEntrants(
-                    databases, databaseId, raceId, raceEventData.entrants, context
-                )
-            } catch (entrantsError) {
-                handleError(entrantsError, 'Entrants processing', context, { raceId }, false, 'medium')
-            }
-        }
+          if (raceEventData.race.status === 'Abandoned') {
+            statusUpdateData.abandonedAt = statusUpdateData.lastStatusChange
+          }
 
-        // Process money tracker data with validation
-        if (raceEventData.money_tracker && raceEventData.money_tracker.entrants) {
-            context.log('💰 Found money tracker data, starting processing', {
-                raceId: raceId.slice(0, 8) + '...',
-                entrantsCount: raceEventData.money_tracker.entrants?.length || 0,
-                raceStatus: raceEventData.race?.status,
-                racePoolDataAvailable: !!racePoolData
-            })
-            
-            try {
-                const raceStatus = raceEventData.race?.status
-                const processingLatency = Date.now() - processingStartTime
-                
-                moneyFlowProcessed = await processMoneyTrackerData(
-                    databases, 
-                    databaseId, 
-                    raceEventData.money_tracker, 
-                    context, 
-                    raceId, 
-                    racePoolData, 
-                    raceStatus,
-                    validationResults
-                )
-                
-                context.log('💰 Money tracker processing completed', {
-                    raceId: raceId.slice(0, 8) + '...',
-                    moneyFlowProcessed,
-                    processingLatency: `${processingLatency}ms`
-                })
-            } catch (moneyError) {
-                context.error('❌ Money tracker processing failed', {
-                    raceId: raceId.slice(0, 8) + '...',
-                    error: moneyError.message,
-                    stack: moneyError.stack?.split('\n')[0]
-                })
-                handleError(moneyError, 'Money tracker processing', context, { raceId }, false, 'medium')
-            }
-        } else {
-            context.log('⚠️ No money tracker data found', {
-                raceId: raceId.slice(0, 8) + '...',
-                hasMoneyTracker: !!raceEventData.money_tracker,
-                hasEntrants: !!raceEventData.money_tracker?.entrants,
-                entrantsLength: raceEventData.money_tracker?.entrants?.length || 0
-            })
-        }
+          await databases.updateDocument(
+            databaseId,
+            'races',
+            raceId,
+            statusUpdateData
+          )
+          raceStatusUpdated = true
 
-        const processingTime = Date.now() - processingStartTime
-
-        context.log('Single race processing completed', {
+          context.log('Race status updated', {
             raceId: raceId.slice(-8),
-            entrantsProcessed,
-            moneyFlowProcessed,
-            raceStatusUpdated,
-            dataQuality: validationResults.consistencyScore,
-            processingTimeMs: processingTime
+            oldStatus: currentRace.status,
+            newStatus: raceEventData.race.status,
+          })
+
+          // Handle results data separately
+          if (
+            (raceEventData.results && raceEventData.results.length > 0) ||
+            (raceEventData.dividends && raceEventData.dividends.length > 0)
+          ) {
+            await saveRaceResults(
+              databases,
+              databaseId,
+              currentRace,
+              raceEventData,
+              context
+            )
+          }
+        }
+      } catch (statusError) {
+        handleError(
+          statusError,
+          'Race status update',
+          context,
+          { raceId },
+          false,
+          'medium'
+        )
+      }
+    }
+
+    // Process tote pools data first to get pool totals
+    let racePoolData = null
+    if (raceEventData.tote_pools && Array.isArray(raceEventData.tote_pools)) {
+      try {
+        await processToteTrendsData(
+          databases,
+          databaseId,
+          raceId,
+          raceEventData.tote_pools,
+          context
+        )
+
+        // Extract pool data for money flow processing
+        racePoolData = { winPoolTotal: 0, placePoolTotal: 0, totalRacePool: 0 }
+
+        raceEventData.tote_pools.forEach((pool) => {
+          const total = pool.total || 0
+          racePoolData.totalRacePool += total
+
+          if (pool.product_type === 'Win') {
+            racePoolData.winPoolTotal = total
+          } else if (pool.product_type === 'Place') {
+            racePoolData.placePoolTotal = total
+          }
         })
 
-        return {
-            success: true,
-            entrantsProcessed,
-            moneyFlowProcessed,
-            raceStatusUpdated,
-            dataQualityScore: validationResults.consistencyScore,
-            processingTimeMs: processingTime
-        }
-
-    } catch (error) {
-        handleError(error, 'Single race data processing', context, { raceId }, false, 'high')
-        
-        return {
-            success: false,
-            error: 'Race data processing failed',
-            message: error instanceof Error ? error.message : 'Unknown error',
-            processingTimeMs: Date.now() - processingStartTime
-        }
+        context.log('Processed tote pools data', {
+          raceId: raceId.slice(-8),
+          poolsCount: raceEventData.tote_pools.length,
+          totalPool: racePoolData.totalRacePool,
+        })
+      } catch (poolError) {
+        handleError(
+          poolError,
+          'Tote pools processing',
+          context,
+          { raceId },
+          false,
+          'low'
+        )
+      }
     }
+
+    // Process entrants data
+    if (raceEventData.entrants && raceEventData.entrants.length > 0) {
+      try {
+        entrantsProcessed = await processEntrants(
+          databases,
+          databaseId,
+          raceId,
+          raceEventData.entrants,
+          context
+        )
+      } catch (entrantsError) {
+        handleError(
+          entrantsError,
+          'Entrants processing',
+          context,
+          { raceId },
+          false,
+          'medium'
+        )
+      }
+    }
+
+    // Process money tracker data with validation
+    // Only process money flow for races with 'Open' status
+    const raceStatus = raceEventData.race?.status
+    if (
+      raceEventData.money_tracker &&
+      raceEventData.money_tracker.entrants &&
+      raceStatus === 'Open'
+    ) {
+      context.log('💰 Found money tracker data, starting processing', {
+        raceId: raceId.slice(0, 8) + '...',
+        entrantsCount: raceEventData.money_tracker.entrants?.length || 0,
+        raceStatus: raceEventData.race?.status,
+        racePoolDataAvailable: !!racePoolData,
+      })
+
+      try {
+        const raceStatus = raceEventData.race?.status
+        const processingLatency = Date.now() - processingStartTime
+
+        moneyFlowProcessed = await processMoneyTrackerData(
+          databases,
+          databaseId,
+          raceEventData.money_tracker,
+          context,
+          raceId,
+          racePoolData,
+          raceStatus,
+          validationResults
+        )
+
+        context.log('💰 Money tracker processing completed', {
+          raceId: raceId.slice(0, 8) + '...',
+          moneyFlowProcessed,
+          processingLatency: `${processingLatency}ms`,
+        })
+      } catch (moneyError) {
+        context.error('❌ Money tracker processing failed', {
+          raceId: raceId.slice(0, 8) + '...',
+          error: moneyError.message,
+          stack: moneyError.stack?.split('\n')[0],
+        })
+        handleError(
+          moneyError,
+          'Money tracker processing',
+          context,
+          { raceId },
+          false,
+          'medium'
+        )
+      }
+    } else {
+      context.log('⚠️ No money tracker data found', {
+        raceId: raceId.slice(0, 8) + '...',
+        hasMoneyTracker: !!raceEventData.money_tracker,
+        hasEntrants: !!raceEventData.money_tracker?.entrants,
+        entrantsLength: raceEventData.money_tracker?.entrants?.length || 0,
+      })
+    }
+
+    const processingTime = Date.now() - processingStartTime
+
+    context.log('Single race processing completed', {
+      raceId: raceId.slice(-8),
+      entrantsProcessed,
+      moneyFlowProcessed,
+      raceStatusUpdated,
+      dataQuality: validationResults.consistencyScore,
+      processingTimeMs: processingTime,
+    })
+
+    return {
+      success: true,
+      entrantsProcessed,
+      moneyFlowProcessed,
+      raceStatusUpdated,
+      dataQualityScore: validationResults.consistencyScore,
+      processingTimeMs: processingTime,
+    }
+  } catch (error) {
+    handleError(
+      error,
+      'Single race data processing',
+      context,
+      { raceId },
+      false,
+      'high'
+    )
+
+    return {
+      success: false,
+      error: 'Race data processing failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      processingTimeMs: Date.now() - processingStartTime,
+    }
+  }
 }
 
 /**
@@ -985,76 +1211,529 @@ async function processSingleRaceData(databases, databaseId, raceId, raceEventDat
  * @param {Object} raceEventData - Race event data from API
  * @param {Object} context - Appwrite function context
  */
-async function saveRaceResults(databases, databaseId, race, raceEventData, context) {
-    try {
-        const timestamp = new Date().toISOString()
-        const resultsData = {
-            race: race.$id,
-            resultTime: timestamp
-        }
-
-        // Add results data if present
-        if (raceEventData.results && Array.isArray(raceEventData.results) && raceEventData.results.length > 0) {
-            resultsData.resultsAvailable = true
-            resultsData.resultsData = JSON.stringify(raceEventData.results)
-            resultsData.resultStatus = raceEventData.race.status === 'Final' ? 'final' : 'interim'
-        }
-
-        // Add dividends data if present
-        if (raceEventData.dividends && Array.isArray(raceEventData.dividends) && raceEventData.dividends.length > 0) {
-            resultsData.dividendsData = JSON.stringify(raceEventData.dividends)
-            
-            // Extract flags from dividend data
-            const dividendStatuses = raceEventData.dividends.map(d => d.status?.toLowerCase() || '')
-            resultsData.photoFinish = dividendStatuses.includes('photo')
-            resultsData.stewardsInquiry = dividendStatuses.includes('inquiry')  
-            resultsData.protestLodged = dividendStatuses.includes('protest')
-        }
-
-        // Capture fixed odds at results time
-        const entrants = raceEventData.runners || raceEventData.entrants || []
-        if (entrants.length > 0) {
-            const fixedOddsData = {}
-            entrants.forEach(entrant => {
-                if (entrant.runner_number && entrant.odds) {
-                    fixedOddsData[entrant.runner_number] = {
-                        fixed_win: entrant.odds.fixed_win || null,
-                        fixed_place: entrant.odds.fixed_place || null,
-                        runner_name: entrant.name || null,
-                        entrant_id: entrant.entrant_id || null
-                    }
-                }
-            })
-
-            if (Object.keys(fixedOddsData).length > 0) {
-                resultsData.fixedOddsData = JSON.stringify(fixedOddsData)
-            }
-        }
-
-        // Try to update existing results document, create if doesn't exist
-        try {
-            const existingResults = await databases.listDocuments(databaseId, 'race-results', [
-                Query.equal('race', race.$id),
-                Query.limit(1)
-            ])
-
-            if (existingResults.documents.length > 0) {
-                await databases.updateDocument(databaseId, 'race-results', existingResults.documents[0].$id, resultsData)
-            } else {
-                await databases.createDocument(databaseId, 'race-results', 'unique()', resultsData)
-            }
-
-            context.log('Race results saved successfully', { 
-                raceId: race.$id.slice(-8),
-                hasResults: !!resultsData.resultsAvailable,
-                hasDividends: !!resultsData.dividendsData
-            })
-
-        } catch (resultsError) {
-            handleError(resultsError, 'Race results save', context, { raceId: race.$id }, false, 'low')
-        }
-
-    } catch (error) {
-        handleError(error, 'Race results processing', context, { raceId: race.$id }, false, 'low')
+async function saveRaceResults(
+  databases,
+  databaseId,
+  race,
+  raceEventData,
+  context
+) {
+  try {
+    const timestamp = new Date().toISOString()
+    const resultsData = {
+      race: race.$id,
+      resultTime: timestamp,
     }
+
+    // Add results data if present
+    if (
+      raceEventData.results &&
+      Array.isArray(raceEventData.results) &&
+      raceEventData.results.length > 0
+    ) {
+      resultsData.resultsAvailable = true
+      resultsData.resultsData = JSON.stringify(raceEventData.results)
+      resultsData.resultStatus =
+        raceEventData.race.status === 'Final' ? 'final' : 'interim'
+    }
+
+    // Add dividends data if present
+    if (
+      raceEventData.dividends &&
+      Array.isArray(raceEventData.dividends) &&
+      raceEventData.dividends.length > 0
+    ) {
+      resultsData.dividendsData = JSON.stringify(raceEventData.dividends)
+
+      // Extract flags from dividend data
+      const dividendStatuses = raceEventData.dividends.map(
+        (d) => d.status?.toLowerCase() || ''
+      )
+      resultsData.photoFinish = dividendStatuses.includes('photo')
+      resultsData.stewardsInquiry = dividendStatuses.includes('inquiry')
+      resultsData.protestLodged = dividendStatuses.includes('protest')
+    }
+
+    // Capture fixed odds at results time
+    const entrants = raceEventData.runners || raceEventData.entrants || []
+    if (entrants.length > 0) {
+      const fixedOddsData = {}
+      entrants.forEach((entrant) => {
+        if (entrant.runner_number && entrant.odds) {
+          fixedOddsData[entrant.runner_number] = {
+            fixed_win: entrant.odds.fixed_win || null,
+            fixed_place: entrant.odds.fixed_place || null,
+            runner_name: entrant.name || null,
+            entrant_id: entrant.entrant_id || null,
+          }
+        }
+      })
+
+      if (Object.keys(fixedOddsData).length > 0) {
+        resultsData.fixedOddsData = JSON.stringify(fixedOddsData)
+      }
+    }
+
+    // Try to update existing results document, create if doesn't exist
+    try {
+      const existingResults = await databases.listDocuments(
+        databaseId,
+        'race-results',
+        [Query.equal('race', race.$id), Query.limit(1)]
+      )
+
+      if (existingResults.documents.length > 0) {
+        await databases.updateDocument(
+          databaseId,
+          'race-results',
+          existingResults.documents[0].$id,
+          resultsData
+        )
+      } else {
+        await databases.createDocument(
+          databaseId,
+          'race-results',
+          'unique()',
+          resultsData
+        )
+      }
+
+      context.log('Race results saved successfully', {
+        raceId: race.$id.slice(-8),
+        hasResults: !!resultsData.resultsAvailable,
+        hasDividends: !!resultsData.dividendsData,
+      })
+    } catch (resultsError) {
+      handleError(
+        resultsError,
+        'Race results save',
+        context,
+        { raceId: race.$id },
+        false,
+        'low'
+      )
+    }
+  } catch (error) {
+    handleError(
+      error,
+      'Race results processing',
+      context,
+      { raceId: race.$id },
+      false,
+      'low'
+    )
+  }
+}
+
+/**
+ * Execute internal polling loop for high-frequency races
+ * @param {Object} databases - Appwrite Databases instance
+ * @param {string} databaseId - Database ID
+ * @param {string} nztabBaseUrl - NZ TAB API base URL
+ * @param {Array} races - Races to poll with internal loop
+ * @param {number} intervalSeconds - Polling interval in seconds
+ * @param {number} maxDurationSeconds - Maximum duration in seconds
+ * @param {Object} context - Appwrite function context
+ * @param {string} priority - Priority level for logging
+ * @returns {Object} Polling results
+ */
+async function executeInternalPollingLoop(
+  databases,
+  databaseId,
+  nztabBaseUrl,
+  races,
+  intervalSeconds,
+  maxDurationSeconds,
+  context,
+  priority
+) {
+  const startTime = Date.now()
+  const intervalMs = intervalSeconds * 1000
+  const maxDurationMs = maxDurationSeconds * 1000
+
+  let totalSuccessfulRaces = 0
+  let totalFailedRaces = 0
+  let totalUpdatesProcessed = 0
+  let totalMoneyFlowProcessed = 0
+  let loopCount = 0
+
+  context.log(`Starting ${priority} internal polling loop`, {
+    raceCount: races.length,
+    intervalSeconds,
+    maxDurationSeconds,
+    raceIds: races.map((r) => r.raceId.slice(-8)),
+  })
+
+  // Continue polling until max duration reached
+  while (Date.now() - startTime < maxDurationMs) {
+    loopCount++
+    const loopStartTime = Date.now()
+
+    // Check if any races have reached final status
+    const activeRaces = []
+    for (const raceData of races) {
+      try {
+        const currentRace = await databases.getDocument(
+          databaseId,
+          'races',
+          raceData.raceId
+        )
+        if (!['Final', 'Finalized', 'Abandoned'].includes(currentRace.status)) {
+          activeRaces.push(raceData)
+        } else {
+          context.log(
+            `Race ${raceData.raceId.slice(
+              -8
+            )} finalized, removing from polling loop`,
+            {
+              status: currentRace.status,
+            }
+          )
+        }
+      } catch (error) {
+        context.error(
+          `Error checking race status for ${raceData.raceId.slice(-8)}`,
+          {
+            error: error.message,
+          }
+        )
+        // Keep race in polling loop if we can't check status
+        activeRaces.push(raceData)
+      }
+    }
+
+    // If all races are finalized, exit loop
+    if (activeRaces.length === 0) {
+      context.log(`All races finalized, exiting ${priority} polling loop`, {
+        totalLoops: loopCount,
+        durationMs: Date.now() - startTime,
+      })
+      break
+    }
+
+    // Process active races in batches
+    const batchSize = Math.min(activeRaces.length, 5)
+    const batches = []
+
+    for (let i = 0; i < activeRaces.length; i += batchSize) {
+      batches.push(activeRaces.slice(i, i + batchSize))
+    }
+
+    context.log(`${priority} polling loop #${loopCount}`, {
+      activeRaces: activeRaces.length,
+      batches: batches.length,
+      timeRemaining:
+        Math.round((maxDurationMs - (Date.now() - startTime)) / 1000) + 's',
+    })
+
+    // Process each batch
+    for (const [batchIndex, batch] of batches.entries()) {
+      try {
+        // Fetch race data for the batch
+        const raceIds = batch.map((r) => r.raceId)
+        const raceResults = await apiCircuitBreaker.execute(async () => {
+          return await batchFetchRaceEventData(
+            nztabBaseUrl,
+            raceIds,
+            context,
+            500
+          )
+        }, context)
+
+        // Process each race in the batch
+        for (const raceData of batch) {
+          const raceId = raceData.raceId
+          const raceEventData = raceResults.get(raceId)
+
+          if (!raceEventData) {
+            totalFailedRaces++
+            continue
+          }
+
+          try {
+            const processingResult = await dbCircuitBreaker.execute(
+              async () => {
+                return await processSingleRaceData(
+                  databases,
+                  databaseId,
+                  raceId,
+                  raceEventData,
+                  context
+                )
+              },
+              context
+            )
+
+            if (processingResult.success) {
+              totalSuccessfulRaces++
+              totalUpdatesProcessed += processingResult.entrantsProcessed || 0
+              totalMoneyFlowProcessed +=
+                processingResult.moneyFlowProcessed || 0
+            } else {
+              totalFailedRaces++
+            }
+          } catch (dbError) {
+            handleError(
+              dbError,
+              `Processing race ${raceId} in ${priority} loop`,
+              context,
+              { raceId },
+              false,
+              'medium'
+            )
+            totalFailedRaces++
+          }
+        }
+
+        // Rate limiting between batches
+        if (batchIndex < batches.length - 1) {
+          await rateLimit(
+            300,
+            context,
+            `Between ${priority} batch processing`,
+            { adaptive: true }
+          )
+        }
+      } catch (batchError) {
+        handleError(
+          batchError,
+          `Processing ${priority} batch ${batchIndex + 1}`,
+          context,
+          {
+            batchSize: batch.length,
+          },
+          false,
+          'medium'
+        )
+
+        totalFailedRaces += batch.length
+      }
+    }
+
+    // Update last_poll_time for all processed races
+    const now = new Date().toISOString()
+    const updatePromises = activeRaces.map(async (raceData) => {
+      try {
+        await databases.updateDocument(databaseId, 'races', raceData.raceId, {
+          last_poll_time: now,
+        })
+      } catch (error) {
+        context.log(
+          `Failed to update last_poll_time for ${raceData.raceId.slice(-8)}`,
+          {
+            error: error.message,
+          }
+        )
+      }
+    })
+
+    await Promise.allSettled(updatePromises)
+
+    const loopTime = Date.now() - loopStartTime
+    const timeToNextInterval = Math.max(0, intervalMs - loopTime)
+
+    context.log(`${priority} loop #${loopCount} completed`, {
+      activeRaces: activeRaces.length,
+      loopTimeMs: loopTime,
+      nextPollIn: Math.round(timeToNextInterval / 1000) + 's',
+    })
+
+    // Wait for next interval if we haven't exceeded max duration
+    if (Date.now() - startTime + timeToNextInterval < maxDurationMs) {
+      await new Promise((resolve) => setTimeout(resolve, timeToNextInterval))
+    }
+  }
+
+  const totalLoopTime = Date.now() - startTime
+
+  context.log(`${priority} internal polling loop completed`, {
+    totalLoops: loopCount,
+    totalLoopTimeMs: totalLoopTime,
+    successfulRaces: totalSuccessfulRaces,
+    failedRaces: totalFailedRaces,
+    updatesProcessed: totalUpdatesProcessed,
+    moneyFlowProcessed: totalMoneyFlowProcessed,
+    avgLoopTime: Math.round(totalLoopTime / loopCount) + 'ms',
+  })
+
+  return {
+    successfulRaces: totalSuccessfulRaces,
+    failedRaces: totalFailedRaces,
+    totalUpdatesProcessed,
+    totalMoneyFlowProcessed,
+    executionTimeMs: totalLoopTime,
+    loopCount,
+  }
+}
+
+/**
+ * Execute standard polling for non-critical races
+ * @param {Object} databases - Appwrite Databases instance
+ * @param {string} databaseId - Database ID
+ * @param {string} nztabBaseUrl - NZ TAB API base URL
+ * @param {Array} races - Races to poll
+ * @param {Object} context - Appwrite function context
+ * @returns {Object} Polling results
+ */
+async function executeStandardPolling(
+  databases,
+  databaseId,
+  nztabBaseUrl,
+  races,
+  context
+) {
+  const startTime = Date.now()
+
+  // Dynamic batch sizing based on race count
+  const batchSize = Math.min(races.length, 5)
+  const batches = []
+
+  for (let i = 0; i < races.length; i += batchSize) {
+    batches.push(races.slice(i, i + batchSize))
+  }
+
+  let totalSuccessfulRaces = 0
+  let totalFailedRaces = 0
+  let totalUpdatesProcessed = 0
+  let totalMoneyFlowProcessed = 0
+
+  context.log(`Starting standard polling with ${batches.length} batches`, {
+    totalRaces: races.length,
+    batchSize,
+  })
+
+  // Process batches with rate limiting
+  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+    const batch = batches[batchIndex]
+    const batchStartTime = Date.now()
+
+    context.log(
+      `Processing standard batch ${batchIndex + 1}/${batches.length}`,
+      {
+        batchSize: batch.length,
+        races: batch
+          .slice(0, 3)
+          .map((r) => ({ id: r.raceId.slice(-8), priority: r.priority })),
+      }
+    )
+
+    try {
+      // Fetch race data for the batch
+      const raceIds = batch.map((r) => r.raceId)
+      const raceResults = await apiCircuitBreaker.execute(async () => {
+        return await batchFetchRaceEventData(
+          nztabBaseUrl,
+          raceIds,
+          context,
+          800
+        )
+      }, context)
+
+      // Process each race in the batch
+      for (const raceData of batch) {
+        const raceId = raceData.raceId
+        const raceEventData = raceResults.get(raceId)
+
+        if (!raceEventData) {
+          totalFailedRaces++
+          continue
+        }
+
+        try {
+          const processingResult = await dbCircuitBreaker.execute(async () => {
+            return await processSingleRaceData(
+              databases,
+              databaseId,
+              raceId,
+              raceEventData,
+              context
+            )
+          }, context)
+
+          if (processingResult.success) {
+            totalSuccessfulRaces++
+            totalUpdatesProcessed += processingResult.entrantsProcessed || 0
+            totalMoneyFlowProcessed += processingResult.moneyFlowProcessed || 0
+          } else {
+            totalFailedRaces++
+          }
+        } catch (dbError) {
+          handleError(
+            dbError,
+            `Processing race ${raceId}`,
+            context,
+            { raceId },
+            false,
+            'medium'
+          )
+          totalFailedRaces++
+        }
+      }
+
+      const batchTime = Date.now() - batchStartTime
+      context.log(
+        `Standard batch ${batchIndex + 1}/${batches.length} completed`,
+        {
+          batchSize: batch.length,
+          batchTimeMs: batchTime,
+        }
+      )
+
+      // Rate limiting between batches
+      if (batchIndex < batches.length - 1) {
+        await rateLimit(500, context, 'Between standard batch processing', {
+          adaptive: true,
+          lastCallDuration: batchTime,
+        })
+      }
+    } catch (batchError) {
+      handleError(
+        batchError,
+        `Processing standard batch ${batchIndex + 1}`,
+        context,
+        {
+          batchSize: batch.length,
+        },
+        false,
+        'medium'
+      )
+
+      totalFailedRaces += batch.length
+    }
+  }
+
+  // Update last_poll_time for all processed races
+  const now = new Date().toISOString()
+  const updatePromises = races.map(async (raceData) => {
+    try {
+      await databases.updateDocument(databaseId, 'races', raceData.raceId, {
+        last_poll_time: now,
+      })
+    } catch (error) {
+      context.log('Failed to update last_poll_time', {
+        raceId: raceData.raceId,
+        error: error.message,
+      })
+    }
+  })
+
+  await Promise.allSettled(updatePromises)
+
+  const executionTime = Date.now() - startTime
+
+  context.log('Standard polling completed', {
+    successfulRaces: totalSuccessfulRaces,
+    failedRaces: totalFailedRaces,
+    executionTimeMs: executionTime,
+    batchCount: batches.length,
+  })
+
+  return {
+    successfulRaces: totalSuccessfulRaces,
+    failedRaces: totalFailedRaces,
+    totalUpdatesProcessed,
+    totalMoneyFlowProcessed,
+    executionTimeMs: executionTime,
+    batchCount: batches.length,
+  }
 }
