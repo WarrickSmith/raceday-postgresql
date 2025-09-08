@@ -149,7 +149,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
         </div>
 
         {/* Column Headers - Pos, No, Runner, Win, Place + blank columns for bet types */}
-        <div className="grid grid-cols-8 gap-2 mb-1 text-sm">
+        <div className="grid grid-cols-10 gap-2 mb-1 text-sm">
           <div className="col-span-1 text-blue-500 font-semibold">Pos</div>
           <div className="col-span-1 text-blue-500 font-semibold">No</div>
           <div className="col-span-2 text-blue-500 font-semibold">Runner</div>
@@ -159,16 +159,16 @@ export const RaceResultsSection = memo(function RaceResultsSection({
           <div className="col-span-1 text-blue-500 font-semibold text-right">
             Place
           </div>
-          <div className="col-span-1"></div>{' '}
-          {/* Blank header for bet type labels */}
-          <div className="col-span-1"></div>{' '}
-          {/* Blank header for bet type values */}
+          <div className="col-span-2"></div>{' '}
+          {/* Blank header for bet type labels (spanning 2 cols) */}
+          <div className="col-span-2"></div>{' '}
+          {/* Blank header for bet type values (spanning 2 cols) */}
         </div>
 
         {/* Results Data Rows - Fallback */}
         <div className="space-y-1">
           {/* Row 1: 1st position + Quinella */}
-          <div className="grid grid-cols-8 gap-2 items-baseline text-sm">
+          <div className="grid grid-cols-10 gap-2 items-baseline text-sm">
             <div className="col-span-1 text-blue-500 font-bold">1st</div>
             <div className="col-span-1 text-gray-900 font-bold">—</div>
             <div className="col-span-2 text-gray-900">—</div>
@@ -178,14 +178,16 @@ export const RaceResultsSection = memo(function RaceResultsSection({
             <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
-            <div className="col-span-1 text-gray-600 truncate">Quinella</div>
-            <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
+            <div className="col-span-2 text-gray-600 truncate pl-2">
+              Quinella
+            </div>
+            <div className="col-span-2 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
           </div>
 
           {/* Row 2: 2nd position + Trifecta */}
-          <div className="grid grid-cols-8 gap-2 items-baseline text-sm">
+          <div className="grid grid-cols-10 gap-2 items-baseline text-sm">
             <div className="col-span-1 text-blue-500 font-bold">2nd</div>
             <div className="col-span-1 text-gray-900 font-bold">—</div>
             <div className="col-span-2 text-gray-900">—</div>
@@ -193,14 +195,16 @@ export const RaceResultsSection = memo(function RaceResultsSection({
             <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
-            <div className="col-span-1 text-gray-600 truncate">Trifecta</div>
-            <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
+            <div className="col-span-2 text-gray-600 truncate pl-2">
+              Trifecta
+            </div>
+            <div className="col-span-2 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
           </div>
 
           {/* Row 3: 3rd position + FirstFour */}
-          <div className="grid grid-cols-8 gap-2 items-baseline text-sm">
+          <div className="grid grid-cols-10 gap-2 items-baseline text-sm">
             <div className="col-span-1 text-blue-500 font-bold">3rd</div>
             <div className="col-span-1 text-gray-900 font-bold">—</div>
             <div className="col-span-2 text-gray-900">—</div>
@@ -208,8 +212,10 @@ export const RaceResultsSection = memo(function RaceResultsSection({
             <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
-            <div className="col-span-1 text-gray-600 truncate">FirstFour</div>
-            <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
+            <div className="col-span-2 text-gray-600 truncate pl-2">
+              FirstFour
+            </div>
+            <div className="col-span-2 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
           </div>
@@ -282,7 +288,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
       </div>
 
       {/* Column Headers - Pos, No, Runner, Win, Place + blank columns for bet types */}
-      <div className="grid grid-cols-8 gap-2 mb-1 text-sm">
+      <div className="grid grid-cols-10 gap-2 mb-1 text-sm">
         <div className="col-span-1 text-blue-500 font-semibold">Pos</div>
         <div className="col-span-1 text-blue-500 font-semibold">No</div>
         <div className="col-span-2 text-blue-500 font-semibold">Runner</div>
@@ -292,16 +298,16 @@ export const RaceResultsSection = memo(function RaceResultsSection({
         <div className="col-span-1 text-blue-500 font-semibold text-right">
           Place
         </div>
-        <div className="col-span-1"></div>{' '}
-        {/* Blank header for bet type labels */}
-        <div className="col-span-1"></div>{' '}
-        {/* Blank header for bet type values */}
+        <div className="col-span-2"></div>{' '}
+        {/* Blank header for bet type labels (spanning 2 cols) */}
+        <div className="col-span-2"></div>{' '}
+        {/* Blank header for bet type values (spanning 2 cols) */}
       </div>
 
       {/* Results Data Rows */}
       <div className="space-y-1">
         {/* Row 1: 1st position + Quinella */}
-        <div className="grid grid-cols-8 gap-2 items-baseline text-sm">
+        <div className="grid grid-cols-10 gap-2 items-baseline text-sm">
           <div className="col-span-1 text-blue-500 font-bold">1st</div>
           <div className="col-span-1 text-gray-900 font-bold">
             {resultsData?.results[0]
@@ -319,8 +325,8 @@ export const RaceResultsSection = memo(function RaceResultsSection({
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
             {getFixedOdds(1, 'place')}
           </div>
-          <div className="col-span-1 text-gray-600 truncate">Quinella</div>
-          <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
+          <div className="col-span-2 text-gray-600 truncate pl-2">Quinella</div>
+          <div className="col-span-2 text-gray-900 font-bold leading-none text-right font-tnum">
             {findDividend('quinella')
               ? `$${findDividend('quinella')!.dividend.toFixed(2)}`
               : '—'}
@@ -328,7 +334,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
         </div>
 
         {/* Row 2: 2nd position + Trifecta */}
-        <div className="grid grid-cols-8 gap-2 items-baseline text-sm">
+        <div className="grid grid-cols-10 gap-2 items-baseline text-sm">
           <div className="col-span-1 text-blue-500 font-bold">2nd</div>
           <div className="col-span-1 text-gray-900 font-bold">
             {resultsData?.results[1]
@@ -344,8 +350,8 @@ export const RaceResultsSection = memo(function RaceResultsSection({
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
             {getFixedOdds(2, 'place')}
           </div>
-          <div className="col-span-1 text-gray-600 truncate">Trifecta</div>
-          <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
+          <div className="col-span-2 text-gray-600 truncate pl-2">Trifecta</div>
+          <div className="col-span-2 text-gray-900 font-bold leading-none text-right font-tnum">
             {findDividend('trifecta')
               ? `$${findDividend('trifecta')!.dividend.toFixed(2)}`
               : '—'}
@@ -353,7 +359,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
         </div>
 
         {/* Row 3: 3rd position + FirstFour */}
-        <div className="grid grid-cols-8 gap-2 items-baseline text-sm">
+        <div className="grid grid-cols-10 gap-2 items-baseline text-sm">
           <div className="col-span-1 text-blue-500 font-bold">3rd</div>
           <div className="col-span-1 text-gray-900 font-bold">
             {resultsData?.results[2]
@@ -369,8 +375,10 @@ export const RaceResultsSection = memo(function RaceResultsSection({
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
             {getFixedOdds(3, 'place')}
           </div>
-          <div className="col-span-1 text-gray-600 truncate">FirstFour</div>
-          <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
+          <div className="col-span-2 text-gray-600 truncate pl-2">
+            FirstFour
+          </div>
+          <div className="col-span-2 text-gray-900 font-bold leading-none text-right font-tnum">
             {findDividend('first4')
               ? `$${findDividend('first4')!.dividend.toFixed(2)}`
               : '—'}
