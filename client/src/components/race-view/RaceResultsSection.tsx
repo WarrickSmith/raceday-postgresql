@@ -23,58 +23,80 @@ export const RaceResultsSection = memo(function RaceResultsSection({
   lastUpdate,
   entrants = [],
 }: RaceResultsSectionProps) {
-  
   // Enhanced helper function to extract runner number from various API field formats
   const getRunnerNumber = (result: any): number | undefined => {
-    return result.runner_number || result.runnerNumber || result.number || result.no;
+    return (
+      result.runner_number || result.runnerNumber || result.number || result.no
+    )
   }
 
   // Enhanced helper function to extract runner name from various API field formats
   const getRunnerName = (result: any): string => {
-    return result.name || result.runnerName || result.horse_name || result.horseName || '';
+    return (
+      result.name ||
+      result.runnerName ||
+      result.horse_name ||
+      result.horseName ||
+      ''
+    )
   }
 
   // Helper function to get fixed odds for a specific position and bet type
   const getFixedOdds = (position: number, type: 'win' | 'place'): string => {
-    if (!resultsData || !resultsData.results || resultsData.results.length === 0) {
+    if (
+      !resultsData ||
+      !resultsData.results ||
+      resultsData.results.length === 0
+    ) {
       return '—'
     }
-    
+
     if (!resultsData.results[position - 1] || !resultsData.fixedOddsData) {
       return '—'
     }
 
     const result = resultsData.results[position - 1]
-    const runnerNumber = getRunnerNumber(result)?.toString()
-    
-    if (!runnerNumber || !resultsData.fixedOddsData[runnerNumber]) {
+    const entrantId = result.entrant_id
+
+    if (!entrantId) {
       return '—'
     }
 
-    const fixedOdds = resultsData.fixedOddsData[runnerNumber]
-    const oddsValue = type === 'win' ? fixedOdds.fixed_win : fixedOdds.fixed_place
-    
+    // Find the fixed odds data by entrant ID
+    const fixedOddsEntry = Object.values(resultsData.fixedOddsData).find(
+      (entry: any) => entry.entrant_id === entrantId
+    )
+
+    if (!fixedOddsEntry) {
+      return '—'
+    }
+
+    const oddsValue =
+      type === 'win' ? fixedOddsEntry.fixed_win : fixedOddsEntry.fixed_place
+
     if (typeof oddsValue === 'number' && oddsValue > 0) {
       // Fixed odds data is already in dollar format - no conversion needed
-      return `$${oddsValue.toFixed(2)}`;
+      return `$${oddsValue.toFixed(2)}`
     }
 
     return '—'
   }
-  
+
   // Status change monitoring for results component
   if (process.env.NODE_ENV === 'development' && resultsData) {
     console.log('🏆 RACE RESULTS SECTION - Status Update:', {
       status: resultsData.status,
       hasResults: resultsData.results.length > 0,
       hasDividends: resultsData.dividends.length > 0,
-      hasFixedOdds: !!resultsData.fixedOddsData && Object.keys(resultsData.fixedOddsData).length > 0,
+      hasFixedOdds:
+        !!resultsData.fixedOddsData &&
+        Object.keys(resultsData.fixedOddsData).length > 0,
       lastUpdate: lastUpdate?.toISOString(),
       position2PlaceOdds: getFixedOdds(2, 'place'),
-      position3PlaceOdds: getFixedOdds(3, 'place')
-    });
+      position3PlaceOdds: getFixedOdds(3, 'place'),
+    })
   }
-  
+
   // Helper function to format runner names to proper case
   const formatRunnerName = (name: string) => {
     return name
@@ -86,25 +108,31 @@ export const RaceResultsSection = memo(function RaceResultsSection({
 
   // Helper function to determine if results are complete (final vs interim)
   const areResultsComplete = (): boolean => {
-    if (!resultsData) return false;
-    
+    if (!resultsData) return false
+
     // Check if status explicitly indicates final results
-    if (resultsData.status === 'final') return true;
-    if (resultsData.status === 'interim') return false;
-    
+    if (resultsData.status === 'final') return true
+    if (resultsData.status === 'interim') return false
+
     // Fall back to checking if dividends are available (indicates final results)
-    return resultsData.dividends && resultsData.dividends.length > 0;
+    return resultsData.dividends && resultsData.dividends.length > 0
   }
 
   // Status indicator for result type
   const getResultStatusIndicator = () => {
-    if (!resultsData) return '';
-    
-    const isComplete = areResultsComplete();
+    if (!resultsData) return ''
+
+    const isComplete = areResultsComplete()
     if (isComplete) {
-      return <span className="ml-2 text-xs text-green-600 font-semibold">FINAL</span>;
+      return (
+        <span className="ml-2 text-xs text-green-600 font-semibold">FINAL</span>
+      )
     } else {
-      return <span className="ml-2 text-xs text-yellow-600 font-semibold">INTERIM</span>;
+      return (
+        <span className="ml-2 text-xs text-yellow-600 font-semibold">
+          INTERIM
+        </span>
+      )
     }
   }
 
@@ -185,7 +213,6 @@ export const RaceResultsSection = memo(function RaceResultsSection({
     )
   }
 
-
   // Helper function to find dividend by poolType - handles NZTAB product_name format
   const findDividend = (type: string) => {
     return resultsData?.dividends.find((d) => {
@@ -251,7 +278,9 @@ export const RaceResultsSection = memo(function RaceResultsSection({
         <div className="grid grid-cols-8 gap-2 items-baseline text-sm">
           <div className="col-span-1 text-blue-500 font-bold">1st</div>
           <div className="col-span-1 text-gray-900 font-bold">
-            {resultsData?.results[0] ? getRunnerNumber(resultsData.results[0]) || '—' : '—'}
+            {resultsData?.results[0]
+              ? getRunnerNumber(resultsData.results[0]) || '—'
+              : '—'}
           </div>
           <div className="col-span-2 text-gray-900">
             {resultsData?.results[0]
@@ -276,7 +305,9 @@ export const RaceResultsSection = memo(function RaceResultsSection({
         <div className="grid grid-cols-8 gap-2 items-baseline text-sm">
           <div className="col-span-1 text-blue-500 font-bold">2nd</div>
           <div className="col-span-1 text-gray-900 font-bold">
-            {resultsData?.results[1] ? getRunnerNumber(resultsData.results[1]) || '—' : '—'}
+            {resultsData?.results[1]
+              ? getRunnerNumber(resultsData.results[1]) || '—'
+              : '—'}
           </div>
           <div className="col-span-2 text-gray-900">
             {resultsData?.results[1]
@@ -299,7 +330,9 @@ export const RaceResultsSection = memo(function RaceResultsSection({
         <div className="grid grid-cols-8 gap-2 items-baseline text-sm">
           <div className="col-span-1 text-blue-500 font-bold">3rd</div>
           <div className="col-span-1 text-gray-900 font-bold">
-            {resultsData?.results[2] ? getRunnerNumber(resultsData.results[2]) || '—' : '—'}
+            {resultsData?.results[2]
+              ? getRunnerNumber(resultsData.results[2]) || '—'
+              : '—'}
           </div>
           <div className="col-span-2 text-gray-900">
             {resultsData?.results[2]
@@ -323,24 +356,21 @@ export const RaceResultsSection = memo(function RaceResultsSection({
       {(lastUpdate || resultsData?.resultTime) && (
         <div className="mt-2 text-xs text-gray-400">
           Updated:{' '}
-          {lastUpdate ? 
-            lastUpdate.toLocaleTimeString('en-US', {
-              hour12: false,
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-            })
-            : resultsData?.resultTime ? 
-              new Date(resultsData.resultTime).toLocaleTimeString('en-US', {
+          {lastUpdate
+            ? lastUpdate.toLocaleTimeString('en-US', {
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              })
+            : resultsData?.resultTime
+            ? new Date(resultsData.resultTime).toLocaleTimeString('en-US', {
                 hour12: false,
                 hour: '2-digit',
                 minute: '2-digit',
               })
-              : '—'
-          }
-          {lastUpdate && (
-            <span className="ml-1 text-green-500">●</span>
-          )}
+            : '—'}
+          {lastUpdate && <span className="ml-1 text-green-500">●</span>}
         </div>
       )}
     </div>
