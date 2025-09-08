@@ -6,16 +6,10 @@ import { RaceDataHeader } from '@/components/race-view/RaceDataHeader'
 import { EnhancedEntrantsGrid } from '@/components/race-view/EnhancedEntrantsGrid'
 import { RaceFooter } from '@/components/race-view/RaceFooter'
 import { useUnifiedRaceRealtime } from '@/hooks/useUnifiedRaceRealtime'
-import {
-  DebugMessageBox,
-  useDebugMessages,
-} from '@/components/debug/DebugMessageBox'
 import type { RaceStatus } from '@/types/racePools'
 
 export function RacePageContent() {
   const { raceData, isLoading, error } = useRace()
-  const { messages, addMessage, dismissMessage, clearMessages } =
-    useDebugMessages()
 
   // Unified real-time subscription for all race page data
   const realtimeData = useUnifiedRaceRealtime({
@@ -58,62 +52,15 @@ export function RacePageContent() {
     const finalStatusUsed =
       realtimeData.resultsData?.status || currentRace.resultStatus || 'interim'
 
-    // Log detailed analysis to console (reduced frequency)
-    console.log('🏆 RACE PAGE CONTENT - Results Data Analysis:', {
-      raceId: currentRace.raceId,
-      statusAnalysis: {
-        raceStatus: currentRace.status,
-        raceResultStatus: currentRace.resultStatus,
-        realtimeResultsStatus: realtimeData.resultsData?.status,
-        finalStatusUsedInUI: finalStatusUsed,
-        resultDataStatus: resultDataStatus,
-        hasStatusConflict: statusConflict,
-        statusConflictDetails: statusConflict
-          ? `races:'${currentRace.status}' vs results:'${currentRace.resultStatus}'`
-          : 'SYNCHRONIZED',
-      },
-    })
-
-    // CRITICAL: Show status conflicts in debug message box
+    // Status conflict monitoring without logging
     if (statusConflict) {
-      addMessage(
-        'warning',
-        'Status Conflict Detected',
-        `Race status (${currentRace.status}) doesn't match result status (${currentRace.resultStatus})`,
-        {
-          racesCollectionStatus: currentRace.status,
-          raceObjectResultStatus: currentRace.resultStatus,
-          uiWillShow: resultDataStatus,
-          dataSource: realtimeData.resultsData ? 'REALTIME' : 'PERSISTENT',
-          issue: 'Real-time subscription may have missed the status update',
-          solution: 'Check race-results collection directly for latest status',
-        }
-      )
-    }
-
-    // Show successful status transitions
-    if (
-      realtimeData.lastResultsUpdate &&
-      currentResultsData?.status === 'final'
-    ) {
-      addMessage(
-        'success',
-        'Results Status Updated',
-        `Race results status changed to: ${currentResultsData.status.toUpperCase()}`,
-        {
-          raceId: currentRace.raceId,
-          previousStatus: 'interim',
-          newStatus: currentResultsData.status,
-          timestamp: realtimeData.lastResultsUpdate,
-        }
-      )
+      // Silently monitor status conflicts without showing modal
     }
   }, [
     raceData?.race,
     realtimeData.race,
     realtimeData.resultsData,
     realtimeData.lastResultsUpdate,
-    addMessage,
   ])
 
   if (!raceData) {
@@ -180,15 +127,6 @@ export function RacePageContent() {
 
   return (
     <div className="race-page-layout">
-      {/* Debug Message Box - Only in development */}
-      {process.env.NODE_ENV === 'development' && (
-        <DebugMessageBox
-          messages={messages}
-          onDismiss={dismissMessage}
-          onClear={clearMessages}
-        />
-      )}
-
       {/* Loading Overlay */}
       {isLoading && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
