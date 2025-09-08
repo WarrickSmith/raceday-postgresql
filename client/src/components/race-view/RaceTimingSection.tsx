@@ -32,7 +32,8 @@ export const RaceTimingSection = memo(function RaceTimingSection({
 
   // Use real-time race data from unified subscription with fallbacks
   const currentStartTime = race?.startTime || raceStartTime
-  const currentStatus = (race?.status?.toLowerCase() as RaceStatus) || raceStatus || 'open'
+  const currentStatus =
+    (race?.status?.toLowerCase() as RaceStatus) || raceStatus || 'open'
   const actualStartTime = race?.actualStart
 
   const calculateTimeRemaining = useCallback(() => {
@@ -149,10 +150,12 @@ export const RaceTimingSection = memo(function RaceTimingSection({
         <div>
           <div className="flex items-center justify-center space-x-2">
             <div className="text-lg font-extrabold text-blue-600 uppercase tracking-wide">
-              Closed
+              Closed @
             </div>
             <div className="text-lg font-extrabold text-blue-600">
-              {new Date(actualStartTime || currentStartTime || new Date()).toLocaleTimeString('en-US', {
+              {new Date(
+                actualStartTime || currentStartTime || new Date()
+              ).toLocaleTimeString('en-US', {
                 hour12: true,
                 hour: 'numeric',
                 minute: '2-digit',
@@ -166,13 +169,21 @@ export const RaceTimingSection = memo(function RaceTimingSection({
       {currentStartTime && (
         <div>
           <div className="flex items-center justify-center space-x-2">
-            <div className="text-lg font-extrabold text-gray-500 uppercase tracking-wide">Scheduled</div>
-            <time dateTime={currentStartTime} className="text-lg font-extrabold text-gray-500">
-              {new Date(currentStartTime || new Date()).toLocaleTimeString('en-US', {
-                hour12: true,
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
+            <div className="text-lg font-extrabold text-gray-500 uppercase tracking-wide">
+              Scheduled
+            </div>
+            <time
+              dateTime={currentStartTime}
+              className="text-lg font-extrabold text-gray-500"
+            >
+              {new Date(currentStartTime || new Date()).toLocaleTimeString(
+                'en-US',
+                {
+                  hour12: true,
+                  hour: 'numeric',
+                  minute: '2-digit',
+                }
+              )}
             </time>
           </div>
         </div>
