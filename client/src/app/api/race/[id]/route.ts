@@ -66,7 +66,7 @@ export async function GET(
     response.headers.set('X-Race-ID', raceId)
 
     return response
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -113,7 +113,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
         if (raceResultsQuery.documents.length > 0) {
           raceResultsData = raceResultsQuery.documents[0]
         }
-      } catch (error) {
+      } catch {
         // Continue without results data - not critical for race display
       }
     }
@@ -452,7 +452,7 @@ async function getNavigationRaceData(raceId: string): Promise<{
         if (raceResultsQuery.documents.length > 0) {
           raceResultsData = raceResultsQuery.documents[0]
         }
-      } catch (error) {
+      } catch {
         // Continue without results data - not critical for navigation display
       }
     }

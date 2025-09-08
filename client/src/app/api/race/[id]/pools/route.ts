@@ -85,7 +85,7 @@ async function getRacePoolData(raceId: string): Promise<RacePoolData | null> {
           isLive: true
         };
       }
-    } catch (poolError) {
+    } catch {
       console.log('Race pools collection not found or no data, generating mock data');
     }
     
