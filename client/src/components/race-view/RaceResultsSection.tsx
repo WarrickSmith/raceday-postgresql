@@ -24,16 +24,54 @@ export const RaceResultsSection = memo(function RaceResultsSection({
   entrants = [],
 }: RaceResultsSectionProps) {
   
-  // CRITICAL DEBUG: Log what results data is received by the component
-  if (process.env.NODE_ENV === 'development') {
-    console.log('🏆 RACE RESULTS SECTION - Received Props:', {
-      hasResultsData: !!resultsData,
-      resultsCount: resultsData?.results?.length || 0,
-      dividendsCount: resultsData?.dividends?.length || 0,
-      status: resultsData?.status,
-      resultTime: resultsData?.resultTime,
+  // Enhanced helper function to extract runner number from various API field formats
+  const getRunnerNumber = (result: any): number | undefined => {
+    return result.runner_number || result.runnerNumber || result.number || result.no;
+  }
+
+  // Enhanced helper function to extract runner name from various API field formats
+  const getRunnerName = (result: any): string => {
+    return result.name || result.runnerName || result.horse_name || result.horseName || '';
+  }
+
+  // Helper function to get fixed odds for a specific position and bet type
+  const getFixedOdds = (position: number, type: 'win' | 'place'): string => {
+    if (!resultsData || !resultsData.results || resultsData.results.length === 0) {
+      return '—'
+    }
+    
+    if (!resultsData.results[position - 1] || !resultsData.fixedOddsData) {
+      return '—'
+    }
+
+    const result = resultsData.results[position - 1]
+    const runnerNumber = getRunnerNumber(result)?.toString()
+    
+    if (!runnerNumber || !resultsData.fixedOddsData[runnerNumber]) {
+      return '—'
+    }
+
+    const fixedOdds = resultsData.fixedOddsData[runnerNumber]
+    const oddsValue = type === 'win' ? fixedOdds.fixed_win : fixedOdds.fixed_place
+    
+    if (typeof oddsValue === 'number' && oddsValue > 0) {
+      // Fixed odds data is already in dollar format - no conversion needed
+      return `$${oddsValue.toFixed(2)}`;
+    }
+
+    return '—'
+  }
+  
+  // Status change monitoring for results component
+  if (process.env.NODE_ENV === 'development' && resultsData) {
+    console.log('🏆 RACE RESULTS SECTION - Status Update:', {
+      status: resultsData.status,
+      hasResults: resultsData.results.length > 0,
+      hasDividends: resultsData.dividends.length > 0,
+      hasFixedOdds: !!resultsData.fixedOddsData && Object.keys(resultsData.fixedOddsData).length > 0,
       lastUpdate: lastUpdate?.toISOString(),
-      entrantsCount: entrants.length
+      position2PlaceOdds: getFixedOdds(2, 'place'),
+      position3PlaceOdds: getFixedOdds(3, 'place')
     });
   }
   
@@ -44,16 +82,6 @@ export const RaceResultsSection = memo(function RaceResultsSection({
       .split(' ')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ')
-  }
-
-  // Enhanced helper function to extract runner number from various API field formats
-  const getRunnerNumber = (result: any): number | undefined => {
-    return result.runner_number || result.runnerNumber || result.number || result.no;
-  }
-
-  // Enhanced helper function to extract runner name from various API field formats
-  const getRunnerName = (result: any): string => {
-    return result.name || result.runnerName || result.horse_name || result.horseName || '';
   }
 
   // Helper function to determine if results are complete (final vs interim)
@@ -190,35 +218,6 @@ export const RaceResultsSection = memo(function RaceResultsSection({
       return expectedFormats.some((format: string) => fieldLower === format)
     })
   }
-
-  // Helper function to get fixed odds for a specific position and bet type
-  const getFixedOdds = (position: number, type: 'win' | 'place'): string => {
-    if (!resultsData || !resultsData.results || resultsData.results.length === 0) {
-      return '—'
-    }
-    
-    if (!resultsData.results[position - 1] || !resultsData.fixedOddsData) {
-      return '—'
-    }
-
-    const result = resultsData.results[position - 1]
-    const runnerNumber = getRunnerNumber(result)?.toString()
-    
-    if (!runnerNumber || !resultsData.fixedOddsData[runnerNumber]) {
-      return '—'
-    }
-
-    const fixedOdds = resultsData.fixedOddsData[runnerNumber]
-    const oddsValue = type === 'win' ? fixedOdds.fixed_win : fixedOdds.fixed_place
-    
-    if (typeof oddsValue === 'number' && oddsValue > 0) {
-      // Fixed odds data is already in dollar format - no conversion needed
-      return `$${oddsValue.toFixed(2)}`;
-    }
-
-    return '—'
-  }
-
 
   return (
     <div className={`${className}`}>

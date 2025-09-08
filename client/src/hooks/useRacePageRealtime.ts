@@ -742,10 +742,34 @@ export function useRacePageRealtime({
                     fixedOddsData = typeof payload.fixedOddsData === 'string' 
                       ? JSON.parse(payload.fixedOddsData) 
                       : payload.fixedOddsData;
+                      
+                    // ENHANCED DEBUG: Detailed fixed odds parsing analysis
+                    debugLog('🎯 FIXED ODDS DATA PARSED from real-time update', {
+                      eventType: isCreateEvent ? 'CREATE' : isUpdateEvent ? 'UPDATE' : 'UNKNOWN',
+                      payloadFieldType: typeof payload.fixedOddsData,
+                      payloadFieldLength: payload.fixedOddsData?.length || 'N/A',
+                      parsedKeys: Object.keys(fixedOddsData),
+                      parsedRunners: Object.keys(fixedOddsData).map(runnerNumber => ({
+                        runnerNumber,
+                        hasFixedWin: !!fixedOddsData[runnerNumber]?.fixed_win,
+                        hasFixedPlace: !!fixedOddsData[runnerNumber]?.fixed_place,
+                        fixedWinValue: fixedOddsData[runnerNumber]?.fixed_win,
+                        fixedPlaceValue: fixedOddsData[runnerNumber]?.fixed_place
+                      })),
+                      sampleFixedOddsEntry: Object.keys(fixedOddsData).length > 0 ? 
+                        fixedOddsData[Object.keys(fixedOddsData)[0]] : null
+                    });
                   } catch (error) {
                     errorLog('Failed to parse real-time fixedOddsData', error);
                     fixedOddsData = {};
                   }
+                } else {
+                  debugLog('⚠️ NO FIXED ODDS DATA in real-time payload', {
+                    eventType: isCreateEvent ? 'CREATE' : isUpdateEvent ? 'UPDATE' : 'UNKNOWN',
+                    payloadHasFixedOddsField: 'fixedOddsData' in (payload || {}),
+                    payloadFixedOddsValue: payload?.fixedOddsData,
+                    payloadKeys: payload ? Object.keys(payload) : []
+                  });
                 }
 
                 // ENHANCED RESULT STATUS CHANGE DETECTION
@@ -754,12 +778,31 @@ export function useRacePageRealtime({
                 const statusChanged = currentStatus && newStatus && currentStatus !== newStatus;
                 
                 if (statusChanged) {
+                  const transitionType = currentStatus === 'interim' && newStatus === 'final' ? 'INTERIM_TO_FINAL' : 'OTHER';
+                  const isInterimToFinal = transitionType === 'INTERIM_TO_FINAL';
+                  
                   debugLog('🔄 RESULT STATUS CHANGE DETECTED', {
                     previousStatus: currentStatus,
                     newStatus: newStatus,
-                    transitionType: currentStatus === 'interim' && newStatus === 'final' ? 'INTERIM_TO_FINAL' : 'OTHER',
-                    documentId: payload.$id
+                    transitionType: transitionType,
+                    documentId: payload.$id,
+                    isInterimToFinal: isInterimToFinal,
+                    timestamp: now.toISOString()
                   });
+                  
+                  // ENHANCED: Special handling for interim→final transitions
+                  if (isInterimToFinal) {
+                    debugLog('🏁 INTERIM→FINAL TRANSITION - Race results now final!', {
+                      raceId: raceId,
+                      documentId: payload.$id,
+                      previousStatus: currentStatus,
+                      newStatus: newStatus,
+                      hasNewDividends: payload.dividendsData ? 'YES' : 'NO',
+                      hasFixedOdds: payload.fixedOddsData ? 'YES' : 'NO',
+                      transition: 'This should trigger final results display in UI',
+                      timestamp: now.toISOString()
+                    });
+                  }
                 }
                 
                 // Create results data if we have results or if status indicates results should be available
@@ -779,6 +822,46 @@ export function useRacePageRealtime({
                   const finalFixedOddsData = Object.keys(fixedOddsData).length > 0 
                     ? fixedOddsData 
                     : (newState.resultsData?.fixedOddsData || {});
+                  
+                  // ENHANCED DEBUG: Fixed odds preservation decision analysis
+                  debugLog('📊 FIXED ODDS PRESERVATION ANALYSIS', {
+                    eventType: isCreateEvent ? 'CREATE' : isUpdateEvent ? 'UPDATE' : 'UNKNOWN',
+                    decisionFlow: {
+                      parsedFixedOddsKeys: Object.keys(fixedOddsData),
+                      parsedFixedOddsCount: Object.keys(fixedOddsData).length,
+                      hasNewFixedOddsData: Object.keys(fixedOddsData).length > 0,
+                      existingFixedOddsKeys: Object.keys(newState.resultsData?.fixedOddsData || {}),
+                      existingFixedOddsCount: Object.keys(newState.resultsData?.fixedOddsData || {}).length,
+                      hasExistingFixedOddsData: Object.keys(newState.resultsData?.fixedOddsData || {}).length > 0,
+                      decision: Object.keys(fixedOddsData).length > 0 ? 'USE_NEW' : 'PRESERVE_EXISTING',
+                      finalFixedOddsKeys: Object.keys(finalFixedOddsData),
+                      finalFixedOddsCount: Object.keys(finalFixedOddsData).length
+                    },
+                    detailedComparison: {
+                      newData: Object.keys(fixedOddsData).reduce((acc, key) => {
+                        acc[key] = {
+                          fixed_win: fixedOddsData[key]?.fixed_win,
+                          fixed_place: fixedOddsData[key]?.fixed_place
+                        };
+                        return acc;
+                      }, {} as any),
+                      existingData: Object.keys(newState.resultsData?.fixedOddsData || {}).reduce((acc, key) => {
+                        const existing = newState.resultsData?.fixedOddsData || {};
+                        acc[key] = {
+                          fixed_win: existing[key]?.fixed_win,
+                          fixed_place: existing[key]?.fixed_place
+                        };
+                        return acc;
+                      }, {} as any),
+                      finalData: Object.keys(finalFixedOddsData).reduce((acc, key) => {
+                        acc[key] = {
+                          fixed_win: finalFixedOddsData[key]?.fixed_win,
+                          fixed_place: finalFixedOddsData[key]?.fixed_place
+                        };
+                        return acc;
+                      }, {} as any)
+                    }
+                  });
                   
                   // FALLBACK: Preserve existing dividends if not provided in update
                   const finalDividends = dividends.length > 0 
@@ -811,6 +894,14 @@ export function useRacePageRealtime({
                       preservedResults: !hasValidResults && finalResults.length > 0,
                       preservedDividends: dividends.length === 0 && finalDividends.length > 0,
                       preservedFixedOdds: Object.keys(fixedOddsData).length === 0 && Object.keys(finalFixedOddsData).length > 0
+                    },
+                    fixedOddsDetails: {
+                      payloadHasFixedOdds: !!payload.fixedOddsData,
+                      parsedFixedOddsKeys: Object.keys(fixedOddsData),
+                      existingFixedOddsKeys: Object.keys(newState.resultsData?.fixedOddsData || {}),
+                      finalFixedOddsKeys: Object.keys(finalFixedOddsData),
+                      sampleFixedOddsData: Object.keys(finalFixedOddsData).length > 0 ? 
+                        finalFixedOddsData[Object.keys(finalFixedOddsData)[0]] : null
                     }
                   });
                   
@@ -836,7 +927,11 @@ export function useRacePageRealtime({
                     debugLog('🏁 RACE OBJECT UPDATED with results data for consistency', {
                       raceId: newState.race.raceId,
                       resultsAvailable: newState.race.resultsAvailable,
-                      resultStatus: newState.race.resultStatus
+                      resultStatus: newState.race.resultStatus,
+                      previousRaceStatus: prevState.race?.resultStatus,
+                      statusActuallyUpdated: prevState.race?.resultStatus !== newState.race.resultStatus,
+                      updateSource: 'race-results subscription',
+                      shouldTriggerUIUpdate: 'YES - RacePageContent uses currentRace.resultStatus'
                     });
                   }
                   
@@ -1192,6 +1287,78 @@ export function useRacePageRealtime({
       uptime,
     };
   }, [state.isConnected, state.totalUpdates]);
+
+  // Status conflict detection and resolution
+  useEffect(() => {
+    if (!state.race || !raceId) return;
+    
+    // Check for status conflicts between race status and result status
+    const raceStatus = state.race.status?.toLowerCase();
+    const resultStatus = state.race.resultStatus?.toLowerCase();
+    const hasStatusConflict = raceStatus && resultStatus && raceStatus !== resultStatus;
+    
+    // If there's a conflict and race status is 'final', try to resolve by fetching latest race-results
+    if (hasStatusConflict && raceStatus === 'final' && resultStatus !== 'final') {
+      debugLog('🔍 STATUS CONFLICT DETECTED - Attempting database lookup for resolution', {
+        raceId,
+        raceStatus,
+        resultStatus,
+        action: 'Querying race-results collection for latest status'
+      });
+      
+      // Attempt to fetch the latest race-results document
+      const resolveStatusConflict = async () => {
+        try {
+          const { databases } = await import('@/lib/appwrite-client');
+          const { Query } = await import('appwrite');
+          
+          const raceResultsResponse = await databases.listDocuments(
+            'raceday-db',
+            'race-results',
+            [Query.equal('race', state.raceDocumentId || '')]
+          );
+          
+          if (raceResultsResponse.documents.length > 0) {
+            const latestResultsDoc = raceResultsResponse.documents[0];
+            
+            debugLog('📋 RACE-RESULTS DATABASE LOOKUP RESULT', {
+              documentId: latestResultsDoc.$id,
+              resultStatus: latestResultsDoc.resultStatus,
+              currentRaceResultStatus: resultStatus,
+              needsUpdate: latestResultsDoc.resultStatus !== resultStatus
+            });
+            
+            // If database shows 'final' but race object shows 'interim', update it
+            if (latestResultsDoc.resultStatus === 'final' && resultStatus !== 'final') {
+              setState(prevState => {
+                if (!prevState.race) return prevState;
+                
+                debugLog('🔄 RESOLVING STATUS CONFLICT - Updating race object resultStatus', {
+                  from: prevState.race.resultStatus,
+                  to: latestResultsDoc.resultStatus,
+                  source: 'database-lookup-resolution'
+                });
+                
+                return {
+                  ...prevState,
+                  race: {
+                    ...prevState.race,
+                    resultStatus: latestResultsDoc.resultStatus
+                  }
+                };
+              });
+            }
+          }
+        } catch (error) {
+          errorLog('Failed to resolve status conflict via database lookup', error);
+        }
+      };
+      
+      // Debounce the resolution attempt
+      const resolutionTimer = setTimeout(resolveStatusConflict, 1000);
+      return () => clearTimeout(resolutionTimer);
+    }
+  }, [state.race?.status, state.race?.resultStatus, state.raceDocumentId, raceId]);
 
   return {
     ...state,
