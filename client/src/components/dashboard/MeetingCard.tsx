@@ -7,10 +7,9 @@ import { getCountryInfo, normalizeCountryCode } from '@/constants/countries';
 
 interface MeetingCardProps {
   meeting: Meeting;
-  onRaceClick?: (raceId: string) => void;
 }
 
-function MeetingCardComponent({ meeting, onRaceClick }: MeetingCardProps) {
+function MeetingCardComponent({ meeting }: MeetingCardProps) {
   const [isCompleted, setIsCompleted] = useState<boolean | null>(null);
 
   // Check if meeting is completed on mount with lightweight query
@@ -190,15 +189,9 @@ function MeetingCardComponent({ meeting, onRaceClick }: MeetingCardProps) {
 // Memoize component to prevent unnecessary re-renders
 export const MeetingCard = memo(MeetingCardComponent, (prevProps, nextProps) => {
   // Custom comparison function for optimization
-  const meetingEqual = (
+  return (
     prevProps.meeting.$id === nextProps.meeting.$id &&
     prevProps.meeting.$updatedAt === nextProps.meeting.$updatedAt &&
     prevProps.meeting.firstRaceTime === nextProps.meeting.firstRaceTime
   );
-  
-  const callbacksEqual = (
-    prevProps.onRaceClick === nextProps.onRaceClick
-  );
-  
-  return meetingEqual && callbacksEqual;
 });

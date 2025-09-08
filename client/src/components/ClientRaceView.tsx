@@ -1,26 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { notFound } from 'next/navigation';
 import { useRace } from '@/contexts/RaceContext';
 import { RacePageContent } from '@/components/race-view/RacePageContent';
-import { Race, Meeting, Entrant, RaceNavigationData } from '@/types/meetings';
 
 interface ClientRaceViewProps {
   raceId: string;
-}
-
-interface RaceContextData {
-  race: Race;
-  meeting: Meeting;
-  entrants: Entrant[];
-  navigationData: RaceNavigationData;
-  dataFreshness: {
-    lastUpdated: string;
-    entrantsDataAge: number;
-    oddsHistoryCount: number;
-    moneyFlowHistoryCount: number;
-  };
 }
 
 export function ClientRaceView({ raceId }: ClientRaceViewProps) {
@@ -52,7 +37,7 @@ export function ClientRaceView({ raceId }: ClientRaceViewProps) {
     } else if (contextLoading || navInProgress) {
       console.log('⏳ ClientRaceView - navigation already in progress, waiting...');
     }
-  }, [raceId, raceData?.race?.raceId, contextLoading, navigateToRace, isNavigationInProgress]);
+  }, [raceId, raceData, contextLoading, navigateToRace, isNavigationInProgress]);
 
   // Handle errors
   if (error) {

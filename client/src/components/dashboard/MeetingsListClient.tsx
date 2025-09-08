@@ -85,7 +85,6 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
       >
         <MeetingCard 
           meeting={meeting}
-          onRaceClick={handleRaceClick}
         />
       </div>
     ));
