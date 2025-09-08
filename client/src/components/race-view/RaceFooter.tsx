@@ -98,25 +98,27 @@ export const RaceFooter = memo(function RaceFooter({
       className={`race-footer bg-white border-2 border-gray-300 shadow-lg rounded-lg ${className}`}
     >
       {/* Enhanced Three-Column Footer Layout: Pools | Results | Timing/Status */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-        {/* Column 1-2: Separate Pools and Results sections restored */}
-        <div className="flex flex-col justify-center col-span-2">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-            <RacePoolsSection
-              raceId={raceId}
-              poolData={currentPoolData}
-              lastUpdate={lastPoolUpdate}
-            />
-            <RaceResultsSection
-              resultsData={currentResultsData}
-              lastUpdate={lastResultsUpdate}
-              entrants={entrants}
-            />
-          </div>
+      <div className="flex flex-col sm:flex-row gap-4 p-4 min-h-0 overflow-x-auto">
+        {/* Column 1: Pools Section */}
+        <div className="flex-shrink-0 min-w-0 flex-grow">
+          <RacePoolsSection
+            raceId={raceId}
+            poolData={currentPoolData}
+            lastUpdate={lastPoolUpdate}
+          />
+        </div>
+
+        {/* Column 2: Results Section */}
+        <div className="flex-shrink-0 min-w-0 flex-grow">
+          <RaceResultsSection
+            resultsData={currentResultsData}
+            lastUpdate={lastResultsUpdate}
+            entrants={entrants}
+          />
         </div>
 
         {/* Column 3: Timing/Status Section (Right) */}
-        <div className="flex flex-col justify-center items-end">
+        <div className="flex-shrink-0 min-w-0 flex-grow flex items-center justify-center sm:justify-end">
           <RaceTimingSection
             raceStartTime={currentRaceStartTime}
             raceStatus={currentRaceStatus}

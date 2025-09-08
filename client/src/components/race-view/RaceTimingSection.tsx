@@ -112,7 +112,9 @@ export const RaceTimingSection = memo(function RaceTimingSection({
     showCountdown && currentStatus === 'open' && timeRemaining.total > 0
 
   return (
-    <div className={`text-center space-y-2 ${className}`}>
+    <div
+      className={`text-center space-y-2 h-full flex flex-col justify-center ${className}`}
+    >
       {/* Race Status - prominent */}
       <div
         className={`inline-flex items-center space-x-2 px-3 py-2 rounded-lg ${statusConfig.bgColor} shadow`}

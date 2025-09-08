@@ -25,7 +25,11 @@ export const RacePoolsSection = memo(function RacePoolsSection({
   lastUpdate,
 }: RacePoolsSectionProps) {
   // Use poolData from unified subscription if available, otherwise use fallback hook for data persistence
-  const { poolData: fallbackPoolData, isLoading, error } = useRacePoolData(poolData ? '' : raceId)
+  const {
+    poolData: fallbackPoolData,
+    isLoading,
+    error,
+  } = useRacePoolData(poolData ? '' : raceId)
   const currentPoolData = poolData || fallbackPoolData
 
   if (isLoading && !poolData) {
@@ -92,9 +96,29 @@ export const RacePoolsSection = memo(function RacePoolsSection({
 
   return (
     <div className={`${className}`}>
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-center mb-1">
         <div className="text-sm text-gray-500 uppercase tracking-wide font-semibold">
           Pools
+        </div>
+        <div className="ml-2 text-xs text-gray-400">
+          Last update:{' '}
+          {lastUpdate
+            ? lastUpdate.toLocaleTimeString('en-US', {
+                hour12: true,
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : currentPoolData?.lastUpdated
+            ? new Date(currentPoolData.lastUpdated).toLocaleTimeString(
+                'en-US',
+                {
+                  hour12: true,
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }
+              )
+            : '—'}
+          {lastUpdate && <span className="ml-1 text-green-500">●</span>}
         </div>
       </div>
 
@@ -105,7 +129,7 @@ export const RacePoolsSection = memo(function RacePoolsSection({
         {pairs.map((p, i) => (
           <div
             key={i}
-            className="grid grid-cols-8 gap-2 items-baseline text-sm"
+            className="grid grid-cols-8 gap-1 items-baseline text-sm"
           >
             {/* Left label - spans 2 columns to match Results layout */}
             <div className="col-span-2 text-sm text-gray-600">
@@ -120,10 +144,10 @@ export const RacePoolsSection = memo(function RacePoolsSection({
             </div>
 
             {/* Spacer columns to align with Results grid */}
-            <div className="col-span-2"></div>
+            <div className="col-span-1"></div>
 
             {/* Right label - spans 1 column to match Results bet type column */}
-            <div className="col-span-1 text-sm text-gray-600">
+            <div className="col-span-2 text-sm text-gray-600 truncate">
               {p.right?.label ?? ''}
             </div>
 
@@ -135,29 +159,6 @@ export const RacePoolsSection = memo(function RacePoolsSection({
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Last updated from real-time subscription */}
-      <div className="mt-2 text-xs text-gray-400">
-        Updated:{' '}
-        {lastUpdate ? 
-          lastUpdate.toLocaleTimeString('en-US', {
-            hour12: false,
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          })
-          : currentPoolData?.lastUpdated ? 
-            new Date(currentPoolData.lastUpdated).toLocaleTimeString('en-US', {
-              hour12: false,
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-            : '—'
-        }
-        {lastUpdate && (
-          <span className="ml-1 text-green-500">●</span>
-        )}
       </div>
     </div>
   )

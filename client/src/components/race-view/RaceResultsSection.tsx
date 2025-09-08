@@ -97,13 +97,18 @@ export const RaceResultsSection = memo(function RaceResultsSection({
     })
   }
 
-  // Helper function to format runner names to proper case
+  // Helper function to format runner names to proper case with truncation
   const formatRunnerName = (name: string) => {
-    return name
+    const formattedName = name
       .toLowerCase()
       .split(' ')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ')
+
+    // Truncate long names with ellipsis
+    return formattedName.length > 12
+      ? `${formattedName.substring(0, 12)}...`
+      : formattedName
   }
 
   // Helper function to determine if results are complete (final vs interim)
@@ -173,7 +178,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
             <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
-            <div className="col-span-1 text-gray-600">Quinella</div>
+            <div className="col-span-1 text-gray-600 truncate">Quinella</div>
             <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
@@ -188,7 +193,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
             <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
-            <div className="col-span-1 text-gray-600">Trifecta</div>
+            <div className="col-span-1 text-gray-600 truncate">Trifecta</div>
             <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
@@ -203,7 +208,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
             <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
-            <div className="col-span-1 text-gray-600">FirstFour</div>
+            <div className="col-span-1 text-gray-600 truncate">FirstFour</div>
             <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
               —
             </div>
@@ -249,10 +254,31 @@ export const RaceResultsSection = memo(function RaceResultsSection({
   return (
     <div className={`${className}`}>
       <div className="flex items-center mb-1">
-        <div className="text-sm text-gray-500 uppercase tracking-wide font-semibold">
-          Results
+        <div className="flex items-center">
+          <div className="text-sm text-gray-500 uppercase tracking-wide font-semibold">
+            Results
+          </div>
+          {getResultStatusIndicator()}
         </div>
-        {getResultStatusIndicator()}
+        {(lastUpdate || resultsData?.resultTime) && (
+          <div className="ml-2 text-xs text-gray-400">
+            Last update:{' '}
+            {lastUpdate
+              ? lastUpdate.toLocaleTimeString('en-US', {
+                  hour12: true,
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : resultsData?.resultTime
+              ? new Date(resultsData.resultTime).toLocaleTimeString('en-US', {
+                  hour12: true,
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : '—'}
+            {lastUpdate && <span className="ml-1 text-green-500">●</span>}
+          </div>
+        )}
       </div>
 
       {/* Column Headers - Pos, No, Runner, Win, Place + blank columns for bet types */}
@@ -282,7 +308,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
               ? getRunnerNumber(resultsData.results[0]) || '—'
               : '—'}
           </div>
-          <div className="col-span-2 text-gray-900">
+          <div className="col-span-2 text-gray-900 truncate">
             {resultsData?.results[0]
               ? formatRunnerName(getRunnerName(resultsData.results[0]))
               : '—'}
@@ -293,7 +319,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
             {getFixedOdds(1, 'place')}
           </div>
-          <div className="col-span-1 text-gray-600">Quinella</div>
+          <div className="col-span-1 text-gray-600 truncate">Quinella</div>
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
             {findDividend('quinella')
               ? `$${findDividend('quinella')!.dividend.toFixed(2)}`
@@ -309,7 +335,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
               ? getRunnerNumber(resultsData.results[1]) || '—'
               : '—'}
           </div>
-          <div className="col-span-2 text-gray-900">
+          <div className="col-span-2 text-gray-900 truncate">
             {resultsData?.results[1]
               ? formatRunnerName(getRunnerName(resultsData.results[1]))
               : '—'}
@@ -318,7 +344,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
             {getFixedOdds(2, 'place')}
           </div>
-          <div className="col-span-1 text-gray-600">Trifecta</div>
+          <div className="col-span-1 text-gray-600 truncate">Trifecta</div>
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
             {findDividend('trifecta')
               ? `$${findDividend('trifecta')!.dividend.toFixed(2)}`
@@ -334,7 +360,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
               ? getRunnerNumber(resultsData.results[2]) || '—'
               : '—'}
           </div>
-          <div className="col-span-2 text-gray-900">
+          <div className="col-span-2 text-gray-900 truncate">
             {resultsData?.results[2]
               ? formatRunnerName(getRunnerName(resultsData.results[2]))
               : '—'}
@@ -343,7 +369,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
             {getFixedOdds(3, 'place')}
           </div>
-          <div className="col-span-1 text-gray-600">FirstFour</div>
+          <div className="col-span-1 text-gray-600 truncate">FirstFour</div>
           <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
             {findDividend('first4')
               ? `$${findDividend('first4')!.dividend.toFixed(2)}`
@@ -351,28 +377,6 @@ export const RaceResultsSection = memo(function RaceResultsSection({
           </div>
         </div>
       </div>
-
-      {/* Last updated from real-time subscription */}
-      {(lastUpdate || resultsData?.resultTime) && (
-        <div className="mt-2 text-xs text-gray-400">
-          Updated:{' '}
-          {lastUpdate
-            ? lastUpdate.toLocaleTimeString('en-US', {
-                hour12: false,
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-              })
-            : resultsData?.resultTime
-            ? new Date(resultsData.resultTime).toLocaleTimeString('en-US', {
-                hour12: false,
-                hour: '2-digit',
-                minute: '2-digit',
-              })
-            : '—'}
-          {lastUpdate && <span className="ml-1 text-green-500">●</span>}
-        </div>
-      )}
     </div>
   )
 })
