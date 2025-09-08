@@ -67,7 +67,6 @@ export async function GET(
 
     return response
   } catch (error) {
-    console.error('API Error fetching race data:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -105,16 +104,16 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
     if (raceQuery.documents.length > 0) {
       const raceDocumentId = raceQuery.documents[0].$id
       try {
-        const raceResultsQuery = await databases.listDocuments('raceday-db', 'race-results', [
-          Query.equal('race', raceDocumentId),
-          Query.limit(1),
-        ])
-        
+        const raceResultsQuery = await databases.listDocuments(
+          'raceday-db',
+          'race-results',
+          [Query.equal('race', raceDocumentId), Query.limit(1)]
+        )
+
         if (raceResultsQuery.documents.length > 0) {
           raceResultsData = raceResultsQuery.documents[0]
         }
       } catch (error) {
-        console.error('Error fetching race results:', error)
         // Continue without results data - not critical for race display
       }
     }
@@ -149,9 +148,15 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       type: raceData.type, // Race type code (T, H, G) for category display
       // Results data fields from race-results collection
       resultsAvailable: raceResultsData?.resultsAvailable || false,
-      resultsData: raceResultsData?.resultsData ? JSON.parse(raceResultsData.resultsData) : undefined,
-      dividendsData: raceResultsData?.dividendsData ? JSON.parse(raceResultsData.dividendsData) : undefined,
-      fixedOddsData: raceResultsData?.fixedOddsData ? JSON.parse(raceResultsData.fixedOddsData) : undefined,
+      resultsData: raceResultsData?.resultsData
+        ? JSON.parse(raceResultsData.resultsData)
+        : undefined,
+      dividendsData: raceResultsData?.dividendsData
+        ? JSON.parse(raceResultsData.dividendsData)
+        : undefined,
+      fixedOddsData: raceResultsData?.fixedOddsData
+        ? JSON.parse(raceResultsData.fixedOddsData)
+        : undefined,
       resultStatus: raceResultsData?.resultStatus,
       photoFinish: raceResultsData?.photoFinish || false,
       stewardsInquiry: raceResultsData?.stewardsInquiry || false,
@@ -438,16 +443,16 @@ async function getNavigationRaceData(raceId: string): Promise<{
     if (raceQuery.documents.length > 0) {
       const raceDocumentId = raceQuery.documents[0].$id
       try {
-        const raceResultsQuery = await databases.listDocuments('raceday-db', 'race-results', [
-          Query.equal('race', raceDocumentId),
-          Query.limit(1),
-        ])
-        
+        const raceResultsQuery = await databases.listDocuments(
+          'raceday-db',
+          'race-results',
+          [Query.equal('race', raceDocumentId), Query.limit(1)]
+        )
+
         if (raceResultsQuery.documents.length > 0) {
           raceResultsData = raceResultsQuery.documents[0]
         }
       } catch (error) {
-        console.error('Error fetching race results:', error)
         // Continue without results data - not critical for navigation display
       }
     }
@@ -480,9 +485,15 @@ async function getNavigationRaceData(raceId: string): Promise<{
       type: raceData.type, // Race type code (T, H, G) for category display
       // Results data fields from race-results collection
       resultsAvailable: raceResultsData?.resultsAvailable || false,
-      resultsData: raceResultsData?.resultsData ? JSON.parse(raceResultsData.resultsData) : undefined,
-      dividendsData: raceResultsData?.dividendsData ? JSON.parse(raceResultsData.dividendsData) : undefined,
-      fixedOddsData: raceResultsData?.fixedOddsData ? JSON.parse(raceResultsData.fixedOddsData) : undefined,
+      resultsData: raceResultsData?.resultsData
+        ? JSON.parse(raceResultsData.resultsData)
+        : undefined,
+      dividendsData: raceResultsData?.dividendsData
+        ? JSON.parse(raceResultsData.dividendsData)
+        : undefined,
+      fixedOddsData: raceResultsData?.fixedOddsData
+        ? JSON.parse(raceResultsData.fixedOddsData)
+        : undefined,
       resultStatus: raceResultsData?.resultStatus,
       photoFinish: raceResultsData?.photoFinish || false,
       stewardsInquiry: raceResultsData?.stewardsInquiry || false,

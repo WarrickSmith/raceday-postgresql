@@ -121,7 +121,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const { raceData } = useRace()
 
   // Use real-time entrants data from unified subscription if available
-  const currentEntrants = realtimeEntrants || raceData?.entrants || initialEntrants
+  const currentEntrants =
+    realtimeEntrants || raceData?.entrants || initialEntrants
   const currentRaceId = raceData?.race.$id || raceId
   const currentRaceStartTime = raceData?.race.startTime || raceStartTime
   const currentRace = raceData?.race
@@ -182,7 +183,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   })
 
   // Local selection for Win/Place/Odds selector
-  const [selectedView, setSelectedView] = useState<'win' | 'place' | 'odds'>('win')
+  const [selectedView, setSelectedView] = useState<'win' | 'place' | 'odds'>(
+    'win'
+  )
 
   // Performance and memory optimization
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -193,16 +196,17 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   // Use entrants data directly (real-time updates come from unified subscription)
   const entrants = useMemo(() => {
     // Use current entrants which includes real-time updates from unified subscription
-    const finalEntrants = currentEntrants && currentEntrants.length > 0 
-      ? currentEntrants 
-      : initialEntrants
+    const finalEntrants =
+      currentEntrants && currentEntrants.length > 0
+        ? currentEntrants
+        : initialEntrants
 
     // Debug logging (can be simplified in production)
     if (process.env.NODE_ENV === 'development') {
       console.log('🔄 EnhancedEntrantsGrid entrants:', {
         entrantsCount: finalEntrants.length,
         hasRealtimeData: !!realtimeEntrants,
-        lastUpdateTime: lastUpdate?.toISOString()
+        lastUpdateTime: lastUpdate?.toISOString(),
       })
     }
 
@@ -587,14 +591,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     const shouldShowPostStartColumns =
       (raceStatus === 'Open' && raceHasStarted && actualPostStartMinutes > 0) ||
       raceIsCompleted // Always show for completed races to preserve review capability
-
-    console.log('🕐 Post-start column logic:', {
-      raceStatus,
-      timeToRaceMinutes,
-      raceHasStarted,
-      actualPostStartMinutes,
-      shouldShowPostStartColumns,
-    })
 
     if (shouldShowPostStartColumns) {
       const dynamicIntervals: number[] = []
@@ -1021,9 +1017,11 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       className={`enhanced-entrants-grid bg-white rounded-lg shadow-md flex-1 flex flex-col ${className}`}
       style={{ minHeight: 0 }}
     >
-
       {/* Enhanced Single-Table Grid Architecture with Perfect Row Alignment */}
-      <div className="flex-1 overflow-hidden bg-white border border-gray-200 rounded-lg flex flex-col" style={{ minHeight: 0 }}>
+      <div
+        className="flex-1 overflow-hidden bg-white border border-gray-200 rounded-lg flex flex-col"
+        style={{ minHeight: 0 }}
+      >
         {/* Consolidated Title Row */}
         <div className="flex items-center justify-between p-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
           {/* LEFT: Win/Place/Odds Selector + Last Update */}
@@ -1060,9 +1058,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                 Odds
               </button>
             </div>
-            
+
             <span className="text-xs text-gray-500">
-              Last update: {lastUpdate ? lastUpdate.toLocaleTimeString() : 'No updates yet'}
+              Last update:{' '}
+              {lastUpdate ? lastUpdate.toLocaleTimeString() : 'No updates yet'}
             </span>
           </div>
 
@@ -1075,11 +1074,15 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                   ? 'bg-blue-100 text-blue-700'
                   : 'bg-gray-200 text-gray-600'
               }`}
-              title={updateNotifications ? 'Disable audio notifications' : 'Enable audio notifications'}
+              title={
+                updateNotifications
+                  ? 'Disable audio notifications'
+                  : 'Enable audio notifications'
+              }
             >
               {updateNotifications ? '🔊' : '🔇'}
             </button>
-            
+
             <button
               onClick={() => setAutoScroll(!autoScroll)}
               className={`text-xs px-2 py-1 rounded transition-colors ${
