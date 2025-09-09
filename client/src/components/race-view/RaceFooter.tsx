@@ -113,7 +113,6 @@ export const RaceFooter = memo(function RaceFooter({
           <RaceResultsSection
             resultsData={currentResultsData}
             lastUpdate={lastResultsUpdate}
-            entrants={entrants}
           />
         </div>
 

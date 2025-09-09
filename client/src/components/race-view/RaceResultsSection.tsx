@@ -3,35 +3,46 @@
 import { memo } from 'react'
 import type { RaceResultsData } from '@/types/racePools'
 
+// Type for race result objects from various API formats
+interface RaceResult {
+  runner_number?: number
+  runnerNumber?: number
+  number?: number
+  no?: number
+  name?: string
+  runnerName?: string
+  horse_name?: string
+  horseName?: string
+  entrant_id?: string
+}
+
+// Type for fixed odds data entries
+interface FixedOddsEntry {
+  entrant_id: string
+  fixed_win?: number
+  fixed_place?: number
+}
+
 interface RaceResultsSectionProps {
   resultsData?: RaceResultsData
   className?: string
   lastUpdate?: Date | null
-  // Add entrants data to lookup actual odds for finishing runners
-  entrants?: Array<{
-    $id: string
-    runnerNumber: number
-    name: string
-    winOdds?: number
-    placeOdds?: number
-  }>
 }
 
 export const RaceResultsSection = memo(function RaceResultsSection({
   resultsData,
   className = '',
   lastUpdate,
-  entrants = [],
 }: RaceResultsSectionProps) {
   // Enhanced helper function to extract runner number from various API field formats
-  const getRunnerNumber = (result: any): number | undefined => {
+  const getRunnerNumber = (result: RaceResult): number | undefined => {
     return (
       result.runner_number || result.runnerNumber || result.number || result.no
     )
   }
 
   // Enhanced helper function to extract runner name from various API field formats
-  const getRunnerName = (result: any): string => {
+  const getRunnerName = (result: RaceResult): string => {
     return (
       result.name ||
       result.runnerName ||
@@ -64,7 +75,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
 
     // Find the fixed odds data by entrant ID
     const fixedOddsEntry = Object.values(resultsData.fixedOddsData).find(
-      (entry: any) => entry.entrant_id === entrantId
+      (entry: FixedOddsEntry) => entry.entrant_id === entrantId
     )
 
     if (!fixedOddsEntry) {
