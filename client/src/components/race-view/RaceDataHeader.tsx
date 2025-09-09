@@ -4,6 +4,7 @@ import { memo, useState, useEffect, useMemo } from 'react'
 import { useRace } from '@/contexts/RaceContext'
 import { formatDistance, formatRaceTime } from '@/utils/raceFormatters'
 import { RaceNavigation } from './RaceNavigation'
+import { getRaceTypeDisplay } from '@/constants/raceTypes'
 import type {
   Race,
   Entrant,
@@ -94,6 +95,20 @@ export const RaceDataHeader = memo(function RaceDataHeader({
     () => connectionHealth?.avgLatency || null,
     [connectionHealth]
   )
+  const formattedRaceType = useMemo(() => {
+    if (!meeting) return ''
+    
+    // Priority 1: Use category code for abbreviated display
+    if (meeting.category) {
+      const abbreviated = getRaceTypeDisplay(meeting.category)
+      if (abbreviated && abbreviated !== meeting.category) {
+        return abbreviated
+      }
+    }
+    
+    // Priority 2: Fallback to full race type (will be truncated by CSS)
+    return meeting.raceType || ''
+  }, [meeting])
 
   if (!race || !meeting) {
     return (
@@ -216,7 +231,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
         </div>
 
         {/* Row 3, Col 1: Meeting info */}
-        <div className="flex items-center gap-1 text-sm text-gray-700 flex-wrap">
+        <div className="flex items-center gap-1 text-sm text-gray-700 overflow-hidden">
           <span className="font-medium">{meeting.meetingName}</span>
           <span>•</span>
           <span>{meeting.country}</span>
@@ -224,8 +239,8 @@ export const RaceDataHeader = memo(function RaceDataHeader({
           <time dateTime={race.startTime} className="font-mono">
             {formattedTime}
           </time>
-          <span className="text-purple-800 font-medium">
-            {meeting.raceType}
+          <span className="text-purple-800 font-medium truncate max-w-24 whitespace-nowrap">
+            {formattedRaceType}
           </span>
         </div>
 
