@@ -137,6 +137,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     activePool: 'win', // Fixed to win pool as per Phase 1 requirements
   }
 
+  // Add update count tracking for grid component
+  const [updateCount, setUpdateCount] = useState(0)
+
   // Get money flow timeline data for all entrants
   const entrantIds = useMemo(
     () => currentEntrants.map((e) => e.$id),
@@ -188,10 +191,15 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   )
 
   // Performance and memory optimization
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _renderCount = useRenderTracking('EnhancedEntrantsGrid')
+  // Track renders for performance monitoring
+  const renderCount = useRenderTracking('EnhancedEntrantsGrid')
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _memory = useMemoryOptimization()
+
+  // Track entrants data updates
+  useEffect(() => {
+    setUpdateCount((prev) => prev + 1)
+  }, [currentEntrants])
 
   // Use entrants data directly (real-time updates come from unified subscription)
   const entrants = useMemo(() => {
@@ -1062,6 +1070,28 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
             <span className="text-xs text-gray-500">
               Last update:{' '}
               {lastUpdate ? lastUpdate.toLocaleTimeString() : 'No updates yet'}
+            </span>
+
+            {/* Renders and Updates tracking */}
+            <span className="text-xs text-gray-500 font-bold uppercase ml-4">
+              RENDERS
+            </span>
+            <span
+              className={`text-sm font-mono font-semibold ${
+                renderCount > 10
+                  ? 'text-red-600'
+                  : renderCount > 5
+                  ? 'text-orange-600'
+                  : 'text-purple-800'
+              }`}
+            >
+              {renderCount}
+            </span>
+            <span className="text-xs text-gray-500 font-bold uppercase ml-2">
+              UPDATES
+            </span>
+            <span className="text-sm font-mono font-semibold text-blue-600">
+              {updateCount}
             </span>
           </div>
 
