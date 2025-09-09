@@ -27,16 +27,52 @@ The daily data import is now handled by three sequential functions with 10-minut
 
 ## 2.2. Real-time Functions
 
-### race-data-poller (Dynamic Schedule)
+### enhanced-race-poller (HTTP-triggered, Master Coordination)
+- **Specification:** s-2vcpu-2gb
+- **Trigger:** HTTP requests with advanced polling logic
+- **Purpose:** Consolidated race polling with mathematical validation and data quality scoring
+- **Features:** 
+  - Enhanced data quality scoring and consistency checks
+  - Mathematical validation of pool sums and percentages
+  - Dual-phase polling: early morning baseline capture + high-frequency critical periods
+  - Server-heavy processing with pre-calculated incremental amounts
+- **Dynamic Intervals:**
+  - T-65m+: 5-minute intervals (baseline capture)
+  - T-30m to T-5m: 1-minute intervals
+  - T-5m to T-3m: 30-second intervals
+  - T-3m to Start: 15-second intervals
+  - Post-start: 15-second intervals until Final
+
+### master-race-scheduler (Scheduled, Autonomous Coordination)
+- **Specification:** s-1vcpu-512mb
+- **Schedule:** Every 1 minute (CRON minimum interval)
+- **Purpose:** Autonomous coordination of all race polling activities
+- **Processing:** Delegates high-frequency polling to enhanced-race-poller internal loops
+- **Coordination:** Manages polling schedules across multiple races simultaneously
+
+### race-data-poller (Dynamic Schedule, Legacy)
 - **Specification:** s-2vcpu-2gb
 - **Schedule:** Every minute during race hours
-- **Purpose:** Real-time updates for active races
+- **Purpose:** Real-time updates for active races (legacy function)
+- **Status:** Maintained for backward compatibility, enhanced-race-poller recommended
 - **Dynamic Intervals:**
   - T-60m to T-20m: 5-minute intervals
   - T-20m to T-10m: 2-minute intervals  
   - T-10m to T-5m: 1-minute intervals
   - T-5m to Start: 15-second intervals
   - Post-start: 5-minute intervals until Final
+
+### single-race-poller (HTTP-triggered, Legacy)
+- **Specification:** s-1vcpu-1gb
+- **Trigger:** HTTP requests with raceId parameter
+- **Purpose:** Individual race monitoring with detailed logging (legacy function)
+- **Status:** Maintained for specific use cases, enhanced-race-poller recommended
+
+### batch-race-poller (Scheduled, Legacy)
+- **Specification:** s-1vcpu-2gb
+- **Trigger:** Scheduled batch operations
+- **Purpose:** Multiple race processing for efficiency (legacy function)
+- **Status:** Maintained for batch scenarios, master-race-scheduler recommended
 
 ### alert-evaluator (Event-triggered)
 - **Specification:** s-1vcpu-512mb
