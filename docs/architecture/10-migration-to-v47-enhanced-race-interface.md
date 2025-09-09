@@ -1,6 +1,6 @@
-# 8. Migration to v4.7 Enhanced Race Interface
+# 10. Migration to v4.7 Enhanced Race Interface
 
-## 8.1. New Features & Components
+## 10.1. New Features & Components
 
 **Enhanced Database Schema:**
 - New `money-flow-history` collection for timeline visualization data
@@ -19,7 +19,7 @@
 - `RaceHeader` with navigation and contextual status
 - `RaceFooter` with pool totals and race results
 
-## 8.2. Data Migration Strategy
+## 10.2. Data Migration Strategy
 
 **Backward Compatibility:**
 - All existing collections and data preserved
@@ -32,7 +32,7 @@
 - Existing odds-history data can be converted to money flow format
 - Jockey silks data populated on-demand via enricher function
 
-## 8.3. Deployment Steps (v4.7)
+## 10.3. Deployment Steps (v4.7)
 
 1. **Database Schema Updates:**
    - Deploy new collections: `money-flow-history`, `race-pools`, `jockey-silks`

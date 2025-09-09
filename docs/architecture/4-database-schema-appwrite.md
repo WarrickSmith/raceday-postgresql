@@ -22,9 +22,12 @@ odds (float), eventTimestamp (datetime, indexed), type (string),
 entrant (relationship → entrants)
 
 -- money-flow-history: NEW - Time-series money flow data for timeline visualization
-winPoolAmount (float), placePoolAmount (float), totalPoolAmount (float),
-poolPercentage (float), incrementalAmount (float), pollingTimestamp (datetime, indexed),
-timeToStart (integer), pollingInterval (string), entrant (relationship → entrants)
+entrant (relationship → entrants), raceId (string, indexed), holdPercentage (float),
+betPercentage (float), type (string, indexed), timeToStart (integer), timeInterval (integer),
+intervalType (string), eventTimestamp (datetime, indexed), pollingTimestamp (datetime, indexed),
+winPoolAmount (integer), placePoolAmount (integer), winPoolPercentage (float),
+placePoolPercentage (float), incrementalAmount (integer), incrementalWinAmount (integer),
+incrementalPlaceAmount (integer), poolType (string), isConsolidated (boolean)
 
 -- race-pools: NEW - Race-level pool totals tracking
 winPoolTotal (float), placePoolTotal (float), quinellaPoolTotal (float),
@@ -49,7 +52,7 @@ type (string), read (boolean), raceId (string), entrantId (string)
 - **races:** idx_race_id (unique), idx_start_time, idx_status
 - **entrants:** idx_entrant_id (unique), idx_runner_number
 - **odds-history:** idx_timestamp, idx_entrant_timestamp (compound)
-- **money-flow-history:** idx_polling_timestamp, idx_entrant_polling (compound), idx_time_to_start
+- **money-flow-history:** idx_entrant, idx_race_id, idx_time_interval, idx_type, idx_entrant_race_type (compound), idx_race_time_interval (compound)
 - **race-pools:** idx_race_id (unique), idx_last_updated
 - **jockey-silks:** idx_silk_id (unique), idx_jockey_name
 - **user-alert-configs:** idx_user_id, idx_user_entrant (compound)

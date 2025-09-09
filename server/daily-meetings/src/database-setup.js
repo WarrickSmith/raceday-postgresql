@@ -695,7 +695,7 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
         { key: 'holdPercentage', type: 'float', required: false }, // Optional - used for hold_percentage data
         { key: 'betPercentage', type: 'float', required: false },  // Optional - used for bet_percentage data
         { key: 'eventTimestamp', type: 'datetime', required: true },
-        { key: 'type', type: 'string', size: 20, required: true }, // Enum: 'hold_percentage' or 'bet_percentage'
+        { key: 'type', type: 'string', size: 30, required: true }, // Enum: 'hold_percentage', 'bet_percentage', or 'bucketed_aggregation'
         
         // CRITICAL MISSING FIELD - Required for proper race filtering
         { key: 'raceId', type: 'string', size: 50, required: false }, // Race identifier for filtering
@@ -720,6 +720,13 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
         // MISSING POOL-SPECIFIC PERCENTAGE FIELDS - Required for proper timeline calculations
         { key: 'winPoolPercentage', type: 'float', required: false }, // Win-specific percentage (winPoolAmount / totalWinPool * 100)
         { key: 'placePoolPercentage', type: 'float', required: false }, // Place-specific percentage (placePoolAmount / totalPlacePool * 100)
+        
+        // PHASE 5 TASK A1 - Additional fields for enhanced data quality and monitoring
+        { key: 'totalPoolAmount', type: 'integer', required: false }, // Total pool for calculations
+        { key: 'dataQualityScore', type: 'integer', required: false }, // 0-100 data completeness
+        { key: 'mathematicallyConsistent', type: 'boolean', required: false }, // Pool sum validation
+        { key: 'pollingLatencyMs', type: 'integer', required: false }, // Performance monitoring
+        { key: 'isStale', type: 'boolean', required: false }, // Data freshness indicator
     ];
     // Create attributes in parallel for improved performance
     await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
@@ -794,6 +801,33 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
             }
             catch (error) {
                 context.error(`Failed to create idx_race_id index for money flow history: ${error}`);
+            }
+        }
+    }
+    
+    // PHASE 5 TASK A1 - Additional indexes for data quality and freshness filtering
+    if (!moneyFlowCollection.indexes.some((idx) => idx.key === 'idx_data_quality_score')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'dataQualityScore', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_data_quality_score', IndexType.Key, ['dataQualityScore']);
+                context.log('idx_data_quality_score index created successfully for money flow history');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_data_quality_score index for money flow history: ${error}`);
+            }
+        }
+    }
+    
+    if (!moneyFlowCollection.indexes.some((idx) => idx.key === 'idx_is_stale')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'isStale', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_is_stale', IndexType.Key, ['isStale']);
+                context.log('idx_is_stale index created successfully for money flow history');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_is_stale index for money flow history: ${error}`);
             }
         }
     }

@@ -1,16 +1,20 @@
-# 7. Performance Characteristics
+# 9. Performance Characteristics
 
-## 7.1. Function Performance Targets
+## 9.1. Function Performance Targets
 
 | Function | Max Duration | Max Memory | Success Rate |
 |----------|-------------|------------|--------------|
 | daily-meetings | 60s | 200MB | >99.5% |
 | daily-races | 90s | 300MB | >99.5% |
 | daily-entrants | 300s | 800MB | >99% |
-| race-data-poller | 120s | 1.5GB | >99.5% |
+| enhanced-race-poller | 120s | 1.5GB | >99.5% |
+| master-race-scheduler | 60s | 200MB | >99.9% |
+| race-data-poller (legacy) | 120s | 1.5GB | >99.5% |
+| single-race-poller (legacy) | 90s | 800MB | >99.5% |
+| batch-race-poller (legacy) | 180s | 1.5GB | >99% |
 | alert-evaluator | 30s | 100MB | >99.9% |
 
-## 7.2. Enhanced Frontend Performance Targets (v4.7)
+## 9.2. Enhanced Frontend Performance Targets (v4.7)
 
 **Core Performance Requirements:**
 - **Initial Load:** < 200ms for cached race data (SSR first paint)

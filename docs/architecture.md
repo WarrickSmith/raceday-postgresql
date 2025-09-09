@@ -49,16 +49,52 @@ The daily data import is now handled by three sequential functions with 10-minut
 
 ### 2.2. Real-time Functions
 
-#### race-data-poller (Dynamic Schedule)
+#### enhanced-race-poller (HTTP-triggered, Master Coordination)
+- **Specification:** s-2vcpu-2gb
+- **Trigger:** HTTP requests with advanced polling logic
+- **Purpose:** Consolidated race polling with mathematical validation and data quality scoring
+- **Features:** 
+  - Enhanced data quality scoring and consistency checks
+  - Mathematical validation of pool sums and percentages
+  - Dual-phase polling: early morning baseline capture + high-frequency critical periods
+  - Server-heavy processing with pre-calculated incremental amounts
+- **Dynamic Intervals:**
+  - T-65m+: 5-minute intervals (baseline capture)
+  - T-30m to T-5m: 1-minute intervals
+  - T-5m to T-3m: 30-second intervals
+  - T-3m to Start: 15-second intervals
+  - Post-start: 15-second intervals until Final
+
+#### master-race-scheduler (Scheduled, Autonomous Coordination)
+- **Specification:** s-1vcpu-512mb
+- **Schedule:** Every 1 minute (CRON minimum interval)
+- **Purpose:** Autonomous coordination of all race polling activities
+- **Processing:** Delegates high-frequency polling to enhanced-race-poller internal loops
+- **Coordination:** Manages polling schedules across multiple races simultaneously
+
+#### race-data-poller (Dynamic Schedule, Legacy)
 - **Specification:** s-2vcpu-2gb
 - **Schedule:** Every minute during race hours
-- **Purpose:** Real-time updates for active races
+- **Purpose:** Real-time updates for active races (legacy function)
+- **Status:** Maintained for backward compatibility, enhanced-race-poller recommended
 - **Dynamic Intervals:**
   - T-60m to T-20m: 5-minute intervals
   - T-20m to T-10m: 2-minute intervals  
   - T-10m to T-5m: 1-minute intervals
   - T-5m to Start: 15-second intervals
   - Post-start: 5-minute intervals until Final
+
+#### single-race-poller (HTTP-triggered, Legacy)
+- **Specification:** s-1vcpu-1gb
+- **Trigger:** HTTP requests with raceId parameter
+- **Purpose:** Individual race monitoring with detailed logging (legacy function)
+- **Status:** Maintained for specific use cases, enhanced-race-poller recommended
+
+#### batch-race-poller (Scheduled, Legacy)
+- **Specification:** s-1vcpu-2gb
+- **Trigger:** Scheduled batch operations
+- **Purpose:** Multiple race processing for efficiency (legacy function)
+- **Status:** Maintained for batch scenarios, master-race-scheduler recommended
 
 #### alert-evaluator (Event-triggered)
 - **Specification:** s-1vcpu-512mb
@@ -338,9 +374,12 @@ odds (float), eventTimestamp (datetime, indexed), type (string),
 entrant (relationship → entrants)
 
 -- money-flow-history: NEW - Time-series money flow data for timeline visualization
-winPoolAmount (float), placePoolAmount (float), totalPoolAmount (float),
-poolPercentage (float), incrementalAmount (float), pollingTimestamp (datetime, indexed),
-timeToStart (integer), pollingInterval (string), entrant (relationship → entrants)
+entrant (relationship → entrants), raceId (string, indexed), holdPercentage (float),
+betPercentage (float), type (string, indexed), timeToStart (integer), timeInterval (integer),
+intervalType (string), eventTimestamp (datetime, indexed), pollingTimestamp (datetime, indexed),
+winPoolAmount (integer), placePoolAmount (integer), winPoolPercentage (float),
+placePoolPercentage (float), incrementalAmount (integer), incrementalWinAmount (integer),
+incrementalPlaceAmount (integer), poolType (string), isConsolidated (boolean)
 
 -- race-pools: NEW - Race-level pool totals tracking
 winPoolTotal (float), placePoolTotal (float), quinellaPoolTotal (float),
@@ -365,7 +404,7 @@ type (string), read (boolean), raceId (string), entrantId (string)
 - **races:** idx_race_id (unique), idx_start_time, idx_status
 - **entrants:** idx_entrant_id (unique), idx_runner_number
 - **odds-history:** idx_timestamp, idx_entrant_timestamp (compound)
-- **money-flow-history:** idx_polling_timestamp, idx_entrant_polling (compound), idx_time_to_start
+- **money-flow-history:** idx_entrant, idx_race_id, idx_time_interval, idx_type, idx_entrant_race_type (compound), idx_race_time_interval (compound)
 - **race-pools:** idx_race_id (unique), idx_last_updated
 - **jockey-silks:** idx_silk_id (unique), idx_jockey_name
 - **user-alert-configs:** idx_user_id, idx_user_entrant (compound)
@@ -420,9 +459,144 @@ const raceData = await Promise.race([
 
 ---
 
-## 6. Deployment Architecture
+## 6. Tech Stack
 
-### 6.1. Function Specifications
+### 6.1. Frontend
+
+#### 6.1.1. Core Framework
+- **Framework:** Next.js 15+ with App Router
+- **Language:** TypeScript 5.0+
+- **Runtime:** Node.js 22.17.0+
+
+#### 6.1.2. Architecture Pattern
+- **Server Components:** Primary rendering strategy for data fetching and static content
+- **Client Components:** Used only for interactivity and real-time features
+- **Streaming:** React Suspense for progressive loading
+- **Caching:** Next.js 15 native caching with revalidation strategies
+
+#### 6.1.3. Performance Optimizations
+- **Bundle Splitting:** Automatic route-based + manual component splitting with `next/dynamic`
+- **Lazy Loading:** Progressive component loading with intersection observer
+- **Code Splitting:** Tree shaking and selective SDK imports
+- **Image Optimization:** Next.js Image component with priority loading
+- **Bundle Analysis:** `@next/bundle-analyzer` for size monitoring
+
+#### 6.1.4. UI and Styling
+- **CSS Framework:** Tailwind CSS 4.0+ (utility-first)
+- **Performance CSS:** Optimized class purging and critical CSS
+- **Responsive Design:** Mobile-first approach with container queries
+- **Accessibility:** WCAG 2.1 compliance with semantic HTML
+
+#### 6.1.5. State Management
+- **Server State:** Server Components with native fetch caching
+- **Client State:** React hooks with optimized re-rendering
+- **Real-time State:** Appwrite subscriptions with update batching
+- **Performance:** React.memo(), useMemo(), useCallback() optimizations
+
+#### 6.1.6. Data Fetching Strategy
+- **Initial Load:** Server Components with cached data fetching
+- **Real-time Updates:** Client Components with Appwrite subscriptions
+- **Caching:** 5-minute revalidation for stable data, instant for critical updates
+- **Error Handling:** Error boundaries with graceful degradation
+
+### 6.2. Backend Services
+
+#### 6.2.1. Primary Platform
+- **Platform:** Appwrite Cloud (latest version)
+- **Architecture:** Microservices with serverless functions
+- **Runtime:** Node.js 22.17.0+
+
+#### 6.2.2. Appwrite SDK Strategy
+- **Server SDK:** `node-appwrite` v17.0.0+ for Server Components and functions
+- **Client SDK:** `appwrite` web SDK v17.0.0+ for Client Components only
+- **Security:** API keys server-side only, session-based client authentication
+- **Performance:** Tree-shaken imports, selective service initialization
+
+#### 6.2.3. Functions Architecture
+- **Language:** JavaScript (ES2022+) for consistency
+- **Pattern:** Microservices with shared utilities
+- **Deployment:** Individual function deployment with CI/CD
+- **Monitoring:** Structured logging and error tracking
+
+### 6.3. Data Sources
+
+#### 6.3.1. External APIs
+- **Primary API:** New Zealand TAB API
+- **Rate Limiting:** Compliance with API quotas
+- **Caching:** Strategic caching to reduce API calls
+- **Error Handling:** Retry logic with exponential backoff
+
+#### 6.3.2. Database
+- **Primary:** Appwrite Database with collections
+- **Real-time:** Appwrite subscriptions for live updates
+- **Caching:** Query result caching with intelligent invalidation
+- **Performance:** Optimized indexing and relationship queries
+
+### 6.4. Performance Targets
+
+#### 6.4.1. Core Web Vitals
+- **Largest Contentful Paint (LCP):** <2.5 seconds
+- **First Input Delay (FID):** <100 milliseconds
+- **Cumulative Layout Shift (CLS):** <0.1
+- **First Contentful Paint (FCP):** <1.8 seconds
+
+#### 6.4.2. Application Metrics
+- **Initial Load Time:** <3 seconds for dashboard
+- **Real-time Latency:** <2 seconds for subscription updates
+- **Bundle Size:** <500KB for main dashboard page
+- **Lighthouse Score:** 90+ for performance
+
+#### 6.4.3. Monitoring and Analysis
+- **Web Vitals:** Real User Monitoring (RUM)
+- **Bundle Analysis:** Automated size tracking in CI/CD
+- **Performance CI:** Lighthouse CI in deployment pipeline
+- **Error Tracking:** Comprehensive error monitoring and alerting
+
+---
+
+## 7. Source Tree
+
+The project follows a standard Next.js `src` directory structure.
+
+```
+/
+|-- .env.local
+|-- .gitignore
+|-- next.config.js
+|-- package.json
+|-- README.md
+|-- tsconfig.json
+|-- public/
+|   |-- favicons/
+|-- src/
+|   |-- app/
+|   |   |-- (api)/               # API routes and server actions
+|   |   |-- (auth)/              # Auth pages (login, signup)
+|   |   |-- (main)/              # Core application layout and pages
+|   |   |   |-- layout.tsx
+|   |   |   |-- page.tsx         # Main dashboard
+|   |   |   |-- race/[id]/       # Detailed race view
+|   |-- components/
+|   |   |-- common/              # Reusable UI components (buttons, modals)
+|   |   |-- layout/              # Layout components (header, sidebar)
+|   |   |-- dashboard/           # Dashboard-specific components
+|   |   |-- race-view/           # Race view-specific components
+|   |-- lib/
+|   |   |-- appwrite.ts          # Appwrite client configuration
+|   |   |-- utils.ts             # Utility functions
+|   |-- hooks/                   # Custom React hooks
+|   |-- services/                # Backend service interactions
+|   |-- styles/
+|   |   |-- globals.css
+|-- scripts/
+    |-- appwrite-setup.ts      # Appwrite project setup script
+```
+
+---
+
+## 8. Deployment Architecture
+
+### 8.1. Function Specifications
 
 ```json
 {
@@ -446,9 +620,33 @@ const raceData = await Promise.race([
       "timeout": 300
     },
     {
+      "$id": "enhanced-race-poller",
+      "specification": "s-2vcpu-2gb",
+      "events": ["http"],
+      "timeout": 300
+    },
+    {
+      "$id": "master-race-scheduler",
+      "specification": "s-1vcpu-512mb",
+      "schedule": "*/1 * * * *",
+      "timeout": 180
+    },
+    {
       "$id": "race-data-poller",
       "specification": "s-2vcpu-2gb",
       "schedule": "*/1 * * * *",
+      "timeout": 300
+    },
+    {
+      "$id": "single-race-poller",
+      "specification": "s-1vcpu-1gb",
+      "events": ["http"],
+      "timeout": 300
+    },
+    {
+      "$id": "batch-race-poller",
+      "specification": "s-1vcpu-2gb",
+      "events": ["schedule"],
       "timeout": 300
     },
     {
@@ -461,7 +659,7 @@ const raceData = await Promise.race([
 }
 ```
 
-### 6.2. Deployment Pipeline
+### 8.2. Deployment Pipeline
 
 - **Frontend:** Vercel deployment with automatic builds on main branch
 - **Backend:** Individual function deployment via Appwrite CLI
@@ -470,19 +668,23 @@ const raceData = await Promise.race([
 
 ---
 
-## 7. Performance Characteristics
+## 9. Performance Characteristics
 
-### 7.1. Function Performance Targets
+### 9.1. Function Performance Targets
 
 | Function | Max Duration | Max Memory | Success Rate |
 |----------|-------------|------------|--------------|
 | daily-meetings | 60s | 200MB | >99.5% |
 | daily-races | 90s | 300MB | >99.5% |
 | daily-entrants | 300s | 800MB | >99% |
-| race-data-poller | 120s | 1.5GB | >99.5% |
+| enhanced-race-poller | 120s | 1.5GB | >99.5% |
+| master-race-scheduler | 60s | 200MB | >99.9% |
+| race-data-poller (legacy) | 120s | 1.5GB | >99.5% |
+| single-race-poller (legacy) | 90s | 800MB | >99.5% |
+| batch-race-poller (legacy) | 180s | 1.5GB | >99% |
 | alert-evaluator | 30s | 100MB | >99.9% |
 
-### 7.2. Enhanced Frontend Performance Targets (v4.7)
+### 9.2. Enhanced Frontend Performance Targets (v4.7)
 
 **Core Performance Requirements:**
 - **Initial Load:** < 200ms for cached race data (SSR first paint)
@@ -504,9 +706,9 @@ const raceData = await Promise.race([
 
 ---
 
-## 8. Migration to v4.7 Enhanced Race Interface
+## 10. Migration to v4.7 Enhanced Race Interface
 
-### 8.1. New Features & Components
+### 10.1. New Features & Components
 
 **Enhanced Database Schema:**
 - New `money-flow-history` collection for timeline visualization data
@@ -525,7 +727,7 @@ const raceData = await Promise.race([
 - `RaceHeader` with navigation and contextual status
 - `RaceFooter` with pool totals and race results
 
-### 8.2. Data Migration Strategy
+### 10.2. Data Migration Strategy
 
 **Backward Compatibility:**
 - All existing collections and data preserved
@@ -538,7 +740,7 @@ const raceData = await Promise.race([
 - Existing odds-history data can be converted to money flow format
 - Jockey silks data populated on-demand via enricher function
 
-### 8.3. Deployment Steps (v4.7)
+### 10.3. Deployment Steps (v4.7)
 
 1. **Database Schema Updates:**
    - Deploy new collections: `money-flow-history`, `race-pools`, `jockey-silks`
@@ -565,16 +767,16 @@ const raceData = await Promise.race([
 
 ---
 
-## 9. Success Metrics
+## 11. Success Metrics
 
-### 9.1. Technical Metrics
+### 11.1. Technical Metrics
 
 - **Zero hanging functions:** All functions complete within timeout limits
 - **Pipeline reliability:** >99% daily pipeline success rate
 - **Data completeness:** >95% of races have complete entrant data
 - **Real-time latency:** <2s from backend update to frontend display
 
-### 9.2. Enhanced Business Metrics (v4.7)
+### 11.2. Enhanced Business Metrics (v4.7)
 
 **User Experience Metrics:**
 - **Race page load:** <200ms initial paint for enhanced grid interface
@@ -596,34 +798,58 @@ const raceData = await Promise.race([
 
 ---
 
-## 10. Client Integration
+## 12. Client Integration
 
-### 10.1. Real-Time Data Architecture
+### 12.1. Enhanced Real-Time Data Architecture
 
-The RaceDay client application leverages Appwrite's real-time subscriptions to provide live betting market visualization with comprehensive historical trend analysis.
+The RaceDay client application leverages Appwrite's real-time subscriptions to provide live betting market visualization with comprehensive historical trend analysis and money flow timeline tracking.
 
 **Key Integration Features:**
-- **Real-time subscriptions** to `entrants` collection for live odds updates
-- **Historical data queries** to `odds-history` collection for trend charts
-- **Sub-second latency** for market movements and status changes
-- **Seamless race switching** with preserved historical context
+- **Unified real-time subscriptions** to `entrants` collection with intelligent filtering
+- **Enhanced historical data queries** to `odds-history` and `money-flow-history` collections
+- **Race status-based subscription management** with automatic lifecycle control
+- **Server-heavy architecture** with pre-calculated incremental amounts
+- **Sub-second latency** for market movements and money flow changes
+- **Seamless race switching** with preserved historical context and cached data
 
-### 10.2. Implementation Guide
+**Enhanced Subscription Patterns:**
+- **Race Status Awareness:** Disable subscriptions for completed races to preserve final state
+- **Debounced Updates:** 500ms delays to handle rapid data changes without UI thrashing
+- **Unified Channels:** Single subscription with intelligent entrant filtering
+- **Error Handling:** Comprehensive try/catch blocks with graceful degradation
+- **Performance Optimization:** Client-side caching with race completion awareness
+
+### 12.2. Money Flow Timeline Integration
+
+**Real-Time Money Flow Data:**
+- **Live timeline updates** via `money-flow-history` collection subscriptions
+- **Pre-calculated incremental amounts** from server-side processing
+- **Timeline column generation** with fixed pre-start and dynamic post-start intervals
+- **Value flash animations** for changed amounts using `useValueFlash` hook
+
+**Enhanced React Hooks:**
+- `useMoneyFlowTimeline` - Unified money flow data with real-time subscriptions
+- `useValueFlash` - Value change animation handling
+- `useRaceSubscription` - Race status-aware subscription management
+- `useUnifiedRaceSubscription` - Single subscription with intelligent filtering
+
+### 12.3. Implementation Guide
 
 For detailed client integration patterns, data access strategies, and React implementation examples, see:
 
 📖 **[Client Real-Time Data Integration Guide](./client-real-time-data-integration.md)**
 
 This guide provides:
-- Complete subscription patterns for live data
-- Historical data querying strategies
-- React hooks and component examples
-- Performance optimization techniques
-- Trend calculation utilities
+- Enhanced subscription patterns with race status awareness
+- Historical data querying strategies for odds and money flow
+- React hooks and component examples with debounced updates
+- Performance optimization techniques and server-heavy architecture
+- Trend calculation utilities and mathematical validation
+- Error handling patterns with comprehensive fallback mechanisms
 
 ---
 
-## 11. Conclusion
+## 13. Conclusion
 
 The RaceDay v4.7 enhanced race interface architecture builds upon the proven v2.0 microservices foundation to deliver professional-grade betting terminal capabilities with comprehensive money flow visualization. The new architecture introduces sophisticated time-series data tracking, high-performance grid rendering, and desktop-optimized data density while maintaining the system's reliability and real-time responsiveness.
 
@@ -637,3 +863,235 @@ The RaceDay v4.7 enhanced race interface architecture builds upon the proven v2.
 The enhanced architecture delivers Bloomberg Terminal-style information density and real-time capabilities while maintaining the robust microservices foundation. This design is production-ready and optimized for immediate deployment with progressive enhancement strategy to minimize risk.
 
 **Next Phase:** Document sharding recommended for specialized team focus areas - frontend components, backend functions, and database optimization can now be developed independently while maintaining architectural coherence.
+
+---
+
+## 14. Money Flow Timeline System Architecture
+
+### 14.1. System Overview
+
+The Money Flow Timeline system provides comprehensive tracking and visualization of betting pool changes over time for each race entrant. This system follows a **server-heavy, client-light** architecture where server functions perform data acquisition, calculation, and storage, while client components focus on presentation and real-time subscriptions.
+
+**Core Architecture Principles:**
+- **NZTAB API Integration:** Direct polling of betting pool data with `with_money_tracker=true` and `with_tote_trends_data=true` parameters
+- **Mathematical Validation:** Server-side validation of pool sums and percentage consistency
+- **Timeline Calculation:** Pre-calculated incremental amounts stored in database for optimal client performance
+- **Real-Time Updates:** Live streaming of money flow changes to connected clients
+
+### 14.2. NZTAB API Data Acquisition
+
+**Primary Endpoint:** `/affiliates/v1/racing/events/{raceId}`
+**Required Parameters:**
+- `with_money_tracker=true` - Enables entrant liability tracking with `hold_percentage` and `bet_percentage`
+- `with_tote_trends_data=true` - Provides pool totals and trend information
+- `will_pays=true` - Additional pool information for validation
+
+**Expected Data Structures:**
+```javascript
+"money_tracker": {
+  "entrants": [
+    {
+      "entrant_id": "uuid-string",
+      "hold_percentage": 4.5,    // General percentage across all pool types
+      "bet_percentage": 7.2      // General percentage across all pool types
+    }
+  ]
+},
+"tote_pools": [
+  {
+    "product_type": "Win",     // Pool type: Win, Place, Quinella, etc.
+    "total": 45320.50,        // Total pool amount in dollars
+    "status": "OPEN"          // Pool status
+  }
+],
+"entrants": [
+  {
+    "entrant_id": "uuid-string",
+    "win_pool_amount": 2341.50,    // Dollars bet on this entrant to Win
+    "place_pool_amount": 1456.25   // Dollars bet on this entrant to Place
+  }
+]
+```
+
+### 14.3. Enhanced Server Processing
+
+**Self-Contained Function Architecture:**
+- `enhanced-race-poller` - Consolidated polling with mathematical validation and data quality scoring
+- `master-race-scheduler` - Autonomous coordination with 1-minute CRON intervals
+- `race-data-poller` (legacy) - Maintained for backward compatibility
+- `single-race-poller` (legacy) - Individual race monitoring
+- `batch-race-poller` (legacy) - Multiple race processing
+
+**Dynamic Polling Strategy:**
+```javascript
+// Enhanced polling intervals based on race timing
+if (timeToStart > 65) intervalType = '5m'    // Baseline capture
+else if (timeToStart > 30) intervalType = '5m' // Early period  
+else if (timeToStart > 5) intervalType = '1m'  // Pre-race buildup
+else if (timeToStart > 3) intervalType = '30s' // Critical period
+else if (timeToStart > 0) intervalType = '15s' // Final countdown
+else intervalType = '15s' // Live updates until Final
+```
+
+### 14.4. Timeline Calculation Logic
+
+**Fixed Timeline Intervals:** 60m, 55m, 50m, 45m, 40m, 35m, 30m, 25m, 20m, 15m, 10m, 5m, 4m, 3m, 2m, 1m, 0, -0.5m, -1m, -1.5m, -2m, etc.
+
+**Baseline Calculation (60m Column):**
+```javascript
+// Establish absolute pool amounts at 60m mark
+winPoolAmount = entrantData.win_pool_amount * 100 // Convert to cents
+placePoolAmount = entrantData.place_pool_amount * 100 // Convert to cents
+
+// Alternative calculation from total pools if needed
+winPoolAmount = totalWinPool * (holdPercentage / 100) * 100
+placePoolAmount = totalPlacePool * (holdPercentage / 100) * 100
+```
+
+**Incremental Calculation:**
+```javascript
+// Core formula for money flow changes
+incrementalWinAmount = currentWinAmount - (previousDoc.winPoolAmount || 0)
+incrementalPlaceAmount = currentPlaceAmount - (previousDoc.placePoolAmount || 0)
+
+// Fallback policy for missing previous buckets
+if (isFirstBucket) {
+  incrementalWinAmount = winPoolAmount
+  incrementalPlaceAmount = placePoolAmount
+} else if (!previousBucket) {
+  incrementalWinAmount = 0 // Explicit zero for display as '—'
+  incrementalPlaceAmount = 0
+}
+```
+
+### 14.5. Database Storage Strategy
+
+**Document Type: bucketed_aggregation**
+```javascript
+{
+  entrant: "entrant-uuid",           // Relationship to entrants collection
+  raceId: "race-uuid",              // Race identifier
+  type: "bucketed_aggregation",     // Pre-calculated timeline data
+  timeInterval: 45,                 // Timeline bucket (60, 55, 50...)
+  intervalType: "1m",               // Polling frequency indicator
+  winPoolAmount: 123450,            // Absolute Win amount in cents
+  placePoolAmount: 67890,           // Absolute Place amount in cents
+  winPoolPercentage: 6.2,           // Win-specific percentage
+  placePoolPercentage: 4.8,         // Place-specific percentage
+  incrementalWinAmount: 5670,       // Win pool increment in cents
+  incrementalPlaceAmount: 2340,     // Place pool increment in cents
+  pollingTimestamp: "2025-08-28...", // When data was collected
+  eventTimestamp: "2025-08-28...",   // When event occurred
+  poolType: "combined",             // Contains both Win and Place data
+  isConsolidated: false             // Processing status
+}
+```
+
+### 14.6. Client-Side Implementation
+
+**React Hook: useMoneyFlowTimeline**
+- Dual-path data fetching: bucketed aggregation with legacy fallback
+- Race status-based subscription management
+- Extended timeline range: -65 to +66 intervals
+- Unified real-time subscriptions with intelligent filtering
+
+**Timeline Grid Component Architecture:**
+- Fixed left columns: Runner, Win Odds, Place Odds (sticky)
+- Scrollable center: Timeline columns with horizontal scrolling
+- Fixed right columns: Pool Total, Pool % (sticky)
+- Value flash animations for changed amounts
+
+**Display Logic:**
+```typescript
+interface MoneyFlowDataPoint {
+  timeInterval: number // Timeline bucket (60, 55, 50...)
+  incrementalWinAmount: number // Server pre-calculated Win increment
+  incrementalPlaceAmount: number // Server pre-calculated Place increment
+  winPoolAmount?: number // Win pool amount in cents
+  placePoolAmount?: number // Place pool amount in cents
+  timestamp: string // When data was recorded
+}
+```
+
+### 14.7. Mathematical Validation & Quality Assurance
+
+**Pool Sum Validation:**
+```javascript
+// Win pool validation
+const totalWinIncrement = entrantIncrements.reduce(
+  (sum, entrant) => sum + entrant.incrementalWinAmount, 0
+)
+const winPoolGrowth = currentWinPoolTotal - previousWinPoolTotal
+const isWinConsistent = Math.abs(totalWinIncrement - winPoolGrowth) < 0.01
+
+// Place pool validation
+const totalPlaceIncrement = entrantIncrements.reduce(
+  (sum, entrant) => sum + entrant.incrementalPlaceAmount, 0
+)
+const placePoolGrowth = currentPlacePoolTotal - previousPlacePoolTotal
+const isPlaceConsistent = Math.abs(totalPlaceIncrement - placePoolGrowth) < 0.01
+```
+
+**Data Quality Scoring:**
+- Automatic consistency checks for pool percentage sums (~100%)
+- Mathematical validation of incremental amounts
+- Logging of negative increments for investigation
+- Data integrity scoring (0-100) for enhanced functions
+
+### 14.8. Development & Testing Tools
+
+**Enhanced NPM Scripts:**
+```bash
+# Deployment commands
+npm run deploy:enhanced-race-poller  # Deploy enhanced function (recommended)
+npm run deploy:master-scheduler      # Deploy master coordination
+npm run deploy:poller               # Deploy legacy poller
+npm run deploy:single-race          # Deploy single race poller
+npm run deploy:batch-race-poller    # Deploy batch poller
+
+# Local testing commands
+npm run enhanced-race-poller        # Test enhanced function locally
+npm run master-scheduler            # Test coordination locally
+npm run poller                     # Test legacy poller locally
+```
+
+**Validation Checklist:**
+- Verify entrant incremental amounts sum to total pool growth
+- Confirm stable pools produce zero incremental amounts
+- Check client displays '—' for zero increments and '+$N' for positive
+- Log negative increments for investigation
+- Validate mathematical consistency across all polling intervals
+
+### 14.9. Race Status Handling
+
+**Status-Based Processing:**
+- **Open:** Active polling at determined intervals with full data collection
+- **Closed:** Continues polling for delayed starts, maintains timeline integrity
+- **Interim:** Captures in-race money movements until Final status
+- **Final:** Stops polling, preserves complete historical record
+- **Abandoned:** Smart handling based on existing data, preserves partial timeline
+
+**Client Subscription Management:**
+- Active races: Live real-time subscriptions enabled
+- Completed races: Subscriptions disabled to preserve final state
+- Navigation persistence: Full timeline data available when returning to race
+- Historical review: Complete money flow history maintained for analysis
+
+### 14.10. Performance Characteristics
+
+**System Performance Targets:**
+- **API Response Time:** <500ms for single race data
+- **Database Write Time:** <100ms per document  
+- **Client Data Loading:** <2 seconds for full timeline
+- **Real-time Update Latency:** <1 second from server to client
+- **Mathematical Consistency Rate:** >98%
+- **Document Creation Success Rate:** >95%
+
+**Key Monitoring Metrics:**
+- No documents created for active race in 10+ minutes (alert)
+- Hold percentage sum deviates >5% from 100% (alert)
+- Client timeline shows >50% empty cells for active race (alert)
+- API call success rate >99%
+- Client subscription connection rate >95%
+
+This Money Flow Timeline system provides comprehensive real-time betting market intelligence with mathematical validation, ensuring accurate and timely visualization of money flow patterns for professional race analysis and monitoring.

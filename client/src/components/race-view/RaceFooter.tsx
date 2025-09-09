@@ -6,9 +6,7 @@ import type {
   RaceResultsData,
   RaceStatus,
 } from '@/types/racePools'
-import { useRace } from '@/contexts/RaceContext'
-import { useRealtimeRace } from '@/hooks/useRealtimeRace'
-import { useRacePoolData } from '@/hooks/useRacePoolData'
+import type { Race } from '@/types/meetings'
 import { screenReader } from '@/utils/accessibility'
 import { STATUS_CONFIG, getStatusConfig } from '@/utils/raceStatusConfig'
 import { RaceTimingSection } from '@/components/race-view/RaceTimingSection'
@@ -30,9 +28,25 @@ interface RaceFooterProps {
   raceStatus: RaceStatus
   poolData?: RacePoolData
   resultsData?: RaceResultsData
+  entrants?: Array<{
+    $id: string
+    runnerNumber: number
+    name: string
+    winOdds?: number
+    placeOdds?: number
+  }>
   className?: string
   showCountdown?: boolean
   showResults?: boolean
+  lastPoolUpdate?: Date | null
+  lastResultsUpdate?: Date | null
+  connectionHealth?: {
+    isHealthy: boolean
+    avgLatency: number | null
+    uptime: number
+  }
+  // Real-time race data from unified subscription
+  race?: Race | null
 }
 
 export const RaceFooter = memo(function RaceFooter({
@@ -41,77 +55,28 @@ export const RaceFooter = memo(function RaceFooter({
   raceStatus,
   poolData,
   resultsData,
+  entrants = [],
   className = '',
   showCountdown = true,
   showResults = true,
+  lastPoolUpdate,
+  lastResultsUpdate,
+  race = null,
 }: RaceFooterProps) {
-  const { raceData } = useRace()
-
-  // Use the same approach as RaceDataHeader - useRealtimeRace with proper fallback
-  const { race: liveRace } = useRealtimeRace({
-    initialRace: raceData?.race || {
-      $id: raceId || 'fallback',
-      raceId: raceId || 'fallback',
-      startTime: raceStartTime,
-      status: raceStatus,
-      name: '',
-      raceNumber: 0,
-      meeting: '',
-      distance: undefined,
-      trackCondition: undefined,
-      $createdAt: '',
-      $updatedAt: '',
-    },
-  })
-
-  // Get real-time pool data for synchronization with header and entrants
-  const {
-    poolData: livePoolData,
-    isLoading: poolLoading,
-    error: poolError,
-  } = useRacePoolData(liveRace?.raceId || raceId)
-
-  // Use live race data (same as header)
-  const currentRaceStartTime = liveRace?.startTime || raceStartTime
-
-  // Use live race status with proper type validation (case-insensitive)
-  const validStatuses: RaceStatus[] = [
-    'open',
-    'closed',
-    'interim',
-    'final',
-    'abandoned',
-    'postponed',
-  ]
-  const liveRaceStatus = liveRace?.status
-  const currentRaceStatus: RaceStatus =
-    liveRaceStatus &&
-    validStatuses.includes(liveRaceStatus.toLowerCase() as RaceStatus)
-      ? (liveRaceStatus.toLowerCase() as RaceStatus)
-      : raceStatus
-
-  // Use live pool data with fallback to prop for compatibility
-  const currentPoolData = livePoolData || poolData
-
-  // Build results data from live race data if available
-  const currentResultsData: RaceResultsData | undefined = 
-    liveRace?.resultsData && liveRace?.dividendsData ? {
-      raceId,
-      results: liveRace.resultsData,
-      dividends: liveRace.dividendsData,
-      status: liveRace.resultStatus || 'final',
-      photoFinish: liveRace.photoFinish || false,
-      stewardsInquiry: liveRace.stewardsInquiry || false,
-      protestLodged: liveRace.protestLodged || false,
-      resultTime: liveRace.resultTime || new Date().toISOString()
-    } : resultsData
-
-  // Get fixed odds data from live race if available
-  const currentFixedOddsData = liveRace?.fixedOddsData || undefined
+  // Use real-time data from props (from unified subscription) with context fallbacks
+  const currentRaceStartTime = race?.startTime || raceStartTime
+  const currentRaceStatus =
+    (race?.status?.toLowerCase() as RaceStatus) || raceStatus
+  const currentPoolData = poolData
+  const currentResultsData = resultsData
 
   // Announce results availability when they become available
   useEffect(() => {
-    if (currentResultsData && currentResultsData.results.length > 0 && showResults) {
+    if (
+      currentResultsData &&
+      currentResultsData.results.length > 0 &&
+      showResults
+    ) {
       // Announce results availability
       screenReader?.announce(
         `Race results are now available with ${currentResultsData.results.length} positions`,
@@ -130,24 +95,34 @@ export const RaceFooter = memo(function RaceFooter({
 
   return (
     <div
-      className={`race-footer bg-white border-2 border-gray-300 shadow-lg rounded-lg ${className}`}
+      className={`race-footer bg-white border-2 border-gray-300 shadow-lg rounded-lg h-40 ${className}`}
     >
       {/* Enhanced Three-Column Footer Layout: Pools | Results | Timing/Status */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-        {/* Column 1-2: Separate Pools and Results sections restored */}
-        <div className="flex flex-col justify-center col-span-2">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-            <RacePoolsSection raceId={raceId} poolData={currentPoolData} />
-            <RaceResultsSection resultsData={currentResultsData} fixedOddsData={currentFixedOddsData} />
-          </div>
+      <div className="flex h-full p-4">
+        {/* Column 1: Pools Section */}
+        <div className="w-96 flex-shrink-0 pr-4">
+          <RacePoolsSection
+            raceId={raceId}
+            poolData={currentPoolData}
+            lastUpdate={lastPoolUpdate}
+          />
+        </div>
+
+        {/* Column 2: Results Section */}
+        <div className="w-96 flex-shrink-0 pr-4">
+          <RaceResultsSection
+            resultsData={currentResultsData}
+            lastUpdate={lastResultsUpdate}
+          />
         </div>
 
         {/* Column 3: Timing/Status Section (Right) */}
-        <div className="flex flex-col justify-center items-end">
+        <div className="flex-grow flex items-center justify-end">
           <RaceTimingSection
             raceStartTime={currentRaceStartTime}
             raceStatus={currentRaceStatus}
             showCountdown={showCountdown}
+            race={race}
           />
         </div>
       </div>

@@ -93,25 +93,33 @@ The system follows a **server-heavy, client-light** architecture where:
 
 ### Self-Contained Function Architecture
 
-Three independent Appwrite functions handle different polling scenarios:
+Four independent Appwrite functions handle different polling scenarios:
 
-#### 2.1 race-data-poller
+#### 2.1 enhanced-race-poller
 
-- **Purpose**: Individual race polling on-demand
+- **Purpose**: Consolidated and improved race polling with mathematical validation
+- **Features**: Enhanced data quality scoring, mathematical consistency checks, dual-phase polling
+- **Trigger**: HTTP requests with advanced polling logic
+- **Deployment**: `npm run deploy:enhanced-race-poller`
+- **Testing**: `npm run enhanced-race-poller`
+
+#### 2.2 race-data-poller
+
+- **Purpose**: Individual race polling on-demand (legacy function)
 - **Trigger**: HTTP requests with raceId parameter
 - **Deployment**: `npm run deploy:poller`
 - **Testing**: `npm run poller`
 
-#### 2.2 single-race-poller
+#### 2.3 single-race-poller
 
-- **Purpose**: Single race monitoring with detailed logging
+- **Purpose**: Single race monitoring with detailed logging (legacy function)
 - **Trigger**: HTTP requests or scheduled events
 - **Deployment**: `npm run deploy:single-race`
 - **Testing**: `npm run single-race`
 
-#### 2.3 batch-race-poller
+#### 2.4 batch-race-poller
 
-- **Purpose**: Multiple race processing for efficiency
+- **Purpose**: Multiple race processing for efficiency (legacy function)
 - **Trigger**: Scheduled batch operations
 - **Deployment**: `npm run deploy:batch-race-poller`
 - **Testing**: `npm run batch-race-poller`
@@ -130,23 +138,43 @@ Three independent Appwrite functions handle different polling scenarios:
 import { ID, Query } from 'node-appwrite'
 ```
 
-### Polling Strategy
+### Enhanced Polling Strategy
 
-#### Interval Timing Based on Race Start
+#### Master Scheduler Coordination
 
+- **Master scheduler** runs every 1 minute (CRON minimum interval)
+- **High-frequency polling** delegated to enhanced-race-poller internal loops
+- **Autonomous coordination** for all race polling activities
+
+#### Dynamic Interval Timing Based on Race Start
+
+**Updated Strategy**:
 ```javascript
-if (timeToStart > 30) intervalType = '5m' // 5-minute intervals
-else if (timeToStart > 5) intervalType = '1m' // 1-minute intervals
-else if (timeToStart > 0) intervalType = '30s' // 30-second intervals
-else intervalType = 'live' // Live updates
+// Pre-race polling intervals
+if (timeToStart > 65) intervalType = '5m'    // 5-minute intervals (early baseline)
+else if (timeToStart > 30) intervalType = '5m' // 5-minute intervals  
+else if (timeToStart > 5) intervalType = '1m'  // 1-minute intervals
+else if (timeToStart > 3) intervalType = '30s' // 30-second intervals (-5m to -3m)
+else if (timeToStart > 0) intervalType = '15s' // 15-second intervals (-3m to start)
+else intervalType = '15s' // Live updates (post-start until Final)
+
+// Post-race polling
+// After Interim status: 30s polling until Final, then stop
 ```
+
+#### Dual-Phase Polling
+
+- **Early Morning Phase**: Captures 65m+ baseline data for enhanced calculations
+- **High-Frequency Phase**: 15-second polling during critical pre-start and live periods
 
 ### Expected Processing Results
 
 - **API calls**: 1 per race per polling interval
 - **Document creation**: 3-10 documents per poll (entrants × types)
 - **Processing time**: <2 seconds per race
-- **Error handling**: Graceful degradation with logging
+- **Error handling**: Enhanced graceful degradation with mathematical validation
+- **Data quality scoring**: Automated validation with consistency scores (0-100)
+- **Mathematical validation**: Automatic pool sum validation and entrant percentage checks
 
 ---
 
@@ -354,31 +382,53 @@ Client contract for incremental fields and display:
 
 ## 5. Client-Side Presentation Layer
 
+> **Related Documentation**: For foundational client-side real-time integration patterns, Appwrite setup, and general React hooks, see [Client Real-Time Data Integration Guide](./client-real-time-data-integration.md).
+
 ### 5.1 React Hook: useMoneyFlowTimeline
 
-**Purpose**: Fetch and subscribe to money flow data
+**Purpose**: Fetch and subscribe to money flow data with unified real-time subscriptions
 **Location**: `/client/src/hooks/useMoneyFlowTimeline.ts`
 
 #### API Endpoint
 
 `/api/race/[id]/money-flow-timeline?entrants=comma,separated,ids`
 
+#### Enhanced Data Handling
+
+**Dual-Path Data Fetching**:
+- **Primary**: Bucketed aggregation data with pre-calculated incremental amounts
+- **Fallback**: Legacy timeToStart data for backward compatibility
+- **Extended Range**: -65 to +66 intervals for comprehensive timeline coverage
+
 #### Data Transformation
 
 ```typescript
 interface EntrantMoneyFlowTimeline {
   entrantId: string
-  dataPoints: Map<number, MoneyFlowDataPoint> // timeInterval -> data
+  dataPoints: Array<MoneyFlowDataPoint> // Chronologically sorted data points
+  latestPercentage: number
+  trend: 'up' | 'down' | 'neutral'
+  significantChange: boolean
 }
 
 interface MoneyFlowDataPoint {
   timeInterval: number // Timeline bucket (60, 55, 50...)
-  incrementalAmount: number // Amount added in this interval
-  poolType: 'win' | 'place' // Pool classification
+  incrementalAmount: number // Server pre-calculated amount
+  incrementalWinAmount: number // Server pre-calculated Win pool increment
+  incrementalPlaceAmount: number // Server pre-calculated Place pool increment
+  poolType: 'win' | 'place' | 'combined' // Pool classification
   timestamp: string // When data was recorded
   poolAmount?: number // Optional absolute pool amount
+  winPoolAmount?: number // Win pool amount in cents
+  placePoolAmount?: number // Place pool amount in cents
 }
 ```
+
+#### Race Status-Based Subscription Management
+
+- **Active Races**: Live real-time subscriptions enabled
+- **Completed Races**: Subscriptions disabled to preserve final state
+- **Debounced Updates**: 500ms delay to handle rapid data changes
 
 ### 5.2 Timeline Grid Component
 
@@ -407,9 +457,17 @@ const timelineColumns = [...preStartColumns, ...postStartColumns]
 
 ### 5.3 Real-time Updates
 
-**Subscription Strategy**: Appwrite real-time subscriptions to money-flow-history collection
-**Update Frequency**: Live updates as server functions create new documents
-**UI Responsiveness**: Value flash animations for changed amounts
+**Enhanced Subscription Strategy**: 
+- **Channel Format**: `databases.raceday-db.collections.money-flow-history.documents`
+- **Unified Subscription**: Single subscription channel for all money flow updates
+- **Entrant Filtering**: Real-time filtering to only process relevant entrant updates
+- **Update Frequency**: Live updates as server functions create new documents
+- **UI Responsiveness**: Value flash animations for changed amounts with `useValueFlash` hook
+
+**Server-Heavy Architecture**:
+- **No Client Processing**: Server provides pre-calculated incremental amounts
+- **Data Integrity**: All calculations performed and validated server-side
+- **Performance**: Minimized client-side computation for optimal responsiveness
 
 ### 5.4 Expected Display Results
 
@@ -473,14 +531,17 @@ const timelineColumns = [...preStartColumns, ...postStartColumns]
 
 ### 7.1 NPM Scripts (Server Functions)
 
+> **Related Documentation**: For general performance considerations, caching strategies, and client-side optimization patterns, see [Client Real-Time Data Integration Guide](./client-real-time-data-integration.md#performance-considerations).
+
 #### Deployment Commands
 
 ```bash
 npm run deploy:meetings          # Deploy daily-meetings function
 npm run deploy:races            # Deploy daily-races function
-npm run deploy:poller           # Deploy race-data-poller function
-npm run deploy:single-race      # Deploy single-race-poller function
-npm run deploy:batch-race-poller # Deploy batch-race-poller function
+npm run deploy:enhanced-race-poller # Deploy enhanced-race-poller function (recommended)
+npm run deploy:poller           # Deploy race-data-poller function (legacy)
+npm run deploy:single-race      # Deploy single-race-poller function (legacy)
+npm run deploy:batch-race-poller # Deploy batch-race-poller function (legacy)
 npm run deploy:master-scheduler  # Deploy master-race-scheduler function
 ```
 
@@ -496,9 +557,11 @@ Post-deploy validation checklist:
 ```bash
 npm run meetings               # Run daily-meetings locally
 npm run races                 # Run daily-races locally
-npm run poller                # Run race-data-poller locally
-npm run single-race           # Run single-race-poller locally
-npm run batch-race-poller     # Run batch-race-poller locally
+npm run enhanced-race-poller   # Run enhanced-race-poller locally (recommended)
+npm run poller                # Run race-data-poller locally (legacy)
+npm run single-race           # Run single-race-poller locally (legacy)
+npm run batch-race-poller     # Run batch-race-poller locally (legacy)
+npm run master-scheduler      # Run master-race-scheduler locally
 ```
 
 #### Environment Management
@@ -685,7 +748,12 @@ const totalHoldPercentage = entrants.reduce(
 
 ### 9.1 Key File Locations
 
-**Server Functions**:
+**Enhanced Server Functions**:
+
+- `/server/enhanced-race-poller/src/database-utils.js` - Enhanced validation and processing
+- `/server/master-race-scheduler/src/main.js` - Autonomous polling coordination
+
+**Legacy Server Functions**:
 
 - `/server/race-data-poller/src/database-utils.js`
 - `/server/single-race-poller/src/database-utils.js`
@@ -693,17 +761,18 @@ const totalHoldPercentage = entrants.reduce(
 
 **Client Components**:
 
-- `/client/src/components/race-view/EnhancedEntrantsGrid.tsx`
-- `/client/src/hooks/useMoneyFlowTimeline.ts`
+- `/client/src/components/race-view/EnhancedEntrantsGrid.tsx` - Timeline grid with flash animations
+- `/client/src/hooks/useMoneyFlowTimeline.ts` - Unified real-time subscription management
+- `/client/src/hooks/useValueFlash.ts` - Value change animation handling
 
 **API Routes**:
 
-- `/client/src/app/api/race/[id]/money-flow-timeline/route.ts`
+- `/client/src/app/api/race/[id]/money-flow-timeline/route.ts` - Dual-path data fetching
 
 **Configuration**:
 
 - `/server/.env` - Environment variables
-- `/server/package.json` - NPM scripts
+- `/server/package.json` - NPM scripts including enhanced functions
 - `/server/appwrite.json` - Function deployment config
 
 ### 9.2 Database Collections Schema
@@ -734,8 +803,31 @@ const totalHoldPercentage = entrants.reduce(
 **Database Scaling**: Appwrite Cloud handles automatic scaling
 **Client Optimization**: Data pre-aggregated server-side for fast client loading
 **Caching Strategy**: Timeline data cached in client state, refreshed on subscription updates
+**Enhanced Processing**: Mathematical validation and data quality scoring for reliable scaling
 
-This document serves as the complete reference for understanding, implementing, and maintaining the Money Flow Timeline system in RaceDay.
+### 9.5 Recent Architecture Improvements (Current Branch)
+
+#### Enhanced Server Architecture
+- **Enhanced Race Poller**: Consolidated polling with mathematical validation and data quality scoring
+- **Master Scheduler**: Autonomous coordination with 1-minute CRON intervals and delegated high-frequency polling
+- **Dual-Phase Polling**: Early morning baseline capture plus high-frequency critical period polling
+
+#### Improved Client Integration
+- **Unified Subscriptions**: Single real-time channel with intelligent entrant filtering
+- **Server-Heavy Processing**: Pre-calculated incremental amounts eliminate client-side computation
+- **Race Status Awareness**: Smart subscription management based on race completion status
+
+#### Database Query Enhancements
+- **Dual-Path Fetching**: Bucketed aggregation with legacy fallback support
+- **Extended Range**: -65 to +66 intervals for comprehensive timeline coverage
+- **Critical Filter Fix**: Proper raceId filtering in database queries
+
+#### Development Workflow Improvements
+- **Enhanced Validation**: Automatic mathematical consistency checks and pool sum validation
+- **Improved Error Handling**: Graceful degradation with detailed logging and debugging support
+- **Legacy Function Support**: Maintains backward compatibility while promoting enhanced functions
+
+This document serves as the complete reference for understanding, implementing, and maintaining the Money Flow Timeline system in RaceDay, incorporating all recent architectural improvements and enhancements from the current development branch.
 
 ### NZTAB API Information
 

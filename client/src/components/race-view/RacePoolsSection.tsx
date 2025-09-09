@@ -5,8 +5,9 @@ import type { RacePoolData } from '@/types/racePools'
 
 interface RacePoolsSectionProps {
   raceId: string
-  poolData?: RacePoolData
+  poolData?: RacePoolData | null
   className?: string
+  lastUpdate?: Date | null
 }
 
 const formatPoolAmount = (cents: number): string => {
@@ -21,12 +22,17 @@ export const RacePoolsSection = memo(function RacePoolsSection({
   raceId,
   poolData,
   className = '',
+  lastUpdate,
 }: RacePoolsSectionProps) {
-  const { poolData: livePoolData, isLoading, error } = useRacePoolData(raceId)
+  // Use poolData from unified subscription if available, otherwise use fallback hook for data persistence
+  const {
+    poolData: fallbackPoolData,
+    isLoading,
+    error,
+  } = useRacePoolData(poolData ? '' : raceId)
+  const currentPoolData = poolData || fallbackPoolData
 
-  const currentPoolData = livePoolData || poolData
-
-  if (isLoading) {
+  if (isLoading && !poolData) {
     return (
       <div className={`${className}`}>
         <div className="animate-pulse">
@@ -42,7 +48,7 @@ export const RacePoolsSection = memo(function RacePoolsSection({
     )
   }
 
-  if (error) {
+  if (error && !poolData) {
     return (
       <div className={`text-red-600 text-sm ${className}`}>
         <div className="text-xs text-gray-500 mb-1">Pool Data</div>
@@ -90,59 +96,68 @@ export const RacePoolsSection = memo(function RacePoolsSection({
 
   return (
     <div className={`${className}`}>
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-center mb-1">
         <div className="text-sm text-gray-500 uppercase tracking-wide font-semibold">
           Pools
         </div>
+        <div className="ml-2 text-xs text-gray-400">
+          Last update:{' '}
+          {lastUpdate
+            ? lastUpdate.toLocaleTimeString('en-US', {
+                hour12: true,
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : currentPoolData?.lastUpdated
+            ? new Date(currentPoolData.lastUpdated).toLocaleTimeString(
+                'en-US',
+                {
+                  hour12: true,
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }
+              )
+            : '—'}
+          {lastUpdate && <span className="ml-1 text-green-500">●</span>}
+        </div>
       </div>
+      {/* insert a blank line or row above the <Pool breakdown rows> */}
+      <div className="h-6"></div>
 
       {/* Pool breakdown rows rendered as consistent pairs: Win <-> Quinella, Place <-> Trifecta, Total <-> FirstFour */}
 
-      {/* Render all rows with consistent 8-column grid formatting to match Results section */}
-      <div className="space-y-1">
+      {/* Render all rows with consistent 4-column grid formatting */}
+      <div className="space-y-1 mr-8">
         {pairs.map((p, i) => (
           <div
             key={i}
-            className="grid grid-cols-8 gap-2 items-baseline text-sm"
+            className="grid grid-cols-4 gap-1 items-baseline text-sm"
           >
-            {/* Left label - spans 2 columns to match Results layout */}
-            <div className="col-span-2 text-sm text-gray-600">
+            {/* Left label - spans 1 columns */}
+            <div className="col-span-1 text-sm text-gray-600">
               {p.left?.label ?? ''}
             </div>
 
             {/* Left value (bold) - spans 1 column */}
-            <div className="col-span-1 text-sm font-bold text-gray-900 leading-none text-right font-tnum">
+            <div className="col-span-1 text-sm font-bold text-gray-900 leading-none text-right font-tnum pr-6">
               {p.left && p.left.value !== undefined && p.left.value > 0
                 ? `$${formatPoolAmount(p.left.value)}`
                 : '—'}
             </div>
 
-            {/* Spacer columns to align with Results grid */}
-            <div className="col-span-2"></div>
-
-            {/* Right label - spans 1 column to match Results bet type column */}
-            <div className="col-span-1 text-sm text-gray-600">
+            {/* Right label - spans 1 column  */}
+            <div className="col-span-1 text-sm text-gray-600 truncate">
               {p.right?.label ?? ''}
             </div>
 
-            {/* Right value (bold) - spans 1 column to match Results bet value column */}
-            <div className="col-span-1 text-sm font-bold text-gray-900 leading-none text-right font-tnum">
+            {/* Right value (bold) - spans 1 column */}
+            <div className="col-span-1 text-sm font-bold text-gray-900 leading-none text-right font-tnum pr-6">
               {p.right && p.right.value !== undefined && p.right.value > 0
                 ? `$${formatPoolAmount(p.right.value)}`
                 : '—'}
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Last updated small */}
-      <div className="mt-2 text-xs text-gray-400">
-        Updated:{' '}
-        {new Date(currentPoolData.lastUpdated).toLocaleTimeString('en-US', {
-          hour12: true,
-          hour: 'numeric',
-          minute: '2-digit',
-        })}
       </div>
     </div>
   )

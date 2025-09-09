@@ -1,6 +1,6 @@
 # 7. Source Tree
 
-The project will follow a standard Next.js `src` directory structure.
+The project follows a standard Next.js `src` directory structure.
 
 ```
 /

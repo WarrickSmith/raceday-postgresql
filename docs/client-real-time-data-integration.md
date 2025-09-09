@@ -4,6 +4,10 @@
 
 This document outlines how the RaceDay client application integrates with the Appwrite backend to provide real-time race data with historical trend analysis. The system enables live betting market visualization with comprehensive odds movement tracking.
 
+> **Related Documentation**: For advanced real-time implementation patterns, complex subscription management, and server-side data processing architecture, see [Money Flow Timeline System Architecture](./Money-Flow-Timeline-System-Architecture.md).
+
+> **Advanced Example**: The Money Flow Timeline system demonstrates sophisticated real-time patterns including race status-based subscription management, debounced updates, and server-heavy processing architecture that can be applied to other real-time features.
+
 ## Data Architecture
 
 ### Primary Collections
@@ -81,6 +85,8 @@ This document outlines how the RaceDay client application integrates with the Ap
 
 ## Real-Time Subscription Implementation
 
+> **Advanced Patterns**: The [Money Flow Timeline System](./Money-Flow-Timeline-System-Architecture.md#real-time-updates) demonstrates unified subscription architecture with intelligent filtering and race status awareness that extends these foundational patterns.
+
 ### Primary Subscription Strategy
 
 **Subscribe to `entrants` collection for live updates:**
@@ -94,7 +100,7 @@ const client = new Client()
 
 const databases = new Databases(client);
 
-// Subscribe to all entrant updates
+// Enhanced subscription with error handling and cleanup
 const subscription = client.subscribe(
   'databases.raceday-db.collections.entrants.documents', 
   response => {
@@ -109,15 +115,90 @@ const subscription = client.subscribe(
     }
   }
 );
+```
 
-// Subscribe to specific race entrants only
-const raceSubscription = client.subscribe([
-  `databases.raceday-db.collections.entrants.documents`,
-  `databases.raceday-db.collections.races.documents.${raceId}`
-], response => {
-  // Handle race-specific updates
-  handleRaceUpdate(response.payload);
-});
+### Enhanced Subscription Patterns
+
+**Race Status-Aware Subscription Management**:
+
+```javascript
+function useRaceSubscription(raceId, raceStatus) {
+  useEffect(() => {
+    // Skip subscriptions for completed races to preserve final state
+    const isRaceComplete = 
+      raceStatus && ['Final', 'Finalized', 'Abandoned', 'Cancelled'].includes(raceStatus);
+    
+    if (isRaceComplete) {
+      return; // No subscription needed for completed races
+    }
+
+    // Set up subscription with proper error handling
+    let unsubscribe = null;
+    
+    try {
+      unsubscribe = client.subscribe(
+        `databases.raceday-db.collections.entrants.documents`,
+        response => {
+          const updatedEntrant = response.payload;
+          
+          // Only process updates for our race (entrant filtering)
+          if (updatedEntrant.race === raceId) {
+            // Debounce rapid updates with small delay
+            setTimeout(() => {
+              updateRaceData(updatedEntrant);
+            }, 500);
+          }
+        }
+      );
+    } catch (subscriptionError) {
+      console.error('Failed to establish subscription:', subscriptionError);
+      // Continue without real-time updates if subscription fails
+    }
+
+    return () => {
+      if (unsubscribe) {
+        try {
+          unsubscribe();
+        } catch (error) {
+          console.warn('Error unsubscribing:', error);
+        }
+      }
+    };
+  }, [raceId, raceStatus]);
+}
+```
+
+**Unified Subscription with Intelligent Filtering**:
+
+```javascript
+// Single subscription channel with intelligent filtering (recommended approach)
+function useUnifiedRaceSubscription(entrantIds, raceStatus) {
+  useEffect(() => {
+    if (!entrantIds.length || 
+        ['Final', 'Finalized', 'Abandoned', 'Cancelled'].includes(raceStatus)) {
+      return;
+    }
+
+    const unsubscribe = client.subscribe(
+      ['databases.raceday-db.collections.entrants.documents'],
+      response => {
+        const updatedEntrant = response.payload;
+        
+        // Check if this update affects our entrants
+        const isRelevantUpdate = entrantIds.includes(updatedEntrant.entrantId);
+        
+        if (isRelevantUpdate) {
+          // Debounced update to handle rapid changes
+          setTimeout(() => {
+            processEntrantUpdate(updatedEntrant);
+          }, 500);
+        }
+      }
+    );
+
+    return () => unsubscribe?.();
+  }, [entrantIds.join(','), raceStatus]);
+}
 ```
 
 ### Historical Data Queries
@@ -183,51 +264,100 @@ async function getCombinedHistory(entrantId, limit = 50) {
 
 ### React Hook for Race Data
 
+**Enhanced Hook with Modern Patterns**:
+
 ```javascript
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { client, databases } from './appwrite-config';
 
-export function useRaceData(raceId) {
+export function useRaceData(raceId, raceStatus) {
   const [entrants, setEntrants] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState(null);
   
-  useEffect(() => {
-    // Initial data load
-    const loadRaceData = async () => {
+  const loadRaceData = useCallback(async () => {
+    if (!raceId) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
       const response = await databases.listDocuments('raceday-db', 'entrants', [
         Query.equal('race', raceId),
         Query.orderAsc('runnerNumber')
       ]);
       
       setEntrants(response.documents);
+      setLastUpdate(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load race data');
+      console.error('Error loading race data:', err);
+    } finally {
       setLoading(false);
-    };
-    
-    loadRaceData();
-    
-    // Real-time subscription
-    const unsubscribe = client.subscribe(
-      `databases.raceday-db.collections.entrants.documents`,
-      response => {
-        const updatedEntrant = response.payload;
-        
-        // Only update if it's for our race
-        if (updatedEntrant.race === raceId) {
-          setEntrants(prev => 
-            prev.map(entrant => 
-              entrant.entrantId === updatedEntrant.entrantId 
-                ? updatedEntrant 
-                : entrant
-            )
-          );
-        }
-      }
-    );
-    
-    return () => unsubscribe();
+    }
   }, [raceId]);
   
-  return { entrants, loading };
+  useEffect(() => {
+    // Initial data load
+    loadRaceData();
+    
+    // Skip real-time subscriptions for completed races
+    const isRaceComplete = 
+      raceStatus && ['Final', 'Finalized', 'Abandoned', 'Cancelled'].includes(raceStatus);
+    
+    if (isRaceComplete) {
+      return; // Race is complete, skip subscription
+    }
+    
+    // Set up real-time subscription with error handling
+    let unsubscribe = null;
+    
+    try {
+      unsubscribe = client.subscribe(
+        `databases.raceday-db.collections.entrants.documents`,
+        response => {
+          const updatedEntrant = response.payload;
+          
+          // Only update if it's for our race (entrant filtering)
+          if (updatedEntrant.race === raceId) {
+            // Debounce rapid updates
+            setTimeout(() => {
+              setEntrants(prev => 
+                prev.map(entrant => 
+                  entrant.entrantId === updatedEntrant.entrantId 
+                    ? updatedEntrant 
+                    : entrant
+                )
+              );
+              setLastUpdate(new Date());
+            }, 500);
+          }
+        }
+      );
+    } catch (subscriptionError) {
+      console.error('Failed to establish subscription:', subscriptionError);
+      // Continue without real-time updates if subscription fails
+    }
+    
+    return () => {
+      if (unsubscribe) {
+        try {
+          unsubscribe();
+        } catch (error) {
+          console.warn('Error unsubscribing:', error);
+        }
+      }
+    };
+  }, [raceId, raceStatus, loadRaceData]);
+  
+  return { 
+    entrants, 
+    loading, 
+    error, 
+    lastUpdate, 
+    refetch: loadRaceData 
+  };
 }
 ```
 
@@ -325,39 +455,82 @@ export function EntrantCard({ entrant }) {
 
 ## Performance Considerations
 
-### Subscription Management
+### Modern Subscription Management
 
-**Best Practices:**
-- Subscribe to collections, not individual documents for better performance
-- Filter subscriptions to relevant races only
-- Unsubscribe when components unmount to prevent memory leaks
-- Use debouncing for rapid updates to prevent UI thrashing
+**Enhanced Best Practices:**
+- **Unified subscriptions**: Use single subscription channels with intelligent filtering instead of multiple subscriptions
+- **Race status awareness**: Disable subscriptions for completed races to preserve final state and reduce unnecessary processing
+- **Debounced updates**: Implement 500ms delays for rapid updates to prevent UI thrashing
+- **Comprehensive error handling**: Always wrap subscriptions in try/catch blocks with graceful degradation
+- **Proper cleanup**: Include error handling in unsubscribe functions
+- **Server-heavy processing**: Rely on pre-calculated server data rather than client-side computations
 
-### Caching Strategy
+### Server-Heavy Architecture Principles
+
+**Recommended Approach:**
+```javascript
+// Server provides pre-calculated data, client displays
+function useServerCalculatedData(raceId) {
+  // Server handles all complex calculations
+  // Client receives ready-to-display data
+  // Minimal client-side processing for optimal performance
+  
+  const processServerUpdate = (serverData) => {
+    // Trust server calculations - no client processing needed
+    // Server provides: incremental amounts, percentages, trends
+    // Client simply displays the pre-calculated values
+    return serverData; // Direct use of server-calculated data
+  };
+}
+
+### Enhanced Caching Strategy
 
 ```javascript
-// Cache historical data to reduce API calls
-const oddsHistoryCache = new Map();
+// Enhanced cache with race status awareness
+const enhancedDataCache = new Map();
 
-async function getCachedOddsHistory(entrantId, oddsType, limit) {
-  const cacheKey = `${entrantId}-${oddsType}-${limit}`;
+async function getCachedData(entrantId, dataType, limit, raceStatus) {
+  const cacheKey = `${entrantId}-${dataType}-${limit}`;
   
-  if (oddsHistoryCache.has(cacheKey)) {
-    const cached = oddsHistoryCache.get(cacheKey);
+  if (enhancedDataCache.has(cacheKey)) {
+    const cached = enhancedDataCache.get(cacheKey);
     
-    // Cache for 30 seconds
-    if (Date.now() - cached.timestamp < 30000) {
+    // Longer cache for completed races (permanent), shorter for active races
+    const cacheExpiry = ['Final', 'Finalized', 'Abandoned'].includes(raceStatus) 
+      ? Infinity // Cache completed race data permanently
+      : 30000;    // 30 seconds for active races
+    
+    if (Date.now() - cached.timestamp < cacheExpiry) {
       return cached.data;
     }
   }
   
-  const data = await getOddsHistory(entrantId, oddsType, limit);
-  oddsHistoryCache.set(cacheKey, {
+  const data = await getData(entrantId, dataType, limit);
+  enhancedDataCache.set(cacheKey, {
     data,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    raceStatus
   });
   
   return data;
+}
+
+// State management with race completion awareness
+function useRaceStateCache(raceId, raceStatus) {
+  const [cachedState, setCachedState] = useState(null);
+  
+  useEffect(() => {
+    // For completed races, preserve final state in cache
+    if (['Final', 'Finalized', 'Abandoned'].includes(raceStatus) && cachedState) {
+      // Freeze the state for completed races
+      return;
+    }
+    
+    // Continue normal updates for active races
+    loadFreshData(raceId).then(setCachedState);
+  }, [raceId, raceStatus]);
+  
+  return cachedState;
 }
 ```
 
@@ -380,16 +553,28 @@ async function preloadRaceData(raceIds) {
 
 ## Data Flow Summary
 
-1. **Backend Polling**: `race-data-poller` function polls NZTAB API every 15-60 seconds
-2. **Historical Storage**: Before updating `entrants`, odds changes saved to `odds-history`  
-3. **Current State Update**: `entrants` collection updated with latest data
-4. **Real-Time Push**: Appwrite pushes updates to subscribed clients instantly
-5. **Frontend Update**: React components receive updates and re-render
-6. **Trend Analysis**: On-demand historical queries for charts and trend calculation
-7. **Visual Indicators**: UI shows live trends, movements, and status changes
+1. **Enhanced Backend Polling**: `enhanced-race-poller` function polls NZTAB API with mathematical validation and data quality scoring
+2. **Historical Storage**: Before updating `entrants`, odds changes saved to `odds-history` with comprehensive validation
+3. **Current State Update**: `entrants` collection updated with pre-calculated, validated data
+4. **Real-Time Push**: Appwrite pushes updates to subscribed clients with intelligent filtering
+5. **Frontend Update**: React components receive updates with race status awareness and debounced processing
+6. **Trend Analysis**: On-demand historical queries enhanced with server-side calculations
+7. **Visual Indicators**: UI shows live trends, movements, and status changes with value flash animations
 
-This architecture enables:
-- **Sub-second latency** for live odds updates
-- **Comprehensive trend analysis** with full historical context
-- **Seamless race switching** with preserved data
-- **Scalable real-time experience** for multiple concurrent users
+This enhanced architecture enables:
+- **Sub-second latency** for live odds updates with mathematical validation
+- **Comprehensive trend analysis** with full historical context and data quality assurance  
+- **Seamless race switching** with preserved data and intelligent caching
+- **Scalable real-time experience** for multiple concurrent users with server-heavy processing
+- **Race status awareness** with automatic subscription management for completed races
+- **Enhanced error handling** with graceful degradation and comprehensive logging
+
+## Related Advanced Implementation
+
+For a comprehensive example of these patterns in practice, see the [Money Flow Timeline System Architecture](./Money-Flow-Timeline-System-Architecture.md), which demonstrates:
+
+- **Advanced subscription management** with unified channels and intelligent filtering
+- **Server-heavy processing** with pre-calculated incremental amounts and mathematical validation
+- **Race status-based behavior** with automatic subscription lifecycle management  
+- **Enhanced error handling** with comprehensive try/catch blocks and fallback mechanisms
+- **Performance optimization** through debounced updates and sophisticated caching strategies

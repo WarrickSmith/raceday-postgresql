@@ -72,7 +72,7 @@ export default async function main(context) {
         // Get race IDs for batch processing
         const raceIds = racesResult.documents.map(race => race.raceId);
         
-        // Process in optimal batches for batch-race-poller (8 races per batch)
+        // Process in optimal batches for enhanced-race-poller (8 races per batch)
         const batchSize = 8;
         const batches = [];
         for (let i = 0; i < raceIds.length; i += batchSize) {
@@ -94,7 +94,7 @@ export default async function main(context) {
             executionErrors: []
         };
         
-        // Process each batch using batch-race-poller function
+        // Process each batch using enhanced-race-poller function
         for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
             const currentBatch = batches[batchIndex];
             
@@ -105,9 +105,9 @@ export default async function main(context) {
             });
             
             try {
-                // Execute batch-race-poller function for comprehensive data
+                // Execute enhanced-race-poller function for comprehensive data
                 const execution = await functions.createExecution(
-                    'batch-race-poller',
+                    'enhanced-race-poller',
                     JSON.stringify({ raceIds: currentBatch }),
                     false // synchronous execution
                 );

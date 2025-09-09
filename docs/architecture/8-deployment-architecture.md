@@ -1,6 +1,6 @@
-# 6. Deployment Architecture
+# 8. Deployment Architecture
 
-## 6.1. Function Specifications
+## 8.1. Function Specifications
 
 ```json
 {
@@ -24,9 +24,33 @@
       "timeout": 300
     },
     {
+      "$id": "enhanced-race-poller",
+      "specification": "s-2vcpu-2gb",
+      "events": ["http"],
+      "timeout": 300
+    },
+    {
+      "$id": "master-race-scheduler",
+      "specification": "s-1vcpu-512mb",
+      "schedule": "*/1 * * * *",
+      "timeout": 180
+    },
+    {
       "$id": "race-data-poller",
       "specification": "s-2vcpu-2gb",
       "schedule": "*/1 * * * *",
+      "timeout": 300
+    },
+    {
+      "$id": "single-race-poller",
+      "specification": "s-1vcpu-1gb",
+      "events": ["http"],
+      "timeout": 300
+    },
+    {
+      "$id": "batch-race-poller",
+      "specification": "s-1vcpu-2gb",
+      "events": ["schedule"],
       "timeout": 300
     },
     {
@@ -39,7 +63,7 @@
 }
 ```
 
-## 6.2. Deployment Pipeline
+## 8.2. Deployment Pipeline
 
 - **Frontend:** Vercel deployment with automatic builds on main branch
 - **Backend:** Individual function deployment via Appwrite CLI

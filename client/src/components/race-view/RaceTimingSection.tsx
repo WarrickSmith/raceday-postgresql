@@ -1,16 +1,17 @@
 'use client'
 
 import { memo, useState, useEffect, useCallback, useMemo } from 'react'
-import { useRace } from '@/contexts/RaceContext'
-import { useRealtimeRace } from '@/hooks/useRealtimeRace'
 import { getStatusConfig } from '@/utils/raceStatusConfig'
 import type { RaceStatus } from '@/types/racePools'
+import type { Race } from '@/types/meetings'
 
 interface RaceTimingSectionProps {
   raceStartTime?: string
   raceStatus?: RaceStatus
   className?: string
   showCountdown?: boolean
+  // Real-time race data from unified subscription
+  race?: Race | null
 }
 
 export const RaceTimingSection = memo(function RaceTimingSection({
@@ -18,26 +19,8 @@ export const RaceTimingSection = memo(function RaceTimingSection({
   raceStatus,
   className = '',
   showCountdown = true,
+  race = null,
 }: RaceTimingSectionProps) {
-  const { raceData } = useRace()
-
-  const { race: liveRace } = useRealtimeRace({
-    initialRace: raceData?.race || {
-      $id: '',
-      $createdAt: '',
-      $updatedAt: '',
-      raceId: '',
-      raceNumber: 0,
-      name: '',
-      startTime: raceStartTime || '',
-      meeting: '',
-      status: raceStatus || ('open' as const),
-      distance: 0,
-      trackCondition: '',
-      actualStart: undefined,
-    },
-  })
-
   const [timeRemaining, setTimeRemaining] = useState<{
     total: number
     hours: number
@@ -47,10 +30,11 @@ export const RaceTimingSection = memo(function RaceTimingSection({
 
   const [delayedTime, setDelayedTime] = useState<string | null>(null)
 
-  const currentStartTime = liveRace?.startTime || raceStartTime
+  // Use real-time race data from unified subscription with fallbacks
+  const currentStartTime = race?.startTime || raceStartTime
   const currentStatus =
-    (liveRace?.status?.toLowerCase() as RaceStatus) || raceStatus
-  const actualStartTime = liveRace?.actualStart
+    (race?.status?.toLowerCase() as RaceStatus) || raceStatus || 'open'
+  const actualStartTime = race?.actualStart
 
   const calculateTimeRemaining = useCallback(() => {
     if (!currentStartTime) return
@@ -128,7 +112,9 @@ export const RaceTimingSection = memo(function RaceTimingSection({
     showCountdown && currentStatus === 'open' && timeRemaining.total > 0
 
   return (
-    <div className={`text-center space-y-2 ${className}`}>
+    <div
+      className={`text-left space-y-2 h-full flex flex-col justify-center ${className}`}
+    >
       {/* Race Status - prominent */}
       <div
         className={`inline-flex items-center space-x-2 px-3 py-2 rounded-lg ${statusConfig.bgColor} shadow`}
@@ -164,12 +150,14 @@ export const RaceTimingSection = memo(function RaceTimingSection({
         currentStatus === 'interim' ||
         currentStatus === 'final') && (
         <div>
-          <div className="flex items-center justify-center space-x-2">
+          <div className="flex items-center justify-start space-x-2">
             <div className="text-lg font-extrabold text-blue-600 uppercase tracking-wide">
-              Closed
+              Closed @
             </div>
             <div className="text-lg font-extrabold text-blue-600">
-              {new Date(actualStartTime || currentStartTime || new Date()).toLocaleTimeString('en-US', {
+              {new Date(
+                actualStartTime || currentStartTime || new Date()
+              ).toLocaleTimeString('en-US', {
                 hour12: true,
                 hour: 'numeric',
                 minute: '2-digit',
@@ -182,14 +170,22 @@ export const RaceTimingSection = memo(function RaceTimingSection({
       {/* Scheduled Start Time - side-by-side layout */}
       {currentStartTime && (
         <div>
-          <div className="flex items-center justify-center space-x-2">
-            <div className="text-lg font-extrabold text-gray-500 uppercase tracking-wide">Scheduled</div>
-            <time dateTime={currentStartTime} className="text-lg font-extrabold text-gray-500">
-              {new Date(currentStartTime || new Date()).toLocaleTimeString('en-US', {
-                hour12: true,
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
+          <div className="flex items-center justify-start space-x-2">
+            <div className="text-lg font-extrabold text-gray-500 uppercase tracking-wide">
+              Scheduled
+            </div>
+            <time
+              dateTime={currentStartTime}
+              className="text-lg font-extrabold text-gray-500"
+            >
+              {new Date(currentStartTime || new Date()).toLocaleTimeString(
+                'en-US',
+                {
+                  hour12: true,
+                  hour: 'numeric',
+                  minute: '2-digit',
+                }
+              )}
             </time>
           </div>
         </div>

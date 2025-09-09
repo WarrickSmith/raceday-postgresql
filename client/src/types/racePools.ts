@@ -70,12 +70,21 @@ export interface PoolDividend {
   description?: string;
 }
 
+// Fixed odds data structure for individual runners
+export interface FixedOddsRunner {
+  fixed_win: number;
+  fixed_place: number;
+  runner_name: string;
+  entrant_id: string;
+}
+
 // Complete race results with dividends
 export interface RaceResultsData {
   raceId: string;
   status: 'interim' | 'final' | 'protest';
   results: RaceResult[];
   dividends: PoolDividend[];
+  fixedOddsData?: Record<string, FixedOddsRunner>; // runner number -> fixed odds data
   photoFinish: boolean;
   stewardsInquiry: boolean;
   protestLodged: boolean;
