@@ -1085,15 +1085,18 @@ async function processSingleRaceData(
     }
 
     // Process entrants data
+    let entrantOddsData = null // STORY 4.9 - Store odds data for timeline storage
     if (raceEventData.entrants && raceEventData.entrants.length > 0) {
       try {
-        entrantsProcessed = await processEntrants(
+        const entrantsResult = await processEntrants(
           databases,
           databaseId,
           raceId,
           raceEventData.entrants,
           context
         )
+        entrantsProcessed = entrantsResult.entrantsProcessed
+        entrantOddsData = entrantsResult.entrantOddsData // STORY 4.9
       } catch (entrantsError) {
         handleError(
           entrantsError,
@@ -1133,7 +1136,8 @@ async function processSingleRaceData(
           raceId,
           racePoolData,
           raceStatus,
-          validationResults
+          validationResults,
+          entrantOddsData // STORY 4.9 - Pass odds data for timeline storage
         )
 
         context.log('💰 Money tracker processing completed', {
