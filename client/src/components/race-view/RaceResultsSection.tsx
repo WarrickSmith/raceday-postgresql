@@ -164,7 +164,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
           <div className="col-span-1 text-blue-500 font-semibold">Pos</div>
           <div className="col-span-1 text-blue-500 font-semibold">No</div>
           <div className="col-span-3 text-blue-500 font-semibold">Runner</div>
-          <div className="col-span-2 text-blue-500 font-semibold text-right">
+          <div className="col-span-2 text-blue-500 font-semibold text-right mr-2">
             Win
           </div>
           <div className="col-span-1 text-blue-500 font-semibold text-right">
@@ -183,7 +183,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
             <div className="col-span-1 text-blue-500 font-bold">1st</div>
             <div className="col-span-1 text-gray-900 font-bold">—</div>
             <div className="col-span-3 text-gray-900">—</div>
-            <div className="col-span-2 text-gray-900 font-bold leading-none text-right font-tnum">
+            <div className="col-span-2 text-gray-900 font-bold leading-none text-right font-tnum mr-2">
               —
             </div>
             <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
@@ -303,7 +303,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
         <div className="col-span-1 text-blue-500 font-semibold">Pos</div>
         <div className="col-span-1 text-blue-500 font-semibold">No</div>
         <div className="col-span-3 text-blue-500 font-semibold">Runner</div>
-        <div className="col-span-2 text-blue-500 font-semibold text-right">
+        <div className="col-span-2 text-blue-500 font-semibold text-right mr-2">
           Win
         </div>
         <div className="col-span-1 text-blue-500 font-semibold text-right">
@@ -330,10 +330,10 @@ export const RaceResultsSection = memo(function RaceResultsSection({
               ? formatRunnerName(getRunnerName(resultsData.results[0]))
               : '—'}
           </div>
-          <div className="col-span-2 text-gray-900 font-bold leading-none text-right font-tnum">
+          <div className="col-span-2 text-gray-900 font-bold leading-none text-right font-tnum  mr-2">
             {getFixedOdds(1, 'win')}
           </div>
-          <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum">
+          <div className="col-span-1 text-gray-900 font-bold leading-none text-right font-tnum ">
             {getFixedOdds(1, 'place')}
           </div>
           <div className="col-span-2 text-gray-600 truncate pl-2">Quinella</div>

@@ -5,17 +5,12 @@
 /**
  * Format race distance in a human-readable format
  * @param distance - Distance in metres
- * @returns Formatted distance string (e.g., "2.2km" or "800m")
+ * @returns Formatted distance string (e.g., "2200m" or "800m")
  */
 export function formatDistance(distance: number | undefined): string | null {
   if (!distance) return null;
   
-  if (distance >= 1000) {
-    const km = (distance / 1000).toFixed(1);
-    return `${km}km`;
-  } else {
-    return `${distance}m`;
-  }
+  return `${distance}m`;
 }
 
 /**
@@ -29,10 +24,10 @@ export function formatRaceTime(dateTimeString: string): string {
     if (isNaN(date.getTime())) {
       return 'TBA';
     }
-    return date.toLocaleTimeString('en-AU', {
+    return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
-      hour12: false,
+      hour12: true,
     });
   } catch {
     return 'TBA';
