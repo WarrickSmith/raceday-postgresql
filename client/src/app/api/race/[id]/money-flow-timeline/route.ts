@@ -10,6 +10,7 @@ export async function GET(
   try {
     const { searchParams } = new URL(request.url)
     const entrantIds = searchParams.get('entrants')?.split(',') || []
+    const poolType = searchParams.get('poolType') || 'win' // NEW: Support filtering by poolType (win/place/odds)
     const { id: raceId } = await params
 
     if (!raceId) {
@@ -114,6 +115,7 @@ export async function GET(
         total: response.total,
         raceId,
         entrantIds,
+        poolType, // NEW: Include requested pool type in response
         bucketedData: false, // Indicate this is legacy data
         message:
           response.documents.length === 0
@@ -122,6 +124,7 @@ export async function GET(
         queryOptimizations: [
           'Time interval filtering',
           'Legacy timeToStart data',
+          'Consolidated odds data (if available)', // NEW: Note that odds may be available
         ],
       })
     }
@@ -140,6 +143,7 @@ export async function GET(
       total: response.total,
       raceId,
       entrantIds,
+      poolType, // NEW: Include requested pool type in response
       bucketedData: true,
       intervalCoverage,
       message:
@@ -151,6 +155,7 @@ export async function GET(
         'Bucketed storage',
         'Pre-calculated incrementals',
         'Extended range (-65 to +66)',
+        'Consolidated odds data (fixedWinOdds, fixedPlaceOdds, poolWinOdds, poolPlaceOdds)', // NEW: Document odds consolidation
       ],
     })
   } catch (error) {
