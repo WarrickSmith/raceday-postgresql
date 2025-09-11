@@ -92,18 +92,24 @@ interface UnifiedRaceRealtimeState {
   resultsData: RaceResultsData | null
 
   // Connection and freshness
+  connectionState: ConnectionState
   isConnected: boolean
   connectionAttempts: number
   lastUpdate: Date | null
   updateLatency: number
   totalUpdates: number
+  isInitialFetchComplete: boolean
 
   // Data freshness indicators
   lastRaceUpdate: Date | null
   lastPoolUpdate: Date | null
   lastResultsUpdate: Date | null
   lastEntrantsUpdate: Date | null
+  moneyFlowUpdateTrigger: number
 }
+
+// Connection state machine
+type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'disconnecting'
 
 // Hook actions interface
 interface UnifiedRaceRealtimeActions {
@@ -133,15 +139,18 @@ export function useUnifiedRaceRealtime({
     navigationData: initialNavigationData,
     poolData: null,
     resultsData: null,
+    connectionState: 'disconnected',
     isConnected: false,
     connectionAttempts: 0,
     lastUpdate: null,
     updateLatency: 0,
     totalUpdates: 0,
+    isInitialFetchComplete: !!initialRace && initialEntrants.length > 0,
     lastRaceUpdate: null,
     lastPoolUpdate: null,
     lastResultsUpdate: null,
     lastEntrantsUpdate: null,
+    moneyFlowUpdateTrigger: 0,
   })
 
   // Performance and connection tracking
@@ -157,9 +166,9 @@ export function useUnifiedRaceRealtime({
   const updateThrottleTimer = useRef<NodeJS.Timeout | null>(null)
   const THROTTLE_DELAY = 100 // 100ms for critical periods
 
-  // Smart channel management
+  // Smart channel management with race status awareness
   const getChannels = useCallback(
-    (raceDocId: string | null, raceResultsDocId?: string) => {
+    (raceDocId: string | null, raceResultsDocId?: string, raceStatus?: string) => {
       if (!raceDocId) return []
 
       const channels = [
@@ -168,13 +177,16 @@ export function useUnifiedRaceRealtime({
         'databases.raceday-db.collections.money-flow-history.documents',
       ]
 
-      // Add race-results subscription (two-phase approach)
-      if (raceResultsDocId) {
-        channels.push(
-          `databases.raceday-db.collections.race-results.documents.${raceResultsDocId}`
-        )
-      } else {
-        channels.push('databases.raceday-db.collections.race-results.documents')
+      // Add race-results subscription ONLY for races with interim/final status (per hybrid architecture)
+      const shouldSubscribeToResults = raceStatus && ['interim', 'final'].includes(raceStatus.toLowerCase())
+      if (shouldSubscribeToResults) {
+        if (raceResultsDocId) {
+          channels.push(
+            `databases.raceday-db.collections.race-results.documents.${raceResultsDocId}`
+          )
+        } else {
+          channels.push('databases.raceday-db.collections.race-results.documents')
+        }
       }
 
       // Add entrant-specific subscriptions if available
@@ -225,6 +237,7 @@ export function useUnifiedRaceRealtime({
         entrants: raceData.entrants || [],
         meeting: raceData.meeting || null,
         navigationData: raceData.navigationData || null,
+        isInitialFetchComplete: true,
         lastUpdate: new Date(),
         lastRaceUpdate: new Date(),
         lastEntrantsUpdate: new Date(),
@@ -797,6 +810,7 @@ export function useUnifiedRaceRealtime({
 
           newState.entrants = updateEntrantMoneyFlow(newState.entrants, payload)
           newState.lastEntrantsUpdate = now
+          newState.moneyFlowUpdateTrigger = prevState.moneyFlowUpdateTrigger + 1
           hasUpdates = true
         }
       }
@@ -852,65 +866,98 @@ export function useUnifiedRaceRealtime({
     [applyPendingUpdates]
   )
 
-  // Setup unified real-time subscription
+  // Hybrid architecture: Setup subscription ONLY after initial fetch completes
   useEffect(() => {
-    if (!raceId || !state.raceDocumentId) return
+    // Don't setup subscription until initial fetch is complete (hybrid architecture requirement)
+    if (!raceId || !state.raceDocumentId || !state.isInitialFetchComplete) {
+      debugLog('⏳ Waiting for initial fetch to complete before subscription', {
+        raceId,
+        hasRaceDoc: !!state.raceDocumentId,
+        fetchComplete: state.isInitialFetchComplete
+      })
+      return
+    }
 
     let connectionRetries = 0
     const maxRetries = 5
+    const connectionDrainDelay = 200 // 200ms drain period for graceful transitions
 
     const setupSubscription = () => {
       try {
-        // Clear any existing subscription
-        if (unsubscribeFunction.current) {
-          unsubscribeFunction.current()
-          unsubscribeFunction.current = null
-        }
-
-        debugLog(
-          '🔄 Setting up unified real-time subscription for race:',
-          raceId
-        )
-
-        // Get smart channels based on current state
-        const channels = getChannels(
-          state.raceDocumentId,
-          state.raceResultsDocumentId || undefined
-        )
-        debugLog('Subscription channels:', channels)
-
-        // Create unified subscription
-        unsubscribeFunction.current = client.subscribe(
-          channels,
-          (response: any) => {
-            debugLog('📡 Unified subscription event received', {
-              channels: response.channels?.length || 0,
-              events: response.events,
-              hasPayload: !!response.payload,
-            })
-            processRealtimeMessage({
-              ...response,
-              channels: response.channels || [],
-            })
-          }
-        )
-
-        // Update connection state
+        // Set connecting state
         setState((prev) => ({
           ...prev,
-          isConnected: true,
-          connectionAttempts: connectionRetries,
+          connectionState: 'connecting',
+          isConnected: false,
         }))
 
-        debugLog(
-          '✅ Unified real-time subscription established for race:',
-          raceId
-        )
+        const continueSetup = () => {
+          debugLog(
+            '🔄 Setting up unified real-time subscription for race:',
+            raceId
+          )
+
+          // Get smart channels based on current state and race status
+          const channels = getChannels(
+            state.raceDocumentId,
+            state.raceResultsDocumentId || undefined,
+            state.race?.status
+          )
+          debugLog('Subscription channels:', channels)
+
+          // Create unified subscription
+          unsubscribeFunction.current = client.subscribe(
+            channels,
+            (response: any) => {
+              debugLog('📡 Unified subscription event received', {
+                channels: response.channels?.length || 0,
+                events: response.events,
+                hasPayload: !!response.payload,
+              })
+              processRealtimeMessage({
+                ...response,
+                channels: response.channels || [],
+              })
+            }
+          )
+
+          // Update connection state
+          setState((prev) => ({
+            ...prev,
+            connectionState: 'connected',
+            isConnected: true,
+            connectionAttempts: connectionRetries,
+          }))
+
+          debugLog(
+            '✅ Unified real-time subscription established for race:',
+            raceId
+          )
+        }
+
+        // Clear any existing subscription with drain period
+        if (unsubscribeFunction.current) {
+          setState((prev) => ({
+            ...prev,
+            connectionState: 'disconnecting',
+          }))
+          
+          unsubscribeFunction.current()
+          unsubscribeFunction.current = null
+          
+          // Allow connection drain period before new connection
+          setTimeout(() => {
+            continueSetup()
+          }, connectionDrainDelay)
+        } else {
+          continueSetup()
+        }
       } catch (error) {
         errorLog('❌ Failed to setup unified subscription:', error)
 
         setState((prev) => ({
           ...prev,
+          connectionState: 'disconnected',
           isConnected: false,
           connectionAttempts: connectionRetries + 1,
         }))
@@ -934,7 +981,7 @@ export function useUnifiedRaceRealtime({
 
     setupSubscription()
 
-    // Cleanup function
+    // Cleanup function with graceful disconnection
     return () => {
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current)
@@ -946,22 +993,32 @@ export function useUnifiedRaceRealtime({
 
       if (unsubscribeFunction.current) {
         try {
+          setState((prev) => ({
+            ...prev,
+            connectionState: 'disconnecting',
+          }))
+          
           unsubscribeFunction.current()
           unsubscribeFunction.current = null
+          
+          setTimeout(() => {
+            setState((prev) => ({
+              ...prev,
+              connectionState: 'disconnected',
+              isConnected: false,
+            }))
+          }, connectionDrainDelay)
         } catch (error) {
           errorLog('Error unsubscribing from unified real-time:', error)
         }
       }
-
-      setState((prev) => ({
-        ...prev,
-        isConnected: false,
-      }))
     }
   }, [
     raceId,
     state.raceDocumentId,
     state.raceResultsDocumentId,
+    state.isInitialFetchComplete,
+    state.race?.status,
     getChannels,
     processRealtimeMessage,
   ])
@@ -988,7 +1045,8 @@ export function useUnifiedRaceRealtime({
 
           const channels = getChannels(
             state.raceDocumentId,
-            state.raceResultsDocumentId || undefined
+            state.raceResultsDocumentId || undefined,
+            state.race?.status
           )
           debugLog(
             '🔄 Recreated subscription with document-specific race-results channel',

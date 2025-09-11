@@ -7,6 +7,9 @@ import { SUPPORTED_RACE_TYPE_CODES } from '@/constants/raceTypes';
 import { isSupportedCountry } from '@/constants/countries';
 import { updateRaceInCache } from './useRacesForMeeting';
 
+// Connection state machine for graceful transitions
+type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'disconnecting'
+
 interface UseRealtimeMeetingsOptions {
   initialData: Meeting[];
   onError?: (error: Error) => void;
@@ -14,8 +17,10 @@ interface UseRealtimeMeetingsOptions {
 
 export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeetingsOptions) {
   const [meetings, setMeetings] = useState<Meeting[]>(initialData);
+  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [isConnected, setIsConnected] = useState(false);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const [isInitialDataReady, setIsInitialDataReady] = useState(initialData.length > 0);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -81,13 +86,15 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
 
   // Setup real-time subscriptions with connection management
   const setupSubscriptions = useCallback(async () => {
-    try {
-      // Clean up existing subscription
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-      }
+    const connectionDrainDelay = 200; // 200ms drain period for graceful transitions
 
-      const unsubscribe = client.subscribe([
+    try {
+      // Set connecting state
+      setConnectionState('connecting');
+      setIsConnected(false);
+
+      const continueSetup = async () => {
+        const unsubscribe = client.subscribe([
         'databases.raceday-db.collections.meetings.documents',
         'databases.raceday-db.collections.races.documents'
       ], async (response) => {
@@ -153,17 +160,35 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
         }
       });
 
-      unsubscribeRef.current = unsubscribe;
-      setIsConnected(true);
-      setConnectionAttempts(0);
-      
-      // Clear any pending retry
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
+        unsubscribeRef.current = unsubscribe;
+        setConnectionState('connected');
+        setIsConnected(true);
+        setConnectionAttempts(0);
+        
+        // Clear any pending retry
+        if (retryTimeoutRef.current) {
+          clearTimeout(retryTimeoutRef.current);
+          retryTimeoutRef.current = null;
+        }
+      };
+
+      // Clear any existing subscription with drain period
+      if (unsubscribeRef.current) {
+        setConnectionState('disconnecting');
+        
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+        
+        // Allow connection drain period before new connection
+        setTimeout(() => {
+          continueSetup();
+        }, connectionDrainDelay);
+      } else {
+        continueSetup();
       }
     } catch (error) {
       console.error('Failed to setup real-time subscriptions:', error);
+      setConnectionState('disconnected');
       setIsConnected(false);
       onError?.(error as Error);
       
@@ -177,24 +202,38 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
     }
   }, [connectionAttempts, getRetryDelay, updateMeetings, removeMeeting, fetchFirstRaceTime, onError, today]);
 
-  // Initialize subscriptions
+  // Effect to mark initial data as ready
   useEffect(() => {
+    setIsInitialDataReady(initialData.length > 0);
+  }, [initialData.length]);
+
+  // Initialize subscriptions - follow hybrid architecture: only subscribe after initial data is ready
+  useEffect(() => {
+    if (!isInitialDataReady) {
+      console.log('⏳ Waiting for initial meetings data to be ready before subscription');
+      return;
+    }
+
+    console.log('✅ Initial meetings data ready, setting up real-time subscription');
     setupSubscriptions();
 
     return () => {
       if (unsubscribeRef.current) {
+        setConnectionState('disconnecting');
         unsubscribeRef.current();
       }
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
       }
     };
-  }, [setupSubscriptions]);
+  }, [isInitialDataReady, setupSubscriptions]);
 
   return {
     meetings,
     isConnected,
+    connectionState,
     connectionAttempts,
+    isInitialDataReady,
     retry: setupSubscriptions
   };
 }

@@ -215,6 +215,7 @@ export function RacePageContent() {
             realtimeData.lastEntrantsUpdate || realtimeData.lastUpdate
           }
           poolData={currentPoolData}
+          moneyFlowUpdateTrigger={realtimeData.moneyFlowUpdateTrigger}
         />
       </main>
 
