@@ -216,9 +216,9 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
           Query.orderAsc('startTime'),
           Query.limit(1),
         ]),
-        // Next scheduled race query - exclude abandoned races (for "Next Scheduled" button)
+        // Next scheduled race query - FIXED: Query races after current race, not current time
         databases.listDocuments('raceday-db', 'races', [
-          Query.greaterThan('startTime', now.toISOString()),
+          Query.greaterThan('startTime', raceData.startTime),
           Query.notEqual('status', 'Abandoned'),
           Query.orderAsc('startTime'),
           Query.limit(1),
@@ -537,8 +537,10 @@ async function getNavigationRaceData(raceId: string): Promise<{
           Query.orderAsc('startTime'),
           Query.limit(1),
         ]),
+        // Next scheduled race query - FIXED: Query races after current race, not current time
         databases.listDocuments('raceday-db', 'races', [
-          Query.greaterThan('startTime', now.toISOString()),
+          Query.greaterThan('startTime', raceData.startTime),
+          Query.notEqual('status', 'Abandoned'), // Exclude abandoned races from Next Scheduled
           Query.orderAsc('startTime'),
           Query.limit(1),
         ]),
