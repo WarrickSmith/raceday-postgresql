@@ -6,12 +6,9 @@ import React, {
   useState,
   useCallback,
   ReactNode,
-  useRef,
 } from 'react'
-import { useRouter } from 'next/navigation'
 import { Race, Meeting, Entrant, RaceNavigationData } from '@/types/meetings'
-import { raceCache, cacheInvalidation } from '@/lib/cache'
-import { racePrefetchService } from '@/services/racePrefetchService'
+import { cacheInvalidation } from '@/lib/cache'
 import { useMemoryOptimization } from '@/utils/performance'
 
 interface RaceContextData {
@@ -32,12 +29,10 @@ interface RaceContextValue {
   isLoading: boolean
   error: string | null
   updateRaceData: (data: RaceContextData) => void
-  navigateToRace: (
-    raceId: string,
-    options?: { skipUrlUpdate?: boolean }
-  ) => Promise<void>
+  loadRaceData: (raceId: string) => Promise<void>
   invalidateRaceCache: (raceId: string) => void
-  isNavigationInProgress: () => boolean
+  // New cleanup signal for subscription management
+  subscriptionCleanupSignal: number
 }
 
 const RaceContext = createContext<RaceContextValue | undefined>(undefined)
@@ -48,13 +43,12 @@ interface RaceProviderProps {
 }
 
 export function RaceProvider({ children, initialData }: RaceProviderProps) {
-  const router = useRouter()
   const [raceData, setRaceDataInternal] = useState<RaceContextData | null>(
     initialData
   )
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const navigationInProgress = useRef<string | null>(null)
+  const [subscriptionCleanupSignal, setSubscriptionCleanupSignal] = useState(0)
 
   // Memory optimization for RaceContext
   const { triggerCleanup } = useMemoryOptimization()
@@ -71,105 +65,25 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
     setRaceData(data)
   }, [])
 
-  const navigateToRace = useCallback(
-    async (raceId: string, options?: { skipUrlUpdate?: boolean }) => {
-      // Prevent duplicate navigation calls
-      if (navigationInProgress.current === raceId) {
-        return
+  // Simple race data loading function (without navigation complexity)
+  const loadRaceData = useCallback(async (raceId: string) => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/race/${raceId}`)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch race data: ${response.statusText}`)
       }
-
-      // If we already have data for this race, just update URL without refetching
-      if (raceData && raceData.race.raceId === raceId) {
-        if (!options?.skipUrlUpdate) {
-          router.replace(`/race/${raceId}`)
-        }
-        return
-      }
-
-      navigationInProgress.current = raceId
-      setIsLoading(true)
-      setError(null)
-
-      try {
-        // Check for pre-fetched basic data for immediate rendering
-        const cachedBasicData = await racePrefetchService.getCachedRaceData(
-          raceId
-        )
-
-        if (cachedBasicData) {
-          // Create minimal race data for immediate rendering
-          const immediateRaceData = {
-            race: cachedBasicData.race,
-            meeting: {
-              $createdAt: '',
-              $updatedAt: '',
-              ...cachedBasicData.meeting,
-              category:
-                cachedBasicData.meeting.category === 'H' ||
-                cachedBasicData.meeting.category === 'T'
-                  ? (cachedBasicData.meeting.category as 'H' | 'T')
-                  : ('T' as const),
-            },
-            entrants: [], // Will be populated by background fetch
-            navigationData: {
-              previousRace: null,
-              nextRace: null,
-              nextScheduledRace: null,
-            },
-            dataFreshness: {
-              lastUpdated: new Date().toISOString(),
-              entrantsDataAge: 0,
-              oddsHistoryCount: 0,
-              moneyFlowHistoryCount: 0,
-            },
-          }
-
-          // Set immediate data and clear loading
-          setRaceData(immediateRaceData)
-          setIsLoading(false)
-
-          // Only update URL if not explicitly skipped
-          if (!options?.skipUrlUpdate) {
-            router.replace(`/race/${raceId}`)
-          }
-        }
-
-        // Use cache-first strategy for complete navigation
-        const newRaceData = await raceCache.get(
-          `race:${raceId}:full`,
-          async () => {
-            const response = await fetch(`/api/race/${raceId}`)
-            if (!response.ok) {
-              throw new Error(
-                `Failed to fetch race data: ${response.statusText}`
-              )
-            }
-            return response.json()
-          },
-          15000 // 15 second cache for live data
-        )
-
-        // Only update if we're still navigating to the same race (prevent race conditions)
-        if (navigationInProgress.current === raceId) {
-          setRaceData(newRaceData)
-          // Only update URL if not already done and not explicitly skipped
-          if (!options?.skipUrlUpdate && !cachedBasicData) {
-            router.replace(`/race/${raceId}`)
-          }
-        }
-      } catch (err) {
-        console.error('❌ Error navigating to race:', err)
-        setError(err instanceof Error ? err.message : 'Unknown error occurred')
-      } finally {
-        // Only clear navigation if we're still on the same race
-        if (navigationInProgress.current === raceId) {
-          navigationInProgress.current = null
-        }
-        setIsLoading(false)
-      }
-    },
-    [raceData, router]
-  )
+      const newRaceData = await response.json()
+      setRaceData(newRaceData)
+    } catch (err) {
+      console.error('❌ Error loading race data:', err)
+      setError(err instanceof Error ? err.message : 'Unknown error occurred')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
 
   const invalidateRaceCache = useCallback(
     (raceId: string) => {
@@ -181,18 +95,14 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
     [triggerCleanup]
   )
 
-  const isNavigationInProgress = useCallback(() => {
-    return navigationInProgress.current !== null
-  }, [])
-
   const value: RaceContextValue = {
     raceData,
     isLoading,
     error,
     updateRaceData,
-    navigateToRace,
+    loadRaceData,
     invalidateRaceCache,
-    isNavigationInProgress,
+    subscriptionCleanupSignal,
   }
 
   return <RaceContext.Provider value={value}>{children}</RaceContext.Provider>
