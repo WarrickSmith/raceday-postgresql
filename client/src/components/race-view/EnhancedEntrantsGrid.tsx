@@ -89,7 +89,7 @@ interface EnhancedEntrantsGridProps {
   dataFreshness?: {
     lastUpdated: string
     entrantsDataAge: number
-    oddsHistoryCount: number
+    oddsHistoryCount: number // DEPRECATED: Always 0, odds data comes from MoneyFlowHistory  
     moneyFlowHistoryCount: number
   }
   className?: string
@@ -146,13 +146,18 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     [currentEntrants]
   )
 
+  // Local selection for Win/Place/Odds selector - MUST be declared before hook calls
+  const [selectedView, setSelectedView] = useState<'win' | 'place' | 'odds'>(
+    'win'
+  )
+
   // Debug: Log entrant IDs being passed to timeline hook (development only)
   if (process.env.NODE_ENV === 'development') {
     console.log('🔍 Timeline hook parameters:', {
       raceId: currentRaceId,
       entrantIds: entrantIds.length,
       entrantCount: entrantIds.length,
-      activePool: poolViewState.activePool,
+      selectedView,
     })
   }
 
@@ -160,8 +165,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     timelineData,
     isLoading: timelineLoading,
     error: timelineError,
-    getEntrantDataForInterval,
-  } = useMoneyFlowTimeline(currentRaceId, entrantIds, poolViewState.activePool)
+    getWinPoolData,
+    getPlacePoolData,
+    getOddsData,
+  } = useMoneyFlowTimeline(currentRaceId, entrantIds, selectedView === 'odds' ? 'win' : selectedView)
 
   const [updateNotifications, setUpdateNotifications] = useState(true)
   const [selectedEntrant, setSelectedEntrant] = useState<string | undefined>()
@@ -184,11 +191,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     direction: 'asc', // Default: lowest to highest odds (favorites first)
     isLoading: false,
   })
-
-  // Local selection for Win/Place/Odds selector
-  const [selectedView, setSelectedView] = useState<'win' | 'place' | 'odds'>(
-    'win'
-  )
 
   // Performance and memory optimization
   // Track renders for performance monitoring
@@ -379,6 +381,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       const entrantWithPoolData = {
         ...entrant,
         moneyFlowTimeline: entrantTimeline, // Add timeline data to entrant
+        // Update odds with latest values from timeline data if available (NEW in Story 4.9)
+        winOdds: entrantTimeline?.latestWinOdds ?? entrant.winOdds,
+        placeOdds: entrantTimeline?.latestPlaceOdds ?? entrant.placeOdds,
         poolMoney: {
           win: winPoolContribution,
           place: placePoolContribution,
@@ -848,48 +853,53 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     isCurrentTimeColumn,
   ])
 
-  // Get data for specific timeline point - shows incremental money amounts since previous time point
+  // Get data for specific timeline point - shows incremental money amounts or odds based on selected view
   const getTimelineData = useCallback(
     (entrantId: string, interval: number): string => {
       const entrant = sortedEntrants.find((e) => e.$id === entrantId)
       if (!entrant || entrant.isScratched) return '—'
 
-      // Use the simplified getEntrantDataForInterval from the timeline hook
-      // This eliminates the complex manual calculation logic
-      if (getEntrantDataForInterval) {
-        const result = getEntrantDataForInterval(
-          entrant.$id,
-          interval,
-          poolViewState.activePool as 'win' | 'place'
-        )
-
-        // Debug logging to help troubleshoot data issues
-        if (interval === 60) {
-          console.log(
-            `📊 Timeline data for ${
-              entrant.name || entrant.$id
-            } at ${interval}m:`,
-            {
-              entrantId: entrant.$id,
-              interval,
-              poolType: poolViewState.activePool,
-              result,
-              timelineDataSize: timelineData?.size || 0,
-              hasTimelineData: timelineData?.has(entrant.$id) || false,
-            }
-          )
-        }
-
-        return result
+      // Use appropriate function based on selected view
+      let result: string
+      switch (selectedView) {
+        case 'win':
+          result = getWinPoolData ? getWinPoolData(entrantId, interval) : '—'
+          break
+        case 'place':
+          result = getPlacePoolData ? getPlacePoolData(entrantId, interval) : '—'
+          break
+        case 'odds':
+          // Show Fixed Win odds for odds view
+          result = getOddsData ? getOddsData(entrantId, interval, 'fixedWin') : '—'
+          break
+        default:
+          result = '—'
       }
 
-      return '—'
+      // Debug logging to help troubleshoot data issues
+      if (interval === 60 && process.env.NODE_ENV === 'development') {
+        console.log(
+          `📊 Timeline data for ${entrant.name || entrant.$id} at ${interval}m:`,
+          {
+            entrantId: entrant.$id,
+            interval,
+            selectedView,
+            result,
+            timelineDataSize: timelineData?.size || 0,
+            hasTimelineData: timelineData?.has(entrant.$id) || false,
+          }
+        )
+      }
+
+      return result
     },
     [
       sortedEntrants,
+      selectedView,
       timelineData,
-      poolViewState.activePool,
-      getEntrantDataForInterval,
+      getWinPoolData,
+      getPlacePoolData,
+      getOddsData,
     ]
   )
 
@@ -911,21 +921,24 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     return `${Math.round(percentage)}%`
   }, [])
 
-  // Get pool amount for the currently selected pool type
+  // Get pool amount for the currently selected view type
   const getPoolAmount = useCallback(
     (entrant: Entrant): number | undefined => {
       if (!entrant.poolMoney) return undefined // Return undefined when no real data yet
 
-      switch (poolViewState.activePool) {
+      switch (selectedView) {
         case 'win':
           return entrant.poolMoney.win || 0
         case 'place':
           return entrant.poolMoney.place || 0
+        case 'odds':
+          // For odds view, show win pool amount as it's related to win odds
+          return entrant.poolMoney.win || 0
         default:
           return entrant.poolMoney.total || 0
       }
     },
-    [poolViewState.activePool]
+    [selectedView]
   )
 
   // Get pool percentage for the currently selected pool type
@@ -936,8 +949,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       // Return undefined if no pool money data available yet (avoid showing dummy percentages)
       if (!entrant.poolMoney) return undefined
 
-      // Calculate percentage based on selected pool type
-      switch (poolViewState.activePool) {
+      // Calculate percentage based on selected view type
+      switch (selectedView) {
         case 'win':
           // Calculate percentage of win pool
           const totalWinPool = entrantsWithPoolData.reduce(
@@ -964,12 +977,25 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
             ? ((entrant.poolMoney.place || 0) / totalPlacePool) * 100
             : 0
 
+        case 'odds':
+          // For odds view, show win pool percentage as it's related to win odds
+          const totalWinPoolForOdds = entrantsWithPoolData.reduce(
+            (sum, e) =>
+              !e.isScratched && e.poolMoney
+                ? sum + (e.poolMoney.win || 0)
+                : sum,
+            0
+          )
+          return totalWinPoolForOdds > 0
+            ? ((entrant.poolMoney.win || 0) / totalWinPoolForOdds) * 100
+            : 0
+
         default:
           // Default to existing percentage calculation
           return entrant.poolMoney.percentage || 0
       }
     },
-    [poolViewState.activePool, entrantsWithPoolData]
+    [selectedView, entrantsWithPoolData]
   )
 
   // Handle entrant selection

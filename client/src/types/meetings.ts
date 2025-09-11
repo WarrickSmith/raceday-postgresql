@@ -98,7 +98,8 @@ export interface MoneyFlowHistory {
   holdPercentage: number
 }
 
-// OddsHistory document interface for sparkline data
+// DEPRECATED: OddsHistory document interface for sparkline data
+// Odds data now comes from MoneyFlowHistory collection via Timeline hooks
 export interface OddsHistoryData {
   $id: string
   $createdAt: string
@@ -108,7 +109,8 @@ export interface OddsHistoryData {
   timestamp: string
 }
 
-// Odds history subscription callback interface for type safety
+// DEPRECATED: Odds history subscription callback interface
+// Real-time odds updates now come via MoneyFlowHistory subscriptions
 export interface OddsHistorySubscriptionResponse {
   payload?: Partial<OddsHistoryData> & { $id: string }
   events?: string[]
@@ -165,12 +167,15 @@ export interface Entrant {
   race: string // Race ID this entrant belongs to
   winOdds?: number // Current win odds
   placeOdds?: number // Current place odds
+  // CONSOLIDATED ODDS DATA (NEW in Story 4.9)
+  poolWinOdds?: number // Pool Win odds (tote)
+  poolPlaceOdds?: number // Pool Place odds (tote)
   holdPercentage?: number // Current money flow percentage
   previousHoldPercentage?: number // Previous money flow for trend calculation
   moneyFlowTrend?: 'up' | 'down' | 'neutral' // Trend direction for display
   moneyFlowHistory?: string[] // MoneyFlowHistory collection relationship
-  oddsHistory?: OddsHistoryData[] // Array of odds history data for sparkline
-  oddsHistoryRelationship?: string[] // OddsHistory collection relationship
+  oddsHistory?: OddsHistoryData[] // DEPRECATED: Array of odds history data for sparkline (use MoneyFlowTimeline instead)
+  oddsHistoryRelationship?: string[] // DEPRECATED: OddsHistory collection relationship (use MoneyFlowHistory instead)
   // Enhanced v4.7 data
   moneyFlowTimeline?: EntrantMoneyFlowTimeline // Timeline visualization data
   silk?: JockeySilk // Jockey silk visual data
