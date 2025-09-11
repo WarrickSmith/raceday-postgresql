@@ -75,6 +75,8 @@ interface UseUnifiedRaceRealtimeProps {
   initialEntrants?: Entrant[]
   initialMeeting?: Meeting | null
   initialNavigationData?: RaceNavigationData | null
+  // New cleanup signal for navigation-triggered cleanup
+  cleanupSignal?: number
 }
 
 // Unified state interface
@@ -128,6 +130,7 @@ export function useUnifiedRaceRealtime({
   initialEntrants = [],
   initialMeeting = null,
   initialNavigationData = null,
+  cleanupSignal = 0,
 }: UseUnifiedRaceRealtimeProps): UnifiedRaceRealtimeState &
   UnifiedRaceRealtimeActions {
   const [state, setState] = useState<UnifiedRaceRealtimeState>({
@@ -160,11 +163,14 @@ export function useUnifiedRaceRealtime({
   const connectionStartTime = useRef<number>(Date.now())
   const latencySamples = useRef<number[]>([])
   const initialDataFetched = useRef<boolean>(false)
+  const lastCleanupSignal = useRef<number>(0)
+  const [isCleaningUp, setIsCleaningUp] = useState<boolean>(false)
 
   // Throttling for performance optimization
   const pendingUpdates = useRef<AppwriteRealtimeMessage[]>([])
   const updateThrottleTimer = useRef<NodeJS.Timeout | null>(null)
   const THROTTLE_DELAY = 100 // 100ms for critical periods
+  const CONNECTION_DRAIN_DELAY = 500 // Increased from 200ms for better cleanup
 
   // Smart channel management with race status awareness
   const getChannels = useCallback(
@@ -366,6 +372,48 @@ export function useUnifiedRaceRealtime({
     initialDataFetched.current = false
     debugLog('Race ID changed, reset fetch flag', { raceId })
   }, [raceId])
+
+  // Handle cleanup signal for navigation-triggered cleanup
+  useEffect(() => {
+    if (cleanupSignal > 0 && cleanupSignal !== lastCleanupSignal.current) {
+      debugLog('🧹 Navigation cleanup signal received', { cleanupSignal, raceId })
+      lastCleanupSignal.current = cleanupSignal
+      setIsCleaningUp(true)
+
+      // Force immediate subscription cleanup
+      if (unsubscribeFunction.current) {
+        setState((prev) => ({
+          ...prev,
+          connectionState: 'disconnecting',
+          isConnected: false,
+        }))
+
+        try {
+          unsubscribeFunction.current()
+          unsubscribeFunction.current = null
+          debugLog('✅ Forced subscription cleanup completed')
+        } catch (error) {
+          errorLog('Error during forced cleanup', error)
+        }
+      }
+
+      // Clear pending updates and timers
+      if (updateThrottleTimer.current) {
+        clearTimeout(updateThrottleTimer.current)
+        updateThrottleTimer.current = null
+      }
+      pendingUpdates.current = []
+
+      // Reset cleanup flag after drain period
+      setTimeout(() => {
+        setIsCleaningUp(false)
+        setState((prev) => ({
+          ...prev,
+          connectionState: 'disconnected',
+        }))
+      }, CONNECTION_DRAIN_DELAY)
+    }
+  }, [cleanupSignal, raceId])
 
   // Fetch initial data when race ID changes
   useEffect(() => {
@@ -869,18 +917,18 @@ export function useUnifiedRaceRealtime({
   // Hybrid architecture: Setup subscription ONLY after initial fetch completes
   useEffect(() => {
     // Don't setup subscription until initial fetch is complete (hybrid architecture requirement)
-    if (!raceId || !state.raceDocumentId || !state.isInitialFetchComplete) {
+    if (!raceId || !state.raceDocumentId || !state.isInitialFetchComplete || isCleaningUp) {
       debugLog('⏳ Waiting for initial fetch to complete before subscription', {
         raceId,
         hasRaceDoc: !!state.raceDocumentId,
-        fetchComplete: state.isInitialFetchComplete
+        fetchComplete: state.isInitialFetchComplete,
+        isCleaningUp
       })
       return
     }
 
     let connectionRetries = 0
     const maxRetries = 5
-    const connectionDrainDelay = 200 // 200ms drain period for graceful transitions
 
     const setupSubscription = () => {
       try {
@@ -948,7 +996,7 @@ export function useUnifiedRaceRealtime({
           // Allow connection drain period before new connection
           setTimeout(() => {
             continueSetup()
-          }, connectionDrainDelay)
+          }, CONNECTION_DRAIN_DELAY)
         } else {
           continueSetup()
         }
@@ -1007,7 +1055,7 @@ export function useUnifiedRaceRealtime({
               connectionState: 'disconnected',
               isConnected: false,
             }))
-          }, connectionDrainDelay)
+          }, CONNECTION_DRAIN_DELAY)
         } catch (error) {
           errorLog('Error unsubscribing from unified real-time:', error)
         }
@@ -1019,6 +1067,7 @@ export function useUnifiedRaceRealtime({
     state.raceResultsDocumentId,
     state.isInitialFetchComplete,
     state.race?.status,
+    isCleaningUp,
     getChannels,
     processRealtimeMessage,
   ])
