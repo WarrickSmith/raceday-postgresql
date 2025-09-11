@@ -109,7 +109,7 @@ export const RaceFooter = memo(function RaceFooter({
         </div>
 
         {/* Column 2: Results Section */}
-        <div className="w-96 flex-shrink-0 pr-4">
+        <div className="w-[470px] flex-shrink-0 pr-4">
           <RaceResultsSection
             resultsData={currentResultsData}
             lastUpdate={lastResultsUpdate}
