@@ -53,7 +53,6 @@ export const RaceDataHeader = memo(function RaceDataHeader({
     return () => clearInterval(timer)
   }, [])
 
-
   // Get connection health status
   const healthStatus = useMemo(() => {
     if (!connectionHealth) return { status: 'unknown', color: 'gray' }
