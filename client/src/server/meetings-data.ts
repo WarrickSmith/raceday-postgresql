@@ -18,21 +18,43 @@ export async function getMeetingsData(): Promise<Meeting[]> {
       timeZone: 'Pacific/Auckland',
     });
     
-    // Convert to datetime format to match database storage format
-    const todayDateTime = `${today}T00:00:00.000+00:00`;
-    // Query meetings for current day using datetime format
-    const meetingsResponse = await databases.listDocuments(
-      'raceday-db',
-      'meetings',
-      [
-        Query.equal('date', todayDateTime),
-        Query.equal('country', [COUNTRY_CODES.AUSTRALIA, COUNTRY_CODES.NEW_ZEALAND]),
-        Query.equal('category', [...SUPPORTED_RACE_TYPE_CODES]),
-        Query.orderAsc('$createdAt'),
-      ]
-    );
+    console.log('Fetching meetings for date:', today);
+    
+    // Try multiple date formats to match database storage format
+    let meetingsResponse;
+    
+    try {
+      // Try with simple date format first
+      meetingsResponse = await databases.listDocuments(
+        'raceday-db',
+        'meetings',
+        [
+          Query.equal('date', today),
+          Query.equal('country', [COUNTRY_CODES.AUSTRALIA, COUNTRY_CODES.NEW_ZEALAND]),
+          Query.equal('category', [...SUPPORTED_RACE_TYPE_CODES]),
+          Query.orderAsc('$createdAt'),
+        ]
+      );
+    } catch (error) {
+      console.warn('Simple date format failed, trying datetime format:', error);
+      
+      // Fallback to datetime format
+      const todayDateTime = `${today}T00:00:00.000+00:00`;
+      meetingsResponse = await databases.listDocuments(
+        'raceday-db',
+        'meetings',
+        [
+          Query.equal('date', todayDateTime),
+          Query.equal('country', [COUNTRY_CODES.AUSTRALIA, COUNTRY_CODES.NEW_ZEALAND]),
+          Query.equal('category', [...SUPPORTED_RACE_TYPE_CODES]),
+          Query.orderAsc('$createdAt'),
+        ]
+      );
+    }
 
     const meetings = meetingsResponse.documents as unknown as Meeting[];
+    
+    console.log(`Found ${meetings.length} meetings for ${today}`);
     
     // Get first race time for each meeting to enable chronological sorting
     const meetingsWithFirstRace = await Promise.all(
@@ -73,6 +95,16 @@ export async function getMeetingsData(): Promise<Meeting[]> {
     return meetingsWithFirstRace;
   } catch (error) {
     console.error('Error fetching meetings data:', error);
+    
+    // Log additional details for debugging
+    console.error('Environment check:', {
+      hasEndpoint: !!process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT,
+      hasProjectId: !!process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID,
+      hasApiKey: !!process.env.APPWRITE_API_KEY
+    });
+    
+    // Return empty array to prevent page crashes
+    // The real-time subscription will provide data once the client loads
     return [];
   }
 }
