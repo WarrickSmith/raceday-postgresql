@@ -12,7 +12,7 @@ interface RaceContextData {
   dataFreshness: {
     lastUpdated: string;
     entrantsDataAge: number;
-    oddsHistoryCount: number;
+    oddsHistoryCount: number; // DEPRECATED: Always 0, odds data comes from MoneyFlowHistory
     moneyFlowHistoryCount: number;
   };
 }

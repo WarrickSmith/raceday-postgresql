@@ -1135,6 +1135,12 @@ function updateEntrantMoneyFlow(
         ...entrant,
         holdPercentage: moneyFlowData.holdPercentage || entrant.holdPercentage,
         moneyFlowTrend: trend,
+        // CONSOLIDATED ODDS DATA UPDATE (NEW in Story 4.9)
+        // Update current odds from money-flow-history if available
+        winOdds: moneyFlowData.fixedWinOdds !== undefined ? moneyFlowData.fixedWinOdds : entrant.winOdds,
+        placeOdds: moneyFlowData.fixedPlaceOdds !== undefined ? moneyFlowData.fixedPlaceOdds : entrant.placeOdds,
+        poolWinOdds: moneyFlowData.poolWinOdds !== undefined ? moneyFlowData.poolWinOdds : entrant.poolWinOdds,
+        poolPlaceOdds: moneyFlowData.poolPlaceOdds !== undefined ? moneyFlowData.poolPlaceOdds : entrant.poolPlaceOdds,
         $updatedAt: new Date().toISOString(),
       }
     }

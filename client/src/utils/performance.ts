@@ -230,26 +230,8 @@ export const entrantsListComparison = (prev: Entrant[], next: Entrant[]): boolea
   return true;
 };
 
-// Memory efficient odds history processing
-export function useOptimizedOddsHistory(entrants: Entrant[], maxHistoryPoints = 20) {
-  return useMemo(() => {
-    const historyMap = new Map<string, number[]>();
-    
-    entrants.forEach(entrant => {
-      if (entrant.oddsHistory && entrant.oddsHistory.length > 0) {
-        // Sample the odds history to reduce memory usage
-        const history = entrant.oddsHistory;
-        const sampledHistory = history.length > maxHistoryPoints
-          ? sampleArray(history.map(h => h.winOdds), maxHistoryPoints)
-          : history.map(h => h.winOdds);
-        
-        historyMap.set(entrant.$id, sampledHistory);
-      }
-    });
-    
-    return historyMap;
-  }, [entrants, maxHistoryPoints]);
-}
+// DEPRECATED: Odds history processing now handled by MoneyFlowTimeline hook
+// This function is no longer needed since odds data comes from consolidated MoneyFlowHistory
 
 // Efficient array sampling for large datasets
 function sampleArray<T>(array: T[], sampleSize: number): T[] {
