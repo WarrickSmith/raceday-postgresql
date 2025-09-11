@@ -27,6 +27,11 @@ interface ServerMoneyFlowPoint {
   placePoolAmount?: number
   type?: string
   poolType?: string
+  // CONSOLIDATED ODDS DATA (NEW in Story 4.9)
+  fixedWinOdds?: number
+  fixedPlaceOdds?: number
+  poolWinOdds?: number
+  poolPlaceOdds?: number
 }
 
 export interface TimelineGridData {
@@ -51,6 +56,10 @@ interface UseMoneyFlowTimelineResult {
     interval: number,
     poolType: 'win' | 'place'
   ) => string
+  // NEW: Multi-pool support functions
+  getWinPoolData: (entrantId: string, interval: number) => string
+  getPlacePoolData: (entrantId: string, interval: number) => string
+  getOddsData: (entrantId: string, interval: number, oddsType: 'fixedWin' | 'fixedPlace' | 'poolWin' | 'poolPlace') => string
 }
 
 export function useMoneyFlowTimeline(
@@ -343,6 +352,79 @@ export function useMoneyFlowTimeline(
     }
   }, [raceId, entrantIds.join(','), raceStatus, fetchTimelineData]) // Use entrantIds.join(',') to avoid array reference issues
 
+  // NEW: Get Win pool data for specific entrant and time interval
+  const getWinPoolData = useCallback(
+    (entrantId: string, interval: number) => {
+      return getEntrantDataForInterval(entrantId, interval, 'win')
+    },
+    [getEntrantDataForInterval]
+  )
+
+  // NEW: Get Place pool data for specific entrant and time interval
+  const getPlacePoolData = useCallback(
+    (entrantId: string, interval: number) => {
+      return getEntrantDataForInterval(entrantId, interval, 'place')
+    },
+    [getEntrantDataForInterval]
+  )
+
+  // NEW: Get odds data for specific entrant and time interval
+  const getOddsData = useCallback(
+    (
+      entrantId: string,
+      interval: number,
+      oddsType: 'fixedWin' | 'fixedPlace' | 'poolWin' | 'poolPlace'
+    ) => {
+      // Handle empty timeline data gracefully
+      if (!timelineData || timelineData.size === 0) {
+        return '—'
+      }
+
+      // Get entrant's timeline data directly
+      const entrantTimeline = timelineData.get(entrantId)
+      if (!entrantTimeline || entrantTimeline.dataPoints.length === 0) {
+        return '—'
+      }
+
+      // Find data point for this specific interval
+      const dataPoint = entrantTimeline.dataPoints.find((point) => {
+        const pointInterval = point.timeInterval ?? point.timeToStart ?? -999
+        return pointInterval === interval
+      })
+
+      if (!dataPoint) {
+        return '—'
+      }
+
+      // Get odds value based on type from consolidated data
+      let oddsValue: number | undefined
+      switch (oddsType) {
+        case 'fixedWin':
+          oddsValue = dataPoint.fixedWinOdds
+          break
+        case 'fixedPlace':
+          oddsValue = dataPoint.fixedPlaceOdds
+          break
+        case 'poolWin':
+          oddsValue = dataPoint.poolWinOdds
+          break
+        case 'poolPlace':
+          oddsValue = dataPoint.poolPlaceOdds
+          break
+        default:
+          return '—'
+      }
+
+      // Format odds for display
+      if (!oddsValue || oddsValue <= 0) {
+        return '—'
+      }
+
+      return oddsValue.toFixed(2)
+    },
+    [timelineData]
+  )
+
   return {
     timelineData,
     gridData,
@@ -351,6 +433,9 @@ export function useMoneyFlowTimeline(
     lastUpdate,
     refetch: fetchTimelineData,
     getEntrantDataForInterval,
+    getWinPoolData,
+    getPlacePoolData,
+    getOddsData,
   }
 }
 
@@ -443,6 +528,11 @@ function processTimelineData(
         incrementalWinAmount: (doc as any).incrementalWinAmount || 0,
         incrementalPlaceAmount: (doc as any).incrementalPlaceAmount || 0,
         pollingInterval: getPollingIntervalFromType((doc as any).intervalType),
+        // CONSOLIDATED ODDS DATA (NEW in Story 4.9)
+        fixedWinOdds: (doc as any).fixedWinOdds,
+        fixedPlaceOdds: (doc as any).fixedPlaceOdds,
+        poolWinOdds: (doc as any).poolWinOdds,
+        poolPlaceOdds: (doc as any).poolPlaceOdds,
       }
 
       timelinePoints.push(timelinePoint)
@@ -480,12 +570,33 @@ function processTimelineData(
       significantChange = Math.abs(percentageChange) >= 1.0 // Reduced threshold for more sensitivity
     }
 
+    // Calculate latest odds from timeline data (NEW in Story 4.9)
+    let latestWinOdds: number | undefined
+    let latestPlaceOdds: number | undefined
+    
+    // Find the most recent odds values - timelinePoints is sorted by time interval descending (60, 55, 50... 0, -0.5, -1)
+    // The LOWEST intervals (closest to 0 or negative) are the NEWEST, so iterate BACKWARDS from the end
+    for (let i = timelinePoints.length - 1; i >= 0; i--) {
+      const point = timelinePoints[i]
+      if (!latestWinOdds && point.fixedWinOdds !== undefined && point.fixedWinOdds > 0) {
+        latestWinOdds = point.fixedWinOdds
+      }
+      if (!latestPlaceOdds && point.fixedPlaceOdds !== undefined && point.fixedPlaceOdds > 0) {
+        latestPlaceOdds = point.fixedPlaceOdds
+      }
+      // Break if we found both odds values
+      if (latestWinOdds && latestPlaceOdds) break
+    }
+
     entrantDataMap.set(entrantId, {
       entrantId,
       dataPoints: timelinePoints,
       latestPercentage: latestPoint?.poolPercentage || 0,
       trend,
       significantChange,
+      // Add latest odds from timeline data
+      latestWinOdds,
+      latestPlaceOdds,
     })
 
     if (process.env.NODE_ENV === 'development') {
