@@ -87,8 +87,7 @@ async function getEntrantsData(raceId: string): Promise<{
         race: doc.race,
         winOdds: doc.poolWinOdds || doc.fixedWinOdds,
         placeOdds: doc.poolPlaceOdds || doc.fixedPlaceOdds,
-        // Basic entrants data - no historical data yet
-        oddsHistory: [],
+        // Basic entrants data - no odds history needed (available via MoneyFlowHistory timeline)
       };
     });
 

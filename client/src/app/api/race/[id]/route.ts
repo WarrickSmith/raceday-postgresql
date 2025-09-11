@@ -5,11 +5,9 @@ import {
   Meeting,
   Entrant,
   MoneyFlowHistory,
-  OddsHistoryData,
   RaceNavigationData,
 } from '@/types/meetings'
 
-const ODDS_HISTORY_QUERY_LIMIT = 500
 
 /**
  * API route for client-side race data fetching
@@ -227,24 +225,15 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
         ]),
       ])
 
-    // Only fetch history data if there are entrants (avoid empty Query.equal calls)
-    const [moneyFlowQuery, oddsHistoryQuery] =
+    // Only fetch money flow history data if there are entrants (avoid empty Query.equal calls)
+    const moneyFlowQuery =
       entrantIds.length > 0
-        ? await Promise.all([
-            // Money flow history batch query
-            databases.listDocuments('raceday-db', 'money-flow-history', [
-              Query.equal('entrant', entrantIds), // Batch query for all entrants at once
-              Query.orderDesc('$createdAt'),
-              Query.limit(200), // Increased limit for comprehensive data
-            ]),
-            // Odds history batch query
-            databases.listDocuments('raceday-db', 'odds-history', [
-              Query.equal('entrant', entrantIds), // Batch query for all entrants at once
-              Query.orderDesc('$createdAt'),
-              Query.limit(ODDS_HISTORY_QUERY_LIMIT),
-            ]),
+        ? await databases.listDocuments('raceday-db', 'money-flow-history', [
+            Query.equal('entrant', entrantIds), // Batch query for all entrants at once
+            Query.orderDesc('$createdAt'),
+            Query.limit(200), // Increased limit for comprehensive data
           ])
-        : [{ documents: [] }, { documents: [] }] // Return empty results if no entrants
+        : { documents: [] } // Return empty results if no entrants
 
     // Group results by entrant for processing with enhanced data structure
     const moneyFlowByEntrant = new Map<string, MoneyFlowHistory[]>()
@@ -257,29 +246,31 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       moneyFlowByEntrant.get(entrantId)!.push(moneyFlowDoc)
     })
 
-    // Group odds history results by entrant for processing and map to correct format
-    const oddsHistoryByEntrant = new Map<string, OddsHistoryData[]>()
-    oddsHistoryQuery.documents.forEach((doc) => {
+    // Extract odds history from MoneyFlowHistory data for sparklines
+    const oddsHistoryByEntrant = new Map<string, Array<{$id: string, $createdAt: string, $updatedAt: string, entrant: string, winOdds: number, timestamp: string}>>()
+    moneyFlowQuery.documents.forEach((doc) => {
       const rawDoc = doc as unknown as {
         entrant: string
-        type: string
+        fixedWinOdds?: number
+        poolWinOdds?: number
         [key: string]: unknown
       }
       const entrantId = rawDoc.entrant
-
-      // Only include win odds for sparklines (pool_win preferred, fixed_win as fallback)
-      if (rawDoc.type !== 'pool_win' && rawDoc.type !== 'fixed_win') {
-        return
+      
+      // Use consolidated odds data from MoneyFlowHistory (prefer fixed odds, fallback to pool odds)
+      const winOdds = rawDoc.fixedWinOdds || rawDoc.poolWinOdds
+      if (!winOdds || winOdds <= 0) {
+        return // Skip if no valid odds data
       }
 
-      // Map the database fields to the expected interface format
-      const oddsHistoryDoc: OddsHistoryData = {
+      // Create odds history entry from MoneyFlowHistory data
+      const oddsHistoryDoc = {
         $id: rawDoc.$id as string,
         $createdAt: rawDoc.$createdAt as string,
         $updatedAt: rawDoc.$updatedAt as string,
         entrant: rawDoc.entrant,
-        winOdds: rawDoc.odds as number, // Map 'odds' field to 'winOdds'
-        timestamp: (rawDoc.eventTimestamp || rawDoc.$createdAt) as string,
+        winOdds: winOdds,
+        timestamp: (rawDoc.$createdAt) as string,
       }
 
       if (!oddsHistoryByEntrant.has(entrantId)) {
@@ -396,7 +387,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
     const dataFreshness = {
       lastUpdated: now.toISOString(),
       entrantsDataAge,
-      oddsHistoryCount: oddsHistoryQuery.documents.length,
+      oddsHistoryCount: 0, // Deprecated: odds data now comes from MoneyFlowHistory
       moneyFlowHistoryCount: moneyFlowQuery.documents.length,
     }
 
