@@ -142,12 +142,6 @@ export interface RaceNavigationData {
   } | null
 }
 
-// Navigation button state interfaces
-export interface NavigationButtonState {
-  isLoading: boolean
-  disabled: boolean
-  disabledReason?: string
-}
 
 export interface Entrant {
   $id: string

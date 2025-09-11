@@ -9,7 +9,7 @@ import { useUnifiedRaceRealtime } from '@/hooks/useUnifiedRaceRealtime'
 import type { RaceStatus } from '@/types/racePools'
 
 export function RacePageContent() {
-  const { raceData, isLoading, error } = useRace()
+  const { raceData, isLoading, error, subscriptionCleanupSignal } = useRace()
 
   // Unified real-time subscription for all race page data
   const realtimeData = useUnifiedRaceRealtime({
@@ -18,6 +18,7 @@ export function RacePageContent() {
     initialEntrants: raceData?.entrants || [],
     initialMeeting: raceData?.meeting || null,
     initialNavigationData: raceData?.navigationData || null,
+    cleanupSignal: subscriptionCleanupSignal,
   })
 
   // Status synchronization monitoring and debug messaging
