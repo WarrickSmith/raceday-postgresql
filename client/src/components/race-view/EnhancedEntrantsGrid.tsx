@@ -99,6 +99,8 @@ interface EnhancedEntrantsGridProps {
   lastUpdate?: Date | null
   // Real-time pool data from unified subscription
   poolData?: RacePoolData | null
+  // Trigger for timeline refetch when unified subscription receives money flow updates
+  moneyFlowUpdateTrigger?: number
 }
 
 // Enhanced single-component architecture with integrated timeline:
@@ -117,6 +119,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   realtimeEntrants,
   lastUpdate,
   poolData = null,
+  moneyFlowUpdateTrigger,
 }: EnhancedEntrantsGridProps) {
   const { raceData } = useRace()
 
@@ -168,10 +171,18 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     getWinPoolData,
     getPlacePoolData,
     getOddsData,
+    refetch: refetchTimeline,
   } = useMoneyFlowTimeline(currentRaceId, entrantIds, selectedView === 'odds' ? 'win' : selectedView)
 
   const [updateNotifications, setUpdateNotifications] = useState(true)
   const [selectedEntrant, setSelectedEntrant] = useState<string | undefined>()
+
+  // Trigger timeline refetch when unified subscription receives money flow updates
+  useEffect(() => {
+    if (moneyFlowUpdateTrigger && refetchTimeline) {
+      refetchTimeline()
+    }
+  }, [moneyFlowUpdateTrigger, refetchTimeline])
 
   // Timeline-related state
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -1257,11 +1268,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                             minute: '2-digit',
                           })}
                         </span>
-                        {column.isDynamic && (
-                          <span className="text-[8px] text-yellow-600 font-medium">
-                            LIVE
-                          </span>
-                        )}
                       </div>
                     </th>
                   ))}

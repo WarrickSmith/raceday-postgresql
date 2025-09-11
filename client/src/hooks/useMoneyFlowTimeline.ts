@@ -6,7 +6,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { client } from '@/lib/appwrite-client'
 import type {
   MoneyFlowDataPoint,
   EntrantMoneyFlowTimeline,
@@ -288,67 +287,20 @@ export function useMoneyFlowTimeline(
       return
     }
 
-    // Set up real-time subscription with proper channel format
-    let unsubscribe: (() => void) | null = null
-
-    try {
-      // Subscribe to the money-flow-history collection with proper channel format
-      const channels = [
-        `databases.raceday-db.collections.money-flow-history.documents`,
-      ]
-
-      unsubscribe = client.subscribe(channels, (response: any) => {
-        // Check if this update affects our entrants
-        const updatedEntrant = response.payload?.entrant
-        const isRelevantUpdate =
-          updatedEntrant &&
-          (typeof updatedEntrant === 'string'
-            ? entrantIds.includes(updatedEntrant)
-            : entrantIds.includes(updatedEntrant?.entrantId))
-
-        if (isRelevantUpdate) {
-          if (process.env.NODE_ENV === 'development') {
-            console.log(
-              '📊 Relevant money flow update for entrant:',
-              updatedEntrant
-            )
-          }
-
-          // Debounce rapid updates with a small delay
-          setTimeout(() => {
-            fetchTimelineData()
-          }, 500)
-        }
-      })
-
-      if (process.env.NODE_ENV === 'development') {
-        console.log(
-          '🔔 Money flow timeline subscription established for channels:',
-          channels
-        )
-      }
-    } catch (subscriptionError) {
-      console.error(
-        '❌ Failed to establish money flow timeline subscription:',
-        subscriptionError
+    // NOTE: Real-time subscription removed to follow hybrid architecture
+    // This hook now only handles data fetching - real-time updates come from 
+    // the unified subscription in useUnifiedRaceRealtime
+    // The parent component should trigger refetch when it receives money-flow-history updates
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(
+        '📊 Money flow timeline using fetch-only mode (no subscription)',
+        { raceId, entrantIds: entrantIds.length }
       )
-      // Continue without real-time updates if subscription fails
     }
 
     return () => {
-      if (unsubscribe) {
-        try {
-          unsubscribe()
-          if (process.env.NODE_ENV === 'development') {
-            console.log('🔕 Money flow timeline subscription closed')
-          }
-        } catch (error) {
-          console.warn(
-            'Error unsubscribing from money flow timeline updates:',
-            error
-          )
-        }
-      }
+      // No subscription cleanup needed - using unified subscription architecture
     }
   }, [raceId, entrantIds.join(','), raceStatus, fetchTimelineData]) // Use entrantIds.join(',') to avoid array reference issues
 
