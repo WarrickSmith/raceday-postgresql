@@ -170,7 +170,7 @@ export function useUnifiedRaceRealtime({
   const pendingUpdates = useRef<AppwriteRealtimeMessage[]>([])
   const updateThrottleTimer = useRef<NodeJS.Timeout | null>(null)
   const THROTTLE_DELAY = 100 // 100ms for critical periods
-  const CONNECTION_DRAIN_DELAY = 500 // Increased from 200ms for better cleanup
+  const CONNECTION_DRAIN_DELAY = 200 // Reduced for faster navigation
 
   // Smart channel management with race status awareness
   const getChannels = useCallback(

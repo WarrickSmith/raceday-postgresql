@@ -40,9 +40,12 @@ export const RaceDataHeader = memo(function RaceDataHeader({
 
   // Use props data if provided (from unified subscription), otherwise fall back to context
   const race = propRace || raceData?.race
-  const entrants = useMemo(() => propEntrants || raceData?.entrants || [], [propEntrants, raceData?.entrants])
+  const entrants = useMemo(
+    () => propEntrants || raceData?.entrants || [],
+    [propEntrants, raceData?.entrants]
+  )
   const meeting = propMeeting || raceData?.meeting
-  
+
   // Use navigation data from props or context (no real-time hook)
   const navigationData = propNavigationData || raceData?.navigationData
 
@@ -226,7 +229,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
             {formattedTime}
           </time>
           <span>•</span>
-          <span className="text-purple-800 font-medium truncate max-w-24 whitespace-nowrap">
+          <span className="text-purple-800 font-medium max-w-24 whitespace-nowrap">
             {formattedRaceType}
           </span>
         </div>
