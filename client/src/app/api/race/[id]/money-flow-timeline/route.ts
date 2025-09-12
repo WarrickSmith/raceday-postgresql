@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/appwrite-server'
 import { Query } from 'node-appwrite'
 
-import type { MoneyFlowDataPoint } from '@/types/money-flow'
+import type { MoneyFlowDataPoint } from '@/types/moneyFlow'
 // Valid pool types for API filtering
 const VALID_POOL_TYPES = ['win', 'place', 'odds'] as const
 type PoolType = typeof VALID_POOL_TYPES[number]
@@ -11,11 +11,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { searchParams } = new URL(request.url)
+  const entrantIds = searchParams.get('entrants')?.split(',') || []
+  const poolTypeParam = searchParams.get('poolType') || 'win'
+  const { id: raceId } = await params
+  
   try {
-    const { searchParams } = new URL(request.url)
-    const entrantIds = searchParams.get('entrants')?.split(',') || []
-    const poolTypeParam = searchParams.get('poolType') || 'win'
-    const { id: raceId } = await params
 
     // Validate poolType parameter
     if (!VALID_POOL_TYPES.includes(poolTypeParam as PoolType)) {
@@ -145,7 +146,7 @@ export async function GET(
 
     // Add interval coverage analysis for debugging
     const intervalCoverage = analyzeIntervalCoverage(
-      response.documents,
+      response.documents as unknown as MoneyFlowDataPoint[],
       entrantIds
     )
 
@@ -175,7 +176,7 @@ export async function GET(
       details: error instanceof Error ? error.message : 'Unknown error',
       context: {
         raceId: raceId || 'unknown',
-        poolType: poolType || 'unknown',
+        poolType: poolTypeParam || 'unknown',
         entrantCount: entrantIds?.length || 0
       }
     }
