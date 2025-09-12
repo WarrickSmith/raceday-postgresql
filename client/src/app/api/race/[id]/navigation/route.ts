@@ -39,7 +39,7 @@ async function getNavigationData(raceId: string): Promise<{
   try {
     const { databases } = await createServerClient();
     
-    // First get race data to find startTime
+    // First get race data to find startTime and meeting info
     const raceQuery = await databases.listDocuments(
       'raceday-db', 
       'races',
@@ -53,8 +53,7 @@ async function getNavigationData(raceId: string): Promise<{
     const raceData = raceQuery.documents[0];
     const now = new Date();
     
-    // Fetch navigation data - previous, next, and next scheduled races
-    // Only exclude abandoned races from Next Scheduled query, not Previous/Next chronological navigation
+    // Fetch navigation data - previous, next, and next scheduled races with meeting info
     const [previousRaceQuery, nextRaceQuery, nextScheduledRaceQuery] = await Promise.all([
       // Previous race query - chronological navigation, includes all races
       databases.listDocuments(
@@ -76,7 +75,7 @@ async function getNavigationData(raceId: string): Promise<{
           Query.limit(1)
         ]
       ),
-      // Next scheduled race query - exclude abandoned races (for "Next Scheduled" button)
+      // Next scheduled race query - find next race from NOW, regardless of current race (for "Next Scheduled" button)
       databases.listDocuments(
         'raceday-db',
         'races',
@@ -89,25 +88,45 @@ async function getNavigationData(raceId: string): Promise<{
       )
     ]);
 
+    // Helper function to get meeting name for a race
+    const getMeetingName = async (race: any): Promise<string> => {
+      try {
+        const meetingQuery = await databases.listDocuments(
+          'raceday-db',
+          'meetings',
+          [Query.equal('$id', race.meeting), Query.limit(1)]
+        );
+        return meetingQuery.documents[0]?.meetingName || 'Unknown Meeting';
+      } catch {
+        return 'Unknown Meeting';
+      }
+    };
+
     // Process navigation data with meeting information
+    const [previousMeetingName, nextMeetingName, nextScheduledMeetingName] = await Promise.all([
+      previousRaceQuery.documents.length > 0 ? getMeetingName(previousRaceQuery.documents[0]) : Promise.resolve(''),
+      nextRaceQuery.documents.length > 0 ? getMeetingName(nextRaceQuery.documents[0]) : Promise.resolve(''),
+      nextScheduledRaceQuery.documents.length > 0 ? getMeetingName(nextScheduledRaceQuery.documents[0]) : Promise.resolve('')
+    ]);
+
     const navigationData: RaceNavigationData = {
       previousRace: previousRaceQuery.documents.length > 0 ? {
         raceId: previousRaceQuery.documents[0].raceId,
         name: previousRaceQuery.documents[0].name,
         startTime: previousRaceQuery.documents[0].startTime,
-        meetingName: previousRaceQuery.documents[0].meeting?.meetingName || 'Unknown Meeting'
+        meetingName: previousMeetingName
       } : null,
       nextRace: nextRaceQuery.documents.length > 0 ? {
         raceId: nextRaceQuery.documents[0].raceId,
         name: nextRaceQuery.documents[0].name,
         startTime: nextRaceQuery.documents[0].startTime,
-        meetingName: nextRaceQuery.documents[0].meeting?.meetingName || 'Unknown Meeting'
+        meetingName: nextMeetingName
       } : null,
       nextScheduledRace: nextScheduledRaceQuery.documents.length > 0 ? {
         raceId: nextScheduledRaceQuery.documents[0].raceId,
         name: nextScheduledRaceQuery.documents[0].name,
         startTime: nextScheduledRaceQuery.documents[0].startTime,
-        meetingName: nextScheduledRaceQuery.documents[0].meeting?.meetingName || 'Unknown Meeting'
+        meetingName: nextScheduledMeetingName
       } : null
     };
 
