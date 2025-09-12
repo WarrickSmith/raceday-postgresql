@@ -33,6 +33,7 @@ interface RaceContextValue {
   invalidateRaceCache: (raceId: string) => void
   // New cleanup signal for subscription management
   subscriptionCleanupSignal: number
+  triggerSubscriptionCleanup: () => void
 }
 
 const RaceContext = createContext<RaceContextValue | undefined>(undefined)
@@ -95,6 +96,11 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
     [triggerCleanup]
   )
 
+  // Trigger subscription cleanup for navigation
+  const triggerSubscriptionCleanup = useCallback(() => {
+    setSubscriptionCleanupSignal(prev => prev + 1)
+  }, [])
+
   const value: RaceContextValue = {
     raceData,
     isLoading,
@@ -103,6 +109,7 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
     loadRaceData,
     invalidateRaceCache,
     subscriptionCleanupSignal,
+    triggerSubscriptionCleanup,
   }
 
   return <RaceContext.Provider value={value}>{children}</RaceContext.Provider>
