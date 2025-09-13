@@ -1,9 +1,8 @@
 import { Client, Databases } from 'node-appwrite';
-import { ensureDatabaseSetup } from './database-setup.js';
 import { fetchRacingData } from './api-client.js';
 import { filterMeetings } from './data-processors.js';
 import { processMeetings, processRaces } from './database-utils.js';
-import { validateEnvironmentVariables, executeWithDatabaseSetupTimeout, handleError } from './error-handlers.js';
+import { validateEnvironmentVariables, handleError } from './error-handlers.js';
 
 export default async function main(context) {
     try {
@@ -27,15 +26,6 @@ export default async function main(context) {
             .setKey(apiKey);
         const databases = new Databases(client);
         const databaseId = 'raceday-db';
-        
-        // Database setup (with timeout protection) - increased timeout for comprehensive schema
-        context.log('Starting database setup verification...');
-        await executeWithDatabaseSetupTimeout(ensureDatabaseSetup, {
-            endpoint,
-            projectId,
-            apiKey,
-            databaseId
-        }, context, 180000); // 3 minutes for comprehensive entrant attributes
         
         // Fetch meetings data from NZ TAB API
         context.log('Fetching meetings data from NZ TAB API...');

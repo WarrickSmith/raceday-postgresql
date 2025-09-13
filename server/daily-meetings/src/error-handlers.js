@@ -17,27 +17,6 @@ export function withTimeout(promise, timeoutMs, operation) {
     return Promise.race([promise, timeoutPromise]);
 }
 
-/**
- * Execute database setup with timeout protection
- * @param {Function} setupFunction - Database setup function
- * @param {Object} config - Configuration object
- * @param {Object} context - Appwrite function context
- * @param {number} timeoutMs - Timeout in milliseconds (default: 60000)
- * @returns {Promise<boolean>} Success status
- */
-export async function executeWithDatabaseSetupTimeout(setupFunction, config, context, timeoutMs = 60000) {
-    try {
-        await withTimeout(setupFunction(config, context), timeoutMs, 'Database setup');
-        context.log('Database setup completed successfully');
-        return true;
-    } catch (error) {
-        context.error('Database setup failed or timed out', {
-            error: error instanceof Error ? error.message : 'Unknown error'
-        });
-        context.log('Continuing without database setup...');
-        return false;
-    }
-}
 
 /**
  * Execute API call with timeout and retry logic
