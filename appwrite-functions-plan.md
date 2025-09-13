@@ -124,6 +124,15 @@ Add to package.json:
 - Implement progress checkpointing for resumable execution
 - Add memory usage monitoring and cleanup
 
+**Developer Notes - Fast-Fail Lock Implementation**:
+- Implement `fastLockCheck()` as the absolute first operation (before any imports or initialization)
+- Target <50ms for lock acquisition attempt to minimize CPU waste for duplicate instances
+- Use atomic document creation with fixed ID 'daily-initial-data-lock' for collision detection
+- Terminate immediately if lock acquisition fails, logging resource usage (should be <100ms total)
+- Only proceed with heavy initialization (database connections, API clients) after lock acquired
+- Include stale lock detection (>3 minutes without heartbeat) with cleanup and retry mechanism
+- Add execution ID generation and heartbeat updates every 60 seconds during execution
+
 ### 5.2 daily-meetings Function Enhancement
 **Current Issues**: Scheduled at 19:00 with 840s timeout, database setup dependency
 **Appwrite Timeout Protection**: Appwrite server enforces 14-minute termination, preventing overlap with daily-races (20:00)
@@ -133,6 +142,15 @@ Add to package.json:
 - Implement 1:00 AM NZ time termination (backup to Appwrite timeout)
 - Add comprehensive API failure handling with exponential backoff
 - Optimize memory usage for large meeting datasets
+
+**Developer Notes - Fast-Fail Lock Implementation**:
+- Implement ultra-lightweight lock check as first operation before NZ TAB API initialization
+- Use fixed document ID 'daily-meetings-lock' with atomic creation for instant collision detection
+- Target <30ms lock check time since this function has lighter initialization than daily-initial-data
+- Immediately terminate if another instance detected, avoiding expensive API client setup
+- Include stale lock cleanup for locks older than 5 minutes (accounting for 840s max runtime)
+- Add heartbeat mechanism every 2 minutes during meeting import processing
+- Log CPU/memory savings when terminating duplicate instances for optimization tracking
 
 ### 5.3 daily-races Function Enhancement
 **Current Issues**: Scheduled at 20:00 with 840s timeout, long execution times
@@ -144,6 +162,16 @@ Add to package.json:
 - Optimize database batch operations
 - Add progress tracking and resumable processing
 
+**Developer Notes - Fast-Fail Lock Implementation**:
+- Execute `fastLockCheck()` immediately before any race data processing or API initialization
+- Use document ID 'daily-races-lock' with atomic creation for instant duplicate detection
+- Target <40ms for lock acquisition due to potentially heavy race processing setup
+- Terminate instantly if lock held, avoiding expensive entrant and pool data initialization
+- Implement robust stale lock detection (>6 minutes) given this function's longer runtime potential
+- Add progress-aware heartbeat updates every 90 seconds with current race processing status
+- Include chunked processing state in lock document for potential resume capability
+- Monitor and log resource savings when duplicate instances terminate early
+
 ### 5.4 enhanced-race-poller Function Enhancement
 **Current Issues**: Complex polling logic, potential overlaps
 **Improvements**:
@@ -152,6 +180,16 @@ Add to package.json:
 - Add 1:00 AM NZ time termination for continuous polling
 - Optimize batch processing algorithms
 - Add intelligent race selection logic to prevent redundant polling
+
+**Developer Notes - Fast-Fail Lock Implementation**:
+- Implement immediate lock check before race selection queries and polling logic initialization
+- Use document ID 'enhanced-race-poller-lock' with sub-document race-specific tracking
+- Target <25ms for ultra-fast lock check given this function's frequent execution pattern
+- Immediately terminate if another poller instance is active, avoiding race query overhead
+- Implement granular stale lock detection (>2 minutes) due to shorter expected runtimes
+- Add race-specific progress tracking in heartbeat updates every 45 seconds
+- Include intelligent backoff mechanism if multiple startup attempts detected
+- Log polling efficiency gains when duplicate instances terminate without processing
 
 ### 5.5 master-race-scheduler Function Enhancement
 **Current Issues**: Continuous 1-minute schedule creates potential overlapping executions across midnight boundary
@@ -164,6 +202,17 @@ Add to package.json:
 - Optimize race selection algorithms for performance
 - Add execution monitoring and automatic backoff on system overload
 
+**Developer Notes - Critical Fast-Fail Lock Implementation**:
+- **CRITICAL**: Implement lock check as absolute first operation given every-minute execution frequency
+- Use document ID 'master-race-scheduler-lock' with 90-second automatic expiration (well under 120s timeout)
+- Target <15ms for lock acquisition - must be ultra-fast given high execution frequency
+- Immediately terminate if lock exists, avoiding any scheduling logic or database queries
+- Implement aggressive stale lock detection (>75 seconds) with automatic cleanup
+- Add midnight boundary detection in lock document to prevent day-transition conflicts
+- Include micro-heartbeat updates every 30 seconds with current scheduling progress
+- **Performance Critical**: Log termination stats to monitor scheduling efficiency and overlap prevention
+- Add automatic backoff detection if multiple rapid terminations occur
+
 ### 5.6 meeting-status-poller Function Enhancement
 **Current Issues**: 15-minute intervals spanning midnight boundary create potential overlaps
 **Critical CRON Schedule Issue**: Function schedule `*/15 21-23,0-11 * * *` spans midnight (23:45 PM to 00:00 AM executions). With 300s timeout, executions could overlap across day boundary.
@@ -175,6 +224,17 @@ Add to package.json:
 - Optimize API call batching for multiple meetings
 - Add graceful degradation on API failures
 
+**Developer Notes - Fast-Fail Lock Implementation**:
+- Implement lock check before any meeting query or API client initialization
+- Use document ID 'meeting-status-poller-lock' with 270-second expiration (under 300s timeout)
+- Target <35ms for lock acquisition including midnight boundary validation
+- Immediately terminate if lock exists, avoiding expensive meeting selection queries
+- Implement day-transition aware stale lock detection (>4 minutes) with boundary checks
+- Add midnight rollover logic in lock document to prevent day-boundary execution conflicts
+- Include meeting-specific progress in heartbeat updates every 2 minutes
+- **Midnight Critical**: Add explicit day transition validation before any processing
+- Log boundary crossing efficiency and overlap prevention metrics
+
 ## Task 6: Implement Appwrite 2025 Best Practices
 
 ### 6.1 Execution Management Best Practices
@@ -184,15 +244,21 @@ Add to package.json:
 - **Event-Driven Architecture**: Leverage Appwrite real-time events where appropriate
 
 ### 6.2 Execution Lock Implementation
-Create shared execution lock utility with Appwrite timeout awareness:
-- Use Appwrite database documents as distributed locks
-- Implement automatic lock expiration accounting for Appwrite's 14-minute force termination:
-  - Master scheduler: 90 seconds maximum (well under 120s timeout)
-  - Meeting status poller: 270 seconds maximum (well under 300s timeout)
-  - Daily functions: 780 seconds maximum (well under 840s timeout)
-- Add heartbeat mechanism for long-running functions
-- Include lock cleanup on function termination
-- Add midnight boundary checks for CRON functions spanning day transitions
+**Note**: Each Appwrite function is self-contained and deployed independently - no shared code utilities possible.
+
+Implement fast-fail execution lock pattern in each function individually:
+- **Fast-Fail Pattern**: Lock check as absolute first operation before any heavy initialization
+- **Resource Efficiency**: Target <50ms lock acquisition time to minimize CPU waste for duplicate instances
+- **Atomic Locking**: Use Appwrite database document creation with fixed IDs for collision detection
+- **Function-Specific Configuration**:
+  - Master scheduler: <15ms lock check, 90s expiration (120s timeout)
+  - Enhanced race poller: <25ms lock check, 120s expiration
+  - Meeting status poller: <35ms lock check, 270s expiration (300s timeout)
+  - Daily functions: <50ms lock check, 780s expiration (840s timeout)
+- **Stale Lock Detection**: Each function implements its own cleanup logic with function-appropriate timeouts
+- **Immediate Termination**: Duplicate instances exit immediately with resource usage logging
+- **Midnight Boundary Protection**: Functions spanning day transitions include boundary validation
+- **Code Duplication Strategy**: Copy fast-lock-check logic into each function's codebase independently
 
 ### 6.3 Auto-Termination Implementation
 Add NZ timezone-aware termination:
