@@ -29,7 +29,7 @@ export const RacePoolsSection = memo(function RacePoolsSection({
     poolData: fallbackPoolData,
     isLoading,
     error,
-  } = useRacePoolData(poolData ? '' : raceId)
+  } = useRacePoolData(poolData ? '' : raceId, !!poolData) // Disable subscription when unified poolData is available
   const currentPoolData = poolData || fallbackPoolData
 
   if (isLoading && !poolData) {

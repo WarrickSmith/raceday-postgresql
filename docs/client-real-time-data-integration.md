@@ -10,6 +10,32 @@ This document outlines how the RaceDay client application integrates with the Ap
 
 ## Data Architecture
 
+### Hybrid Data Approach
+
+The RaceDay client application employs a **hybrid data approach** that optimizes for both initial load performance and real-time responsiveness:
+
+#### Primary Pattern: Initial Fetch + Unified Subscription
+1. **Initial Data Fetch**: Components fetch baseline data on mount
+2. **Single Unified Subscription**: Establish one primary subscription to the Appwrite database
+3. **Specific Channel Subscriptions**: Create targeted channels for specific collections and documents
+4. **Intelligent Filtering**: Filter updates to only process relevant data changes
+
+This approach ensures:
+- **Fast Initial Load**: Users see data immediately without waiting for subscriptions
+- **Minimized Data Transfer**: Only relevant updates are processed
+- **Optimal Responsiveness**: Real-time updates maintain UI freshness
+- **Reduced Overhead**: Fewer subscription channels reduce connection complexity
+
+#### Race Results Exception
+One notable exception to the hybrid approach is the **Race Page Footer Results component**:
+- **No Initial Data**: No results data exists until race reaches 'interim' status
+- **Status-Based Logic**: Displays fallback values of '-' until race status changes
+- **Delayed Subscription**: Results data fetched and subscription established only after 'interim' status
+- **Results Collection**: Uses separate `race-results` collection with `resultStatus` attribute
+- **Status Transitions**: Real-time updates when `resultStatus` changes from 'interim' to 'final'
+
+This ensures race results display immediately when available without unnecessary empty data fetching.
+
 ### Primary Collections
 
 #### `entrants` Collection - Current State Data
@@ -41,31 +67,40 @@ This document outlines how the RaceDay client application integrates with the Ap
 }
 ```
 
-#### `odds-history` Collection - Historical Trend Data
-**Purpose**: Time-series data for odds trend analysis and charts
-**Query Pattern**: On-demand historical data fetching
+#### `money-flow-history` Collection - Consolidated Timeline Data
+**Purpose**: Unified time-series data for money flow analysis, market sentiment, AND odds history
+**Query Pattern**: Single collection for all timeline data (money + odds)
+
+> **Architecture Change**: As of Story 4.9 implementation, odds data has been consolidated into the money-flow-history collection, eliminating the need for a separate odds-history collection. This provides better performance and data consistency.
 
 **Fields:**
 ```javascript
 {
-  entrant: "entrant-uuid",     // Relationship to entrants
-  odds: 2.25,                  // Odds value at this timestamp
-  type: "fixed_win",           // Odds type: fixed_win, fixed_place, pool_win, pool_place
-  eventTimestamp: "2025-07-30T22:59:25.565Z"
-}
-```
-
-#### `money-flow-history` Collection - Money Flow Trend Data
-**Purpose**: Time-series data for money flow analysis and market sentiment
-**Query Pattern**: On-demand historical money flow data fetching
-
-**Fields:**
-```javascript
-{
-  entrant: "entrant-uuid",     // Relationship to entrants
-  holdPercentage: 15.5,        // Money held percentage (hold_percentage or bet_percentage)
-  type: "hold_percentage",     // Flow type: hold_percentage, bet_percentage
-  eventTimestamp: "2025-07-31T01:31:39.863Z"
+  entrant: "entrant-uuid",          // Relationship to entrants
+  raceId: "race-uuid",             // Race identifier
+  holdPercentage: 15.5,             // Money held percentage (hold_percentage or bet_percentage)
+  type: "bucketed_aggregation",     // Document type (bucketed_aggregation, win_pool_data, place_pool_data)
+  timeToStart: 45,                  // Minutes to race start
+  timeInterval: 45,                 // Timeline bucket
+  intervalType: "1m",               // Polling frequency indicator
+  eventTimestamp: "2025-08-28T...", // When event occurred
+  pollingTimestamp: "2025-08-28...",// When data was collected
+  
+  // Money Flow Data
+  winPoolAmount: 123450,            // Win pool amount in cents
+  placePoolAmount: 67890,           // Place pool amount in cents
+  incrementalWinAmount: 5670,       // Win pool increment in cents
+  incrementalPlaceAmount: 2340,     // Place pool increment in cents
+  winPoolPercentage: 6.2,           // Win-specific percentage
+  placePoolPercentage: 4.8,         // Place-specific percentage
+  
+  // CONSOLIDATED ODDS DATA (NEW)
+  fixedWinOdds: 2.25,              // Fixed Win odds at this time bucket
+  fixedPlaceOdds: 1.45,            // Fixed Place odds at this time bucket  
+  poolWinOdds: 2.7,                // Pool Win odds (tote) at this time bucket
+  poolPlaceOdds: 3.3,              // Pool Place odds (tote) at this time bucket
+  
+  poolType: "combined"              // Contains both Win and Place data
 }
 ```
 
@@ -203,60 +238,67 @@ function useUnifiedRaceSubscription(entrantIds, raceStatus) {
 
 ### Historical Data Queries
 
-**Fetch odds history for trend analysis:**
+**Fetch consolidated timeline data (money flow + odds) for analysis:**
 
 ```javascript
-// Get odds history for a specific entrant
-async function getOddsHistory(entrantId, oddsType = 'fixed_win', limit = 50) {
-  const history = await databases.listDocuments('raceday-db', 'odds-history', [
-    Query.equal('entrant', entrantId),
-    Query.equal('type', oddsType),
-    Query.orderDesc('eventTimestamp'),
-    Query.limit(limit)
-  ]);
-  
-  return history.documents;
-}
-
-// Get odds history for all entrants in a race
-async function getRaceOddsHistory(raceId, oddsType = 'fixed_win') {
-  // First get all entrants for the race
-  const entrants = await databases.listDocuments('raceday-db', 'entrants', [
-    Query.equal('race', raceId)
-  ]);
-  
-  // Then get history for each entrant
-  const historyPromises = entrants.documents.map(entrant => 
-    getOddsHistory(entrant.entrantId, oddsType)
-  );
-  
-  const histories = await Promise.all(historyPromises);
-  return histories;
-}
-
-// Get money flow history for a specific entrant
-async function getMoneyFlowHistory(entrantId, flowType = 'hold_percentage', limit = 50) {
+// Get consolidated timeline data for a specific entrant
+async function getTimelineHistory(entrantId, raceId, limit = 50) {
   const history = await databases.listDocuments('raceday-db', 'money-flow-history', [
     Query.equal('entrant', entrantId),
-    Query.equal('type', flowType),
-    Query.orderDesc('eventTimestamp'),
+    Query.equal('raceId', raceId),
+    Query.equal('type', 'bucketed_aggregation'),
+    Query.orderDesc('timeInterval'),
     Query.limit(limit)
   ]);
   
   return history.documents;
 }
 
-// Get combined odds and money flow data for comprehensive analysis
-async function getCombinedHistory(entrantId, limit = 50) {
-  const [oddsHistory, moneyFlowHistory] = await Promise.all([
-    getOddsHistory(entrantId, 'fixed_win', limit),
-    getMoneyFlowHistory(entrantId, 'hold_percentage', limit)
+// Get odds data from consolidated timeline collection
+async function getOddsFromTimeline(entrantId, raceId, oddsType = 'fixedWinOdds', limit = 50) {
+  const timeline = await getTimelineHistory(entrantId, raceId, limit);
+  
+  return timeline.map(doc => ({
+    odds: doc[oddsType],
+    timestamp: doc.eventTimestamp,
+    timeInterval: doc.timeInterval,
+    pollingTime: doc.pollingTimestamp
+  }));
+}
+
+// Get timeline data for all entrants in a race
+async function getRaceTimelineData(raceId) {
+  const timeline = await databases.listDocuments('raceday-db', 'money-flow-history', [
+    Query.equal('raceId', raceId),
+    Query.equal('type', 'bucketed_aggregation'),
+    Query.orderDesc('timeInterval')
   ]);
   
-  return {
-    odds: oddsHistory,
-    moneyFlow: moneyFlowHistory
-  };
+  return timeline.documents;
+}
+
+// Get comprehensive timeline data with both money flow and odds
+async function getComprehensiveTimeline(entrantId, raceId, limit = 50) {
+  const timeline = await getTimelineHistory(entrantId, raceId, limit);
+  
+  return timeline.map(doc => ({
+    timeInterval: doc.timeInterval,
+    timestamp: doc.eventTimestamp,
+    
+    // Money flow data
+    winPoolAmount: doc.winPoolAmount,
+    placePoolAmount: doc.placePoolAmount,
+    incrementalWinAmount: doc.incrementalWinAmount,
+    incrementalPlaceAmount: doc.incrementalPlaceAmount,
+    winPoolPercentage: doc.winPoolPercentage,
+    placePoolPercentage: doc.placePoolPercentage,
+    
+    // Consolidated odds data
+    fixedWinOdds: doc.fixedWinOdds,
+    fixedPlaceOdds: doc.fixedPlaceOdds,
+    poolWinOdds: doc.poolWinOdds,
+    poolPlaceOdds: doc.poolPlaceOdds
+  }));
 }
 ```
 
@@ -404,13 +446,14 @@ export function EntrantCard({ entrant }) {
   
   useEffect(() => {
     const loadTrend = async () => {
-      const history = await getOddsHistory(entrant.entrantId, 'fixed_win', 10);
-      const trendData = calculateTrend(entrant.fixedWinOdds, history);
+      // Get odds from consolidated timeline data
+      const oddsData = await getOddsFromTimeline(entrant.entrantId, entrant.race, 'fixedWinOdds', 10);
+      const trendData = calculateTrend(entrant.fixedWinOdds, oddsData);
       setTrend(trendData);
     };
     
     loadTrend();
-  }, [entrant.fixedWinOdds, entrant.entrantId]);
+  }, [entrant.fixedWinOdds, entrant.entrantId, entrant.race]);
   
   return (
     <div className={`entrant-card ${getTrendClass(trend?.trend)}`}>
@@ -554,20 +597,23 @@ async function preloadRaceData(raceIds) {
 ## Data Flow Summary
 
 1. **Enhanced Backend Polling**: `enhanced-race-poller` function polls NZTAB API with mathematical validation and data quality scoring
-2. **Historical Storage**: Before updating `entrants`, odds changes saved to `odds-history` with comprehensive validation
+2. **Consolidated Storage**: Money flow data AND odds changes saved to unified `money-flow-history` collection with comprehensive validation
 3. **Current State Update**: `entrants` collection updated with pre-calculated, validated data
-4. **Real-Time Push**: Appwrite pushes updates to subscribed clients with intelligent filtering
+4. **Real-Time Push**: Appwrite pushes updates to subscribed clients with intelligent filtering using hybrid subscription approach
 5. **Frontend Update**: React components receive updates with race status awareness and debounced processing
-6. **Trend Analysis**: On-demand historical queries enhanced with server-side calculations
+6. **Unified Analysis**: Single collection queries provide both money flow and odds data with server-side calculations
 7. **Visual Indicators**: UI shows live trends, movements, and status changes with value flash animations
 
 This enhanced architecture enables:
-- **Sub-second latency** for live odds updates with mathematical validation
+- **Sub-second latency** for live updates with mathematical validation
+- **Unified data source** for money flow and odds with consolidated timeline queries
+- **Hybrid data approach** optimizing initial load and real-time updates
 - **Comprehensive trend analysis** with full historical context and data quality assurance  
 - **Seamless race switching** with preserved data and intelligent caching
 - **Scalable real-time experience** for multiple concurrent users with server-heavy processing
 - **Race status awareness** with automatic subscription management for completed races
 - **Enhanced error handling** with graceful degradation and comprehensive logging
+- **Simplified client queries** with single collection access for all timeline data
 
 ## Related Advanced Implementation
 

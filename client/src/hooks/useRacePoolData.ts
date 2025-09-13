@@ -16,7 +16,7 @@ interface UseRacePoolDataResult {
   refreshPoolData: () => Promise<void>
 }
 
-export function useRacePoolData(raceId: string): UseRacePoolDataResult {
+export function useRacePoolData(raceId: string, disableSubscription = false): UseRacePoolDataResult {
   const [poolData, setPoolData] = useState<RacePoolData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -78,7 +78,15 @@ export function useRacePoolData(raceId: string): UseRacePoolDataResult {
     // Initial fetch
     fetchPoolData()
 
-    // Set up real-time subscription
+    // Skip subscription if disabled (when used with unified subscription)
+    if (disableSubscription) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📊 Pool data subscription disabled - using unified subscription mode')
+      }
+      return
+    }
+
+    // Set up real-time subscription only if not disabled
     let unsubscribe: (() => void) | null = null
 
     try {
@@ -139,7 +147,7 @@ export function useRacePoolData(raceId: string): UseRacePoolDataResult {
         }
       }
     }
-  }, [raceId, fetchPoolData])
+  }, [raceId, disableSubscription, fetchPoolData])
 
   const refreshPoolData = useCallback(async () => {
     await fetchPoolData()

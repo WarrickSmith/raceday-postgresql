@@ -40,8 +40,13 @@ export const RaceDataHeader = memo(function RaceDataHeader({
 
   // Use props data if provided (from unified subscription), otherwise fall back to context
   const race = propRace || raceData?.race
-  const entrants = propEntrants || raceData?.entrants || []
+  const entrants = useMemo(
+    () => propEntrants || raceData?.entrants || [],
+    [propEntrants, raceData?.entrants]
+  )
   const meeting = propMeeting || raceData?.meeting
+
+  // Use navigation data from props or context (no real-time hook)
   const navigationData = propNavigationData || raceData?.navigationData
 
   // Real-time clock update
@@ -52,17 +57,6 @@ export const RaceDataHeader = memo(function RaceDataHeader({
 
     return () => clearInterval(timer)
   }, [])
-
-  // Format last update timestamp for display
-  const formatLastUpdate = useMemo(() => {
-    if (!lastUpdate) return null
-    return lastUpdate.toLocaleTimeString('en-US', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    })
-  }, [lastUpdate])
 
   // Get connection health status
   const healthStatus = useMemo(() => {
@@ -97,7 +91,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
   )
   const formattedRaceType = useMemo(() => {
     if (!meeting) return ''
-    
+
     // Priority 1: Use category code for abbreviated display
     if (meeting.category) {
       const abbreviated = getRaceTypeDisplay(meeting.category)
@@ -105,7 +99,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
         return abbreviated
       }
     }
-    
+
     // Priority 2: Fallback to full race type (will be truncated by CSS)
     return meeting.raceType || ''
   }, [meeting])
@@ -222,11 +216,6 @@ export const RaceDataHeader = memo(function RaceDataHeader({
             >
               {healthStatus.status}
             </span>
-            {formatLastUpdate && (
-              <span className="text-xs text-gray-500 ml-1">
-                @{formatLastUpdate}
-              </span>
-            )}
           </div>
         </div>
 
@@ -239,7 +228,8 @@ export const RaceDataHeader = memo(function RaceDataHeader({
           <time dateTime={race.startTime} className="font-mono">
             {formattedTime}
           </time>
-          <span className="text-purple-800 font-medium truncate max-w-24 whitespace-nowrap">
+          <span>•</span>
+          <span className="text-purple-800 font-medium max-w-24 whitespace-nowrap">
             {formattedRaceType}
           </span>
         </div>

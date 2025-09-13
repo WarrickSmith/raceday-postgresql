@@ -2,10 +2,18 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { SparklineChart } from '../SparklineChart';
-import { OddsHistoryData } from '@/types/meetings';
+// Simplified odds data interface for testing (from MoneyFlowHistory)
+interface OddsDataPoint {
+  $id: string;
+  $createdAt: string;
+  $updatedAt: string;
+  entrant: string;
+  winOdds: number;
+  timestamp: string;
+}
 
 // Mock data for testing
-const mockOddsHistoryData: OddsHistoryData[] = [
+const mockOddsHistoryData: OddsDataPoint[] = [
   {
     $id: '1',
     $createdAt: '2025-08-11T10:00:00Z',
@@ -32,7 +40,7 @@ const mockOddsHistoryData: OddsHistoryData[] = [
   }
 ];
 
-const mockFlatOddsData: OddsHistoryData[] = [
+const mockFlatOddsData: OddsDataPoint[] = [
   {
     $id: '1',
     $createdAt: '2025-08-11T10:00:00Z',

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, Query } from '@/lib/appwrite-server';
-import { MoneyFlowHistory, OddsHistoryData } from '@/types/meetings';
+import { MoneyFlowHistory } from '@/types/meetings';
 
-const ODDS_HISTORY_QUERY_LIMIT = 500;
 
 export async function GET(
   request: NextRequest,
@@ -42,7 +41,7 @@ interface MoneyFlowData {
 }
 
 async function getHistoricalData(raceId: string): Promise<{
-  oddsHistory: { [entrantId: string]: OddsHistoryData[] };
+  oddsHistory: { [entrantId: string]: Array<{$id: string, $createdAt: string, $updatedAt: string, entrant: string, winOdds: number, timestamp: string}> };
   moneyFlow: { [entrantId: string]: MoneyFlowData };
   dataFreshness: {
     oddsHistoryCount: number;
@@ -85,29 +84,16 @@ async function getHistoricalData(raceId: string): Promise<{
       };
     }
 
-    // Fetch historical data in parallel
-    const [moneyFlowQuery, oddsHistoryQuery] = await Promise.all([
-      // Money flow history batch query
-      databases.listDocuments(
-        'raceday-db',
-        'money-flow-history',
-        [
-          Query.equal('entrant', entrantIds),
-          Query.orderDesc('$createdAt'),
-          Query.limit(200)
-        ]
-      ),
-      // Odds history batch query
-      databases.listDocuments(
-        'raceday-db',
-        'odds-history',
-        [
-          Query.equal('entrant', entrantIds),
-          Query.orderDesc('$createdAt'),
-          Query.limit(ODDS_HISTORY_QUERY_LIMIT)
-        ]
-      )
-    ]);
+    // Fetch money flow history data (which now contains consolidated odds)
+    const moneyFlowQuery = await databases.listDocuments(
+      'raceday-db',
+      'money-flow-history',
+      [
+        Query.equal('entrant', entrantIds),
+        Query.orderDesc('$createdAt'),
+        Query.limit(200)
+      ]
+    );
 
     // Process money flow data
     const moneyFlowByEntrant = new Map<string, MoneyFlowHistory[]>();
@@ -120,24 +106,30 @@ async function getHistoricalData(raceId: string): Promise<{
       moneyFlowByEntrant.get(entrantId)!.push(moneyFlowDoc);
     });
 
-    // Process odds history data
-    const oddsHistoryByEntrant = new Map<string, OddsHistoryData[]>();
-    oddsHistoryQuery.documents.forEach(doc => {
-      const rawDoc = doc as unknown as { entrant: string; type: string; [key: string]: unknown };
+    // Extract odds history from MoneyFlowHistory data for sparklines
+    const oddsHistoryByEntrant = new Map<string, Array<{$id: string, $createdAt: string, $updatedAt: string, entrant: string, winOdds: number, timestamp: string}>>(); 
+    moneyFlowQuery.documents.forEach(doc => {
+      const rawDoc = doc as unknown as {
+        entrant: string;
+        fixedWinOdds?: number;
+        poolWinOdds?: number;
+        [key: string]: unknown;
+      };
       const entrantId = rawDoc.entrant;
       
-      // Only include win odds for sparklines (pool_win preferred, fixed_win as fallback)
-      if (rawDoc.type !== 'pool_win' && rawDoc.type !== 'fixed_win') {
-        return;
+      // Use consolidated odds data from MoneyFlowHistory (prefer fixed odds, fallback to pool odds)
+      const winOdds = rawDoc.fixedWinOdds || rawDoc.poolWinOdds;
+      if (!winOdds || winOdds <= 0) {
+        return; // Skip if no valid odds data
       }
       
-      const oddsHistoryDoc: OddsHistoryData = {
+      const oddsHistoryDoc = {
         $id: rawDoc.$id as string,
         $createdAt: rawDoc.$createdAt as string,
         $updatedAt: rawDoc.$updatedAt as string,
         entrant: rawDoc.entrant,
-        winOdds: rawDoc.odds as number,
-        timestamp: (rawDoc.eventTimestamp || rawDoc.$createdAt) as string
+        winOdds: winOdds,
+        timestamp: rawDoc.$createdAt as string
       };
       
       if (!oddsHistoryByEntrant.has(entrantId)) {
@@ -170,7 +162,7 @@ async function getHistoricalData(raceId: string): Promise<{
     });
 
     // Convert odds history to final format
-    const oddsHistoryMap: { [entrantId: string]: OddsHistoryData[] } = {};
+    const oddsHistoryMap: { [entrantId: string]: Array<{$id: string, $createdAt: string, $updatedAt: string, entrant: string, winOdds: number, timestamp: string}> } = {};
     entrantIds.forEach(entrantId => {
       const oddsHistory = oddsHistoryByEntrant.get(entrantId) || [];
       oddsHistory.sort((a, b) => new Date(a.$createdAt).getTime() - new Date(b.$createdAt).getTime());
@@ -181,7 +173,7 @@ async function getHistoricalData(raceId: string): Promise<{
       oddsHistory: oddsHistoryMap,
       moneyFlow: moneyFlowMap,
       dataFreshness: {
-        oddsHistoryCount: oddsHistoryQuery.documents.length,
+        oddsHistoryCount: 0, // Deprecated: odds data now comes from MoneyFlowHistory
         moneyFlowHistoryCount: moneyFlowQuery.documents.length,
       },
     };

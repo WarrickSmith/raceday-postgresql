@@ -727,9 +727,28 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
         { key: 'mathematicallyConsistent', type: 'boolean', required: false }, // Pool sum validation
         { key: 'pollingLatencyMs', type: 'integer', required: false }, // Performance monitoring
         { key: 'isStale', type: 'boolean', required: false }, // Data freshness indicator
+        
+        // STORY 4.9 - Consolidate odds data into MoneyFlowHistory collection for unified timeline
+        { key: 'fixedWinOdds', type: 'float', required: false }, // Fixed Win odds at this time bucket
+        { key: 'fixedPlaceOdds', type: 'float', required: false }, // Fixed Place odds at this time bucket
+        { key: 'poolWinOdds', type: 'float', required: false }, // Pool Win odds (tote) at this time bucket  
+        { key: 'poolPlaceOdds', type: 'float', required: false }, // Pool Place odds (tote) at this time bucket
     ];
     // Create attributes in parallel for improved performance
     await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
+    
+    // CRITICAL: Wait for Story 4.9 odds fields to be available before proceeding
+    context.log('Waiting for Story 4.9 odds fields to become available...');
+    const oddsFields = ['fixedWinOdds', 'fixedPlaceOdds', 'poolWinOdds', 'poolPlaceOdds'];
+    for (const oddsField of oddsFields) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, oddsField, context);
+        if (!isAvailable) {
+            context.error(`Failed to wait for ${oddsField} attribute to become available`);
+        } else {
+            context.log(`✅ ${oddsField} attribute is now available`);
+        }
+    }
+    
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'entrant'))) {
         context.log('Creating money flow history->entrants relationship...');
         await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.entrants, RelationshipType.ManyToOne, false, 'entrant', 'moneyFlowHistory');
@@ -828,6 +847,33 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
             }
             catch (error) {
                 context.error(`Failed to create idx_is_stale index for money flow history: ${error}`);
+            }
+        }
+    }
+    
+    // STORY 4.9 - Indexes for odds data in MoneyFlowHistory collection
+    if (!moneyFlowCollection.indexes.some((idx) => idx.key === 'idx_fixed_win_odds')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'fixedWinOdds', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_fixed_win_odds', IndexType.Key, ['fixedWinOdds']);
+                context.log('idx_fixed_win_odds index created successfully for money flow history');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_fixed_win_odds index for money flow history: ${error}`);
+            }
+        }
+    }
+    
+    if (!moneyFlowCollection.indexes.some((idx) => idx.key === 'idx_fixed_place_odds')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'fixedPlaceOdds', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_fixed_place_odds', IndexType.Key, ['fixedPlaceOdds']);
+                context.log('idx_fixed_place_odds index created successfully for money flow history');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_fixed_place_odds index for money flow history: ${error}`);
             }
         }
     }

@@ -444,7 +444,7 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
  * @param {string} raceStatus - Race status for filtering
  * @returns {number} Number of entrants processed for money flow
  */
-export async function processMoneyTrackerData(databases, databaseId, moneyTrackerData, context, raceId = 'unknown', racePoolData = null, raceStatus = null, validationResults = null) {
+export async function processMoneyTrackerData(databases, databaseId, moneyTrackerData, context, raceId = 'unknown', racePoolData = null, raceStatus = null, validationResults = null, entrantOddsData = null) {
   if (!moneyTrackerData || !moneyTrackerData.entrants || !Array.isArray(moneyTrackerData.entrants)) {
     context.log('❌ No money tracker entrants data available', { 
       raceId,
@@ -559,7 +559,7 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
     })
     try {
       const bucketedRecords = await saveTimeBucketedMoneyFlowHistory(
-        databases, databaseId, raceId, entrantMoneyData, racePoolData, context
+        databases, databaseId, raceId, entrantMoneyData, racePoolData, context, entrantOddsData
       )
       context.log('✅ Saved time-bucketed money flow history', {
         raceId, bucketedRecords
@@ -601,9 +601,10 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
  * @param {Object} entrantMoneyData - Aggregated money data per entrant
  * @param {Object} racePoolData - Race pool totals
  * @param {Object} context - Appwrite function context for logging
+ * @param {Object} entrantOddsData - Current odds data per entrant (STORY 4.9)
  * @returns {number} Number of bucketed records created
  */
-async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, entrantMoneyData, racePoolData, context) {
+async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, entrantMoneyData, racePoolData, context, entrantOddsData = null) {
   let recordsCreated = 0
   const timestamp = new Date().toISOString()
 
@@ -767,7 +768,29 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
           ? (winPoolAmount / (racePoolData.winPoolTotal * 100)) * 100 : null,
         placePoolPercentage: racePoolData && racePoolData.placePoolTotal > 0
           ? (placePoolAmount / (racePoolData.placePoolTotal * 100)) * 100 : null,
+        
+        // STORY 4.9 - Consolidated odds data in MoneyFlowHistory
+        fixedWinOdds: entrantOddsData?.[entrantId]?.fixed_win || null,
+        fixedPlaceOdds: entrantOddsData?.[entrantId]?.fixed_place || null,
+        poolWinOdds: entrantOddsData?.[entrantId]?.pool_win || null,
+        poolPlaceOdds: entrantOddsData?.[entrantId]?.pool_place || null,
       }
+
+      // Debug logging for odds storage in timeline
+      context.log('🎯 ODDS DEBUG - Storing odds in timeline bucket', {
+        entrantId: entrantId.slice(0, 8) + '...',
+        entrantIdType: typeof entrantId,
+        entrantIdLength: entrantId.length,
+        timeInterval: timeInterval,
+        entrantOddsDataExists: !!entrantOddsData,
+        entrantOddsDataKeys: entrantOddsData ? Object.keys(entrantOddsData).slice(0, 3) : [],
+        entrantSpecificOddsExists: !!entrantOddsData?.[entrantId],
+        rawEntrantOdds: entrantOddsData?.[entrantId],
+        fixedWinOdds: bucketedDoc.fixedWinOdds,
+        fixedPlaceOdds: bucketedDoc.fixedPlaceOdds,
+        poolWinOdds: bucketedDoc.poolWinOdds,
+        poolPlaceOdds: bucketedDoc.poolPlaceOdds
+      })
 
       context.log('📝 Creating bucketed document with fields', {
         entrantId: entrantId.slice(0, 8) + '...',
@@ -781,7 +804,18 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
         hasRawPollingData: !!bucketedDoc.rawPollingData,
         pollingLatencyMs: bucketedDoc.pollingLatencyMs,
         rawPollingData: !!bucketedDoc.rawPollingData,
-        mathematicallyConsistent: bucketedDoc.mathematicallyConsistent
+        mathematicallyConsistent: bucketedDoc.mathematicallyConsistent,
+        // STORY 4.9 - Debug odds values being sent to database
+        oddsFieldsBeingSaved: {
+          fixedWinOdds: bucketedDoc.fixedWinOdds,
+          fixedPlaceOdds: bucketedDoc.fixedPlaceOdds,
+          poolWinOdds: bucketedDoc.poolWinOdds,
+          poolPlaceOdds: bucketedDoc.poolPlaceOdds,
+          fixedWinType: typeof bucketedDoc.fixedWinOdds,
+          fixedPlaceType: typeof bucketedDoc.fixedPlaceOdds,
+          poolWinType: typeof bucketedDoc.poolWinOdds,
+          poolPlaceType: typeof bucketedDoc.poolPlaceOdds
+        }
       })
 
       await databases.createDocument(databaseId, 'money-flow-history', bucketDocumentId, bucketedDoc)
@@ -872,10 +906,11 @@ export async function processToteTrendsData(databases, databaseId, raceId, tote_
  * @param {string} raceId - Race ID
  * @param {Array} entrants - Array of entrant objects from NZTAB API
  * @param {Object} context - Appwrite function context for logging
- * @returns {number} Number of entrants processed
+ * @returns {Object} {entrantsProcessed: number, entrantOddsData: Object} - Count and odds data for timeline storage
  */
 export async function processEntrants(databases, databaseId, raceId, entrants, context) {
   let entrantsProcessed = 0
+  const entrantOddsData = {} // STORY 4.9 - Collect odds data for timeline storage
   const processingStartTime = Date.now()
 
   context.log('Starting enhanced entrants processing', {
@@ -935,6 +970,29 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
         if (!hasValidOdds) {
           context.log('⚠️ Entrant has no valid odds', { entrantId: entrant.entrant_id })
         }
+        
+        // STORY 4.9 - Collect odds data for timeline storage in MoneyFlowHistory
+        // Handle optional pool odds fields and ensure proper type conversion
+        const processedOdds = {
+          fixed_win: typeof entrant.odds.fixed_win === 'number' ? entrant.odds.fixed_win : null,
+          fixed_place: typeof entrant.odds.fixed_place === 'number' ? entrant.odds.fixed_place : null,
+          pool_win: typeof entrant.odds.pool_win === 'number' ? entrant.odds.pool_win : null,
+          pool_place: typeof entrant.odds.pool_place === 'number' ? entrant.odds.pool_place : null
+        }
+        
+        entrantOddsData[entrant.entrant_id] = processedOdds
+        
+        // Debug logging for odds data collection
+        context.log('🎯 ODDS DEBUG - Collected and processed odds data', {
+          entrantId: entrant.entrant_id,
+          entrantName: entrant.name,
+          rawOddsObject: entrant.odds,
+          processedOdds: processedOdds,
+          hasFixedWin: processedOdds.fixed_win !== null,
+          hasFixedPlace: processedOdds.fixed_place !== null,
+          hasPoolWin: processedOdds.pool_win !== null,
+          hasPoolPlace: processedOdds.pool_place !== null
+        })
       }
 
       // Additional comprehensive fields (keeping existing implementation)
@@ -1017,10 +1075,14 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
     totalEntrants: entrants.length,
     entrantsProcessed,
     successRate: `${((entrantsProcessed / entrants.length) * 100).toFixed(1)}%`,
-    processingTimeMs: processingTime
+    processingTimeMs: processingTime,
+    oddsDataCollected: Object.keys(entrantOddsData).length // STORY 4.9
   })
 
-  return entrantsProcessed
+  return {
+    entrantsProcessed,
+    entrantOddsData // STORY 4.9 - Return odds data for timeline storage
+  }
 }
 
 /**

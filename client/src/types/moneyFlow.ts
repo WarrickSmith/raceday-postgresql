@@ -33,6 +33,12 @@ export interface MoneyFlowDataPoint {
   incrementalWinAmount?: number // optional pre-calculated win incremental (cents)
   incrementalPlaceAmount?: number // optional pre-calculated place incremental (cents)
 
+  // CONSOLIDATED ODDS DATA (NEW in Story 4.9)
+  fixedWinOdds?: number // Fixed Win odds at this time bucket
+  fixedPlaceOdds?: number // Fixed Place odds at this time bucket  
+  poolWinOdds?: number // Pool Win odds (tote) at this time bucket
+  poolPlaceOdds?: number // Pool Place odds (tote) at this time bucket
+
   // Allow other optional properties that may appear on server docs
   [k: string]: any
 }
@@ -44,6 +50,9 @@ export interface EntrantMoneyFlowTimeline {
   latestPercentage: number
   trend: 'up' | 'down' | 'neutral'
   significantChange: boolean // true if change > 5%
+  // Latest odds from timeline data (NEW in Story 4.9)
+  latestWinOdds?: number // Latest Fixed Win odds from timeline
+  latestPlaceOdds?: number // Latest Fixed Place odds from timeline
 }
 
 // Visual indicators for money flow changes

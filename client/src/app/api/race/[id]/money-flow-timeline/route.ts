@@ -2,15 +2,35 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/appwrite-server'
 import { Query } from 'node-appwrite'
 
-import type { MoneyFlowDataPoint } from '@/types/money-flow'
+import type { MoneyFlowDataPoint } from '@/types/moneyFlow'
+// Valid pool types for API filtering
+const VALID_POOL_TYPES = ['win', 'place', 'odds'] as const
+type PoolType = typeof VALID_POOL_TYPES[number]
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { searchParams } = new URL(request.url)
+  const entrantIds = searchParams.get('entrants')?.split(',') || []
+  const poolTypeParam = searchParams.get('poolType') || 'win'
+  const { id: raceId } = await params
+  
   try {
-    const { searchParams } = new URL(request.url)
-    const entrantIds = searchParams.get('entrants')?.split(',') || []
-    const { id: raceId } = await params
+
+    // Validate poolType parameter
+    if (!VALID_POOL_TYPES.includes(poolTypeParam as PoolType)) {
+      return NextResponse.json(
+        { 
+          error: 'Invalid poolType parameter',
+          message: `poolType must be one of: ${VALID_POOL_TYPES.join(', ')}`,
+          received: poolTypeParam
+        },
+        { status: 400 }
+      )
+    }
+
+    const poolType = poolTypeParam as PoolType
 
     if (!raceId) {
       return NextResponse.json(
@@ -114,21 +134,19 @@ export async function GET(
         total: response.total,
         raceId,
         entrantIds,
+        poolType, // Include requested pool type in response
         bucketedData: false, // Indicate this is legacy data
         message:
           response.documents.length === 0
             ? 'No timeline data available yet - collection may be empty after reinitialization'
             : undefined,
-        queryOptimizations: [
-          'Time interval filtering',
-          'Legacy timeToStart data',
-        ],
+        queryOptimizations: getPoolTypeOptimizations(poolType, false),
       })
     }
 
     // Add interval coverage analysis for debugging
     const intervalCoverage = analyzeIntervalCoverage(
-      response.documents,
+      response.documents as unknown as MoneyFlowDataPoint[],
       entrantIds
     )
 
@@ -140,29 +158,151 @@ export async function GET(
       total: response.total,
       raceId,
       entrantIds,
+      poolType, // Include requested pool type in response
       bucketedData: true,
       intervalCoverage,
       message:
         response.documents.length === 0
           ? 'No timeline data available yet - collection may be empty after reinitialization'
           : undefined,
-      queryOptimizations: [
-        'Time interval filtering',
-        'Bucketed storage',
-        'Pre-calculated incrementals',
-        'Extended range (-65 to +66)',
-      ],
+      queryOptimizations: getPoolTypeOptimizations(poolType, true),
     })
   } catch (error) {
     console.error('Error fetching money flow timeline:', error)
-    return NextResponse.json(
-      {
-        error: 'Failed to fetch money flow timeline data',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    
+    // Enhanced error handling with context
+    const errorResponse = {
+      error: 'Failed to fetch money flow timeline data',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      context: {
+        raceId: raceId || 'unknown',
+        poolType: poolTypeParam || 'unknown',
+        entrantCount: entrantIds?.length || 0
+      }
+    }
+
+    // Check for specific error types
+    if (error instanceof Error) {
+      // Database connection errors
+      if (error.message.includes('database') || error.message.includes('connection')) {
+        errorResponse.error = 'Database connection error'
+        errorResponse.details = 'Unable to connect to race data database'
+      }
+      // Query errors (possibly related to poolType filtering)
+      else if (error.message.includes('query') || error.message.includes('filter')) {
+        errorResponse.error = 'Data query error'
+        errorResponse.details = 'Error processing timeline data request'
+      }
+    }
+
+    return NextResponse.json(errorResponse, { status: 500 })
   }
+}
+
+/**
+ * Transform response data based on poolType to optimize for specific view modes
+ */
+function transformResponseForPoolType(
+  documents: MoneyFlowDataPoint[],
+  poolType: PoolType
+) {
+  return documents.map(doc => {
+    // Base document with common fields
+    const baseDoc = {
+      $id: doc.$id,
+      $createdAt: doc.$createdAt,
+      $updatedAt: doc.$updatedAt,
+      entrant: doc.entrant,
+      raceId: doc.raceId,
+      pollingTimestamp: doc.pollingTimestamp,
+      timeInterval: doc.timeInterval,
+      timeToStart: doc.timeToStart,
+      intervalType: doc.intervalType,
+      type: doc.type
+    }
+
+    switch (poolType) {
+      case 'win':
+        return {
+          ...baseDoc,
+          // Win pool specific fields
+          winPoolAmount: doc.winPoolAmount,
+          incrementalWinAmount: doc.incrementalWinAmount,
+          winPoolPercentage: doc.winPoolPercentage,
+          // Include incremental amount for backward compatibility
+          incrementalAmount: doc.incrementalWinAmount || doc.incrementalAmount,
+          // Include current odds for reference
+          fixedWinOdds: doc.fixedWinOdds,
+          poolWinOdds: doc.poolWinOdds
+        }
+
+      case 'place':
+        return {
+          ...baseDoc,
+          // Place pool specific fields
+          placePoolAmount: doc.placePoolAmount,
+          incrementalPlaceAmount: doc.incrementalPlaceAmount,
+          placePoolPercentage: doc.placePoolPercentage,
+          // Include incremental amount for backward compatibility
+          incrementalAmount: doc.incrementalPlaceAmount || doc.incrementalAmount,
+          // Include current odds for reference
+          fixedPlaceOdds: doc.fixedPlaceOdds,
+          poolPlaceOdds: doc.poolPlaceOdds
+        }
+
+      case 'odds':
+        return {
+          ...baseDoc,
+          // Odds specific fields (all odds types)
+          fixedWinOdds: doc.fixedWinOdds,
+          fixedPlaceOdds: doc.fixedPlaceOdds,
+          poolWinOdds: doc.poolWinOdds,
+          poolPlaceOdds: doc.poolPlaceOdds,
+          // Include Win pool data as Pool/Pool% columns show Win data in odds view
+          winPoolAmount: doc.winPoolAmount,
+          winPoolPercentage: doc.winPoolPercentage,
+          incrementalAmount: doc.incrementalWinAmount || doc.incrementalAmount
+        }
+
+      default:
+        // Return full document as fallback
+        return doc
+    }
+  })
+}
+
+/**
+ * Get poolType-specific query optimizations documentation
+ */
+function getPoolTypeOptimizations(poolType: PoolType, bucketedData: boolean): string[] {
+  const baseOptimizations = [
+    'Time interval filtering',
+    bucketedData ? 'Bucketed storage' : 'Legacy timeToStart data',
+    bucketedData ? 'Pre-calculated incrementals' : 'Raw data fallback',
+    'Extended range (-65 to +66)',
+  ]
+
+  const poolSpecificOptimizations = {
+    win: [
+      'Consolidated data includes Win pool fields (incrementalWinAmount, winPoolAmount, winPoolPercentage)',
+      'Consolidated data includes Fixed Win odds (fixedWinOdds)',
+      'Consolidated data includes Pool Win odds (poolWinOdds)',
+      'Client-side filtering for Win pool view'
+    ],
+    place: [
+      'Consolidated data includes Place pool fields (incrementalPlaceAmount, placePoolAmount, placePoolPercentage)', 
+      'Consolidated data includes Fixed Place odds (fixedPlaceOdds)',
+      'Consolidated data includes Pool Place odds (poolPlaceOdds)',
+      'Client-side filtering for Place pool view'
+    ],
+    odds: [
+      'Consolidated data includes all odds types (fixedWinOdds, fixedPlaceOdds, poolWinOdds, poolPlaceOdds)',
+      'Consolidated data includes Win pool reference fields (winPoolAmount, winPoolPercentage)',
+      'Client-side filtering for Odds timeline view'
+    ]
+  }
+
+  return [...baseOptimizations, ...poolSpecificOptimizations[poolType]]
 }
 
 /**

@@ -1,7 +1,15 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { OddsHistoryData } from '@/types/meetings';
+// Simplified odds data interface for sparklines (from MoneyFlowHistory)
+interface OddsDataPoint {
+  $id: string;
+  $createdAt: string;
+  $updatedAt: string;
+  entrant: string;
+  winOdds: number;
+  timestamp: string;
+}
 
 const SPARKLINE_COLORS = {
   neutral: '#6b7280', // gray-500
@@ -10,7 +18,7 @@ const SPARKLINE_COLORS = {
 } as const;
 
 interface SparklineChartProps {
-  data: OddsHistoryData[];
+  data: OddsDataPoint[];
   width?: number;
   height?: number;
   className?: string;
