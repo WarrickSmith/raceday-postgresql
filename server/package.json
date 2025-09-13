@@ -11,18 +11,18 @@
     "deploy": "appwrite push functions",
     "deploy:meetings": "node scripts/deploy.js daily-meetings",
     "deploy:races": "node scripts/deploy.js daily-races",
+    "deploy:initial-data": "node scripts/deploy.js daily-initial-data",
+    "deploy:enhanced-race-poller": "node scripts/deploy.js enhanced-race-poller",
     "deploy:meeting-status": "node scripts/deploy.js meeting-status-poller",
     "deploy:master-scheduler": "node scripts/deploy.js master-race-scheduler",
-    "deploy:initial-data": "node scripts/deploy.js daily-initial-data",
     "meetings": "node scripts/run-function.js daily-meetings",
     "races": "node scripts/run-function.js daily-races",
     "initial-data": "node scripts/run-function.js daily-initial-data",
-    "meeting-status": "node scripts/run-function.js meeting-status-poller",
     "enhanced-race-poller": "node scripts/run-function.js enhanced-race-poller",
+    "meeting-status": "node scripts/run-function.js meeting-status-poller",
     "master-scheduler": "node scripts/run-function.js master-race-scheduler",
     "execute": "node scripts/execute-function.js",
-    "get-test-race-ids": "node scripts/get-test-race-ids.js",
-    "deploy:enhanced-race-poller": "node scripts/deploy.js enhanced-race-poller"
+    "get-test-race-ids": "node scripts/get-test-race-ids.js"
   },
   "dependencies": {
     "node-appwrite": "^17.0.0",
