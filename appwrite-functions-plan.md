@@ -114,26 +114,7 @@ Add to package.json:
 
 ## Task 5: Individual Function Robustness Review
 
-### 5.1 daily-initial-data Function Enhancement
-**Current Issues**: Scheduled at 20:30 with 840s timeout, could run until 20:44
-**Appwrite Timeout Protection**: Appwrite server enforces 14-minute termination, preventing next-day overlap
-**Improvements**:
-- Add execution lock mechanism using Appwrite database document as semaphore
-- Implement 1:00 AM NZ time auto-termination with cleanup (backup to Appwrite timeout)
-- Add graceful shutdown handling for long-running operations
-- Implement progress checkpointing for resumable execution
-- Add memory usage monitoring and cleanup
-
-**Developer Notes - Fast-Fail Lock Implementation**:
-- Implement `fastLockCheck()` as the absolute first operation (before any imports or initialization)
-- Target <50ms for lock acquisition attempt to minimize CPU waste for duplicate instances
-- Use atomic document creation with fixed ID 'daily-initial-data-lock' for collision detection
-- Terminate immediately if lock acquisition fails, logging resource usage (should be <100ms total)
-- Only proceed with heavy initialization (database connections, API clients) after lock acquired
-- Include stale lock detection (>3 minutes without heartbeat) with cleanup and retry mechanism
-- Add execution ID generation and heartbeat updates every 60 seconds during execution
-
-### 5.2 daily-meetings Function Enhancement
+### 5.1 daily-meetings Function Enhancement
 **Current Issues**: Scheduled at 19:00 with 840s timeout, database setup dependency
 **Appwrite Timeout Protection**: Appwrite server enforces 14-minute termination, preventing overlap with daily-races (20:00)
 **Improvements**:
@@ -152,7 +133,7 @@ Add to package.json:
 - Add heartbeat mechanism every 2 minutes during meeting import processing
 - Log CPU/memory savings when terminating duplicate instances for optimization tracking
 
-### 5.3 daily-races Function Enhancement
+### 5.2 daily-races Function Enhancement
 **Current Issues**: Scheduled at 20:00 with 840s timeout, long execution times
 **Appwrite Timeout Protection**: Appwrite server enforces 14-minute termination, preventing overlap with next day
 **Improvements**:
@@ -172,48 +153,26 @@ Add to package.json:
 - Include chunked processing state in lock document for potential resume capability
 - Monitor and log resource savings when duplicate instances terminate early
 
-### 5.4 enhanced-race-poller Function Enhancement
-**Current Issues**: Complex polling logic, potential overlaps
+### 5.3 daily-initial-data Function Enhancement
+**Current Issues**: Scheduled at 20:30 with 840s timeout, could run until 20:44
+**Appwrite Timeout Protection**: Appwrite server enforces 14-minute termination, preventing next-day overlap
 **Improvements**:
-- Add robust execution lock with race-specific granularity
-- Implement dynamic timeout based on polling interval requirements
-- Add 1:00 AM NZ time termination for continuous polling
-- Optimize batch processing algorithms
-- Add intelligent race selection logic to prevent redundant polling
+- Add execution lock mechanism using Appwrite database document as semaphore
+- Implement 1:00 AM NZ time auto-termination with cleanup (backup to Appwrite timeout)
+- Add graceful shutdown handling for long-running operations
+- Implement progress checkpointing for resumable execution
+- Add memory usage monitoring and cleanup
 
 **Developer Notes - Fast-Fail Lock Implementation**:
-- Implement immediate lock check before race selection queries and polling logic initialization
-- Use document ID 'enhanced-race-poller-lock' with sub-document race-specific tracking
-- Target <25ms for ultra-fast lock check given this function's frequent execution pattern
-- Immediately terminate if another poller instance is active, avoiding race query overhead
-- Implement granular stale lock detection (>2 minutes) due to shorter expected runtimes
-- Add race-specific progress tracking in heartbeat updates every 45 seconds
-- Include intelligent backoff mechanism if multiple startup attempts detected
-- Log polling efficiency gains when duplicate instances terminate without processing
+- Implement `fastLockCheck()` as the absolute first operation (before any imports or initialization)
+- Target <50ms for lock acquisition attempt to minimize CPU waste for duplicate instances
+- Use atomic document creation with fixed ID 'daily-initial-data-lock' for collision detection
+- Terminate immediately if lock acquisition fails, logging resource usage (should be <100ms total)
+- Only proceed with heavy initialization (database connections, API clients) after lock acquired
+- Include stale lock detection (>3 minutes without heartbeat) with cleanup and retry mechanism
+- Add execution ID generation and heartbeat updates every 60 seconds during execution
 
-### 5.5 master-race-scheduler Function Enhancement
-**Current Issues**: Continuous 1-minute schedule creates potential overlapping executions across midnight boundary
-**Critical CRON Schedule Issue**: Function executes every minute (`*/1 * * * *`) with 120s timeout. Risk of overlapping executions particularly at midnight when new day's schedule begins.
-**Improvements**:
-- Add strict execution lock to prevent overlapping scheduler instances (lock expires at 90 seconds maximum to stay within Appwrite 14-minute termination limit)
-- Implement midnight boundary awareness with explicit checks for day rollover
-- Add self-termination at 1:00 AM NZ time with cleanup
-- Add intelligent scheduling logic to prevent function overload
-- Optimize race selection algorithms for performance
-- Add execution monitoring and automatic backoff on system overload
-
-**Developer Notes - Critical Fast-Fail Lock Implementation**:
-- **CRITICAL**: Implement lock check as absolute first operation given every-minute execution frequency
-- Use document ID 'master-race-scheduler-lock' with 90-second automatic expiration (well under 120s timeout)
-- Target <15ms for lock acquisition - must be ultra-fast given high execution frequency
-- Immediately terminate if lock exists, avoiding any scheduling logic or database queries
-- Implement aggressive stale lock detection (>75 seconds) with automatic cleanup
-- Add midnight boundary detection in lock document to prevent day-transition conflicts
-- Include micro-heartbeat updates every 30 seconds with current scheduling progress
-- **Performance Critical**: Log termination stats to monitor scheduling efficiency and overlap prevention
-- Add automatic backoff detection if multiple rapid terminations occur
-
-### 5.6 meeting-status-poller Function Enhancement
+### 5.4 meeting-status-poller Function Enhancement
 **Current Issues**: 15-minute intervals spanning midnight boundary create potential overlaps
 **Critical CRON Schedule Issue**: Function schedule `*/15 21-23,0-11 * * *` spans midnight (23:45 PM to 00:00 AM executions). With 300s timeout, executions could overlap across day boundary.
 **Improvements**:
@@ -234,6 +193,47 @@ Add to package.json:
 - Include meeting-specific progress in heartbeat updates every 2 minutes
 - **Midnight Critical**: Add explicit day transition validation before any processing
 - Log boundary crossing efficiency and overlap prevention metrics
+
+### 5.5 enhanced-race-poller Function Enhancement
+**Current Issues**: Complex polling logic, potential overlaps
+**Improvements**:
+- Add robust execution lock with race-specific granularity
+- Implement dynamic timeout based on polling interval requirements
+- Add 1:00 AM NZ time termination for continuous polling
+- Optimize batch processing algorithms
+- Add intelligent race selection logic to prevent redundant polling
+
+**Developer Notes - Fast-Fail Lock Implementation**:
+- Implement immediate lock check before race selection queries and polling logic initialization
+- Use document ID 'enhanced-race-poller-lock' with sub-document race-specific tracking
+- Target <25ms for ultra-fast lock check given this function's frequent execution pattern
+- Immediately terminate if another poller instance is active, avoiding race query overhead
+- Implement granular stale lock detection (>2 minutes) due to shorter expected runtimes
+- Add race-specific progress tracking in heartbeat updates every 45 seconds
+- Include intelligent backoff mechanism if multiple startup attempts detected
+- Log polling efficiency gains when duplicate instances terminate without processing
+
+### 5.6 master-race-scheduler Function Enhancement
+**Current Issues**: Continuous 1-minute schedule creates potential overlapping executions across midnight boundary
+**Critical CRON Schedule Issue**: Function executes every minute (`*/1 * * * *`) with 120s timeout. Risk of overlapping executions particularly at midnight when new day's schedule begins.
+**Improvements**:
+- Add strict execution lock to prevent overlapping scheduler instances (lock expires at 90 seconds maximum to stay within Appwrite 14-minute termination limit)
+- Implement midnight boundary awareness with explicit checks for day rollover
+- Add self-termination at 1:00 AM NZ time with cleanup
+- Add intelligent scheduling logic to prevent function overload
+- Optimize race selection algorithms for performance
+- Add execution monitoring and automatic backoff on system overload
+
+**Developer Notes - Critical Fast-Fail Lock Implementation**:
+- **CRITICAL**: Implement lock check as absolute first operation given every-minute execution frequency
+- Use document ID 'master-race-scheduler-lock' with 90-second automatic expiration (well under 120s timeout)
+- Target <15ms for lock acquisition - must be ultra-fast given high execution frequency
+- Immediately terminate if lock exists, avoiding any scheduling logic or database queries
+- Implement aggressive stale lock detection (>75 seconds) with automatic cleanup
+- Add midnight boundary detection in lock document to prevent day-transition conflicts
+- Include micro-heartbeat updates every 30 seconds with current scheduling progress
+- **Performance Critical**: Log termination stats to monitor scheduling efficiency and overlap prevention
+- Add automatic backoff detection if multiple rapid terminations occur
 
 ## Task 6: Implement Appwrite 2025 Best Practices
 
