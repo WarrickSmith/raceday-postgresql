@@ -183,6 +183,33 @@
                 "execution.read",
                 "execution.write"
             ]
+        },
+        {
+            "$id": "database-setup",
+            "name": "Database Setup and Schema Management",
+            "runtime": "node-22",
+            "specification": "s-2vcpu-2gb",
+            "path": "database-setup",
+            "execute": [
+                "any"
+            ],
+            "events": [],
+            "schedule": "",
+            "timeout": 300,
+            "enabled": true,
+            "logging": true,
+            "entrypoint": "src/main.js",
+            "commands": "npm install",
+            "scopes": [
+                "databases.read",
+                "databases.write",
+                "collections.read",
+                "collections.write",
+                "attributes.read",
+                "attributes.write",
+                "indexes.read",
+                "indexes.write"
+            ]
         }
     ]
 }
