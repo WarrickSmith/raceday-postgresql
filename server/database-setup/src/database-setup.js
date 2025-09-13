@@ -38,6 +38,7 @@ const collections = {
     racePools: 'race-pools',
     userAlertConfigs: 'user-alert-configs',
     notifications: 'notifications',
+    functionLocks: 'function-locks',
 };
 
 // Progress tracking collection for resumable operations
@@ -414,7 +415,8 @@ export async function ensureDatabaseSetup(config, context) {
             { name: 'money-flow-history', func: ensureMoneyFlowHistoryCollection },
             { name: 'race-pools', func: ensureRacePoolsCollection },
             { name: 'user-alert-configs', func: ensureUserAlertConfigsCollection },
-            { name: 'notifications', func: ensureNotificationsCollection }
+            { name: 'notifications', func: ensureNotificationsCollection },
+            { name: 'function-locks', func: ensureFunctionLocksCollection }
         ];
 
         for (const [index, { name, func }] of collectionSetupFunctions.entries()) {
@@ -1496,6 +1498,51 @@ async function ensureNotificationsCollection(databases, config, context, progres
             context.log('userId attribute is not available for index creation, skipping idx_user_id index');
         }
     }
+}
+
+/**
+ * Set up function-locks collection for execution lock management
+ * Used by daily-meetings and other functions for preventing concurrent execution
+ * @param {Object} databases - Appwrite Databases instance
+ * @param {Object} config - Database configuration
+ * @param {Object} context - Appwrite function context
+ * @param {Object} progressTracker - Progress tracking object
+ * @param {Object} rollbackManager - Rollback manager for cleanup
+ * @returns {Object} Setup result
+ */
+async function ensureFunctionLocksCollection(databases, config, context, progressTracker = null, rollbackManager = null) {
+    const collectionId = collections.functionLocks;
+    const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
+    if (!exists) {
+        context.log('Creating function-locks collection...');
+        await databases.createCollection(config.databaseId, collectionId, 'Function Execution Locks', [
+            Permission.read(Role.any()),
+            Permission.create(Role.any()),
+            Permission.update(Role.any()),
+            Permission.delete(Role.any()),
+        ]);
+    }
+
+    const requiredAttributes = [
+        // Core execution tracking
+        { key: 'executionId', type: 'string', size: 255, required: true },
+        { key: 'startTime', type: 'string', size: 50, required: true },
+        { key: 'lastHeartbeat', type: 'string', size: 50, required: true },
+        { key: 'status', type: 'string', size: 50, required: true },
+
+        // Progress and debugging information
+        { key: 'nzTime', type: 'string', size: 100, required: false },
+        { key: 'processMetrics', type: 'string', size: 2000, required: false },
+        { key: 'resourceMetrics', type: 'string', size: 2000, required: false },
+    ];
+
+    // Create attributes with enhanced parallel processing and error isolation
+    const attributeResults = await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context, rollbackManager);
+    logAttributeResults(attributeResults, collectionId, context);
+
+    // Note: function-locks collection doesn't require indexes since it's used for simple document existence checks
+
+    return { success: true, collection: collectionId };
 }
 
 /**
