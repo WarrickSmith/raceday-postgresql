@@ -123,3 +123,85 @@ export function rateLimit(delayMs, context, reason = 'API rate limiting') {
     context.log(`Applying rate limit delay: ${delayMs}ms`, { reason });
     return new Promise(resolve => setTimeout(resolve, delayMs));
 }
+
+/**
+ * Monitor memory usage and return metrics with warning levels
+ * @param {Object} context - Appwrite function context
+ * @param {string} operation - Current operation description
+ * @returns {Object} Memory metrics with warning indicators
+ */
+export function monitorMemoryUsage(context, operation = 'memory-check') {
+    const memUsage = process.memoryUsage();
+    const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+    const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
+    const externalMB = Math.round(memUsage.external / 1024 / 1024);
+    const rssMB = Math.round(memUsage.rss / 1024 / 1024);
+
+    // Warning thresholds (conservative for 2GB specification)
+    const warningThresholdMB = 1400; // 70% of 2GB
+    const criticalThresholdMB = 1600; // 80% of 2GB
+
+    const metrics = {
+        heapUsedMB,
+        heapTotalMB,
+        externalMB,
+        rssMB,
+        warningLevel: heapUsedMB > warningThresholdMB,
+        criticalLevel: heapUsedMB > criticalThresholdMB,
+        efficiencyRatio: Math.round((heapUsedMB / heapTotalMB) * 100) / 100
+    };
+
+    if (metrics.criticalLevel) {
+        context.error(`Critical memory usage detected during ${operation}`, {
+            memoryMetrics: metrics,
+            recommendation: 'Consider forcing garbage collection'
+        });
+    } else if (metrics.warningLevel) {
+        context.log(`High memory usage warning during ${operation}`, {
+            memoryMetrics: metrics,
+            recommendation: 'Monitor for potential memory leaks'
+        });
+    } else {
+        context.log(`Memory usage within normal range for ${operation}`, {
+            memoryMetrics: metrics
+        });
+    }
+
+    return metrics;
+}
+
+/**
+ * Force garbage collection and log memory cleanup results
+ * @param {Object} context - Appwrite function context
+ * @param {string} reason - Reason for forcing garbage collection
+ */
+export function forceGarbageCollection(context, reason = 'memory-optimization') {
+    const beforeMemory = process.memoryUsage();
+    const beforeMB = Math.round(beforeMemory.heapUsed / 1024 / 1024);
+
+    try {
+        if (global.gc) {
+            global.gc();
+            const afterMemory = process.memoryUsage();
+            const afterMB = Math.round(afterMemory.heapUsed / 1024 / 1024);
+            const freedMB = beforeMB - afterMB;
+
+            context.log(`Forced garbage collection completed for ${reason}`, {
+                beforeMB,
+                afterMB,
+                freedMB,
+                efficiencyGain: freedMB > 0 ? `${Math.round((freedMB / beforeMB) * 100)}%` : '0%'
+            });
+        } else {
+            context.log(`Garbage collection not available for ${reason}`, {
+                beforeMB,
+                note: 'Running without --expose-gc flag'
+            });
+        }
+    } catch (error) {
+        context.error(`Failed to force garbage collection for ${reason}`, {
+            error: error.message,
+            beforeMB
+        });
+    }
+}
