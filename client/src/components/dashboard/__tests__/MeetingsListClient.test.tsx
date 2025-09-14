@@ -50,7 +50,9 @@ describe('MeetingsListClient', () => {
     mockUseRealtimeMeetings.mockReturnValue({
       meetings: mockMeetings,
       isConnected: true,
+      connectionState: 'connected' as const,
       connectionAttempts: 0,
+      isInitialDataReady: true,
       retry: jest.fn(),
     });
   });
@@ -69,7 +71,9 @@ describe('MeetingsListClient', () => {
     mockUseRealtimeMeetings.mockReturnValue({
       meetings: mockMeetings,
       isConnected: false,
+      connectionState: 'disconnected' as const,
       connectionAttempts: 1,
+      isInitialDataReady: false,
       retry: jest.fn(),
     });
 
@@ -87,7 +91,9 @@ describe('MeetingsListClient', () => {
     mockUseRealtimeMeetings.mockReturnValue({
       meetings: mockMeetings,
       isConnected: false,
+      connectionState: 'disconnected' as const,
       connectionAttempts: 2,
+      isInitialDataReady: false,
       retry: mockRetry,
     });
 
@@ -98,7 +104,9 @@ describe('MeetingsListClient', () => {
       return {
         meetings: mockMeetings,
         isConnected: false,
+        connectionState: 'disconnected' as const,
         connectionAttempts: 2,
+        isInitialDataReady: false,
         retry: mockRetry,
       };
     });
@@ -123,7 +131,9 @@ describe('MeetingsListClient', () => {
     mockUseRealtimeMeetings.mockReturnValue({
       meetings: [],
       isConnected: true,
+      connectionState: 'connected' as const,
       connectionAttempts: 1, // Set to > 0 to avoid loading skeleton
+      isInitialDataReady: true,
       retry: jest.fn(),
     });
 
@@ -145,7 +155,9 @@ describe('MeetingsListClient', () => {
     mockUseRealtimeMeetings.mockReturnValue({
       meetings: singleMeeting,
       isConnected: true,
+      connectionState: 'connected' as const,
       connectionAttempts: 0,
+      isInitialDataReady: true,
       retry: jest.fn(),
     });
 
@@ -187,7 +199,9 @@ describe('MeetingsListClient', () => {
     mockUseRealtimeMeetings.mockReturnValue({
       meetings: updatedMeetings,
       isConnected: true,
+      connectionState: 'connected' as const,
       connectionAttempts: 0,
+      isInitialDataReady: true,
       retry: jest.fn(),
     });
 

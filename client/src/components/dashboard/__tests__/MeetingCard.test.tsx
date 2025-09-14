@@ -35,7 +35,7 @@ describe('MeetingCard', () => {
     render(<MeetingCard meeting={mockMeeting} />);
 
     expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
-    expect(screen.getByText('Thoroughbred')).toBeInTheDocument();
+    expect(screen.getByText('THROUGHBRED')).toBeInTheDocument();
     expect(screen.getByText('ID: meeting1')).toBeInTheDocument();
     
     // Wait for async status to load
@@ -114,7 +114,7 @@ describe('MeetingCard', () => {
     
     render(<MeetingCard meeting={harnessMeeting} />);
     
-    expect(screen.getByText('Harness')).toBeInTheDocument();
+    expect(screen.getByText('HARNESS')).toBeInTheDocument();
     
     // Wait for component to fully render
     await waitFor(() => {

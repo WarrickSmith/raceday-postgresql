@@ -43,7 +43,7 @@ describe('MeetingCard Integration Tests', () => {
 
     // Should display the meeting information
     expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
-    expect(screen.getByText('Thoroughbred')).toBeInTheDocument();
+    expect(screen.getByText('THROUGHBRED')).toBeInTheDocument();
     
     // Verify API was called
     expect(global.fetch).toHaveBeenCalledWith('/api/meetings/meeting1/status');
@@ -141,7 +141,7 @@ describe('MeetingCard Integration Tests', () => {
     render(<MeetingCard meeting={harnessMeeting} />);
     
     // Should display correct race type
-    expect(screen.getByText('Harness')).toBeInTheDocument();
+    expect(screen.getByText('HARNESS')).toBeInTheDocument();
     
     await waitFor(() => {
       expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();

@@ -2,10 +2,10 @@ import { formatDistance, formatRaceTime, formatCategory } from '../raceFormatter
 
 describe('raceFormatters', () => {
   describe('formatDistance', () => {
-    it('formats distances over 1000m as kilometers', () => {
-      expect(formatDistance(2200)).toBe('2.2km');
-      expect(formatDistance(1600)).toBe('1.6km');
-      expect(formatDistance(1000)).toBe('1.0km');
+    it('formats all distances in meters', () => {
+      expect(formatDistance(2200)).toBe('2200m');
+      expect(formatDistance(1600)).toBe('1600m');
+      expect(formatDistance(1000)).toBe('1000m');
     });
 
     it('formats distances under 1000m as meters', () => {
