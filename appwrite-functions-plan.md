@@ -115,12 +115,12 @@ Add to package.json:
 ## Task 5: Individual Function Robustness Review
 
 ### 5.1 daily-meetings Function Enhancement
-**Current Issues**: Scheduled at 19:00 with 840s timeout, database setup dependency
-**Appwrite Timeout Protection**: Appwrite server enforces 14-minute termination, preventing overlap with daily-races (20:00)
+**Current Issues**: Scheduled at 19:00 UTC (7:00 AM NZST) with 840s timeout, database setup dependency
+**Appwrite Timeout Protection**: Appwrite server enforces 14-minute termination, preventing overlap with daily-races (20:00 UTC / 8:00 AM NZST)
 **Improvements**:
 - Remove database setup logic (moved to separate function)
 - Add execution lock to prevent concurrent runs
-- Implement 1:00 AM NZ time termination (backup to Appwrite timeout)
+- Implement 6:00 AM NZ time termination (backup to Appwrite timeout) - functions runs at 7:00 AM NZST
 - Add comprehensive API failure handling with exponential backoff
 - Optimize memory usage for large meeting datasets
 
@@ -134,12 +134,12 @@ Add to package.json:
 - Log CPU/memory savings when terminating duplicate instances for optimization tracking
 
 ### 5.2 daily-races Function Enhancement
-**Current Issues**: Scheduled at 20:00 with 840s timeout, long execution times
-**Appwrite Timeout Protection**: Appwrite server enforces 14-minute termination, preventing overlap with next day
+**Current Issues**: Scheduled at 20:00 UTC (8:00 AM NZST) with 840s timeout, long execution times
+**Appwrite Timeout Protection**: Appwrite server enforces 14-minute termination, preventing overlap with next day scheduling
 **Improvements**:
 - Add execution lock mechanism
 - Implement chunked processing for large race datasets
-- Add 1:00 AM NZ time termination with state persistence (backup to Appwrite timeout)
+- Add 6:00 AM NZ time termination with state persistence (backup to Appwrite timeout) - function runs at 8:00 AM NZST
 - Optimize database batch operations
 - Add progress tracking and resumable processing
 
@@ -154,11 +154,11 @@ Add to package.json:
 - Monitor and log resource savings when duplicate instances terminate early
 
 ### 5.3 daily-initial-data Function Enhancement
-**Current Issues**: Scheduled at 20:30 with 840s timeout, could run until 20:44
-**Appwrite Timeout Protection**: Appwrite server enforces 14-minute termination, preventing next-day overlap
+**Current Issues**: Scheduled at 20:30 UTC (8:30 AM NZST) with 840s timeout, could run until 20:44 UTC (8:44 AM NZST)
+**Appwrite Timeout Protection**: Appwrite server enforces 14-minute termination, preventing next-day scheduling overlap
 **Improvements**:
 - Add execution lock mechanism using Appwrite database document as semaphore
-- Implement 1:00 AM NZ time auto-termination with cleanup (backup to Appwrite timeout)
+- Implement 6:00 AM NZ time auto-termination with cleanup (backup to Appwrite timeout) - function runs at 8:30 AM NZST
 - Add graceful shutdown handling for long-running operations
 - Implement progress checkpointing for resumable execution
 - Add memory usage monitoring and cleanup
