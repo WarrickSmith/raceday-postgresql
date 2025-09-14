@@ -98,26 +98,30 @@ export async function fastLockCheck(databases, databaseId, context) {
                     // Try to replace stale lock
                     await databases.deleteDocument(databaseId, LOCK_COLLECTION_ID, LOCK_DOCUMENT_ID);
 
-                    // Retry lock acquisition after cleanup
+                    // Retry lock acquisition after cleanup - optimized for speed
+                    const retryProcessMetrics = JSON.stringify({
+                        meetingsProcessed: 0,
+                        racesProcessed: 0,
+                        currentOperation: 'initializing-after-stale-cleanup'
+                    });
+
+                    const resourceMetrics = JSON.stringify({
+                        memoryUsageStart: process.memoryUsage(),
+                        cpuTimeStart: process.cpuUsage(),
+                        staleLockCleanup: {
+                            previousExecutionId: existingLock.executionId,
+                            cleanupTime: new Date().toISOString()
+                        }
+                    });
+
                     const newLockDoc = {
                         executionId,
                         startTime: lockStartTime,
                         lastHeartbeat: lockStartTime,
                         status: 'running',
-                        processMetrics: {
-                            meetingsProcessed: 0,
-                            racesProcessed: 0,
-                            currentOperation: 'initializing-after-stale-cleanup'
-                        },
+                        processMetrics: retryProcessMetrics.length > 1900 ? retryProcessMetrics.substring(0, 1900) : retryProcessMetrics,
                         nzTime: new Date().toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
-                        resourceMetrics: {
-                            memoryUsageStart: process.memoryUsage(),
-                            cpuTimeStart: process.cpuUsage()
-                        },
-                        staleLockCleanup: {
-                            previousExecutionId: existingLock.executionId,
-                            cleanupTime: new Date().toISOString()
-                        }
+                        resourceMetrics: resourceMetrics.length > 1900 ? resourceMetrics.substring(0, 1900) : resourceMetrics
                     };
 
                     await databases.createDocument(databaseId, LOCK_COLLECTION_ID, LOCK_DOCUMENT_ID, newLockDoc);
