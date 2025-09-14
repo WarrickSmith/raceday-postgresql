@@ -1,6 +1,6 @@
 {
-  "name": "batch-race-poller",
-  "version": "1.0.0",
+  "name": "database-setup",
+  "version": "2.0.0",
   "type": "module",
   "main": "src/main.js",
   "dependencies": {

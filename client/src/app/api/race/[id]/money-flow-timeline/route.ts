@@ -345,7 +345,7 @@ function analyzeIntervalCoverage(
       const docEntrantId =
         typeof doc.entrant === 'string'
           ? doc.entrant
-          : doc.entrant?.entrantId || doc.entrant?.$id || 'unknown'
+          : (doc.entrant as any)?.entrantId || (doc.entrant as any)?.$id || 'unknown'
       return docEntrantId === entrantId
     })
 

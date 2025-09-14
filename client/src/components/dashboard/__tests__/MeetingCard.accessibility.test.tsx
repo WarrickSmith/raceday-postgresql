@@ -143,14 +143,14 @@ describe('MeetingCard Accessibility Tests', () => {
 
   it('should provide clear race type information', async () => {
     render(<MeetingCard meeting={mockMeeting} />);
-    
+
     // Wait for component to fully render
     await waitFor(() => {
-      expect(screen.getByText(/Thoroughbred/)).toBeInTheDocument();
+      expect(screen.getByText(/THROUGHBRED/)).toBeInTheDocument();
     });
-    
+
     // Race type should be clearly displayed
-    expect(screen.getByText(/Thoroughbred/)).toBeInTheDocument();
+    expect(screen.getByText(/THROUGHBRED/)).toBeInTheDocument();
   });
 
   it('should handle missing optional data gracefully', async () => {

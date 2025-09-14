@@ -1,11 +1,33 @@
 /**
- * Database Setup for Raceday Application
- * 
- * Performance Optimization: Attribute creation operations use Promise.all for parallel execution
- * instead of sequential loops, significantly improving setup performance when creating multiple
- * attributes per collection.
+ * Enhanced Database Setup for Raceday Application
+ *
+ * Features:
+ * - Exponential backoff retry logic with circuit breaker protection
+ * - Progress tracking and resumable operations
+ * - Rollback capability for failed setups
+ * - Comprehensive validation and health checks
+ * - Rate limiting awareness and batch size optimization
+ * - Schema version tracking and migration support
+ *
+ * Performance Optimization: Attribute creation operations use optimized parallel execution
+ * with intelligent error isolation and adaptive batching based on Appwrite API limits.
  */
-import { Client, Databases, Permission, Role, RelationshipType, IndexType } from 'node-appwrite';
+import { Client, Databases, Permission, Role, RelationshipType, IndexType, ID } from 'node-appwrite';
+import {
+    retryWithExponentialBackoff,
+    CircuitBreaker,
+    processBatch,
+    handleError,
+    withTimeout,
+    rateLimit
+} from './error-handlers.js';
+import {
+    validatePreSetup,
+    validatePostSetup,
+    performHealthCheck,
+    updateSchemaVersion,
+    SCHEMA_VERSION
+} from './validation.js';
 const collections = {
     meetings: 'meetings',
     races: 'races',
@@ -16,6 +38,28 @@ const collections = {
     racePools: 'race-pools',
     userAlertConfigs: 'user-alert-configs',
     notifications: 'notifications',
+    functionLocks: 'function-locks',
+};
+
+// Progress tracking collection for resumable operations
+const PROGRESS_COLLECTION = 'database-setup-progress';
+const ROLLBACK_COLLECTION = 'database-setup-rollback';
+
+// Setup states for progress tracking
+const SETUP_STATES = {
+    NOT_STARTED: 'not_started',
+    IN_PROGRESS: 'in_progress',
+    COMPLETED: 'completed',
+    FAILED: 'failed',
+    ROLLED_BACK: 'rolled_back'
+};
+
+// Circuit breakers for different operation types
+const circuitBreakers = {
+    database: new CircuitBreaker('database_operations', { failureThreshold: 3, resetTimeout: 30000 }),
+    collection: new CircuitBreaker('collection_operations', { failureThreshold: 5, resetTimeout: 60000 }),
+    attribute: new CircuitBreaker('attribute_operations', { failureThreshold: 10, resetTimeout: 30000 }),
+    index: new CircuitBreaker('index_operations', { failureThreshold: 5, resetTimeout: 45000 })
 };
 const resourceExists = async (checkFn) => {
     try {
@@ -53,15 +97,16 @@ const isAttributeAvailable = async (databases, databaseId, collectionId, attribu
     }
 };
 /**
- * Create multiple attributes in parallel using Promise.all for improved performance
+ * Create multiple attributes with enhanced parallel processing and error isolation
  * @param {Object} databases - Appwrite Databases instance
  * @param {string} databaseId - Database ID
  * @param {string} collectionId - Collection ID
  * @param {Array} attributes - Array of attribute objects to create
  * @param {Object} context - Appwrite function context for logging
- * @returns {Promise<number>} Number of attributes created
+ * @param {Object} rollbackManager - Rollback manager for cleanup
+ * @returns {Promise<Object>} Detailed creation results
  */
-const createAttributesInParallel = async (databases, databaseId, collectionId, attributes, context) => {
+const createAttributesInParallel = async (databases, databaseId, collectionId, attributes, context, rollbackManager = null) => {
     // Filter out attributes that already exist
     const attributesToCreate = [];
     for (const attr of attributes) {
@@ -72,87 +117,220 @@ const createAttributesInParallel = async (databases, databaseId, collectionId, a
 
     if (attributesToCreate.length === 0) {
         context.log('All attributes already exist, skipping creation');
-        return 0;
+        return {
+            successful: 0,
+            failed: 0,
+            total: 0,
+            results: [],
+            duration: 0,
+            successRate: 100.0
+        };
     }
 
-    context.log(`Creating ${attributesToCreate.length} attributes in parallel for collection ${collectionId}`);
-    const startTime = Date.now();
-    
-    // Create all attributes in parallel using Promise.all
-    const createPromises = attributesToCreate.map(async (attr) => {
+    context.log(`Creating ${attributesToCreate.length} attributes with enhanced parallel processing for collection ${collectionId}`);
+
+    // Determine optimal batch size based on attribute count and API limits
+    const optimalBatchSize = Math.min(Math.max(Math.floor(attributesToCreate.length / 3), 5), 15);
+
+    // Use batch processing with retry logic and error isolation
+    const batchResults = await processBatch(
+        attributesToCreate,
+        async (attr, index) => {
+            return await circuitBreakers.attribute.execute(async () => {
+                return await retryWithExponentialBackoff(
+                    () => createSingleAttribute(databases, databaseId, collectionId, attr, context),
+                    {
+                        maxRetries: 2,
+                        baseDelay: 1000,
+                        maxDelay: 5000,
+                        timeoutMs: 30000
+                    },
+                    context
+                );
+            }, context);
+        },
+        {
+            batchSize: optimalBatchSize,
+            parallel: true,
+            stopOnFirstError: false,
+            retryOptions: {}
+        },
+        context
+    );
+
+    // Record successful attributes for rollback if needed
+    if (rollbackManager) {
         try {
-            context.log(`Starting creation of attribute: ${attr.key} (${attr.type})`);
-            
-            if (attr.type === 'string') {
-                await databases.createStringAttribute(databaseId, collectionId, attr.key, attr.size, attr.required, attr.default);
-            } else if (attr.type === 'datetime') {
-                await databases.createDatetimeAttribute(databaseId, collectionId, attr.key, attr.required, attr.default);
-            } else if (attr.type === 'float') {
-                await databases.createFloatAttribute(databaseId, collectionId, attr.key, attr.required, null, null, attr.default);
-            } else if (attr.type === 'integer') {
-                await databases.createIntegerAttribute(databaseId, collectionId, attr.key, attr.required, null, null, attr.default);
-            } else if (attr.type === 'boolean') {
-                await databases.createBooleanAttribute(databaseId, collectionId, attr.key, attr.required, attr.default);
-            } else {
-                throw new Error(`Unsupported attribute type: ${attr.type}`);
+            const successfulAttributes = batchResults.results
+                .filter(result => result.success)
+                .map(result => result.item.key);
+
+            if (successfulAttributes.length > 0) {
+                await rollbackManager.addRollbackAction('delete_attributes', {
+                    collectionId,
+                    attributes: successfulAttributes
+                });
             }
-            
-            context.log(`✓ Successfully created attribute: ${attr.key}`);
-            return attr.key;
-        } catch (error) {
-            context.error(`✗ Failed to create attribute ${attr.key}: ${error.message}`);
-            // Don't throw here - let other attributes continue
-            return null;
+        } catch (rollbackError) {
+            context.error('Failed to record rollback actions for attributes, continuing setup', {
+                error: rollbackError.message,
+                collectionId
+            });
         }
+    }
+
+    // Safe logging for batch results
+    const successful = batchResults?.successful || 0;
+    const failed = batchResults?.failed || 0;
+    const successRate = batchResults?.successRate != null ? batchResults.successRate : 100.0;
+    const duration = batchResults?.duration || 0;
+
+    context.log(`Attribute creation completed for ${collectionId}`, {
+        successful,
+        failed,
+        total: attributesToCreate.length,
+        successRate: `${successRate.toFixed(1)}%`,
+        duration
     });
 
-    // Execute all attribute creations in parallel with error handling
-    try {
-        const results = await Promise.all(createPromises);
-        const successCount = results.filter(result => result !== null).length;
-        const failureCount = results.length - successCount;
-        const duration = Date.now() - startTime;
-        
-        context.log(`Parallel attribute creation completed in ${duration}ms: ${successCount} succeeded, ${failureCount} failed`);
-        
-        if (failureCount > 0) {
-            const failedAttributes = results.filter(result => result === null).map((_, index) => attributesToCreate[index].key);
-            context.error(`Failed to create ${failureCount} attributes: ${failedAttributes.join(', ')}. This may be due to rate limiting or concurrent access.`);
-        }
-        
-        return successCount;
-    } catch (error) {
-        context.error(`Parallel attribute creation failed: ${error.message}`);
-        return 0;
-    }
+    return {
+        successful,
+        failed,
+        total: attributesToCreate.length,
+        results: batchResults?.results || [],
+        duration,
+        successRate
+    };
 };
 
-const waitForAttributeAvailable = async (databases, databaseId, collectionId, attributeKey, context, maxRetries = 3, delayMs = 1000) => {
-    context.log(`Starting to wait for attribute ${attributeKey} to become available...`);
-    
-    for (let i = 0; i < maxRetries; i++) {
-        try {
-            const isAvailable = await isAttributeAvailable(databases, databaseId, collectionId, attributeKey);
-            if (isAvailable) {
-                context.log(`Attribute ${attributeKey} is now available after ${i + 1} attempts`);
-                return true;
-            }
-            context.log(`Waiting for attribute ${attributeKey} to become available... (${i + 1}/${maxRetries})`);
-            
-            if (i < maxRetries - 1) { // Don't wait after the last attempt
-                await new Promise((resolve) => setTimeout(resolve, delayMs));
-            }
-        } catch (error) {
-            context.error(`Error checking attribute ${attributeKey} availability`, {
-                error: error instanceof Error ? error.message : 'Unknown error',
-                attempt: i + 1
-            });
-            // Continue to next attempt instead of breaking
+/**
+ * Create a single attribute with proper error handling
+ * @param {Object} databases - Appwrite Databases instance
+ * @param {string} databaseId - Database ID
+ * @param {string} collectionId - Collection ID
+ * @param {Object} attr - Attribute definition
+ * @param {Object} context - Appwrite function context
+ * @returns {Promise<string>} Created attribute key
+ */
+async function createSingleAttribute(databases, databaseId, collectionId, attr, context) {
+    context.log(`Creating attribute: ${attr.key} (${attr.type}) in ${collectionId}`);
+
+    try {
+        switch (attr.type) {
+            case 'string':
+                await databases.createStringAttribute(
+                    databaseId,
+                    collectionId,
+                    attr.key,
+                    attr.size,
+                    attr.required,
+                    attr.default
+                );
+                break;
+
+            case 'datetime':
+                await databases.createDatetimeAttribute(
+                    databaseId,
+                    collectionId,
+                    attr.key,
+                    attr.required,
+                    attr.default
+                );
+                break;
+
+            case 'float':
+                await databases.createFloatAttribute(
+                    databaseId,
+                    collectionId,
+                    attr.key,
+                    attr.required,
+                    null,
+                    null,
+                    attr.default
+                );
+                break;
+
+            case 'integer':
+                await databases.createIntegerAttribute(
+                    databaseId,
+                    collectionId,
+                    attr.key,
+                    attr.required,
+                    null,
+                    null,
+                    attr.default
+                );
+                break;
+
+            case 'boolean':
+                await databases.createBooleanAttribute(
+                    databaseId,
+                    collectionId,
+                    attr.key,
+                    attr.required,
+                    attr.default
+                );
+                break;
+
+            default:
+                throw new Error(`Unsupported attribute type: ${attr.type}`);
         }
+
+        context.log(`✓ Successfully created attribute: ${attr.key}`);
+        return attr.key;
+
+    } catch (error) {
+        context.error(`✗ Failed to create attribute ${attr.key}`, {
+            error: error.message,
+            attributeType: attr.type,
+            collectionId
+        });
+        throw error;
     }
-    
-    context.log(`Attribute ${attributeKey} did not become available after ${maxRetries} attempts, continuing anyway...`);
-    return false;
+}
+
+/**
+ * Enhanced attribute availability checker with exponential backoff
+ * @param {Object} databases - Appwrite Databases instance
+ * @param {string} databaseId - Database ID
+ * @param {string} collectionId - Collection ID
+ * @param {string} attributeKey - Attribute key to check
+ * @param {Object} context - Appwrite function context
+ * @param {number} maxRetries - Maximum retry attempts
+ * @param {number} baseDelay - Base delay in milliseconds
+ * @returns {Promise<boolean>} Whether attribute is available
+ */
+const waitForAttributeAvailable = async (databases, databaseId, collectionId, attributeKey, context, maxRetries = 8, baseDelay = 3000) => {
+    context.log(`Waiting for attribute ${attributeKey} to become available...`);
+
+    const result = await retryWithExponentialBackoff(
+        async () => {
+            const isAvailable = await isAttributeAvailable(databases, databaseId, collectionId, attributeKey);
+            if (!isAvailable) {
+                throw new Error(`Attribute ${attributeKey} not yet available`);
+            }
+            return true;
+        },
+        {
+            maxRetries,
+            baseDelay,
+            maxDelay: 45000,
+            timeoutMs: 15000 // Increased timeout to 15 seconds
+        },
+        context
+    );
+
+    if (result === null) {
+        context.error(`Attribute ${attributeKey} failed to become available, but continuing setup`, {
+            attributeKey,
+            collectionId,
+            maxRetries,
+            timeoutMs: 15000
+        });
+        return false;
+    }
+
+    return true;
 };
 export async function ensureDatabaseSetup(config, context) {
     const setupStartTime = Date.now();
@@ -161,45 +339,305 @@ export async function ensureDatabaseSetup(config, context) {
         .setProject(config.projectId)
         .setKey(config.apiKey);
     const databases = new Databases(client);
+
+    let progressTracker = null;
+    let rollbackManager = null;
+
     try {
-        context.log('Checking database setup...');
-        const dbExists = await resourceExists(() => databases.get(config.databaseId));
+        context.log('Starting enhanced database setup with robustness features...');
+
+        // Pre-setup validation
+        context.log('Performing pre-setup validation...');
+        const preValidation = await validatePreSetup(config, context);
+        if (!preValidation.success) {
+            throw new Error(`Pre-setup validation failed: ${preValidation.issues.join(', ')}`);
+        }
+        context.log('Pre-setup validation passed successfully');
+
+        // Initialize progress tracking and rollback management
+        progressTracker = new ProgressTracker(databases, config.databaseId, context);
+        rollbackManager = new RollbackManager(databases, config.databaseId, context);
+
+        // Initialize with proper error handling
+        try {
+            await progressTracker.initialize();
+            await rollbackManager.initialize();
+            context.log('Progress tracking and rollback management initialized successfully');
+        } catch (error) {
+            context.error('Failed to initialize progress/rollback tracking, continuing without tracking', {
+                error: error.message
+            });
+            // Continue without progress tracking if it fails
+            progressTracker = null;
+            rollbackManager = null;
+        }
+
+        // Check if we're resuming a previous setup
+        let existingProgress = null;
+        if (progressTracker) {
+            existingProgress = await progressTracker.getProgress();
+            if (existingProgress && existingProgress.state === SETUP_STATES.IN_PROGRESS) {
+                context.log('Resuming previous setup from checkpoint', {
+                    previousState: existingProgress.state,
+                    completedSteps: existingProgress.completedSteps?.length || 0,
+                    lastUpdated: existingProgress.lastUpdated
+                });
+            }
+
+            await progressTracker.updateProgress(SETUP_STATES.IN_PROGRESS, 'database_creation');
+        }
+
+        // Database creation with circuit breaker protection
+        context.log('Ensuring database exists...');
+        const dbExists = await circuitBreakers.database.execute(async () => {
+            return await resourceExists(() => databases.get(config.databaseId));
+        }, context);
+
         if (!dbExists) {
             context.log('Creating database...');
-            await databases.create(config.databaseId, 'RaceDay Database');
+            await circuitBreakers.database.execute(async () => {
+                await databases.create(config.databaseId, 'RaceDay Database');
+            }, context);
             context.log('Database created successfully');
+            if (rollbackManager) {
+                await rollbackManager.addRollbackAction('delete_database', { databaseId: config.databaseId });
+            }
         }
-        
+
+        // Collections setup with enhanced error handling and progress tracking
         const collectionsStart = Date.now();
-        await ensureMeetingsCollection(databases, config, context);
-        await ensureRacesCollection(databases, config, context);
-        await ensureRaceResultsCollection(databases, config, context);
-        
-        // Entrants collection is the most complex - track it separately
-        const entrantsStart = Date.now();
-        await ensureEntrantsCollection(databases, config, context);
-        const entrantsDuration = Date.now() - entrantsStart;
-        context.log(`Entrants collection setup completed in ${entrantsDuration}ms`);
-        
-        await ensureOddsHistoryCollection(databases, config, context);
-        await ensureMoneyFlowHistoryCollection(databases, config, context);
-        await ensureRacePoolsCollection(databases, config, context);
-        await ensureUserAlertConfigsCollection(databases, config, context);
-        await ensureNotificationsCollection(databases, config, context);
-        
+        const collectionSetupFunctions = [
+            { name: 'meetings', func: ensureMeetingsCollection },
+            { name: 'races', func: ensureRacesCollection },
+            { name: 'race-results', func: ensureRaceResultsCollection },
+            { name: 'entrants', func: ensureEntrantsCollection },
+            { name: 'odds-history', func: ensureOddsHistoryCollection },
+            { name: 'money-flow-history', func: ensureMoneyFlowHistoryCollection },
+            { name: 'race-pools', func: ensureRacePoolsCollection },
+            { name: 'user-alert-configs', func: ensureUserAlertConfigsCollection },
+            { name: 'notifications', func: ensureNotificationsCollection },
+            { name: 'function-locks', func: ensureFunctionLocksCollection }
+        ];
+
+        for (const [index, { name, func }] of collectionSetupFunctions.entries()) {
+            const stepProgress = ((index / collectionSetupFunctions.length) * 80) + 10; // 10-90% range
+
+            // Skip if already completed in previous run
+            if (existingProgress?.completedSteps?.includes(name)) {
+                context.log(`Skipping already completed collection: ${name}`);
+                continue;
+            }
+
+            context.log(`Setting up collection: ${name} (${stepProgress.toFixed(1)}% complete)`);
+            if (progressTracker) {
+                await progressTracker.updateProgress(SETUP_STATES.IN_PROGRESS, name, stepProgress);
+            }
+
+            const collectionStart = Date.now();
+
+            try {
+                await retryWithExponentialBackoff(
+                    () => func(databases, config, context, progressTracker, rollbackManager),
+                    {
+                        maxRetries: 3,
+                        baseDelay: 2000,
+                        maxDelay: 30000,
+                        timeoutMs: 120000 // 2 minutes per collection
+                    },
+                    context
+                );
+
+                const collectionDuration = Date.now() - collectionStart;
+                if (progressTracker) {
+                    await progressTracker.markStepCompleted(name);
+                }
+
+                context.log(`Collection ${name} setup completed`, {
+                    durationMs: collectionDuration,
+                    progress: `${stepProgress.toFixed(1)}%`
+                });
+
+            } catch (error) {
+                const collectionDuration = Date.now() - collectionStart;
+
+                handleError(
+                    error,
+                    `Collection ${name} setup`,
+                    context,
+                    {
+                        collectionName: name,
+                        durationMs: collectionDuration,
+                        progress: stepProgress
+                    },
+                    false,
+                    'high'
+                );
+
+                // Attempt rollback for this collection
+                if (rollbackManager) {
+                    await rollbackManager.rollbackCollection(name);
+                }
+
+                // Continue with other collections unless it's a critical error
+                if (!isRetryableError(error)) {
+                    throw error;
+                }
+            }
+        }
+
+        // Schema version tracking
+        context.log('Updating schema version...');
+        if (progressTracker) {
+            await progressTracker.updateProgress(SETUP_STATES.IN_PROGRESS, 'schema_version', 90);
+        }
+        await updateSchemaVersion(databases, config.databaseId, SCHEMA_VERSION, context);
+
+        // Post-setup validation
+        context.log('Performing post-setup validation...');
+        if (progressTracker) {
+            await progressTracker.updateProgress(SETUP_STATES.IN_PROGRESS, 'post_validation', 95);
+        }
+        const postValidation = await validatePostSetup(config, context);
+
+        if (!postValidation.success) {
+            context.error('Post-setup validation failed', {
+                issues: postValidation.issues,
+                completeness: postValidation.completeness
+            });
+
+            // Don't throw here - allow partial setup with warnings
+            if (postValidation.completeness < 50) {
+                throw new Error(`Post-setup validation failed with low completeness: ${postValidation.completeness.toFixed(1)}%`);
+            }
+        }
+
+        // Final health check
+        context.log('Performing final health check...');
+        const healthCheck = await performHealthCheck(config, context);
+
+        if (progressTracker) {
+            await progressTracker.updateProgress(SETUP_STATES.COMPLETED, 'completed', 100);
+        }
+
         const totalDuration = Date.now() - setupStartTime;
-        context.log(`Database setup verification completed in ${totalDuration}ms`);
-    }
-    catch (error) {
-        const totalDuration = Date.now() - setupStartTime;
-        context.error('Database setup failed', {
-            error: error instanceof Error ? error.message : 'Unknown error',
-            duration: totalDuration
+        const collectionsSetupDuration = Date.now() - collectionsStart;
+
+        context.log('Database setup completed successfully', {
+            totalDurationMs: totalDuration,
+            collectionsSetupDurationMs: collectionsSetupDuration,
+            schemaVersion: SCHEMA_VERSION,
+            postValidationCompleteness: `${postValidation.completeness.toFixed(1)}%`,
+            healthCheckStatus: healthCheck.healthy ? 'healthy' : 'warning',
+            circuitBreakerStats: Object.fromEntries(
+                Object.entries(circuitBreakers).map(([key, cb]) => [key, cb.getStatus()])
+            )
         });
+
+        // Clean up progress tracking (but keep rollback info for audit)
+        if (progressTracker) {
+            await progressTracker.cleanup();
+        }
+
+        return {
+            success: true,
+            duration: totalDuration,
+            schemaVersion: SCHEMA_VERSION,
+            validation: postValidation,
+            healthCheck: healthCheck
+        };
+
+    } catch (error) {
+        const totalDuration = Date.now() - setupStartTime;
+
+        // Update progress to failed state
+        if (progressTracker) {
+            try {
+                await progressTracker.updateProgress(SETUP_STATES.FAILED, 'error', null, error.message);
+            } catch (progressError) {
+                context.error('Failed to update progress to failed state', { error: progressError.message });
+            }
+        }
+
+        handleError(
+            error,
+            'Database setup',
+            context,
+            {
+                totalDurationMs: totalDuration,
+                schemaVersion: SCHEMA_VERSION,
+                circuitBreakerStats: Object.fromEntries(
+                    Object.entries(circuitBreakers).map(([key, cb]) => [key, cb.getStatus()])
+                )
+            },
+            false,
+            'critical'
+        );
+
+        // Attempt cleanup/rollback on failure
+        if (rollbackManager) {
+            context.log('Attempting rollback due to setup failure...');
+            try {
+                await rollbackManager.executeRollback();
+                context.log('Rollback completed successfully');
+            } catch (rollbackError) {
+                // Don't fail the entire process if rollback fails
+                context.error('Rollback failed but continuing', {
+                    rollbackError: rollbackError.message,
+                    originalError: error.message
+                });
+            }
+        }
+
         throw error;
     }
 }
-async function ensureMeetingsCollection(databases, config, context) {
+
+/**
+ * Check if an error is retryable (moved from error-handlers.js to avoid circular import)
+ */
+function isRetryableError(error) {
+    if (!error) return false;
+
+    const message = error.message?.toLowerCase() || '';
+    const code = error.code?.toLowerCase() || '';
+
+    // Retryable error types
+    const retryableIndicators = [
+        'timeout',
+        'network',
+        'connection',
+        'rate limit',
+        '429',
+        '5' // 5xx server errors
+    ];
+
+    return retryableIndicators.some(indicator =>
+        message.includes(indicator) || code.includes(indicator)
+    );
+}
+
+/**
+ * Helper function to safely log attribute results
+ * @param {Object} attributeResults - Results from createAttributesInParallel
+ * @param {string} collectionName - Name of the collection
+ * @param {Object} context - Appwrite function context
+ */
+function logAttributeResults(attributeResults, collectionName, context) {
+    const successful = attributeResults?.successful || 0;
+    const failed = attributeResults?.failed || 0;
+    const total = attributeResults?.total || 0;
+    const successRate = attributeResults?.successRate != null ? attributeResults.successRate : 100.0;
+    const duration = attributeResults?.duration || 0;
+
+    if (failed > 0) {
+        context.log(`${collectionName} collection: ${failed} attributes failed to create`, {
+            successRate: `${successRate.toFixed(1)}%`,
+            successful,
+            failed
+        });
+    }
+}
+async function ensureMeetingsCollection(databases, config, context, progressTracker = null, rollbackManager = null) {
     const collectionId = collections.meetings;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
@@ -240,8 +678,10 @@ async function ensureMeetingsCollection(databases, config, context) {
         { key: 'apiGeneratedTime', type: 'datetime', required: false },
     ];
     
-    // Create attributes in parallel for improved performance
-    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
+    // Create attributes with enhanced parallel processing and error isolation
+    const attributeResults = await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context, rollbackManager);
+
+    logAttributeResults(attributeResults, collectionId, context);
     const collection = await databases.getCollection(config.databaseId, collectionId);
     if (!collection.indexes.some((idx) => idx.key === 'idx_date')) {
         context.log('Creating idx_date index on date...');
@@ -305,7 +745,7 @@ async function ensureMeetingsCollection(databases, config, context) {
         }
     }
 }
-async function ensureRacesCollection(databases, config, context) {
+async function ensureRacesCollection(databases, config, context, progressTracker = null, rollbackManager = null) {
     const collectionId = collections.races;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
@@ -394,8 +834,10 @@ async function ensureRacesCollection(databases, config, context) {
         { key: 'finalizedAt', type: 'datetime', required: false }, // Timestamp when race status became Final/Finalized
         { key: 'abandonedAt', type: 'datetime', required: false }, // Timestamp when race was abandoned
     ];
-    // Create attributes in parallel for improved performance
-    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
+    // Create attributes with enhanced parallel processing and error isolation
+    const attributeResults = await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context, rollbackManager);
+
+    logAttributeResults(attributeResults, collectionId, context);
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'meeting'))) {
         context.log('Creating races->meetings relationship...');
         await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.meetings, RelationshipType.ManyToOne, false, 'meeting', 'races');
@@ -448,7 +890,7 @@ async function ensureRacesCollection(databases, config, context) {
     }
 }
 
-async function ensureRaceResultsCollection(databases, config, context) {
+async function ensureRaceResultsCollection(databases, config, context, progressTracker = null, rollbackManager = null) {
     const collectionId = collections.raceResults;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     
@@ -480,8 +922,10 @@ async function ensureRaceResultsCollection(databases, config, context) {
         { key: 'protestLodged', type: 'boolean', required: false, default: false }, // Protest lodged flag
     ];
     
-    // Create attributes in parallel for improved performance
-    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
+    // Create attributes with enhanced parallel processing and error isolation
+    const attributeResults = await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context, rollbackManager);
+
+    logAttributeResults(attributeResults, collectionId, context);
     
     // Create relationship to races collection
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'race'))) {
@@ -493,7 +937,7 @@ async function ensureRaceResultsCollection(databases, config, context) {
     // The relationship itself provides efficient lookups via the relationship system
 }
 
-async function ensureEntrantsCollection(databases, config, context) {
+async function ensureEntrantsCollection(databases, config, context, progressTracker = null, rollbackManager = null) {
     const collectionId = collections.entrants;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
@@ -586,11 +1030,28 @@ async function ensureEntrantsCollection(databases, config, context) {
         { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
         { key: 'importedAt', type: 'datetime', required: false },
     ];
-    // Create attributes in parallel for improved performance
-    const attributesCreated = await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
-    
-    if (attributesCreated > 0) {
-        context.log(`Entrants collection: ${attributesCreated} new attributes created in parallel`);
+    // Create attributes with enhanced parallel processing and error isolation
+    const attributeResults = await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context, rollbackManager);
+
+    // Safely handle attribute results logging
+    const successful = attributeResults?.successful || 0;
+    const failed = attributeResults?.failed || 0;
+    const total = attributeResults?.total || 0;
+    const successRate = attributeResults?.successRate != null ? attributeResults.successRate : 100.0;
+    const duration = attributeResults?.duration || 0;
+
+    context.log(`Entrants collection attribute creation completed`, {
+        successful,
+        failed,
+        total,
+        successRate: `${successRate.toFixed(1)}%`,
+        duration
+    });
+
+    if (failed > 0) {
+        context.log(`Entrants collection: ${failed} attributes failed to create`, {
+            successRate: `${successRate.toFixed(1)}%`
+        });
     }
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'race'))) {
         context.log('Creating entrants->races relationship...');
@@ -629,7 +1090,7 @@ async function ensureEntrantsCollection(databases, config, context) {
     }
 }
 
-async function ensureOddsHistoryCollection(databases, config, context) {
+async function ensureOddsHistoryCollection(databases, config, context, progressTracker = null, rollbackManager = null) {
     const collectionId = collections.oddsHistory;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
@@ -646,8 +1107,10 @@ async function ensureOddsHistoryCollection(databases, config, context) {
         { key: 'eventTimestamp', type: 'datetime', required: true },
         { key: 'type', type: 'string', size: 20, required: true },
     ];
-    // Create attributes in parallel for improved performance
-    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
+    // Create attributes with enhanced parallel processing and error isolation
+    const attributeResults = await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context, rollbackManager);
+
+    logAttributeResults(attributeResults, collectionId, context);
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'entrant'))) {
         context.log('Creating odds history->entrants relationship...');
         await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.entrants, RelationshipType.ManyToOne, false, 'entrant', 'oddsHistory');
@@ -679,7 +1142,7 @@ async function ensureOddsHistoryCollection(databases, config, context) {
     // 3. If performance becomes an issue, consider denormalizing data or creating additional collections
     //    to store pre-aggregated or indexed data for specific query patterns.
 }
-async function ensureMoneyFlowHistoryCollection(databases, config, context) {
+async function ensureMoneyFlowHistoryCollection(databases, config, context, progressTracker = null, rollbackManager = null) {
     const collectionId = collections.moneyFlowHistory;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
@@ -734,8 +1197,10 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
         { key: 'poolWinOdds', type: 'float', required: false }, // Pool Win odds (tote) at this time bucket  
         { key: 'poolPlaceOdds', type: 'float', required: false }, // Pool Place odds (tote) at this time bucket
     ];
-    // Create attributes in parallel for improved performance
-    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
+    // Create attributes with enhanced parallel processing and error isolation
+    const attributeResults = await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context, rollbackManager);
+
+    logAttributeResults(attributeResults, collectionId, context);
     
     // CRITICAL: Wait for Story 4.9 odds fields to be available before proceeding
     context.log('Waiting for Story 4.9 odds fields to become available...');
@@ -888,7 +1353,7 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context) {
     // 3. If performance becomes an issue, consider denormalizing data or creating additional collections
     //    to store pre-aggregated or indexed data for specific query patterns.
 }
-async function ensureRacePoolsCollection(databases, config, context) {
+async function ensureRacePoolsCollection(databases, config, context, progressTracker = null, rollbackManager = null) {
     const collectionId = collections.racePools;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
@@ -912,8 +1377,10 @@ async function ensureRacePoolsCollection(databases, config, context) {
         { key: 'currency', type: 'string', size: 10, required: false, default: '$' },
         { key: 'lastUpdated', type: 'datetime', required: false },
     ];
-    // Create attributes in parallel for improved performance
-    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
+    // Create attributes with enhanced parallel processing and error isolation
+    const attributeResults = await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context, rollbackManager);
+
+    logAttributeResults(attributeResults, collectionId, context);
     const racePoolsCollection = await databases.getCollection(config.databaseId, collectionId);
     if (!racePoolsCollection.indexes.some((idx) => idx.key === 'idx_race_id')) {
         const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'raceId', context);
@@ -931,7 +1398,7 @@ async function ensureRacePoolsCollection(databases, config, context) {
         }
     }
 }
-async function ensureUserAlertConfigsCollection(databases, config, context) {
+async function ensureUserAlertConfigsCollection(databases, config, context, progressTracker = null, rollbackManager = null) {
     const collectionId = collections.userAlertConfigs;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
@@ -950,8 +1417,10 @@ async function ensureUserAlertConfigsCollection(databases, config, context) {
         { key: 'timeWindowSeconds', type: 'integer', required: false },
         { key: 'enabled', type: 'boolean', required: true },
     ];
-    // Create attributes in parallel for improved performance
-    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
+    // Create attributes with enhanced parallel processing and error isolation
+    const attributeResults = await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context, rollbackManager);
+
+    logAttributeResults(attributeResults, collectionId, context);
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'entrant'))) {
         context.log('Creating user alert configs->entrants relationship...');
         await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.entrants, RelationshipType.ManyToOne, false, 'entrant', 'alertConfigs');
@@ -988,7 +1457,7 @@ async function ensureUserAlertConfigsCollection(databases, config, context) {
         }
     }
 }
-async function ensureNotificationsCollection(databases, config, context) {
+async function ensureNotificationsCollection(databases, config, context, progressTracker = null, rollbackManager = null) {
     const collectionId = collections.notifications;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
@@ -1009,8 +1478,10 @@ async function ensureNotificationsCollection(databases, config, context) {
         { key: 'raceId', type: 'string', size: 50, required: false },
         { key: 'entrantId', type: 'string', size: 50, required: false },
     ];
-    // Create attributes in parallel for improved performance
-    await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context);
+    // Create attributes with enhanced parallel processing and error isolation
+    const attributeResults = await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context, rollbackManager);
+
+    logAttributeResults(attributeResults, collectionId, context);
     const notificationsCollection = await databases.getCollection(config.databaseId, collectionId);
     if (!notificationsCollection.indexes.some((idx) => idx.key === 'idx_user_id')) {
         const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'userId', context);
@@ -1025,6 +1496,352 @@ async function ensureNotificationsCollection(databases, config, context) {
         }
         else {
             context.log('userId attribute is not available for index creation, skipping idx_user_id index');
+        }
+    }
+}
+
+/**
+ * Set up function-locks collection for execution lock management
+ * Used by daily-meetings and other functions for preventing concurrent execution
+ * @param {Object} databases - Appwrite Databases instance
+ * @param {Object} config - Database configuration
+ * @param {Object} context - Appwrite function context
+ * @param {Object} progressTracker - Progress tracking object
+ * @param {Object} rollbackManager - Rollback manager for cleanup
+ * @returns {Object} Setup result
+ */
+async function ensureFunctionLocksCollection(databases, config, context, progressTracker = null, rollbackManager = null) {
+    const collectionId = collections.functionLocks;
+    const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
+    if (!exists) {
+        context.log('Creating function-locks collection...');
+        await databases.createCollection(config.databaseId, collectionId, 'Function Execution Locks', [
+            Permission.read(Role.any()),
+            Permission.create(Role.any()),
+            Permission.update(Role.any()),
+            Permission.delete(Role.any()),
+        ]);
+    }
+
+    const requiredAttributes = [
+        // Core execution tracking
+        { key: 'executionId', type: 'string', size: 255, required: true },
+        { key: 'startTime', type: 'string', size: 50, required: true },
+        { key: 'lastHeartbeat', type: 'string', size: 50, required: true },
+        { key: 'status', type: 'string', size: 50, required: true },
+
+        // Progress and debugging information
+        { key: 'nzTime', type: 'string', size: 100, required: false },
+        { key: 'processMetrics', type: 'string', size: 2000, required: false },
+        { key: 'resourceMetrics', type: 'string', size: 2000, required: false },
+    ];
+
+    // Create attributes with enhanced parallel processing and error isolation
+    const attributeResults = await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context, rollbackManager);
+    logAttributeResults(attributeResults, collectionId, context);
+
+    // Note: function-locks collection doesn't require indexes since it's used for simple document existence checks
+
+    return { success: true, collection: collectionId };
+}
+
+/**
+ * Progress Tracker for resumable database setup operations
+ */
+class ProgressTracker {
+    constructor(databases, databaseId, context) {
+        this.databases = databases;
+        this.databaseId = databaseId;
+        this.context = context;
+        this.progressId = `setup-${Date.now()}`;
+    }
+
+    async initialize() {
+        try {
+            // Create progress tracking collection if it doesn't exist
+            try {
+                await this.databases.getCollection(this.databaseId, PROGRESS_COLLECTION);
+            } catch (error) {
+                if (error.code === 404) {
+                    await this.databases.createCollection(this.databaseId, PROGRESS_COLLECTION, 'Database Setup Progress', []);
+
+                    // Create required attributes with proper waiting
+                    await this.databases.createStringAttribute(this.databaseId, PROGRESS_COLLECTION, 'state', 20, true);
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for attribute
+
+                    await this.databases.createStringAttribute(this.databaseId, PROGRESS_COLLECTION, 'currentStep', 100, false);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    await this.databases.createFloatAttribute(this.databaseId, PROGRESS_COLLECTION, 'progress', false);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    await this.databases.createDatetimeAttribute(this.databaseId, PROGRESS_COLLECTION, 'lastUpdated', true);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    await this.databases.createStringAttribute(this.databaseId, PROGRESS_COLLECTION, 'completedSteps', 1000, false);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    await this.databases.createStringAttribute(this.databaseId, PROGRESS_COLLECTION, 'errorMessage', 500, false);
+                    await new Promise(resolve => setTimeout(resolve, 2000)); // Final wait
+
+                    this.context.log('Progress tracking collection created and attributes initialized');
+                }
+            }
+        } catch (error) {
+            this.context.error('Failed to initialize progress tracker', {
+                error: error.message
+            });
+            throw error; // Re-throw to disable progress tracking
+        }
+    }
+
+    async updateProgress(state, currentStep = null, progress = null, errorMessage = null) {
+        try {
+            const updateData = {
+                state,
+                lastUpdated: new Date().toISOString()
+            };
+
+            if (currentStep) updateData.currentStep = currentStep;
+            if (progress !== null) updateData.progress = progress;
+            if (errorMessage) updateData.errorMessage = errorMessage;
+
+            // Try to update existing progress document
+            try {
+                const existingDocs = await this.databases.listDocuments(this.databaseId, PROGRESS_COLLECTION);
+                if (existingDocs.documents.length > 0) {
+                    await this.databases.updateDocument(this.databaseId, PROGRESS_COLLECTION, existingDocs.documents[0].$id, updateData);
+                } else {
+                    await this.databases.createDocument(this.databaseId, PROGRESS_COLLECTION, this.progressId, updateData);
+                }
+            } catch (error) {
+                if (error.code === 404) {
+                    await this.databases.createDocument(this.databaseId, PROGRESS_COLLECTION, this.progressId, updateData);
+                } else {
+                    throw error;
+                }
+            }
+        } catch (error) {
+            this.context.error('Failed to update progress', {
+                error: error.message,
+                state,
+                currentStep,
+                progress
+            });
+        }
+    }
+
+    async markStepCompleted(stepName) {
+        try {
+            const existingDocs = await this.databases.listDocuments(this.databaseId, PROGRESS_COLLECTION);
+            if (existingDocs.documents.length > 0) {
+                const doc = existingDocs.documents[0];
+                const completedSteps = doc.completedSteps ? JSON.parse(doc.completedSteps) : [];
+                if (!completedSteps.includes(stepName)) {
+                    completedSteps.push(stepName);
+                    await this.databases.updateDocument(this.databaseId, PROGRESS_COLLECTION, doc.$id, {
+                        completedSteps: JSON.stringify(completedSteps)
+                    });
+                }
+            }
+        } catch (error) {
+            this.context.error('Failed to mark step completed', {
+                error: error.message,
+                stepName
+            });
+        }
+    }
+
+    async getProgress() {
+        try {
+            const docs = await this.databases.listDocuments(this.databaseId, PROGRESS_COLLECTION);
+            if (docs.documents.length > 0) {
+                const doc = docs.documents[0];
+                return {
+                    state: doc.state,
+                    currentStep: doc.currentStep,
+                    progress: doc.progress,
+                    lastUpdated: doc.lastUpdated,
+                    completedSteps: doc.completedSteps ? JSON.parse(doc.completedSteps) : [],
+                    errorMessage: doc.errorMessage
+                };
+            }
+            return null;
+        } catch (error) {
+            this.context.error('Failed to get progress', {
+                error: error.message
+            });
+            return null;
+        }
+    }
+
+    async cleanup() {
+        try {
+            const docs = await this.databases.listDocuments(this.databaseId, PROGRESS_COLLECTION);
+            for (const doc of docs.documents) {
+                await this.databases.deleteDocument(this.databaseId, PROGRESS_COLLECTION, doc.$id);
+            }
+            this.context.log('Progress tracking cleaned up');
+        } catch (error) {
+            this.context.error('Failed to cleanup progress tracking', {
+                error: error.message
+            });
+        }
+    }
+}
+
+/**
+ * Rollback Manager for database setup cleanup
+ */
+class RollbackManager {
+    constructor(databases, databaseId, context) {
+        this.databases = databases;
+        this.databaseId = databaseId;
+        this.context = context;
+        this.rollbackId = `rollback-${Date.now()}`;
+        this.rollbackActions = [];
+    }
+
+    async initialize() {
+        try {
+            // Create rollback tracking collection if it doesn't exist
+            try {
+                await this.databases.getCollection(this.databaseId, ROLLBACK_COLLECTION);
+            } catch (error) {
+                if (error.code === 404) {
+                    await this.databases.createCollection(this.databaseId, ROLLBACK_COLLECTION, 'Database Setup Rollback', []);
+
+                    // Create required attributes with proper waiting
+                    await this.databases.createStringAttribute(this.databaseId, ROLLBACK_COLLECTION, 'action', 50, true);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    await this.databases.createStringAttribute(this.databaseId, ROLLBACK_COLLECTION, 'data', 1000, true);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    await this.databases.createDatetimeAttribute(this.databaseId, ROLLBACK_COLLECTION, 'createdAt', true);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    await this.databases.createBooleanAttribute(this.databaseId, ROLLBACK_COLLECTION, 'executed', false, false);
+                    await new Promise(resolve => setTimeout(resolve, 2000)); // Final wait
+
+                    this.context.log('Rollback tracking collection created and attributes initialized');
+                }
+            }
+        } catch (error) {
+            this.context.error('Failed to initialize rollback manager', {
+                error: error.message
+            });
+            throw error; // Re-throw to disable rollback tracking
+        }
+    }
+
+    async addRollbackAction(action, data) {
+        try {
+            const rollbackAction = {
+                action,
+                data: JSON.stringify(data),
+                createdAt: new Date().toISOString(),
+                executed: false
+            };
+
+            await this.databases.createDocument(this.databaseId, ROLLBACK_COLLECTION, ID.unique(), rollbackAction);
+            this.rollbackActions.push(rollbackAction);
+
+            this.context.log('Rollback action recorded', {
+                action,
+                data: JSON.stringify(data)
+            });
+        } catch (error) {
+            this.context.error('Failed to record rollback action', {
+                error: error.message,
+                action
+            });
+        }
+    }
+
+    async executeRollback() {
+        try {
+            this.context.log('Starting rollback execution...');
+
+            const docs = await this.databases.listDocuments(this.databaseId, ROLLBACK_COLLECTION);
+            const pendingActions = docs.documents.filter(doc => !doc.executed);
+
+            for (const actionDoc of pendingActions.reverse()) { // Execute in reverse order
+                try {
+                    await this.executeRollbackAction(actionDoc.action, JSON.parse(actionDoc.data));
+
+                    // Mark as executed
+                    await this.databases.updateDocument(this.databaseId, ROLLBACK_COLLECTION, actionDoc.$id, {
+                        executed: true
+                    });
+
+                    this.context.log(`Rollback action executed: ${actionDoc.action}`);
+                } catch (error) {
+                    this.context.error(`Failed to execute rollback action: ${actionDoc.action}`, {
+                        error: error.message,
+                        data: actionDoc.data
+                    });
+                }
+            }
+
+            this.context.log('Rollback execution completed');
+        } catch (error) {
+            this.context.error('Failed to execute rollback', {
+                error: error.message
+            });
+        }
+    }
+
+    async executeRollbackAction(action, data) {
+        switch (action) {
+            case 'delete_database':
+                try {
+                    await this.databases.delete(data.databaseId);
+                    this.context.log(`Rolled back database: ${data.databaseId}`);
+                } catch (error) {
+                    if (error.code !== 404) throw error;
+                }
+                break;
+
+            case 'delete_collection':
+                try {
+                    await this.databases.deleteCollection(this.databaseId, data.collectionId);
+                    this.context.log(`Rolled back collection: ${data.collectionId}`);
+                } catch (error) {
+                    if (error.code !== 404) throw error;
+                }
+                break;
+
+            case 'delete_attributes':
+                for (const attributeKey of data.attributes) {
+                    try {
+                        await this.databases.deleteAttribute(this.databaseId, data.collectionId, attributeKey);
+                        this.context.log(`Rolled back attribute: ${data.collectionId}.${attributeKey}`);
+                    } catch (error) {
+                        if (error.code !== 404) {
+                            this.context.error(`Failed to rollback attribute: ${attributeKey}`, {
+                                error: error.message
+                            });
+                        }
+                    }
+                }
+                break;
+
+            default:
+                this.context.log(`Unknown rollback action: ${action}`);
+        }
+    }
+
+    async rollbackCollection(collectionId) {
+        try {
+            await this.databases.deleteCollection(this.databaseId, collectionId);
+            this.context.log(`Rolled back collection: ${collectionId}`);
+        } catch (error) {
+            if (error.code !== 404) {
+                this.context.error(`Failed to rollback collection: ${collectionId}`, {
+                    error: error.message
+                });
+            }
         }
     }
 }
