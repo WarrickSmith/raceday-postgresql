@@ -307,7 +307,8 @@ export function setupHeartbeatInterval(lockManager, progressTracker) {
 }
 
 /**
- * Check if current NZ time is past 1:00 AM (termination time)
+ * Check if current NZ time is in termination window (1:00-6:00 AM NZST)
+ * Function runs at 19:00 UTC (7:00 AM NZST), so this allows proper execution
  * @param {Object} context - Appwrite function context for logging
  * @returns {boolean} True if should terminate
  */

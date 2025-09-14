@@ -5,6 +5,14 @@ import { processMeetings, processRaces } from './database-utils.js';
 import { validateEnvironmentVariables, executeApiCallWithTimeout, monitorMemoryUsage, forceGarbageCollection } from './error-handlers.js';
 import { fastLockCheck, updateHeartbeat, releaseLock, setupHeartbeatInterval, shouldTerminateForNzTime } from './lock-manager.js';
 
+/**
+ * Daily Meetings Import Function
+ *
+ * TIMEZONE CONTEXT:
+ * - Scheduled: 19:00 UTC = 7:00 AM NZST (next day)
+ * - Termination Window: 1:00-6:00 AM NZST (allows proper 7:00 AM execution)
+ * - Execution Sequence: Runs before daily-races (8:00 AM NZST) and daily-initial-data (8:30 AM NZST)
+ */
 export default async function main(context) {
     const functionStartTime = Date.now();
     let lockManager = null;
@@ -64,7 +72,7 @@ export default async function main(context) {
             await releaseLock(lockManager, progressTracker, 'nz-time-termination');
             return {
                 success: false,
-                message: 'Terminated due to NZ time limit (past 1:00 AM)',
+                message: 'Terminated - in NZ time termination window (1:00-6:00 AM NZST, function runs at 7:00 AM)',
                 terminationReason: 'nz-time-limit'
             };
         }
