@@ -1,3 +1,4 @@
+# <!-- Powered by BMAD™ Core -->
 template:
   id: story-template-v2
   name: Story Document
@@ -12,7 +13,7 @@ workflow:
   elicitation: advanced-elicitation
 
 agent_config:
-  editable_sections: 
+  editable_sections:
     - Status
     - Story
     - Acceptance Criteria
@@ -29,7 +30,7 @@ sections:
     instruction: Select the current status of the story
     owner: scrum-master
     editors: [scrum-master, dev-agent]
-    
+
   - id: story
     title: Story
     type: template-text
@@ -41,7 +42,7 @@ sections:
     elicit: true
     owner: scrum-master
     editors: [scrum-master]
-    
+
   - id: acceptance-criteria
     title: Acceptance Criteria
     type: numbered-list
@@ -49,7 +50,7 @@ sections:
     elicit: true
     owner: scrum-master
     editors: [scrum-master]
-    
+
   - id: tasks-subtasks
     title: Tasks / Subtasks
     type: bullet-list
@@ -66,64 +67,31 @@ sections:
     elicit: true
     owner: scrum-master
     editors: [scrum-master, dev-agent]
-    
+
   - id: dev-notes
     title: Dev Notes
     instruction: |
       Populate relevant information, only what was pulled from actual artifacts from docs folder, relevant to this story:
       - Do not invent information
-      - Include Relevant Source Tree info that relates to this story
-      - Include important notes from previous stories that are relevant
-      - CRITICAL: Include Next.js 15 performance optimization requirements
-      - CRITICAL: Include Appwrite best practices from architecture docs
-      - Put enough information so the dev agent should NEVER need to read the architecture documents
-      - These notes along with tasks/subtasks must give complete context for implementation
+      - If known add Relevant Source Tree info that relates to this story
+      - If there were important notes from previous story that are relevant to this one, include them here
+      - Put enough information in this section so that the dev agent should NEVER need to read the architecture documents, these notes along with the tasks and subtasks must give the Dev Agent the complete context it needs to comprehend with the least amount of overhead the information to complete the story, meeting all AC and completing all tasks+subtasks
     elicit: true
     owner: scrum-master
     editors: [scrum-master]
     sections:
-      - id: performance-requirements
-        title: Next.js 15 Performance Requirements
-        instruction: |
-          MANDATORY: Include Next.js 15 performance optimization requirements from architecture:
-          - Server Component vs Client Component usage patterns
-          - Appwrite dual SDK strategy (node-appwrite vs appwrite)
-          - Bundle optimization and lazy loading requirements
-          - Real-time subscription optimization patterns
-          - Performance targets (bundle size, Core Web Vitals, etc.)
-          - Caching and revalidation strategies
-        elicit: true
-        owner: scrum-master
-        editors: [scrum-master]
-        
-      - id: appwrite-best-practices
-        title: Appwrite Best Practices
-        instruction: |
-          MANDATORY: Include Appwrite best practices from architecture docs:
-          - SDK configuration patterns for server vs client
-          - Database query optimization requirements
-          - Real-time subscription management
-          - Error handling and retry logic
-          - Security and authentication patterns
-          - Performance monitoring requirements
-        elicit: true
-        owner: scrum-master
-        editors: [scrum-master]
-        
       - id: testing-standards
-        title: Testing Requirements
+        title: Testing
         instruction: |
-          Include comprehensive testing standards from architecture:
-          - Component testing with React Testing Library
-          - Server Component testing patterns
-          - Real-time subscription testing
-          - Performance testing requirements (bundle size, Lighthouse)
-          - Appwrite SDK mocking strategies
-          - Test file locations and naming conventions
+          List Relevant Testing Standards from Architecture the Developer needs to conform to:
+          - Test file location
+          - Test standards
+          - Testing frameworks and patterns to use
+          - Any specific testing requirements for this story
         elicit: true
         owner: scrum-master
         editors: [scrum-master]
-        
+
   - id: change-log
     title: Change Log
     type: table
@@ -131,7 +99,7 @@ sections:
     instruction: Track changes made to this story document
     owner: scrum-master
     editors: [scrum-master, dev-agent, qa-agent]
-    
+
   - id: dev-agent-record
     title: Dev Agent Record
     instruction: This section is populated by the development agent during implementation
@@ -144,25 +112,25 @@ sections:
         instruction: Record the specific AI agent model and version used for development
         owner: dev-agent
         editors: [dev-agent]
-        
+
       - id: debug-log-references
         title: Debug Log References
         instruction: Reference any debug logs or traces generated during development
         owner: dev-agent
         editors: [dev-agent]
-        
+
       - id: completion-notes
         title: Completion Notes List
         instruction: Notes about the completion of tasks and any issues encountered
         owner: dev-agent
         editors: [dev-agent]
-        
+
       - id: file-list
         title: File List
         instruction: List all files created, modified, or affected during story implementation
         owner: dev-agent
         editors: [dev-agent]
-        
+
   - id: qa-results
     title: QA Results
     instruction: Results from QA Agent QA review of the completed story implementation
