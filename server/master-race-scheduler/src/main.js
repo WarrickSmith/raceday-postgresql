@@ -1,7 +1,28 @@
-import { Client, Databases, Functions, Query } from 'node-appwrite'
+import { Client, Databases, Functions, Query } from 'node-appwrite';
+import { validateEnvironmentVariables, executeWithTimeout, monitorMemoryUsage, forceGarbageCollection, categorizeError, logPerformanceMetrics } from './error-handlers.js';
+import { fastLockCheck, updateHeartbeat, releaseLock, setupHeartbeatInterval, shouldTerminateForNzTime } from './lock-manager.js';
 
 /**
  * Master Race Scheduler - Autonomous polling coordination for horse race data
+ *
+ * ENHANCED VERSION 2.0 - Critical CRON Schedule Issue Resolution
+ *
+ * CRITICAL CRON SCHEDULE ISSUE: Function executes every minute with 120s timeout.
+ * Risk of overlapping executions particularly at midnight when new day's schedule begins.
+ *
+ * TIMEZONE CONTEXT:
+ * - Scheduled: Every minute in UTC
+ * - Enhanced Termination: 1:00 AM NZST with midnight boundary awareness
+ * - Execution Frequency: High (every 60 seconds)
+ * - Overlap Prevention: Ultra-fast lock check (<15ms target)
+ *
+ * ENHANCED FEATURES:
+ * - Ultra-fast-fail lock mechanism (target <15ms) to prevent overlapping executions
+ * - Midnight boundary detection with explicit day-rollover validation
+ * - Aggressive stale lock detection (>75 seconds) with automatic cleanup
+ * - Micro-heartbeat updates every 30 seconds with scheduling progress
+ * - Automatic backoff detection for multiple rapid terminations
+ * - NZ time-aware termination at 1:00 AM with resource optimization
  *
  * This function serves as the central coordinator for all race polling activities.
  * When triggered by cron (every minute), runs 2 cycles at 30-second intervals (0s, 30s).
@@ -23,69 +44,213 @@ import { Client, Databases, Functions, Query } from 'node-appwrite'
  * - Stops polling when race status becomes 'Final'
  */
 export default async function main(context) {
-  const startTime = Date.now()
-
-  context.log('Master race scheduler started', {
-    timestamp: new Date().toISOString(),
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  })
-
-  // Check if this is a scheduled run (cron) vs manual run
-  if (context.req.headers['x-appwrite-task']) {
-    // Run the polling logic once for cron-triggered executions (every 1 minute)
-    // High-frequency polling is now delegated to enhanced-race-poller internal loops
-    context.log(
-      'Scheduled execution: Running single cycle (high-frequency polling delegated to enhanced-race-poller)'
-    )
-
-    await runSchedulerLogic(context)
-
-    return context.res.json({
-      success: true,
-      message:
-        'Scheduler completed single cycle (high-frequency polling delegated to enhanced-race-poller)',
-      totalExecutionTime: Date.now() - startTime,
-    })
-  } else {
-    // For manual runs, just run once
-    context.log('Manual execution: Running single cycle')
-    return await runSchedulerLogic(context)
-  }
-}
-
-/**
- * Core scheduler logic - extracted to allow both single and multiple executions
- */
-async function runSchedulerLogic(context) {
-  const startTime = Date.now()
+  const functionStartTime = Date.now();
+  let lockManager = null;
+  let heartbeatInterval = null;
+  let progressTracker = {
+      racesAnalyzed: 0,
+      racesScheduled: 0,
+      functionsTriggered: 0,
+      currentOperation: 'initializing',
+      schedulingPhase: 'startup'
+  };
 
   try {
-    // Validate environment variables
-    const requiredEnvVars = [
-      'APPWRITE_ENDPOINT',
-      'APPWRITE_PROJECT_ID',
-      'APPWRITE_API_KEY',
-    ]
+    // Validate environment variables before any processing
+    validateEnvironmentVariables(['APPWRITE_ENDPOINT', 'APPWRITE_PROJECT_ID', 'APPWRITE_API_KEY'], context);
 
-    for (const envVar of requiredEnvVars) {
-      if (!process.env[envVar]) {
-        throw new Error(`Missing required environment variable: ${envVar}`)
-      }
-    }
+    context.log('Enhanced Master race scheduler started - performing ultra-fast lock check', {
+      timestamp: new Date().toISOString(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      version: '2.0-enhanced-overlap-prevention',
+      executionFrequency: 'every-minute'
+    });
 
-    const endpoint = process.env['APPWRITE_ENDPOINT']
-    const projectId = process.env['APPWRITE_PROJECT_ID']
-    const apiKey = process.env['APPWRITE_API_KEY']
+    const endpoint = process.env['APPWRITE_ENDPOINT'];
+    const projectId = process.env['APPWRITE_PROJECT_ID'];
+    const apiKey = process.env['APPWRITE_API_KEY'];
+    const databaseId = 'raceday-db';
 
-    // Initialize Appwrite clients
+    // Initialize Appwrite client (lightweight for lock check)
     const client = new Client()
       .setEndpoint(endpoint)
       .setProject(projectId)
-      .setKey(apiKey)
+      .setKey(apiKey);
+    const databases = new Databases(client);
 
-    const databases = new Databases(client)
-    const functions = new Functions(client)
-    const databaseId = 'raceday-db'
+    // PHASE 1: Ultra-fast-fail lock check (target <15ms) - CRITICAL for every-minute execution
+    const lockStartTime = Date.now();
+    lockManager = await fastLockCheck(databases, databaseId, context);
+    const lockAcquisitionTime = Date.now() - lockStartTime;
+
+    if (!lockManager) {
+        // Another instance is running - ultra-fast termination to save resources
+        const ultraFastTermination = lockAcquisitionTime < 20;
+        context.log('Terminating due to active concurrent execution - ultra-fast resource savings', {
+            terminationReason: 'concurrent-execution-detected',
+            ultraFastTermination,
+            lockCheckTimeMs: lockAcquisitionTime,
+            resourcesSaved: {
+              noRaceAnalysis: true,
+              noFunctionTriggers: true,
+              totalExecutionTimeMs: Date.now() - functionStartTime
+            },
+            everyMinuteOptimization: 'prevented expensive operations'
+        });
+        return {
+            success: false,
+            message: 'Another instance already running - ultra-fast termination to save resources',
+            terminationReason: 'concurrent-execution',
+            ultraFastTermination,
+            executionTimeMs: Date.now() - functionStartTime
+        };
+    }
+
+    // Update progress and establish micro-heartbeat
+    progressTracker.currentOperation = 'lock-acquired';
+    progressTracker.lockAcquisitionTimeMs = lockAcquisitionTime;
+    heartbeatInterval = setupHeartbeatInterval(lockManager, progressTracker);
+
+    // Check NZ time termination before expensive operations
+    if (shouldTerminateForNzTime(context)) {
+        await releaseLock(lockManager, progressTracker, 'nz-time-termination');
+        return {
+            success: false,
+            message: 'Terminated - outside racing hours (1:00-9:00 AM NZST for optimal resource usage)',
+            terminationReason: 'nz-time-limit',
+            executionTimeMs: Date.now() - functionStartTime
+        };
+    }
+
+    // Monitor initial memory usage
+    const initialMemory = monitorMemoryUsage(context);
+    progressTracker.schedulingPhase = 'race-analysis';
+
+  // Check if this is a scheduled run (cron) vs manual run
+  if (context.req.headers['x-appwrite-task']) {
+    // Run the enhanced polling logic once for cron-triggered executions (every 1 minute)
+    // High-frequency polling is now delegated to enhanced-race-poller internal loops
+    context.log(
+      'Scheduled execution: Running enhanced single cycle with overlap prevention'
+    )
+
+    const result = await runEnhancedSchedulerLogic(context, databases, databaseId, lockManager, progressTracker, functionStartTime)
+
+    // Clean up and release resources
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    await releaseLock(lockManager, result.statistics || progressTracker, 'completed');
+
+    return context.res.json({
+      success: result.success,
+      message: result.message || 'Enhanced scheduler completed single cycle',
+      ...result,
+      totalExecutionTime: Date.now() - functionStartTime,
+      lockAcquisitionTimeMs: lockAcquisitionTime
+    })
+  } else {
+    // For manual runs, just run once
+    context.log('Manual execution: Running enhanced single cycle')
+    const result = await runEnhancedSchedulerLogic(context, databases, databaseId, lockManager, progressTracker, functionStartTime)
+
+    // Clean up and release resources
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    await releaseLock(lockManager, result.statistics || progressTracker, 'completed');
+
+    return result
+  }
+
+  } catch (error) {
+        // Ensure cleanup even on error
+        if (heartbeatInterval) clearInterval(heartbeatInterval);
+
+        if (lockManager) {
+            progressTracker.currentOperation = 'error-cleanup';
+            progressTracker.error = error.message;
+            await releaseLock(lockManager, progressTracker, 'failed');
+        }
+
+        const executionDuration = Date.now() - functionStartTime;
+        const errorAnalysis = categorizeError(error, context);
+
+        context.error('Enhanced Master race scheduler failed', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined,
+            executionDurationMs: executionDuration,
+            progressWhenFailed: progressTracker,
+            errorAnalysis,
+            timestamp: new Date().toISOString(),
+            version: '2.0-enhanced-overlap-prevention'
+        });
+
+        return {
+            success: false,
+            message: 'Enhanced Master race scheduler failed with error',
+            error: error instanceof Error ? error.message : 'Unknown error',
+            progressAtFailure: progressTracker,
+            executionDurationMs: executionDuration,
+            errorAnalysis
+        };
+
+    } finally {
+        // Final cleanup
+        if (heartbeatInterval) clearInterval(heartbeatInterval);
+
+        // Force garbage collection for memory cleanup if significant work was done
+        if (progressTracker.racesAnalyzed > 0 || progressTracker.functionsTriggered > 0) {
+            forceGarbageCollection(context);
+        }
+
+        // Log final performance metrics
+        const finalExecutionTime = Date.now() - functionStartTime;
+        const performanceMetrics = logPerformanceMetrics({
+            executionTimeMs: finalExecutionTime,
+            racesAnalyzed: progressTracker.racesAnalyzed,
+            racesScheduled: progressTracker.racesScheduled,
+            functionsTriggered: progressTracker.functionsTriggered,
+            memoryUsageMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+            lockAcquisitionMs: progressTracker.lockAcquisitionTimeMs,
+            schedulingPhase: progressTracker.schedulingPhase
+        }, context);
+
+        context.log('Enhanced Master race scheduler cleanup completed', {
+            finalExecutionTime,
+            cleanupCompleted: true,
+            performanceMetrics: performanceMetrics.performanceIndicators,
+            version: '2.0-enhanced-overlap-prevention'
+        });
+    }
+}
+
+/**
+ * Enhanced core scheduler logic with lock management and NZ time termination
+ * Optimized for every-minute execution frequency
+ */
+async function runEnhancedSchedulerLogic(context, databases, databaseId, lockManager, progressTracker, functionStartTime) {
+  const startTime = Date.now();
+
+  try {
+    // Initialize Functions client for triggering race polling
+    const client = new Client()
+      .setEndpoint(process.env['APPWRITE_ENDPOINT'])
+      .setProject(process.env['APPWRITE_PROJECT_ID'])
+      .setKey(process.env['APPWRITE_API_KEY']);
+
+    const functions = new Functions(client);
+
+    // PHASE 2: Race Analysis with Heartbeat Updates
+    progressTracker.currentOperation = 'analyzing-races';
+    progressTracker.schedulingPhase = 'race-analysis';
+    await updateHeartbeat(lockManager, progressTracker);
+
+    // Check NZ time termination after lock acquisition
+    if (shouldTerminateForNzTime(context)) {
+        return {
+            success: false,
+            message: 'Terminated due to NZ time limit during race analysis',
+            terminationReason: 'nz-time-limit',
+            statistics: progressTracker
+        };
+    }
 
     // Simplified timezone handling using native NZ API fields
     // NZTAB API provides raceDateNz and startTimeNz fields that eliminate complex UTC conversions
@@ -128,6 +293,7 @@ async function runSchedulerLogic(context) {
     ])
 
     const racesToday = todaysRaces.documents
+    progressTracker.racesAnalyzed = racesToday.length;
 
     context.log('Enhanced race filtering', {
       nzToday,
@@ -142,6 +308,10 @@ async function runSchedulerLogic(context) {
         status: r.status,
       })),
     })
+
+    // Update heartbeat after race query
+    progressTracker.currentOperation = 'race-filtering-completed';
+    await updateHeartbeat(lockManager, progressTracker);
 
     if (racesToday.length === 0) {
       context.log('No races found for today, scheduler dormant', {
@@ -220,6 +390,21 @@ async function runSchedulerLogic(context) {
       racesToAnalyze: activeRaces.documents.filter((r) => r.status !== 'Final')
         .length,
     })
+
+    // Update heartbeat and check NZ time before race analysis
+    progressTracker.currentOperation = 'active-race-analysis';
+    progressTracker.schedulingPhase = 'polling-analysis';
+    await updateHeartbeat(lockManager, progressTracker);
+
+    // Check NZ time termination before intensive race analysis
+    if (shouldTerminateForNzTime(context)) {
+        return {
+            success: false,
+            message: 'Terminated due to NZ time limit before race analysis',
+            terminationReason: 'nz-time-limit',
+            statistics: progressTracker
+        };
+    }
 
     // Analyze each race for polling requirements
     const racesDueForPolling = []
@@ -381,6 +566,22 @@ async function runSchedulerLogic(context) {
       }
     }
 
+    // PHASE 3: Function Execution with Enhanced Monitoring
+    progressTracker.currentOperation = 'scheduling-functions';
+    progressTracker.schedulingPhase = 'function-execution';
+    progressTracker.racesScheduled = racesDueForPolling.length;
+    await updateHeartbeat(lockManager, progressTracker);
+
+    // Check NZ time termination before function execution
+    if (shouldTerminateForNzTime(context)) {
+        return {
+            success: false,
+            message: 'Terminated due to NZ time limit before function execution',
+            terminationReason: 'nz-time-limit',
+            statistics: progressTracker
+        };
+    }
+
     // Enhanced polling strategy with comprehensive execution monitoring
     let pollingStrategy
     let functionTriggered = false
@@ -422,6 +623,7 @@ async function runSchedulerLogic(context) {
         )
 
         functionTriggered = true
+        progressTracker.functionsTriggered = 1
         context.log('✓ Enhanced race poller (single) triggered successfully', {
           raceId: race.raceId.slice(-8),
           raceName: race.raceName.substring(0, 40),
@@ -461,6 +663,7 @@ async function runSchedulerLogic(context) {
         )
 
         functionTriggered = true
+        progressTracker.functionsTriggered = 1
         context.log('✓ Enhanced race poller (batch) triggered successfully', {
           raceCount: raceIds.length,
           criticalCount: criticalRaces.length,
@@ -542,6 +745,7 @@ async function runSchedulerLogic(context) {
       }
 
       functionTriggered = successfulBatches > 0
+      progressTracker.functionsTriggered = successfulBatches
 
       context.log('Multiple batch execution completed', {
         totalBatches: batches.length,
@@ -614,9 +818,14 @@ async function runSchedulerLogic(context) {
       },
     }
 
+    // Final heartbeat update and completion
+    progressTracker.currentOperation = 'execution-completed';
+    progressTracker.schedulingPhase = 'completion';
+    await updateHeartbeat(lockManager, progressTracker);
+
     const executionSummary = {
       success: true,
-      message: `Enhanced Master Scheduler completed successfully`,
+      message: `Enhanced Master Scheduler v2.0 completed successfully`,
       pollingStrategy,
       racesScheduled: racesDueForPolling.length,
       criticalRacesHandled: criticalRacesPolled,
@@ -624,9 +833,11 @@ async function runSchedulerLogic(context) {
       analysis: analysisResults,
       executionTimeMs: totalExecutionTime,
       functionTriggered,
+      functionsTriggered: progressTracker.functionsTriggered,
       nextCheckIn: '1 minute (CRON minimum)',
       nzTimeDisplay,
       isAfterNz9AM,
+      statistics: progressTracker, // Include full progress for cleanup
       enhancedFeatures: {
         dualPhasePollingStrategy: true,
         earlyMorningBaselineCollection: true,
@@ -634,6 +845,10 @@ async function runSchedulerLogic(context) {
         simplifiedTimezoneHandling: true,
         criticalPeriodMonitoring: true,
         comprehensiveExecutionLogging: true,
+        ultraFastLockMechanism: true,
+        midnightBoundaryProtection: true,
+        nzTimeAwareTermination: true,
+        microHeartbeatMonitoring: true
       },
     }
 
