@@ -1,5 +1,6 @@
 import { ensureDatabaseSetup } from './database-setup.js';
 import { validateEnvironmentVariables, handleError } from './error-handlers.js';
+import { logDebug, logInfo, logWarn, logError, logFunctionStart, logFunctionComplete } from './logging-utils.js';
 
 export default async function main(context) {
     try {
@@ -11,13 +12,13 @@ export default async function main(context) {
         const apiKey = process.env['APPWRITE_API_KEY'];
         const databaseId = 'raceday-db';
 
-        context.log('Database setup function started', {
+        logDebug(context,'Database setup function started', {
             timestamp: new Date().toISOString(),
             databaseId
         });
 
         // Execute database setup with comprehensive schema validation
-        context.log('Starting comprehensive database setup...');
+        logDebug(context,'Starting comprehensive database setup...');
         await ensureDatabaseSetup({
             endpoint,
             projectId,
@@ -25,7 +26,7 @@ export default async function main(context) {
             databaseId
         }, context);
 
-        context.log('Database setup function completed successfully', {
+        logDebug(context,'Database setup function completed successfully', {
             timestamp: new Date().toISOString(),
             databaseId
         });
