@@ -1,6 +1,7 @@
 import { Client, Databases, Query } from 'node-appwrite';
 import { fastLockCheck, updateHeartbeat, releaseLock, setupHeartbeatInterval, shouldTerminateForNzTime } from './lock-manager.js';
 import { validateEnvironmentVariables, executeApiCallWithTimeout, monitorMemoryUsage, forceGarbageCollection, nzTabApiCircuitBreaker, handleError } from './error-handlers.js';
+import { logDebug, logInfo, logWarn, logError, logFunctionStart, logFunctionComplete } from './logging-utils.js';
 
 /**
  * Meeting Status Poller - Enhanced with fast-fail lock pattern and robustness improvements
@@ -44,8 +45,7 @@ export default async function main(context) {
         const nztabBaseUrl = process.env['NZTAB_API_BASE_URL'] || 'https://api.tab.co.nz';
         const databaseId = 'raceday-db';
 
-        context.log('Meeting status poller started - performing fast lock check', {
-            timestamp: new Date().toISOString(),
+        logFunctionStart(context, 'Meeting Status Poller', {
             nztabBaseUrl,
             functionVersion: '2.0.0-enhanced',
             cronSchedule: 'every-15-minutes-21-to-11',
@@ -65,7 +65,7 @@ export default async function main(context) {
 
         if (!lockManager) {
             // Another instance is running OR midnight boundary blocked execution
-            context.log('Meeting status poller terminating due to lock or boundary check', {
+            logInfo(context, 'Meeting status poller terminating due to lock or boundary check', {
                 terminationReason: 'concurrent-execution-or-boundary-blocked',
                 resourcesSaved: true,
                 executionTimeMs: Date.now() - functionStartTime,
@@ -103,7 +103,7 @@ export default async function main(context) {
             timeZone: 'Pacific/Auckland',
         });
 
-        context.log('Fetching existing meetings from database...', {
+        logDebug(context,'Fetching existing meetings from database...', {
             nzDate,
             timezone: 'Pacific/Auckland'
         });
@@ -117,7 +117,7 @@ export default async function main(context) {
         ]);
 
         if (existingMeetings.documents.length === 0) {
-            context.log('No existing meetings found for today - completing successfully');
+            logDebug(context,'No existing meetings found for today - completing successfully');
             await releaseLock(lockManager, {
                 meetingsFound: 0,
                 action: 'no-meetings-to-update'
@@ -131,7 +131,7 @@ export default async function main(context) {
             };
         }
 
-        context.log(`Found ${existingMeetings.documents.length} existing meetings to check for status updates`);
+        logDebug(context,`Found ${existingMeetings.documents.length} existing meetings to check for status updates`);
         progressTracker.totalMeetingsToCheck = existingMeetings.documents.length;
 
         // Check NZ time termination after database query
@@ -148,7 +148,7 @@ export default async function main(context) {
         progressTracker.currentOperation = 'fetching-api-data';
         await updateHeartbeat(lockManager, progressTracker);
 
-        context.log('Fetching fresh meeting data from NZ TAB API with circuit breaker protection...');
+        logDebug(context,'Fetching fresh meeting data from NZ TAB API with circuit breaker protection...');
 
         const freshMeetings = await nzTabApiCircuitBreaker.execute(
             fetchMeetingsFromAPI,
@@ -157,7 +157,7 @@ export default async function main(context) {
         );
 
         if (!freshMeetings || freshMeetings.length === 0) {
-            context.log('No fresh meeting data returned from API - completing with no updates');
+            logDebug(context,'No fresh meeting data returned from API - completing with no updates');
             await releaseLock(lockManager, {
                 existingMeetings: existingMeetings.documents.length,
                 freshMeetingsFromAPI: 0,
@@ -172,7 +172,7 @@ export default async function main(context) {
             };
         }
 
-        context.log(`Successfully fetched ${freshMeetings.length} fresh meetings from API`);
+        logDebug(context,`Successfully fetched ${freshMeetings.length} fresh meetings from API`);
 
         // Monitor memory after API call
         const afterApiMemory = monitorMemoryUsage(context);
@@ -194,7 +194,7 @@ export default async function main(context) {
         progressTracker.currentOperation = 'processing-meeting-updates';
         await updateHeartbeat(lockManager, progressTracker);
 
-        context.log('Processing meeting status updates with enhanced logic...');
+        logDebug(context,'Processing meeting status updates with enhanced logic...');
         const results = await processMeetingStatusUpdatesEnhanced(
             databases,
             databaseId,
@@ -238,7 +238,7 @@ export default async function main(context) {
             }
         };
 
-        context.log('Meeting status poller completed successfully', {
+        logDebug(context,'Meeting status poller completed successfully', {
             timestamp: new Date().toISOString(),
             ...completionStats,
             nzTime: new Date().toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
@@ -307,7 +307,7 @@ export default async function main(context) {
             forceGarbageCollection(context);
         }
 
-        context.log('Meeting status poller cleanup completed', {
+        logDebug(context,'Meeting status poller cleanup completed', {
             finalExecutionTime: Date.now() - functionStartTime,
             cleanupCompleted: true,
             specification: 's-1vcpu-1gb'
@@ -331,7 +331,7 @@ async function fetchMeetingsFromAPI(baseUrl, nzDate, context) {
 
         const apiUrl = `${baseUrl}/affiliates/v1/racing/meetings?${params.toString()}`;
 
-        context.log('Fetching fresh meeting data for status updates with enhanced protection', {
+        logDebug(context,'Fetching fresh meeting data for status updates with enhanced protection', {
             apiUrl,
             nzDate,
             function: 'meeting-status-poller'
@@ -358,7 +358,7 @@ async function fetchMeetingsFromAPI(baseUrl, nzDate, context) {
             throw new Error('Invalid API response format: missing meetings data');
         }
 
-        context.log('Successfully fetched fresh meeting data with enhanced handling', {
+        logDebug(context,'Successfully fetched fresh meeting data with enhanced handling', {
             meetingsCount: data.data.meetings.length,
             generatedTime: data.header?.generated_time,
             function: 'meeting-status-poller',
@@ -402,7 +402,7 @@ async function processMeetingStatusUpdatesEnhanced(databases, databaseId, existi
         }
     });
 
-    context.log('Starting enhanced meeting status updates processing', {
+    logDebug(context,'Starting enhanced meeting status updates processing', {
         existingMeetingsCount: existingMeetings.length,
         freshMeetingsCount: freshMeetings.length,
         mappedFreshMeetings: freshMeetingsMap.size,
@@ -423,7 +423,7 @@ async function processMeetingStatusUpdatesEnhanced(databases, databaseId, existi
 
         // Check NZ time termination during processing
         if (shouldTerminateForNzTime(context)) {
-            context.log('NZ time termination triggered during meeting processing', {
+            logDebug(context,'NZ time termination triggered during meeting processing', {
                 meetingsProcessedSoFar: meetingsChecked,
                 meetingsUpdatedSoFar: meetingsUpdated,
                 batchProgress: `${i}/${existingMeetings.length}`
@@ -465,7 +465,7 @@ async function processMeetingStatusUpdatesEnhanced(databases, databaseId, existi
         failedUpdates: results.filter(r => r.status === 'rejected').length
     };
 
-    context.log('Enhanced meeting status update processing completed', {
+    logDebug(context,'Enhanced meeting status update processing completed', {
         ...processingResults,
         function: 'meeting-status-poller'
     });
@@ -490,7 +490,7 @@ async function processSingleMeetingUpdate(existingMeeting, freshMeetingsMap, dat
         const freshMeeting = freshMeetingsMap.get(existingMeeting.meetingId);
 
         if (!freshMeeting) {
-            context.log(`No fresh data found for meeting ${existingMeeting.meetingId}`, {
+            logDebug(context,`No fresh data found for meeting ${existingMeeting.meetingId}`, {
                 meetingName: existingMeeting.meetingName,
                 function: 'meeting-status-poller'
             });
@@ -505,7 +505,7 @@ async function processSingleMeetingUpdate(existingMeeting, freshMeetingsMap, dat
         if (freshMeeting.status && freshMeeting.status !== existingMeeting.status) {
             updates.status = freshMeeting.status;
             fieldsUpdated++;
-            context.log(`Status change detected for meeting ${existingMeeting.meetingId}`, {
+            logDebug(context,`Status change detected for meeting ${existingMeeting.meetingId}`, {
                 meetingName: existingMeeting.meetingName,
                 old: existingMeeting.status,
                 new: freshMeeting.status,
@@ -517,7 +517,7 @@ async function processSingleMeetingUpdate(existingMeeting, freshMeetingsMap, dat
         if (freshMeeting.track_condition && freshMeeting.track_condition !== existingMeeting.trackCondition) {
             updates.trackCondition = safeStringField(freshMeeting.track_condition, 50);
             fieldsUpdated++;
-            context.log(`Track condition change for meeting ${existingMeeting.meetingId}`, {
+            logDebug(context,`Track condition change for meeting ${existingMeeting.meetingId}`, {
                 meetingName: existingMeeting.meetingName,
                 old: existingMeeting.trackCondition,
                 new: freshMeeting.track_condition,
@@ -529,7 +529,7 @@ async function processSingleMeetingUpdate(existingMeeting, freshMeetingsMap, dat
         if (freshMeeting.weather && freshMeeting.weather !== existingMeeting.weather) {
             updates.weather = safeStringField(freshMeeting.weather, 50);
             fieldsUpdated++;
-            context.log(`Weather change for meeting ${existingMeeting.meetingId}`, {
+            logDebug(context,`Weather change for meeting ${existingMeeting.meetingId}`, {
                 meetingName: existingMeeting.meetingName,
                 old: existingMeeting.weather,
                 new: freshMeeting.weather,
@@ -563,7 +563,7 @@ async function processSingleMeetingUpdate(existingMeeting, freshMeetingsMap, dat
             // Apply updates to database with error handling
             await databases.updateDocument(databaseId, 'meetings', existingMeeting.$id, updates);
 
-            context.log(`Enhanced update applied to meeting ${existingMeeting.meetingId}`, {
+            logDebug(context,`Enhanced update applied to meeting ${existingMeeting.meetingId}`, {
                 meetingName: existingMeeting.meetingName,
                 fieldsUpdated,
                 updates: Object.keys(updates),

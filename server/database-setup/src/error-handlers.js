@@ -4,6 +4,8 @@
  * Following Appwrite 2025 best practices for robust function execution
  */
 
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
+
 /**
  * Enhanced timeout protection wrapper for promises with cleanup
  * @param {Promise} promise - Promise to wrap with timeout
@@ -63,7 +65,7 @@ export function handleError(error, operation, context, metadata = {}, shouldThro
     if (severity === 'critical' || severity === 'high') {
         context.error(`[${severity.toUpperCase()}] ${operation} failed`, errorDetails);
     } else {
-        context.log(`[${severity.toUpperCase()}] ${operation} failed`, errorDetails);
+        logInfo(context, `[${severity.toUpperCase()}] ${operation} failed`, errorDetails);
     }
 
     if (shouldThrow) {
@@ -91,7 +93,7 @@ export function validateEnvironmentVariables(requiredVars, context) {
         throw error;
     }
 
-    context.log('Environment variables validated successfully', {
+    logDebug(context, 'Environment variables validated successfully', {
         validatedVars: requiredVars
     });
 }
@@ -127,7 +129,7 @@ export function rateLimit(delayMs, context, reason = 'API rate limiting', option
         actualDelay += jitterAmount;
     }
 
-    context.log(`Applying rate limit delay: ${actualDelay}ms`, {
+    logDebug(context, `Applying rate limit delay: ${actualDelay}ms`, {
         reason,
         baseDelay: delayMs,
         adaptive,
@@ -162,7 +164,7 @@ export async function retryWithExponentialBackoff(operation, options = {}, conte
         const startTime = Date.now();
 
         try {
-            context.log(`Attempt ${attempt}/${maxRetries + 1} starting`, {
+            logDebug(context, `Attempt ${attempt}/${maxRetries + 1} starting`, {
                 operation: operation.name || 'unknown',
                 timeoutMs
             });
@@ -175,7 +177,7 @@ export async function retryWithExponentialBackoff(operation, options = {}, conte
             );
 
             const duration = Date.now() - startTime;
-            context.log(`Operation succeeded on attempt ${attempt}`, {
+            logDebug(context, `Operation succeeded on attempt ${attempt}`, {
                 durationMs: duration,
                 attempt,
                 totalAttempts: maxRetries + 1
@@ -218,7 +220,7 @@ export async function retryWithExponentialBackoff(operation, options = {}, conte
             const jitterAmount = jitter ? Math.round(delay * 0.1 * Math.random()) : 0;
             const actualDelay = delay + jitterAmount;
 
-            context.log(`Retrying in ${actualDelay}ms...`, {
+            logDebug(context, `Retrying in ${actualDelay}ms...`, {
                 attempt,
                 baseDelay,
                 calculatedDelay: delay,
@@ -336,7 +338,7 @@ export class CircuitBreaker {
             if (Date.now() - this.lastFailureTime >= this.resetTimeout) {
                 this.state = 'HALF_OPEN';
                 this.successCount = 0;
-                context.log(`Circuit breaker ${this.name}: Moving to HALF_OPEN state`);
+                logInfo(context, `Circuit breaker ${this.name}: Moving to HALF_OPEN state`);
             } else {
                 const error = new Error(`Circuit breaker ${this.name} is OPEN - operation blocked`);
                 error.circuitBreakerBlocked = true;
@@ -364,7 +366,7 @@ export class CircuitBreaker {
                 this.state = 'CLOSED';
                 this.failures = 0;
                 this.lastFailureTime = null;
-                context.log(`Circuit breaker ${this.name}: Closed after successful recovery`);
+                logInfo(context, `Circuit breaker ${this.name}: Closed after successful recovery`);
             }
         } else {
             // Gradually reduce failure count on success
@@ -438,7 +440,7 @@ export async function processBatch(items, operation, options = {}, context) {
 
     const startTime = Date.now();
 
-    context.log(`Starting batch processing`, {
+    logDebug(context, `Starting batch processing`, {
         totalItems: items.length,
         batchSize,
         parallel,
@@ -451,7 +453,7 @@ export async function processBatch(items, operation, options = {}, context) {
         const batchNumber = Math.floor(i / batchSize) + 1;
         const totalBatches = Math.ceil(items.length / batchSize);
 
-        context.log(`Processing batch ${batchNumber}/${totalBatches}`, {
+        logDebug(context, `Processing batch ${batchNumber}/${totalBatches}`, {
             batchSize: batch.length,
             startIndex: i
         });
@@ -519,7 +521,7 @@ export async function processBatch(items, operation, options = {}, context) {
 
         // Progress update
         const progress = ((results.totalProcessed / items.length) * 100).toFixed(1);
-        context.log(`Batch ${batchNumber} completed`, {
+        logDebug(context, `Batch ${batchNumber} completed`, {
             progress: `${progress}%`,
             successful: results.successful,
             failed: results.failed
@@ -529,7 +531,7 @@ export async function processBatch(items, operation, options = {}, context) {
     results.duration = Date.now() - startTime;
     results.successRate = results.totalProcessed > 0 ? (results.successful / results.totalProcessed) * 100 : 0;
 
-    context.log('Batch processing completed', {
+    logDebug(context, 'Batch processing completed', {
         totalItems: items.length,
         successful: results.successful,
         failed: results.failed,

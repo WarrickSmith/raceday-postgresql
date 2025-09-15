@@ -1,6 +1,7 @@
 import { Client, Databases, Query, Functions } from 'node-appwrite';
 import { validateEnvironmentVariables, handleError, rateLimit, monitorMemoryUsage, forceGarbageCollection } from './error-handlers.js';
 import { fastLockCheck, updateHeartbeat, releaseLock, setupHeartbeatInterval, shouldTerminateForNzTime } from './lock-manager.js';
+import { logDebug, logInfo, logWarn, logError, logFunctionStart, logFunctionComplete } from './logging-utils.js';
 
 /**
  * Daily Initial Data Population - Scheduled function for racing day baseline data
@@ -43,7 +44,7 @@ export default async function main(context) {
         const apiKey = process.env['APPWRITE_API_KEY'];
         const databaseId = 'raceday-db';
 
-        context.log('Daily initial data function started - performing fast lock check', {
+        logDebug(context,'Daily initial data function started - performing fast lock check', {
             timestamp: new Date().toISOString(),
             functionVersion: '2.0.0-enhanced-task-5.3'
         });
@@ -60,7 +61,7 @@ export default async function main(context) {
 
         if (!lockManager) {
             // Another instance is running - terminate immediately to save resources
-            context.log('Terminating due to active concurrent execution - resources saved', {
+            logDebug(context,'Terminating due to active concurrent execution - resources saved', {
                 terminationReason: 'concurrent-execution-detected',
                 resourcesSaved: true,
                 executionTimeMs: Date.now() - functionStartTime
@@ -96,7 +97,7 @@ export default async function main(context) {
             timeZone: 'Pacific/Auckland',
         });
 
-        context.log('Fetching today\'s races for initial data population...', { nzDate });
+        logDebug(context,'Fetching today\'s races for initial data population...', { nzDate });
         const functions = new Functions(client);
 
         const racesResult = await databases.listDocuments(databaseId, 'races', [
@@ -105,7 +106,7 @@ export default async function main(context) {
             Query.limit(999) // Get all races for the day
         ]);
 
-        context.log(`Found ${racesResult.documents.length} races for initial data population`);
+        logDebug(context,`Found ${racesResult.documents.length} races for initial data population`);
 
         if (racesResult.documents.length === 0) {
             await releaseLock(lockManager, { ...progressTracker, racesFound: 0 }, 'completed');
@@ -144,7 +145,7 @@ export default async function main(context) {
             batches.push(raceIds.slice(i, i + batchSize));
         }
 
-        context.log(`Processing ${raceIds.length} races in ${batches.length} batch(es) for comprehensive initial data`, {
+        logDebug(context,`Processing ${raceIds.length} races in ${batches.length} batch(es) for comprehensive initial data`, {
             batchSize,
             totalRaces: raceIds.length,
             estimatedTime: `${Math.ceil(batches.length * 1.5)} minutes`
@@ -188,7 +189,7 @@ export default async function main(context) {
                 };
             }
 
-            context.log(`🎯 Processing initial data batch ${batchIndex + 1}/${batches.length}`, {
+            logDebug(context,`🎯 Processing initial data batch ${batchIndex + 1}/${batches.length}`, {
                 raceIds: currentBatch,
                 batchSize: currentBatch.length,
                 progress: `${Math.round((batchIndex / batches.length) * 100)}%`
@@ -207,7 +208,7 @@ export default async function main(context) {
                 try {
                     executionResult = JSON.parse(execution.responseBody || '{}');
                 } catch (parseError) {
-                    context.log('Could not parse batch execution response', {
+                    logDebug(context,'Could not parse batch execution response', {
                         batchIndex: batchIndex + 1,
                         executionId: execution.$id,
                         status: execution.status
@@ -226,7 +227,7 @@ export default async function main(context) {
                 progressTracker.batchesProcessed = initialDataStats.batchesProcessed;
                 progressTracker.racesProcessed = initialDataStats.successfulRaces;
 
-                context.log(`✅ Completed initial data batch ${batchIndex + 1}/${batches.length}`, {
+                logDebug(context,`✅ Completed initial data batch ${batchIndex + 1}/${batches.length}`, {
                     executionId: execution.$id,
                     executionStatus: execution.status,
                     executionTime: `${execution.duration}ms`,
@@ -265,7 +266,7 @@ export default async function main(context) {
             // Rate limit between batches to prevent API overwhelming
             if (batchIndex < batches.length - 1) {
                 const delayMs = 3000; // 3 seconds between batches
-                context.log(`Applying rate limit delay: ${delayMs}ms before next batch`);
+                logDebug(context,`Applying rate limit delay: ${delayMs}ms before next batch`);
                 await rateLimit(delayMs, context, `Between initial data batches`);
             }
         }
@@ -293,7 +294,7 @@ export default async function main(context) {
             }
         };
 
-        context.log('🎉 Daily initial data population completed', {
+        logDebug(context,'🎉 Daily initial data population completed', {
             timestamp: new Date().toISOString(),
             totalExecutionTime: `${Math.round(executionDuration / 1000)}s`,
             ...completionStats,
@@ -357,7 +358,7 @@ export default async function main(context) {
             forceGarbageCollection(context, 'final-cleanup');
         }
 
-        context.log('Daily initial data function cleanup completed', {
+        logDebug(context,'Daily initial data function cleanup completed', {
             finalExecutionTime: Date.now() - functionStartTime,
             cleanupCompleted: true
         });

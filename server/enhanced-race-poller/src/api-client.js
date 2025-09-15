@@ -4,6 +4,8 @@
  * Provides unified race data fetching with enhanced timeout handling and batch optimization
  */
 
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
+
 /**
  * Fetch detailed race event data for a specific race with enhanced error handling
  * @param {string} baseUrl - Base URL for NZ TAB API
@@ -24,7 +26,7 @@ export async function fetchRaceEventData(baseUrl, raceId, context, timeoutMs = 1
         });
         const apiUrl = `${baseUrl}/affiliates/v1/racing/events/${raceId}?${params.toString()}`;
         
-        context.log('Fetching race event data from NZTAB API', {
+        logDebug(context, 'Fetching race event data from NZTAB API', {
             apiUrl,
             raceId,
             timeoutMs,
@@ -61,7 +63,7 @@ export async function fetchRaceEventData(baseUrl, raceId, context, timeoutMs = 1
             const data = await response.json();
 
             if (!data.data) {
-                context.log(`No data in API response for race ${raceId}`);
+                logDebug(context, `No data in API response for race ${raceId}`);
                 return null;
             }
 
@@ -71,7 +73,7 @@ export async function fetchRaceEventData(baseUrl, raceId, context, timeoutMs = 1
             const hasTotePools = data.data.tote_pools && Array.isArray(data.data.tote_pools);
             const hasMoneyTracker = data.data.money_tracker && data.data.money_tracker.entrants;
             
-            context.log('Successfully fetched race event data from NZTAB API', {
+            logDebug(context, 'Successfully fetched race event data from NZTAB API', {
                 raceId,
                 entrantsCount,
                 runnersCount,
@@ -86,10 +88,10 @@ export async function fetchRaceEventData(baseUrl, raceId, context, timeoutMs = 1
 
             // Ensure entrants data is available - convert runners if needed
             if (!data.data.entrants && data.data.runners && data.data.runners.length > 0) {
-                context.log(`Converting ${runnersCount} runners to entrants format`, { raceId });
+                logDebug(context, `Converting ${runnersCount} runners to entrants format`, { raceId });
                 data.data.entrants = data.data.runners;
             } else if (!data.data.entrants || data.data.entrants.length === 0) {
-                context.log(`No entrants or runners data available for race ${raceId}`, {
+                logDebug(context, `No entrants or runners data available for race ${raceId}`, {
                     hasEntrants: !!data.data.entrants,
                     hasRunners: !!data.data.runners,
                     entrantsCount,
@@ -136,7 +138,7 @@ export async function batchFetchRaceEventData(baseUrl, raceIds, context, delayBe
     const results = new Map();
     const startTime = Date.now();
 
-    context.log('Starting batch race data fetch', {
+    logDebug(context, 'Starting batch race data fetch', {
         raceCount: raceIds.length,
         delayBetweenCalls,
         timeoutPerCall,
@@ -148,13 +150,13 @@ export async function batchFetchRaceEventData(baseUrl, raceIds, context, delayBe
         const callStartTime = Date.now();
 
         try {
-            context.log(`Fetching race ${i + 1}/${raceIds.length}: ${raceId}`);
+            logDebug(context, `Fetching race ${i + 1}/${raceIds.length}: ${raceId}`);
             
             const raceData = await fetchRaceEventData(baseUrl, raceId, context, timeoutPerCall);
             results.set(raceId, raceData);
 
             const callDuration = Date.now() - callStartTime;
-            context.log(`Completed race ${i + 1}/${raceIds.length}`, {
+            logDebug(context, `Completed race ${i + 1}/${raceIds.length}`, {
                 raceId,
                 success: !!raceData,
                 callDurationMs: callDuration
@@ -162,7 +164,7 @@ export async function batchFetchRaceEventData(baseUrl, raceIds, context, delayBe
 
             // Rate limiting between calls (except for the last call)
             if (i < raceIds.length - 1) {
-                context.log(`Rate limiting: waiting ${delayBetweenCalls}ms before next call`);
+                logDebug(context, `Rate limiting: waiting ${delayBetweenCalls}ms before next call`);
                 await new Promise(resolve => setTimeout(resolve, delayBetweenCalls));
             }
 
@@ -183,7 +185,7 @@ export async function batchFetchRaceEventData(baseUrl, raceIds, context, delayBe
     const totalDuration = Date.now() - startTime;
     const successCount = Array.from(results.values()).filter(data => data !== null).length;
 
-    context.log('Batch race data fetch completed', {
+    logDebug(context, 'Batch race data fetch completed', {
         totalRaces: raceIds.length,
         successfulRaces: successCount,
         failedRaces: raceIds.length - successCount,
@@ -214,7 +216,7 @@ export async function fetchRacingData(baseUrl, context, targetDate = null) {
         
         const apiUrl = `${baseUrl}/affiliates/v1/racing/meetings?${params.toString()}`;
         
-        context.log('Fetching racing data from NZTAB API', {
+        logDebug(context, 'Fetching racing data from NZTAB API', {
             apiUrl,
             nzDate,
             timezone: 'Pacific/Auckland'
@@ -241,7 +243,7 @@ export async function fetchRacingData(baseUrl, context, targetDate = null) {
             throw new Error('Invalid API response format: missing meetings data');
         }
         
-        context.log('Successfully fetched racing data from NZTAB API', {
+        logDebug(context, 'Successfully fetched racing data from NZTAB API', {
             meetingsCount: data.data.meetings.length,
             generatedTime: data.header.generated_time
         });

@@ -1,6 +1,7 @@
 import { Client, Databases, Functions, Query } from 'node-appwrite';
 import { validateEnvironmentVariables, executeWithTimeout, monitorMemoryUsage, forceGarbageCollection, categorizeError, logPerformanceMetrics } from './error-handlers.js';
 import { fastLockCheck, updateHeartbeat, releaseLock, setupHeartbeatInterval, shouldTerminateForNzTime } from './lock-manager.js';
+import { logDebug, logInfo, logWarn, logError, logFunctionStart, logFunctionComplete } from './logging-utils.js';
 
 /**
  * Master Race Scheduler - Autonomous polling coordination for horse race data
@@ -59,7 +60,7 @@ export default async function main(context) {
     // Validate environment variables before any processing
     validateEnvironmentVariables(['APPWRITE_ENDPOINT', 'APPWRITE_PROJECT_ID', 'APPWRITE_API_KEY'], context);
 
-    context.log('Enhanced Master race scheduler started - performing ultra-fast lock check', {
+    logDebug(context,'Enhanced Master race scheduler started - performing ultra-fast lock check', {
       timestamp: new Date().toISOString(),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       version: '2.0-enhanced-overlap-prevention',
@@ -86,7 +87,7 @@ export default async function main(context) {
     if (!lockManager) {
         // Another instance is running - ultra-fast termination to save resources
         const ultraFastTermination = lockAcquisitionTime < 20;
-        context.log('Terminating due to active concurrent execution - ultra-fast resource savings', {
+        logDebug(context,'Terminating due to active concurrent execution - ultra-fast resource savings', {
             terminationReason: 'concurrent-execution-detected',
             ultraFastTermination,
             lockCheckTimeMs: lockAcquisitionTime,
@@ -130,7 +131,7 @@ export default async function main(context) {
   if (context.req.headers['x-appwrite-task']) {
     // Run the enhanced polling logic once for cron-triggered executions (every 1 minute)
     // High-frequency polling is now delegated to enhanced-race-poller internal loops
-    context.log(
+    logDebug(context,
       'Scheduled execution: Running enhanced single cycle with overlap prevention'
     )
 
@@ -149,7 +150,7 @@ export default async function main(context) {
     })
   } else {
     // For manual runs, just run once
-    context.log('Manual execution: Running enhanced single cycle')
+    logDebug(context,'Manual execution: Running enhanced single cycle')
     const result = await runEnhancedSchedulerLogic(context, databases, databaseId, lockManager, progressTracker, functionStartTime)
 
     // Clean up and release resources
@@ -212,7 +213,7 @@ export default async function main(context) {
             schedulingPhase: progressTracker.schedulingPhase
         }, context);
 
-        context.log('Enhanced Master race scheduler cleanup completed', {
+        logDebug(context,'Enhanced Master race scheduler cleanup completed', {
             finalExecutionTime,
             cleanupCompleted: true,
             performanceMetrics: performanceMetrics.performanceIndicators,
@@ -295,7 +296,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
     const racesToday = todaysRaces.documents
     progressTracker.racesAnalyzed = racesToday.length;
 
-    context.log('Enhanced race filtering', {
+    logDebug(context,'Enhanced race filtering', {
       nzToday,
       nzTimeDisplay,
       isAfterNz9AM,
@@ -314,7 +315,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
     await updateHeartbeat(lockManager, progressTracker);
 
     if (racesToday.length === 0) {
-      context.log('No races found for today, scheduler dormant', {
+      logDebug(context,'No races found for today, scheduler dormant', {
         nzToday,
         nzTimeDisplay,
         isAfterNz9AM,
@@ -337,7 +338,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
       isAfterNz9AM && racesWithStartTime.length > 0 && !allFinalized
 
     if (racesWithStartTime.length === 0) {
-      context.log('No races with start times found, scheduler dormant', {
+      logDebug(context,'No races with start times found, scheduler dormant', {
         nzTimeDisplay,
         racesTodayCount: racesToday.length,
       })
@@ -349,7 +350,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
       }
     }
 
-    context.log('Enhanced racing schedule check', {
+    logDebug(context,'Enhanced racing schedule check', {
       nzTimeDisplay,
       isAfterNz9AM,
       racesTodayCount: racesToday.length,
@@ -361,7 +362,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
     if (!isCurrentlyActive) {
       const reason = !isAfterNz9AM ? 'before 9AM NZ' : 'all races finalized'
 
-      context.log('Outside racing period, scheduler sleeping', {
+      logDebug(context,'Outside racing period, scheduler sleeping', {
         nzTimeDisplay,
         reason,
         allFinalized,
@@ -385,7 +386,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
       Query.limit(400), // Ensure we can handle large race days
     ])
 
-    context.log('Active races retrieved', {
+    logDebug(context,'Active races retrieved', {
       totalRaces: activeRaces.documents.length,
       racesToAnalyze: activeRaces.documents.filter((r) => r.status !== 'Final')
         .length,
@@ -428,7 +429,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
       // Skip races without start time
       if (!race.startTime) {
         analysisResults.skippedNoStartTime++
-        context.log('Race missing start time', {
+        logDebug(context,'Race missing start time', {
           raceId: race.$id,
           raceName: race.name || 'Unknown',
         })
@@ -456,7 +457,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
         : 'PROXIMITY_CRITICAL'
 
       if (isCriticalPeriod || isEarlyMorningPhase) {
-        context.log(
+        logDebug(context,
           `${pollingPhase} race analysis: ${
             race.name?.substring(0, 40) || 'Unknown'
           }`,
@@ -476,7 +477,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
       if (requiredInterval === null) {
         analysisResults.skippedFinalized++
         if (isCriticalPeriod) {
-          context.log('Skipping finalized critical race', {
+          logDebug(context,'Skipping finalized critical race', {
             raceId: race.$id.slice(-8),
             status: race.status,
           })
@@ -507,7 +508,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
 
       // Enhanced logging for polling decisions (critical races and early morning phase)
       if (isCriticalPeriod || isEarlyMorningPhase) {
-        context.log(`Polling decision for ${pollingPhase.toLowerCase()} race`, {
+        logDebug(context,`Polling decision for ${pollingPhase.toLowerCase()} race`, {
           raceId: race.$id.slice(-8),
           shouldPoll,
           isFirstPoll,
@@ -542,7 +543,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
       }
     }
 
-    context.log('Race analysis completed', {
+    logDebug(context,'Race analysis completed', {
       ...analysisResults,
       racesToPoll: racesDueForPolling.length,
       sampleRacesDueForPolling: racesDueForPolling.slice(0, 5).map((r) => ({
@@ -589,7 +590,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
 
     // Detailed pre-execution analysis
     const criticalRaces = racesDueForPolling.filter((r) => r.isCriticalPeriod)
-    context.log('Function execution analysis', {
+    logDebug(context,'Function execution analysis', {
       totalRacesDue: racesDueForPolling.length,
       criticalRaces: criticalRaces.length,
       criticalRaceDetails: criticalRaces.map((r) => ({
@@ -606,7 +607,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
       pollingStrategy = 'enhanced_single'
       const race = racesDueForPolling[0]
 
-      context.log('Executing single race polling strategy', {
+      logDebug(context,'Executing single race polling strategy', {
         raceId: race.raceId.slice(-8),
         raceName: race.raceName.substring(0, 40),
         status: race.status,
@@ -624,7 +625,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
 
         functionTriggered = true
         progressTracker.functionsTriggered = 1
-        context.log('✓ Enhanced race poller (single) triggered successfully', {
+        logDebug(context,'✓ Enhanced race poller (single) triggered successfully', {
           raceId: race.raceId.slice(-8),
           raceName: race.raceName.substring(0, 40),
           executionId: executionResult.$id,
@@ -643,7 +644,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
       pollingStrategy = 'enhanced_batch'
       const raceIds = racesDueForPolling.map((r) => r.raceId)
 
-      context.log('Executing batch polling strategy', {
+      logDebug(context,'Executing batch polling strategy', {
         raceCount: raceIds.length,
         criticalCount: criticalRaces.length,
         raceDetails: racesDueForPolling.map((r) => ({
@@ -664,7 +665,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
 
         functionTriggered = true
         progressTracker.functionsTriggered = 1
-        context.log('✓ Enhanced race poller (batch) triggered successfully', {
+        logDebug(context,'✓ Enhanced race poller (batch) triggered successfully', {
           raceCount: raceIds.length,
           criticalCount: criticalRaces.length,
           executionId: executionResult.$id,
@@ -688,7 +689,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
         batches.push(racesDueForPolling.slice(i, i + batchSize))
       }
 
-      context.log('Executing multiple batch polling strategy', {
+      logDebug(context,'Executing multiple batch polling strategy', {
         totalRaces: racesDueForPolling.length,
         totalBatches: batches.length,
         batchSize,
@@ -722,7 +723,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
           }
           batchResults.push(batchResult)
 
-          context.log(
+          logDebug(context,
             `✓ Enhanced poller batch ${index + 1}/${batches.length} triggered`,
             batchResult
           )
@@ -747,7 +748,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
       functionTriggered = successfulBatches > 0
       progressTracker.functionsTriggered = successfulBatches
 
-      context.log('Multiple batch execution completed', {
+      logDebug(context,'Multiple batch execution completed', {
         totalBatches: batches.length,
         successfulBatches,
         totalRaces: racesDueForPolling.length,
@@ -774,7 +775,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
 
       await Promise.allSettled(updatePromises)
 
-      context.log('Updated last_poll_time for scheduled races', {
+      logDebug(context,'Updated last_poll_time for scheduled races', {
         racesUpdated: racesDueForPolling.length,
       })
     }
@@ -852,7 +853,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
       },
     }
 
-    context.log('🚀 Enhanced Master Scheduler execution completed', {
+    logDebug(context,'🚀 Enhanced Master Scheduler execution completed', {
       ...executionSummary,
       performanceMetrics: {
         totalTimeMs: totalExecutionTime,

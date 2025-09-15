@@ -3,6 +3,7 @@ import { fetchRaceEventData } from './api-client.js';
 import { processDetailedRaces, processEntrants } from './database-utils.js';
 import { validateEnvironmentVariables, executeApiCallWithTimeout, handleError, rateLimit, monitorMemoryUsage, forceGarbageCollection } from './error-handlers.js';
 import { fastLockCheck, updateHeartbeat, releaseLock, setupHeartbeatInterval, shouldTerminateForNzTime } from './lock-manager.js';
+import { logDebug, logInfo, logWarn, logError, logFunctionStart, logFunctionComplete } from './logging-utils.js';
 
 export default async function main(context) {
     const functionStartTime = Date.now();
@@ -26,8 +27,7 @@ export default async function main(context) {
         const nztabBaseUrl = process.env['NZTAB_API_BASE_URL'] || 'https://api.tab.co.nz';
         const databaseId = 'raceday-db';
 
-        context.log('Daily races function started - performing fast lock check', {
-            timestamp: new Date().toISOString(),
+        logFunctionStart(context, 'Daily Races Import', {
             nztabBaseUrl,
             functionVersion: '2.1.0-enhanced'
         });
@@ -44,7 +44,7 @@ export default async function main(context) {
 
         if (!lockManager) {
             // Another instance is running - terminate immediately to save resources
-            context.log('Terminating due to active concurrent execution - resources saved', {
+            logInfo(context, 'Terminating due to active concurrent execution - resources saved', {
                 terminationReason: 'concurrent-execution-detected',
                 resourcesSaved: true,
                 executionTimeMs: Date.now() - functionStartTime
@@ -81,14 +81,14 @@ export default async function main(context) {
         });
 
         // Get basic races from database (that were created by daily-meetings function)
-        context.log('Fetching basic races from database for detailed enhancement...');
+        logDebug(context, 'Fetching basic races from database for detailed enhancement...');
         const racesResult = await databases.listDocuments(databaseId, 'races', [
             Query.greaterThanEqual('startTime', nzDate),
             Query.orderAsc('startTime'),
             Query.limit(999) // Override default 25 limit to get all races
         ]);
 
-        context.log(`Found ${racesResult.documents.length} races for detailed processing`);
+        logDebug(context, `Found ${racesResult.documents.length} races for detailed processing`);
         progressTracker.totalRacesFound = racesResult.documents.length;
 
         if (racesResult.documents.length === 0) {
@@ -118,7 +118,7 @@ export default async function main(context) {
         const chunkSize = 8; // Smaller chunks for better memory management
         const totalChunks = Math.ceil(totalRaces / chunkSize);
 
-        context.log(`Processing ALL ${totalRaces} races in ${totalChunks} chunks of ${chunkSize} races each`);
+        logInfo(context, `Processing ALL ${totalRaces} races in ${totalChunks} chunks of ${chunkSize} races each`);
         progressTracker.currentOperation = 'chunked-processing';
         progressTracker.chunkedProcessingState = 'started';
         progressTracker.totalChunks = totalChunks;
@@ -146,7 +146,7 @@ export default async function main(context) {
             const endIndex = Math.min(startIndex + chunkSize, totalRaces);
             const currentChunk = racesResult.documents.slice(startIndex, endIndex);
 
-            context.log(`Processing chunk ${chunkIndex + 1}/${totalChunks} (races ${startIndex + 1}-${endIndex})`);
+            logDebug(context, `Processing chunk ${chunkIndex + 1}/${totalChunks} (races ${startIndex + 1}-${endIndex})`);
             progressTracker.currentChunk = chunkIndex + 1;
             progressTracker.chunkedProcessingState = `processing-chunk-${chunkIndex + 1}`;
             await updateHeartbeat(lockManager, progressTracker);
@@ -163,7 +163,7 @@ export default async function main(context) {
 
                 try {
                     progressTracker.currentRaceProcessing = `${basicRace.raceId} (${startIndex + i + 1}/${totalRaces})`;
-                    context.log(`Fetching detailed data for race ${basicRace.raceId} (${startIndex + i + 1}/${totalRaces})`);
+                    logDebug(context, `Fetching detailed data for race ${basicRace.raceId} (${startIndex + i + 1}/${totalRaces})`);
 
                     // Fetch detailed race event data with enhanced retry logic
                     const raceEventData = await executeApiCallWithTimeout(
@@ -175,7 +175,7 @@ export default async function main(context) {
                     );
 
                     if (!raceEventData || !raceEventData.race) {
-                        context.log(`No detailed race data found for race ${basicRace.raceId}`);
+                        logWarn(context, `No detailed race data found for race ${basicRace.raceId}`);
                         continue; // Skip to next race
                     }
 
@@ -186,7 +186,7 @@ export default async function main(context) {
                         entrantsData: raceEventData.runners // Include entrants data for consolidated processing
                     });
 
-                    context.log(`Successfully fetched detailed data for race ${basicRace.raceId}`, {
+                    logDebug(context, `Successfully fetched detailed data for race ${basicRace.raceId}`, {
                         runnersFound: raceEventData.runners ? raceEventData.runners.length : 0
                     });
 
@@ -217,7 +217,7 @@ export default async function main(context) {
         
         // PHASE 4: Process the detailed race data and entrants (consolidated approach)
         if (detailedRaces.length > 0) {
-            context.log('Processing consolidated race and entrant data...');
+            logInfo(context, 'Processing consolidated race and entrant data...');
             progressTracker.currentOperation = 'database-processing';
             progressTracker.chunkedProcessingState = 'completed';
             await updateHeartbeat(lockManager, progressTracker);
@@ -278,8 +278,7 @@ export default async function main(context) {
             }
         };
 
-        context.log('Daily races function completed successfully', {
-            timestamp: new Date().toISOString(),
+        logFunctionComplete(context, 'Daily Races Import', functionStartTime, {
             ...completionStats,
             nzTime: new Date().toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
             performanceMetrics: {
@@ -341,7 +340,7 @@ export default async function main(context) {
             forceGarbageCollection(context);
         }
 
-        context.log('Daily races function cleanup completed', {
+        logDebug(context, 'Daily races function cleanup completed', {
             finalExecutionTime: Date.now() - functionStartTime,
             cleanupCompleted: true
         });

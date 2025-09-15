@@ -4,6 +4,8 @@
  * Adds mathematical validation, timeout protection, and data quality monitoring
  */
 
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
+
 /**
  * Enhanced timeout protection wrapper for promises
  * @param {Promise} promise - Promise to wrap with timeout
@@ -47,7 +49,7 @@ export async function executeApiCallWithTimeout(apiCall, args, context, timeoutM
         const startTime = Date.now();
         
         try {
-            context.log(`API call attempt ${attempt}/${maxRetries + 1}`, {
+            logDebug(context, `API call attempt ${attempt}/${maxRetries + 1}`, {
                 operation: apiCall.name || 'unknown',
                 timeoutMs,
                 args: args.length > 0 ? typeof args[0] === 'string' ? args[0] : '[object]' : 'none'
@@ -56,7 +58,7 @@ export async function executeApiCallWithTimeout(apiCall, args, context, timeoutM
             const result = await withTimeout(apiCall(...args), timeoutMs, `API call (attempt ${attempt})`, context);
             const duration = Date.now() - startTime;
             
-            context.log(`API call succeeded on attempt ${attempt}`, {
+            logDebug(context, `API call succeeded on attempt ${attempt}`, {
                 durationMs: duration,
                 success: true
             });
@@ -84,7 +86,7 @@ export async function executeApiCallWithTimeout(apiCall, args, context, timeoutM
             // Only retry on timeout or network errors
             if (attempt <= maxRetries && (isTimeout || isNetworkError)) {
                 const delayMs = baseDelayMs * Math.pow(2, attempt - 1); // Exponential backoff
-                context.log(`Retrying API call in ${delayMs}ms...`, {
+                logDebug(context, `Retrying API call in ${delayMs}ms...`, {
                     attempt,
                     maxRetries,
                     delayMs,
@@ -130,7 +132,7 @@ export function handleError(error, operation, context, metadata = {}, shouldThro
     if (severity === 'critical' || severity === 'high') {
         context.error(`[${severity.toUpperCase()}] ${operation} failed`, errorDetails);
     } else {
-        context.log(`[${severity.toUpperCase()}] ${operation} failed`, errorDetails);
+        logInfo(context, `[${severity.toUpperCase()}] ${operation} failed`, errorDetails);
     }
     
     // Track error metrics (could be extended for monitoring)
@@ -204,7 +206,7 @@ export function validateEnvironmentVariables(requiredVars, context) {
         }, true, 'critical');
     }
     
-    context.log('Environment variables validated successfully', {
+    logDebug(context, 'Environment variables validated successfully', {
         validatedVars: presentVars,
         totalValidated: presentVars.length
     });
@@ -232,7 +234,7 @@ export function rateLimit(delayMs, context, reason = 'API rate limiting', option
         const adaptiveComponent = Math.round(lastCallDuration * adaptiveMultiplier);
         actualDelay = Math.min(delayMs + adaptiveComponent, delayMs * 3); // Cap at 3x base delay
         
-        context.log(`Applying adaptive rate limit`, {
+        logDebug(context, `Applying adaptive rate limit`, {
             baseDelay: delayMs,
             lastCallDuration,
             adaptiveComponent,
@@ -240,7 +242,7 @@ export function rateLimit(delayMs, context, reason = 'API rate limiting', option
             reason
         });
     } else {
-        context.log(`Applying rate limit delay: ${actualDelay}ms`, { reason });
+        logDebug(context, `Applying rate limit delay: ${actualDelay}ms`, { reason });
     }
     
     return new Promise(resolve => setTimeout(resolve, actualDelay));
@@ -302,9 +304,9 @@ export function summarizeBatchResults(results, context, operation = 'batch opera
     if (parseFloat(successRate) < 50) {
         context.error(`${operation} batch results - LOW SUCCESS RATE`, summary);
     } else if (parseFloat(successRate) < 90) {
-        context.log(`${operation} batch results - PARTIAL SUCCESS`, summary);
+        logInfo(context, `${operation} batch results - PARTIAL SUCCESS`, summary);
     } else {
-        context.log(`${operation} batch results - SUCCESS`, summary);
+        logInfo(context, `${operation} batch results - SUCCESS`, summary);
     }
     
     return summary;
@@ -340,7 +342,7 @@ export function validateMathematicalConsistency(entrantIncrements, totalPoolGrow
             severity: percentageDifference > 10 ? 'high' : 'medium'
         });
     } else {
-        context.log('Mathematical consistency validated', {
+        logDebug(context, 'Mathematical consistency validated', {
             consistencyScore: result.consistencyScore,
             percentageDifference: result.percentageDifference.toFixed(2)
         });
@@ -372,9 +374,9 @@ export function logPerformance(operation, startTime, context, metadata = {}) {
     if (performanceLevel === 'slow' || performanceLevel === 'very_slow') {
         context.error(`PERFORMANCE ISSUE: ${operation}`, performanceData);
     } else if (performanceLevel === 'moderate') {
-        context.log(`PERFORMANCE WARNING: ${operation}`, performanceData);
+        logWarn(context, `PERFORMANCE WARNING: ${operation}`, performanceData);
     } else {
-        context.log(`Performance: ${operation}`, performanceData);
+        logDebug(context, `Performance: ${operation}`, performanceData);
     }
     
     return duration;
@@ -448,7 +450,7 @@ export function assessDataQuality(data, requiredFields, context) {
         quality: getQualityLevel(score)
     };
     
-    context.log('Data quality assessment completed', {
+    logDebug(context, 'Data quality assessment completed', {
         score,
         quality: assessment.quality,
         completeness: `${completeness.toFixed(1)}%`,
@@ -492,7 +494,7 @@ export class CircuitBreaker {
             if (Date.now() - this.lastFailureTime >= this.resetTimeout) {
                 this.state = 'HALF_OPEN';
                 this.successCount = 0;
-                context.log(`Circuit breaker ${this.name}: Moving to HALF_OPEN state`);
+                logInfo(context, `Circuit breaker ${this.name}: Moving to HALF_OPEN state`);
             } else {
                 throw new Error(`Circuit breaker ${this.name} is OPEN - operation blocked`);
             }
@@ -508,7 +510,7 @@ export class CircuitBreaker {
                     this.state = 'CLOSED';
                     this.failures = 0;
                     this.lastFailureTime = null;
-                    context.log(`Circuit breaker ${this.name}: Closed after successful recovery`);
+                    logInfo(context, `Circuit breaker ${this.name}: Closed after successful recovery`);
                 }
             } else {
                 this.failures = Math.max(0, this.failures - 1); // Gradually reduce failure count

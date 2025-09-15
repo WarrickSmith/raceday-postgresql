@@ -2,6 +2,8 @@
  * Enhanced error handling patterns for Appwrite functions with exponential backoff
  */
 
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
+
 /**
  * Create a timeout protection wrapper for promises
  * @param {Promise} promise - Promise to wrap with timeout
@@ -80,7 +82,7 @@ export async function executeApiCallWithTimeout(apiCall, args, context, timeoutM
             const result = await withTimeout(apiCall(...args), timeoutMs, 'API call');
 
             if (attempt > 1) {
-                context.log('API call succeeded after retry', {
+                logDebug(context, 'API call succeeded after retry', {
                     attempt,
                     totalRetries: attempt - 1,
                     totalTimeMs: Date.now() - startTime,
@@ -102,7 +104,7 @@ export async function executeApiCallWithTimeout(apiCall, args, context, timeoutM
 
             if (!isLastAttempt && isRetryable) {
                 const delayMs = calculateBackoffDelay(attempt);
-                context.log(`Retrying with exponential backoff in ${delayMs}ms...`, {
+                logDebug(context, `Retrying with exponential backoff in ${delayMs}ms...`, {
                     attempt,
                     delayMs,
                     nextAttempt: attempt + 1,
@@ -167,7 +169,7 @@ export function validateEnvironmentVariables(requiredVars, context) {
         throw error;
     }
     
-    context.log('Environment variables validated successfully', {
+    logDebug(context, 'Environment variables validated successfully', {
         validatedVars: requiredVars
     });
 }
@@ -180,7 +182,7 @@ export function validateEnvironmentVariables(requiredVars, context) {
  * @returns {Promise} Promise that resolves after delay
  */
 export function rateLimit(delayMs, context, reason = 'API rate limiting') {
-    context.log(`Applying rate limit delay: ${delayMs}ms`, { reason });
+    logDebug(context, `Applying rate limit delay: ${delayMs}ms`, { reason });
     return new Promise(resolve => setTimeout(resolve, delayMs));
 }
 
@@ -213,7 +215,7 @@ export function monitorMemoryUsage(context, warningThresholdMB = 400, criticalTh
             action: 'Consider triggering garbage collection or reducing data processing batch size'
         });
     } else if (memoryInfo.warningLevel) {
-        context.log('High memory usage warning', {
+        logWarn(context, 'High memory usage warning', {
             ...memoryInfo,
             action: 'Monitor closely for potential memory issues'
         });
@@ -237,7 +239,7 @@ export function forceGarbageCollection(context) {
         const afterHeapMB = Math.round(afterMemory.heapUsed / 1024 / 1024);
         const freedMB = beforeHeapMB - afterHeapMB;
 
-        context.log('Forced garbage collection completed', {
+        logDebug(context, 'Forced garbage collection completed', {
             beforeHeapMB,
             afterHeapMB,
             freedMB,
@@ -246,7 +248,7 @@ export function forceGarbageCollection(context) {
 
         return { beforeMemory, afterMemory, freedMB };
     } else {
-        context.log('Garbage collection not available (--expose-gc not set)', {
+        logDebug(context, 'Garbage collection not available (--expose-gc not set)', {
             currentHeapMB: beforeHeapMB,
             gcAvailable: false
         });

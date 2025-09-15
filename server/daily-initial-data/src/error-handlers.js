@@ -2,6 +2,8 @@
  * Common error handling patterns for Appwrite functions
  */
 
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
+
 /**
  * Create a timeout protection wrapper for promises
  * @param {Promise} promise - Promise to wrap with timeout
@@ -28,13 +30,13 @@ export function withTimeout(promise, timeoutMs, operation) {
 export async function executeWithDatabaseSetupTimeout(setupFunction, config, context, timeoutMs = 60000) {
     try {
         await withTimeout(setupFunction(config, context), timeoutMs, 'Database setup');
-        context.log('Database setup completed successfully');
+        logDebug(context, 'Database setup completed successfully');
         return true;
     } catch (error) {
         context.error('Database setup failed or timed out', {
             error: error instanceof Error ? error.message : 'Unknown error'
         });
-        context.log('Continuing without database setup...');
+        logDebug(context, 'Continuing without database setup...');
         return false;
     }
 }
@@ -59,7 +61,7 @@ export async function executeApiCallWithTimeout(apiCall, args, context, timeoutM
             
             if (attempt <= maxRetries) {
                 const delayMs = attempt * 1000; // Progressive delay
-                context.log(`Retrying in ${delayMs}ms...`);
+                logDebug(context, `Retrying in ${delayMs}ms...`);
                 await new Promise(resolve => setTimeout(resolve, delayMs));
             } else {
                 context.error('API call failed after all retry attempts');
@@ -107,7 +109,7 @@ export function validateEnvironmentVariables(requiredVars, context) {
         throw error;
     }
     
-    context.log('Environment variables validated successfully', {
+    logDebug(context, 'Environment variables validated successfully', {
         validatedVars: requiredVars
     });
 }
@@ -120,7 +122,7 @@ export function validateEnvironmentVariables(requiredVars, context) {
  * @returns {Promise} Promise that resolves after delay
  */
 export function rateLimit(delayMs, context, reason = 'API rate limiting') {
-    context.log(`Applying rate limit delay: ${delayMs}ms`, { reason });
+    logDebug(context, `Applying rate limit delay: ${delayMs}ms`, { reason });
     return new Promise(resolve => setTimeout(resolve, delayMs));
 }
 
@@ -157,12 +159,12 @@ export function monitorMemoryUsage(context, operation = 'memory-check') {
             recommendation: 'Consider forcing garbage collection'
         });
     } else if (metrics.warningLevel) {
-        context.log(`High memory usage warning during ${operation}`, {
+        logWarn(context, `High memory usage warning during ${operation}`, {
             memoryMetrics: metrics,
             recommendation: 'Monitor for potential memory leaks'
         });
     } else {
-        context.log(`Memory usage within normal range for ${operation}`, {
+        logDebug(context, `Memory usage within normal range for ${operation}`, {
             memoryMetrics: metrics
         });
     }
@@ -186,14 +188,14 @@ export function forceGarbageCollection(context, reason = 'memory-optimization') 
             const afterMB = Math.round(afterMemory.heapUsed / 1024 / 1024);
             const freedMB = beforeMB - afterMB;
 
-            context.log(`Forced garbage collection completed for ${reason}`, {
+            logDebug(context, `Forced garbage collection completed for ${reason}`, {
                 beforeMB,
                 afterMB,
                 freedMB,
                 efficiencyGain: freedMB > 0 ? `${Math.round((freedMB / beforeMB) * 100)}%` : '0%'
             });
         } else {
-            context.log(`Garbage collection not available for ${reason}`, {
+            logDebug(context, `Garbage collection not available for ${reason}`, {
                 beforeMB,
                 note: 'Running without --expose-gc flag'
             });

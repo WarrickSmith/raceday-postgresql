@@ -6,6 +6,7 @@
  */
 
 import { ID } from 'node-appwrite';
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
 
 const LOCK_DOCUMENT_ID = 'enhanced-race-poller-lock';
 const LOCK_COLLECTION_ID = 'function-locks';
@@ -64,7 +65,7 @@ export async function fastLockCheck(databases, databaseId, context) {
         await databases.createDocument(databaseId, LOCK_COLLECTION_ID, LOCK_DOCUMENT_ID, lockDoc);
 
         const acquisitionTime = Date.now() - startTime;
-        context.log('Ultra-fast lock acquired successfully', {
+        logDebug(context, 'Ultra-fast lock acquired successfully', {
             executionId,
             acquisitionTimeMs: acquisitionTime,
             targetTime: '<25ms',
@@ -105,7 +106,7 @@ export async function fastLockCheck(databases, databaseId, context) {
                 const lockAge = Date.now() - new Date(existingLock.lastHeartbeat).getTime();
 
                 if (lockAge > STALE_LOCK_THRESHOLD_MS) {
-                    context.log('Detected stale lock, attempting cleanup', {
+                    logDebug(context, 'Detected stale lock, attempting cleanup', {
                         staleLockExecutionId: existingLock.executionId,
                         lockAgeMs: lockAge,
                         threshold: STALE_LOCK_THRESHOLD_MS,
@@ -155,7 +156,7 @@ export async function fastLockCheck(databases, databaseId, context) {
                     await databases.createDocument(databaseId, LOCK_COLLECTION_ID, LOCK_DOCUMENT_ID, newLockDoc);
 
                     const totalTime = Date.now() - startTime;
-                    context.log('Ultra-fast lock acquired after stale cleanup', {
+                    logDebug(context, 'Ultra-fast lock acquired after stale cleanup', {
                         executionId,
                         totalAcquisitionTimeMs: totalTime,
                         staleLockCleanedUp: true,
@@ -171,7 +172,7 @@ export async function fastLockCheck(databases, databaseId, context) {
                     };
                 } else {
                     // Active lock held by another instance - terminate immediately for frequent execution efficiency
-                    context.log('Lock held by active instance - terminating to save resources (frequent execution optimization)', {
+                    logDebug(context, 'Lock held by active instance - terminating to save resources (frequent execution optimization)', {
                         activeExecutionId: existingLock.executionId,
                         activeLockAge: lockAge,
                         activeStatus: existingLock.status,
@@ -264,7 +265,7 @@ export async function updateHeartbeat(lockManager, progress = {}) {
             updateData
         );
 
-        lockManager.context.log('Enhanced race poller heartbeat updated', {
+        logDebug(lockManager.context, 'Enhanced race poller heartbeat updated', {
             executionId: lockManager.executionId,
             heartbeatTime: now,
             progress: {
@@ -304,7 +305,7 @@ export async function releaseLock(lockManager, completionStats = {}, status = 'c
         const finalCpu = process.cpuUsage();
 
         // Log completion summary before releasing lock with enhanced race poller specific metrics
-        lockManager.context.log('Enhanced race poller execution completed - releasing lock', {
+        logDebug(lockManager.context, 'Enhanced race poller execution completed - releasing lock', {
             executionId: lockManager.executionId,
             status,
             executionDurationMs: executionDuration,
@@ -340,7 +341,7 @@ export async function releaseLock(lockManager, completionStats = {}, status = 'c
             LOCK_DOCUMENT_ID
         );
 
-        lockManager.context.log('Enhanced race poller lock released successfully', {
+        logDebug(lockManager.context, 'Enhanced race poller lock released successfully', {
             executionId: lockManager.executionId,
             endTime,
             finalStatus: status,
@@ -369,7 +370,7 @@ export function setupHeartbeatInterval(lockManager, progressTracker) {
         await updateHeartbeat(lockManager, progressTracker);
     }, HEARTBEAT_INTERVAL_MS);
 
-    lockManager.context.log('Enhanced race poller heartbeat interval established', {
+    logDebug(lockManager.context, 'Enhanced race poller heartbeat interval established', {
         executionId: lockManager.executionId,
         intervalMs: HEARTBEAT_INTERVAL_MS,
         intervalSeconds: HEARTBEAT_INTERVAL_MS / 1000,
@@ -398,7 +399,7 @@ export function shouldTerminateForNzTime(context) {
         const shouldTerminate = nzHour >= 1 && nzHour < 6;
 
         if (shouldTerminate) {
-            context.log('Enhanced race poller NZ time termination triggered', {
+            logDebug(context, 'Enhanced race poller NZ time termination triggered', {
                 nzTime,
                 nzHour,
                 terminationReason: 'Past 1:00 AM NZ time - continuous polling termination',
@@ -431,7 +432,7 @@ export function applyIntelligentBackoff(context, attemptCount = 1) {
     const delayIndex = Math.min(attemptCount - 2, backoffDelays.length - 1);
     const backoffDelay = backoffDelays[delayIndex];
 
-    context.log('Enhanced race poller applying intelligent backoff', {
+    logDebug(context, 'Enhanced race poller applying intelligent backoff', {
         attemptCount,
         backoffDelayMs: backoffDelay,
         reason: 'Multiple rapid startup attempts detected',

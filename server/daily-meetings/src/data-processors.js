@@ -2,6 +2,8 @@
  * Data processing utilities for race data filtering and transformation
  */
 
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
+
 /**
  * Filter meetings for AU/NZ Thoroughbred (T) and Harness (H) racing only
  * @param {Array} meetings - Array of meeting objects
@@ -24,7 +26,7 @@ export function filterMeetings(meetings, context) {
         return true;
     });
     
-    context.log('Filtered meetings for AU/NZ Horse/Harness racing', {
+    logDebug(context, 'Filtered meetings for AU/NZ Horse/Harness racing', {
         originalCount: meetings.length,
         filteredCount: filtered.length,
         allowedCountries,

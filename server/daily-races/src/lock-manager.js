@@ -5,6 +5,7 @@
  */
 
 import { ID } from 'node-appwrite';
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
 
 const LOCK_DOCUMENT_ID = 'daily-races-lock';
 const LOCK_COLLECTION_ID = 'function-locks';
@@ -44,7 +45,7 @@ export async function fastLockCheck(databases, databaseId, context) {
         await databases.createDocument(databaseId, LOCK_COLLECTION_ID, LOCK_DOCUMENT_ID, lockDoc);
 
         const acquisitionTime = Date.now() - startTime;
-        context.log('Fast lock acquired successfully', {
+        logDebug(context, 'Fast lock acquired successfully', {
             executionId,
             acquisitionTimeMs: acquisitionTime,
             targetTime: '<40ms',
@@ -84,7 +85,7 @@ export async function fastLockCheck(databases, databaseId, context) {
                 const lockAge = Date.now() - new Date(existingLock.lastHeartbeat).getTime();
 
                 if (lockAge > STALE_LOCK_THRESHOLD_MS) {
-                    context.log('Detected stale lock, attempting cleanup', {
+                    logDebug(context, 'Detected stale lock, attempting cleanup', {
                         staleLockExecutionId: existingLock.executionId,
                         lockAgeMs: lockAge,
                         threshold: STALE_LOCK_THRESHOLD_MS,
@@ -113,7 +114,7 @@ export async function fastLockCheck(databases, databaseId, context) {
                     await databases.createDocument(databaseId, LOCK_COLLECTION_ID, LOCK_DOCUMENT_ID, newLockDoc);
 
                     const totalTime = Date.now() - startTime;
-                    context.log('Lock acquired after stale cleanup', {
+                    logDebug(context, 'Lock acquired after stale cleanup', {
                         executionId,
                         totalAcquisitionTimeMs: totalTime,
                         staleLockCleanedUp: true
@@ -128,7 +129,7 @@ export async function fastLockCheck(databases, databaseId, context) {
                     };
                 } else {
                     // Active lock held by another instance
-                    context.log('Lock held by active instance - terminating to save resources', {
+                    logDebug(context, 'Lock held by active instance - terminating to save resources', {
                         activeExecutionId: existingLock.executionId,
                         activeLockAge: lockAge,
                         activeStatus: existingLock.status,
@@ -204,7 +205,7 @@ export async function updateHeartbeat(lockManager, progress = {}) {
             updateData
         );
 
-        lockManager.context.log('Lock heartbeat updated', {
+        logDebug(lockManager.context, 'Lock heartbeat updated', {
             executionId: lockManager.executionId,
             heartbeatTime: now,
             progress: progress,
@@ -235,7 +236,7 @@ export async function releaseLock(lockManager, completionStats = {}, status = 'c
         const finalCpu = process.cpuUsage();
 
         // Log completion summary before releasing lock
-        lockManager.context.log('Execution completed - releasing lock', {
+        logDebug(lockManager.context, 'Execution completed - releasing lock', {
             executionId: lockManager.executionId,
             status,
             executionDurationMs: executionDuration,
@@ -257,7 +258,7 @@ export async function releaseLock(lockManager, completionStats = {}, status = 'c
             LOCK_DOCUMENT_ID
         );
 
-        lockManager.context.log('Lock released successfully', {
+        logDebug(lockManager.context, 'Lock released successfully', {
             executionId: lockManager.executionId,
             endTime,
             finalStatus: status
@@ -285,7 +286,7 @@ export function setupHeartbeatInterval(lockManager, progressTracker) {
         await updateHeartbeat(lockManager, progressTracker);
     }, HEARTBEAT_INTERVAL_MS);
 
-    lockManager.context.log('Heartbeat interval established', {
+    logDebug(lockManager.context, 'Heartbeat interval established', {
         executionId: lockManager.executionId,
         intervalMs: HEARTBEAT_INTERVAL_MS,
         intervalSeconds: HEARTBEAT_INTERVAL_MS / 1000,
@@ -313,7 +314,7 @@ export function shouldTerminateForNzTime(context) {
         const shouldTerminate = nzHour >= 1 && nzHour < 6;
 
         if (shouldTerminate) {
-            context.log('NZ time termination triggered', {
+            logDebug(context, 'NZ time termination triggered', {
                 nzTime,
                 nzHour,
                 terminationReason: 'Past 1:00 AM NZ time',

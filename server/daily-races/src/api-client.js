@@ -3,6 +3,8 @@
  * Handles race meetings, race events, and entrant data fetching
  */
 
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
+
 /**
  * Fetch racing data (meetings) from NZ TAB API
  * @param {string} baseUrl - Base URL for NZ TAB API
@@ -19,7 +21,7 @@ export async function fetchRacingData(baseUrl, context) {
             date_to: nzDate,
         });
         const apiUrl = `${baseUrl}/affiliates/v1/racing/meetings?${params.toString()}`;
-        context.log('Fetching racing data from NZTAB API', {
+        logDebug(context, 'Fetching racing data from NZTAB API', {
             apiUrl,
             nzDate,
             timezone: 'Pacific/Auckland'
@@ -41,7 +43,7 @@ export async function fetchRacingData(baseUrl, context) {
         if (!data.data || !Array.isArray(data.data.meetings)) {
             throw new Error('Invalid API response format: missing meetings data');
         }
-        context.log('Successfully fetched racing data from NZTAB API', {
+        logDebug(context, 'Successfully fetched racing data from NZTAB API', {
             meetingsCount: data.data.meetings.length,
             generatedTime: data.header.generated_time
         });
@@ -73,7 +75,7 @@ export async function fetchRaceEventData(baseUrl, raceId, context) {
         });
         const apiUrl = `${baseUrl}/affiliates/v1/racing/events/${raceId}?${params.toString()}`;
         
-        context.log('Fetching detailed race event data from NZTAB API', {
+        logDebug(context, 'Fetching detailed race event data from NZTAB API', {
             apiUrl,
             raceId,
             timestamp: new Date().toISOString()
@@ -102,7 +104,7 @@ export async function fetchRaceEventData(baseUrl, raceId, context) {
         const data = await response.json();
 
         if (!data.data || !data.data.race) {
-            context.log(`No detailed race data in API response for race ${raceId}`, {
+            logDebug(context, `No detailed race data in API response for race ${raceId}`, {
                 hasData: !!data.data,
                 hasRace: !!(data.data && data.data.race),
                 dataKeys: data.data ? Object.keys(data.data) : []
@@ -110,7 +112,7 @@ export async function fetchRaceEventData(baseUrl, raceId, context) {
             return null;
         }
 
-        context.log('Successfully fetched detailed race event data from NZTAB API', {
+        logDebug(context, 'Successfully fetched detailed race event data from NZTAB API', {
             raceId,
             raceStatus: data.data.race.status,
             entrantCount: data.data.race.entrant_count || 0,

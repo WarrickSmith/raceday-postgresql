@@ -5,6 +5,7 @@
  */
 
 import { ID, Query } from 'node-appwrite'
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
 
 /**
  * Enhanced pool totals extraction with validation
@@ -26,7 +27,7 @@ function extractPoolTotals(tote_pools, context) {
   }
 
   if (!tote_pools || !Array.isArray(tote_pools)) {
-    context.log('No tote_pools array found or invalid format')
+    logDebug(context, 'No tote_pools array found or invalid format');
     pools.validationScore = 0
     return pools
   }
@@ -58,7 +59,7 @@ function extractPoolTotals(tote_pools, context) {
         pools.first4PoolTotal = total
         break
       default:
-        context.log(`Unknown pool product_type: ${pool.product_type}`, {
+        logDebug(context, `Unknown pool product_type: ${pool.product_type}`, {
           productType: pool.product_type,
           total: total,
         })
@@ -71,7 +72,7 @@ function extractPoolTotals(tote_pools, context) {
     pools.validationScore -= 30
   }
 
-  context.log('Extracted pool totals with validation', {
+  logDebug(context, 'Extracted pool totals with validation', {
     poolCount: tote_pools.length,
     totalRacePool: pools.totalRacePool,
     winPoolTotal: pools.winPoolTotal,
@@ -167,7 +168,7 @@ export function validateRacePoolData(raceData, entrantData, context) {
       validationResults.consistencyScore = 50
     }
 
-    context.log('Pool data validation completed', {
+    logDebug(context, 'Pool data validation completed', {
       isValid: validationResults.isValid,
       consistencyScore: validationResults.consistencyScore,
       errorsCount: validationResults.errors.length,
@@ -334,7 +335,7 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
           timeToStart = Math.round((raceStartTime.getTime() - currentTime.getTime()) / (1000 * 60))
         }
       } catch (error) {
-        context.log('Could not calculate timeToStart for money flow history', { raceId, entrantId })
+        logDebug(context, 'Could not calculate timeToStart for money flow history', { raceId, entrantId });
       }
     }
 
@@ -446,7 +447,7 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
  */
 export async function processMoneyTrackerData(databases, databaseId, moneyTrackerData, context, raceId = 'unknown', racePoolData = null, raceStatus = null, validationResults = null, entrantOddsData = null) {
   if (!moneyTrackerData || !moneyTrackerData.entrants || !Array.isArray(moneyTrackerData.entrants)) {
-    context.log('❌ No money tracker entrants data available', { 
+    logDebug(context, '❌ No money tracker entrants data available', { 
       raceId,
       hasMoneyTrackerData: !!moneyTrackerData,
       hasEntrants: !!moneyTrackerData?.entrants,
@@ -456,7 +457,7 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
     return 0
   }
   
-  context.log('💰 Starting money tracker processing', {
+  logDebug(context, '💰 Starting money tracker processing', {
     raceId: raceId.slice(0, 8) + '...',
     entrantsCount: moneyTrackerData.entrants.length,
     raceStatus,
@@ -472,17 +473,17 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
       ])
 
       if (existingData.documents.length === 0) {
-        context.log('Skipping money tracker processing for abandoned race with no prior data', {
+        logDebug(context, 'Skipping money tracker processing for abandoned race with no prior data', {
           raceId, raceStatus, reason: 'Abandoned race never had betting activity'
         })
         return 0
       } else {
-        context.log('Processing final data for abandoned race with existing timeline', {
+        logDebug(context, 'Processing final data for abandoned race with existing timeline', {
           raceId, raceStatus, reason: 'Preserving timeline data for race abandoned mid-process'
         })
       }
     } catch (error) {
-      context.log('Could not check existing data, skipping abandoned race', { raceId, raceStatus })
+      logDebug(context, 'Could not check existing data, skipping abandoned race', { raceId, raceStatus });
       return 0
     }
   }
@@ -495,7 +496,7 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
   let entriesWithoutId = 0
   let entriesWithId = 0
   
-  context.log('💰 Processing entrant money data', {
+  logDebug(context, '💰 Processing entrant money data', {
     raceId: raceId.slice(0, 8) + '...',
     totalEntries: moneyTrackerData.entrants.length,
     sampleEntry: moneyTrackerData.entrants[0] ? {
@@ -518,7 +519,7 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
     }
   }
   
-  context.log('💰 Entrant aggregation completed', {
+  logDebug(context, '💰 Entrant aggregation completed', {
     raceId: raceId.slice(0, 8) + '...',
     entriesWithId,
     entriesWithoutId,
@@ -534,7 +535,7 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
   const holdPercentageValid = Math.abs(totalHoldPercentage - 100) < 5
   
   if (!holdPercentageValid) {
-    context.log('⚠️ Hold percentages validation failed', {
+    logWarn(context, '⚠️ Hold percentages validation failed', {
       raceId,
       totalHoldPercentage,
       entrantCount: Object.keys(entrantMoneyData).length,
@@ -554,14 +555,14 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
 
   // Save time-bucketed version for timeline
   if (entrantsProcessed > 0 && racePoolData) {
-    context.log('🔄 Attempting to save time-bucketed money flow history', {
+    logDebug(context, '🔄 Attempting to save time-bucketed money flow history', {
       raceId, entrantsProcessed, racePoolDataAvailable: !!racePoolData
     })
     try {
       const bucketedRecords = await saveTimeBucketedMoneyFlowHistory(
         databases, databaseId, raceId, entrantMoneyData, racePoolData, context, entrantOddsData
       )
-      context.log('✅ Saved time-bucketed money flow history', {
+      logDebug(context, '✅ Saved time-bucketed money flow history', {
         raceId, bucketedRecords
       })
     } catch (error) {
@@ -570,7 +571,7 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
       })
     }
   } else {
-    context.log('⏭️ Skipping time-bucketed money flow history', {
+    logDebug(context, '⏭️ Skipping time-bucketed money flow history', {
       raceId, entrantsProcessed, racePoolDataAvailable: !!racePoolData,
       reason: entrantsProcessed === 0 ? 'No entrants processed' : 'No race pool data'
     })
@@ -578,7 +579,7 @@ export async function processMoneyTrackerData(databases, databaseId, moneyTracke
 
   const processingTime = Date.now() - processingStartTime
 
-  context.log('Enhanced money tracker processing completed', {
+  logDebug(context, 'Enhanced money tracker processing completed', {
     raceId,
     totalEntries: moneyTrackerData.entrants.length,
     uniqueEntrants: Object.keys(entrantMoneyData).size,
@@ -654,7 +655,7 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
     let bucketDocumentId = null
     
     try {
-      context.log('💰 Processing bucketed money flow for entrant', {
+      logDebug(context, '💰 Processing bucketed money flow for entrant', {
         entrantId: entrantId.slice(0, 8) + '...',
         raceId, timeInterval, 
         holdPercentage: moneyData.hold_percentage,
@@ -692,7 +693,7 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
           incrementalWinAmount = winPoolAmount - previousWinAmount
           incrementalPlaceAmount = placePoolAmount - previousPlaceAmount
 
-          context.log('Found previous bucket for incremental calculation', {
+          logDebug(context, 'Found previous bucket for incremental calculation', {
             entrantId: entrantId.slice(0, 8) + '...',
             currentInterval: timeInterval,
             previousInterval: prevDoc.timeInterval,
@@ -705,7 +706,7 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
             // Likely first bucket - use full amount as baseline
             incrementalWinAmount = winPoolAmount
             incrementalPlaceAmount = placePoolAmount
-            context.log('First bucket detected - using pool totals as incremental', {
+            logDebug(context, 'First bucket detected - using pool totals as incremental', {
               entrantId: entrantId.slice(0, 8) + '...',
               timeInterval, winAmount: winPoolAmount, placeAmount: placePoolAmount
             })
@@ -713,14 +714,14 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
             // Non-first bucket with no previous data - record zero increments
             incrementalWinAmount = 0
             incrementalPlaceAmount = 0
-            context.log('No previous bucket found for non-first interval - using zero increments', {
+            logDebug(context, 'No previous bucket found for non-first interval - using zero increments', {
               entrantId: entrantId.slice(0, 8) + '...',
               timeInterval
             })
           }
         }
       } catch (queryError) {
-        context.log('Previous bucket query failed - using fallback increments', {
+        logDebug(context, 'Previous bucket query failed - using fallback increments', {
           entrantId: entrantId.slice(0, 8) + '...',
           timeInterval, error: queryError.message,
           fallbackStrategy: timeInterval >= 55 ? 'baseline' : 'zero'
@@ -777,7 +778,7 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
       }
 
       // Debug logging for odds storage in timeline
-      context.log('🎯 ODDS DEBUG - Storing odds in timeline bucket', {
+      logDebug(context, '🎯 ODDS DEBUG - Storing odds in timeline bucket', {
         entrantId: entrantId.slice(0, 8) + '...',
         entrantIdType: typeof entrantId,
         entrantIdLength: entrantId.length,
@@ -792,7 +793,7 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
         poolPlaceOdds: bucketedDoc.poolPlaceOdds
       })
 
-      context.log('📝 Creating bucketed document with fields', {
+      logDebug(context, '📝 Creating bucketed document with fields', {
         entrantId: entrantId.slice(0, 8) + '...',
         entrant: bucketedDoc.entrant || 'NULL_ENTRANT',
         timeInterval: bucketedDoc.timeInterval,
@@ -821,7 +822,7 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
       await databases.createDocument(databaseId, 'money-flow-history', bucketDocumentId, bucketedDoc)
       recordsCreated++
 
-      context.log('Saved enhanced bucketed money flow', {
+      logDebug(context, 'Saved enhanced bucketed money flow', {
         entrantId: entrantId.slice(0, 8) + '...',
         timeInterval, winIncrement: incrementalWinAmount, placeIncrement: incrementalPlaceAmount,
         dataQuality: bucketedDoc.dataQualityScore
@@ -835,7 +836,7 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
     }
   }
 
-  context.log('Enhanced time-bucketed money flow history completed', {
+  logDebug(context, 'Enhanced time-bucketed money flow history completed', {
     raceId, recordsCreated, timeInterval, intervalType
   })
 
@@ -853,7 +854,7 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
  */
 export async function processToteTrendsData(databases, databaseId, raceId, tote_pools, context) {
   if (!tote_pools) {
-    context.log('No tote pools data available for race:', raceId)
+    logDebug(context, 'No tote pools data available for race:', raceId);
     return false
   }
 
@@ -878,7 +879,7 @@ export async function processToteTrendsData(databases, databaseId, raceId, tote_
     const success = await performantUpsert(databases, databaseId, 'race-pools', raceId, poolData, context)
 
     if (success) {
-      context.log('Saved enhanced race pool data', {
+      logDebug(context, 'Saved enhanced race pool data', {
         raceId,
         totalPool: poolData.totalRacePool,
         winPool: poolData.winPoolTotal,
@@ -913,7 +914,7 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
   const entrantOddsData = {} // STORY 4.9 - Collect odds data for timeline storage
   const processingStartTime = Date.now()
 
-  context.log('Starting enhanced entrants processing', {
+  logDebug(context, 'Starting enhanced entrants processing', {
     raceId, entrantCount: entrants.length
   })
 
@@ -968,7 +969,7 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
         // Validate odds reasonableness (validation only, no quality scoring for entrants)
         const hasValidOdds = entrantDoc.fixedWinOdds > 0 || entrantDoc.poolWinOdds > 0
         if (!hasValidOdds) {
-          context.log('⚠️ Entrant has no valid odds', { entrantId: entrant.entrant_id })
+          logWarn(context, '⚠️ Entrant has no valid odds', { entrantId: entrant.entrant_id });
         }
         
         // STORY 4.9 - Collect odds data for timeline storage in MoneyFlowHistory
@@ -983,7 +984,7 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
         entrantOddsData[entrant.entrant_id] = processedOdds
         
         // Debug logging for odds data collection
-        context.log('🎯 ODDS DEBUG - Collected and processed odds data', {
+        logDebug(context, '🎯 ODDS DEBUG - Collected and processed odds data', {
           entrantId: entrant.entrant_id,
           entrantName: entrant.name,
           rawOddsObject: entrant.odds,
@@ -1030,12 +1031,12 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
           const historyRecords = await saveOddsHistory(databases, databaseId, entrant.entrant_id, entrant.odds, currentData, context)
           
           if (historyRecords > 0) {
-            context.log('Created odds history records', {
+            logDebug(context, 'Created odds history records', {
               entrantId: entrant.entrant_id, recordsCreated: historyRecords
             })
           }
         } catch (oddsHistoryError) {
-          context.log('Failed to save odds history', {
+          logError(context, 'Failed to save odds history', {
             entrantId: entrant.entrant_id,
             error: oddsHistoryError instanceof Error ? oddsHistoryError.message : 'Unknown error'
           })
@@ -1048,7 +1049,7 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
       if (success) {
         entrantsProcessed++
         
-        context.log('Enhanced entrant processing completed', {
+        logDebug(context, 'Enhanced entrant processing completed', {
           entrantId: entrant.entrant_id,
           name: entrant.name,
           raceId: raceId,
@@ -1070,7 +1071,7 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
 
   const processingTime = Date.now() - processingStartTime
 
-  context.log('Enhanced entrants processing completed', {
+  logDebug(context, 'Enhanced entrants processing completed', {
     raceId,
     totalEntrants: entrants.length,
     entrantsProcessed,

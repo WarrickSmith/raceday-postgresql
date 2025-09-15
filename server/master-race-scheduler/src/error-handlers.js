@@ -3,6 +3,8 @@
  * Optimized for high-frequency execution (every minute)
  */
 
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
+
 /**
  * Validate required environment variables
  * @param {string[]} requiredVars - Array of required environment variable names
@@ -21,7 +23,7 @@ export function validateEnvironmentVariables(requiredVars, context) {
         throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
     }
 
-    context.log('Environment variables validated successfully', {
+    logDebug(context, 'Environment variables validated successfully', {
         validatedVariables: requiredVars.length,
         functionName: 'master-race-scheduler'
     });
@@ -50,7 +52,7 @@ export async function executeWithTimeout(operation, args = [], context, timeoutM
             const result = await Promise.race([operationPromise, timeoutPromise]);
 
             if (attempt > 1) {
-                context.log('Operation succeeded after retry', {
+                logDebug(context, 'Operation succeeded after retry', {
                     attempt,
                     totalRetries: attempt - 1,
                     timeoutMs
@@ -64,7 +66,7 @@ export async function executeWithTimeout(operation, args = [], context, timeoutM
 
             if (attempt <= maxRetries) {
                 const backoffDelay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Max 5 seconds for scheduler
-                context.log('Operation failed, retrying with backoff', {
+                logDebug(context, 'Operation failed, retrying with backoff', {
                     attempt,
                     maxRetries,
                     error: error.message,
@@ -120,7 +122,7 @@ export function monitorMemoryUsage(context) {
     if (criticalLevel) {
         context.error('Critical memory usage detected in scheduler', metrics);
     } else if (warningLevel) {
-        context.log('High memory usage in scheduler', metrics);
+        logWarn(context, 'High memory usage in scheduler', metrics);
     }
 
     return metrics;
@@ -135,7 +137,7 @@ export function forceGarbageCollection(context) {
         try {
             global.gc();
             const afterGC = monitorMemoryUsage(context);
-            context.log('Forced garbage collection completed', {
+            logDebug(context, 'Forced garbage collection completed', {
                 memoryAfterGC: afterGC.heapUsedMB + 'MB',
                 gcAvailable: true
             });
@@ -146,7 +148,7 @@ export function forceGarbageCollection(context) {
             });
         }
     } else {
-        context.log('Garbage collection not available', {
+        logDebug(context, 'Garbage collection not available', {
             gcAvailable: false,
             suggestion: 'Start Node.js with --expose-gc flag for manual GC control'
         });
@@ -217,7 +219,7 @@ export function categorizeError(error, context) {
         timestamp: new Date().toISOString()
     };
 
-    context.log('Error categorized for scheduler', {
+    logDebug(context, 'Error categorized for scheduler', {
         ...analysis,
         functionName: 'master-race-scheduler',
         highFrequencyContext: 'every-minute execution'
@@ -274,7 +276,7 @@ export function logPerformanceMetrics(metrics, context) {
         executionFrequency: 'every-minute'
     };
 
-    context.log('Scheduler performance metrics', optimizationMetrics);
+    logDebug(context, 'Scheduler performance metrics', optimizationMetrics);
 
     return optimizationMetrics;
 }

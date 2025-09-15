@@ -46,6 +46,7 @@ import {
   CircuitBreaker,
 } from './error-handlers.js'
 import { fastLockCheck, updateHeartbeat, releaseLock, setupHeartbeatInterval, shouldTerminateForNzTime } from './lock-manager.js'
+import { logDebug, logInfo, logWarn, logError, logPerformance as logPerfOptimized, logFunctionStart, logFunctionComplete } from './logging-utils.js'
 
 // Initialize circuit breaker for critical operations
 const apiCircuitBreaker = new CircuitBreaker('nztab-api', {
@@ -105,8 +106,7 @@ export default async function main(context) {
       process.env['NZTAB_API_BASE_URL'] || 'https://api.tab.co.nz'
     const databaseId = 'raceday-db'
 
-    context.log('Enhanced race poller started - performing ultra-fast lock check', {
-      timestamp: new Date().toISOString(),
+    logFunctionStart(context, 'Enhanced Race Poller', {
       nztabBaseUrl,
       functionVersion: '2.0.0-task-5.5-enhanced'
     })
@@ -123,7 +123,7 @@ export default async function main(context) {
 
     if (!lockManager) {
       // Another instance is running - terminate immediately to save resources
-      context.log('Terminating due to active concurrent execution - ultra-fast resource savings', {
+      logInfo(context, 'Terminating due to active concurrent execution - ultra-fast resource savings', {
         terminationReason: 'concurrent-execution-detected',
         resourcesSaved: true,
         executionTimeMs: Date.now() - functionStartTime,
@@ -156,9 +156,8 @@ export default async function main(context) {
     const executionMode = determineExecutionMode(context)
     progressTracker.executionMode = executionMode.type
 
-    context.log('Enhanced race poller execution mode determined', {
+    logDebug(context, 'Enhanced race poller execution mode determined', {
       executionMode: executionMode.type,
-      timestamp: new Date().toISOString(),
       nztabBaseUrl,
       circuitBreakers: {
         api: apiCircuitBreaker.getStatus(),
@@ -234,8 +233,7 @@ export default async function main(context) {
         : 0
     }
 
-    context.log('Enhanced race poller function completed successfully', {
-      timestamp: new Date().toISOString(),
+    logFunctionComplete(context, 'Enhanced Race Poller', functionStartTime, {
       ...completionStats,
       nzTime: new Date().toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
       performanceMetrics: {
@@ -280,12 +278,11 @@ export default async function main(context) {
 
     const executionDuration = Date.now() - functionStartTime
 
-    context.error('Enhanced race poller function failed', {
+    logError(context, 'Enhanced race poller function failed', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
       executionDurationMs: executionDuration,
-      progressWhenFailed: progressTracker,
-      timestamp: new Date().toISOString()
+      progressWhenFailed: progressTracker
     })
 
     return {
@@ -299,7 +296,7 @@ export default async function main(context) {
     // Final cleanup
     if (heartbeatInterval) clearInterval(heartbeatInterval)
 
-    context.log('Enhanced race poller function cleanup completed', {
+    logDebug(context, 'Enhanced race poller function cleanup completed', {
       finalExecutionTime: Date.now() - functionStartTime,
       cleanupCompleted: true
     })
@@ -379,7 +376,7 @@ async function executeScheduledPolling(
 ) {
   const startTime = Date.now()
 
-  context.log('Starting scheduled polling for active races with enhanced tracking')
+  logInfo(context, 'Starting scheduled polling for active races with enhanced tracking')
 
   // Update progress tracker
   progressTracker.currentOperation = 'fetching-race-candidates'
@@ -412,7 +409,7 @@ async function executeScheduledPolling(
     ])
 
     const allRaces = racesQuery.documents
-    context.log(
+    logDebug(context,
       `Found ${allRaces.length} races in extended window for enhanced analysis`
     )
 
@@ -474,7 +471,7 @@ async function executeScheduledPolling(
       }
     }
 
-    context.log(`Selected ${racesToPoll.length} races for enhanced scheduled polling`, {
+    logInfo(context, `Selected ${racesToPoll.length} races for enhanced scheduled polling`, {
       ultra_critical: racesByPriority.ultra_critical.length,
       critical: racesByPriority.critical.length,
       urgent: racesByPriority.urgent.length,
@@ -557,7 +554,7 @@ async function executeHttpSinglePolling(
 ) {
   const startTime = Date.now()
 
-  context.log('Starting HTTP single race polling', { raceId })
+  logDebug(context, 'Starting HTTP single race polling', { raceId })
 
   try {
     // Quick race validation
@@ -572,7 +569,7 @@ async function executeHttpSinglePolling(
       }
     }
 
-    context.log(`Polling single race: ${race.name} (${race.status})`)
+    logDebug(context, `Polling single race: ${race.name} (${race.status})`)
 
     // For HTTP requests, return immediate response and process in background
     if (context.res && context.res.json) {
@@ -674,7 +671,7 @@ async function executeHttpBatchPolling(
 ) {
   const startTime = Date.now()
 
-  context.log('Starting HTTP batch race polling', { raceCount: raceIds.length })
+  logDebug(context, 'Starting HTTP batch race polling', { raceCount: raceIds.length })
 
   try {
     // Validate batch size
@@ -731,7 +728,7 @@ async function executeHttpBatchPolling(
       return response
     }
 
-    context.log(`Processing batch of ${validRaces.length} valid races`)
+    logDebug(context, `Processing batch of ${validRaces.length} valid races`)
 
     // For HTTP requests, return immediate response and process in background
     if (context.res && context.res.json) {
@@ -872,7 +869,7 @@ function categorizeRacesByUrgency(races, now, context) {
     // Races outside the -60m window are ignored
   }
 
-  context.log('Enhanced race categorization completed', {
+  logDebug(context, 'Enhanced race categorization completed', {
     ultra_critical: categories.ultra_critical.length,
     critical: categories.critical.length,
     urgent: categories.urgent.length,
@@ -1019,7 +1016,7 @@ function selectRacesForPolling(categorizedRaces, context) {
     ? Math.round((totalSkipped / totalCandidates) * 100)
     : 0
 
-  context.log('Enhanced intelligent race selection completed - Task 5.5', {
+  logDebug(context, 'Enhanced intelligent race selection completed - Task 5.5', {
     selected: selectedRaces.length,
     totalCandidates,
     redundancyPreventionStats: {
@@ -1084,7 +1081,7 @@ async function executeIntelligentPolling(
   let totalUpdatesProcessed = 0
   let totalMoneyFlowProcessed = 0
 
-  context.log(`Starting enhanced intelligent polling with internal loops`, {
+  logInfo(context, `Starting enhanced intelligent polling with internal loops`, {
     totalRaces: racesToPoll.length,
     ultraCritical: ultraCriticalRaces.length,
     critical: criticalRaces.length,
@@ -1094,7 +1091,7 @@ async function executeIntelligentPolling(
 
   // Process ultra-critical races with internal 15-second polling loop
   if (ultraCriticalRaces.length > 0) {
-    context.log(`Starting ultra-critical polling loop (15-second intervals)`, {
+    logInfo(context, `Starting ultra-critical polling loop (15-second intervals)`, {
       raceCount: ultraCriticalRaces.length,
       duration: '4 minutes maximum',
     })
@@ -1118,7 +1115,7 @@ async function executeIntelligentPolling(
 
   // Process critical races with internal 30-second polling loop
   if (criticalRaces.length > 0) {
-    context.log(`Starting critical polling loop (30-second intervals)`, {
+    logInfo(context, `Starting critical polling loop (30-second intervals)`, {
       raceCount: criticalRaces.length,
       duration: '2 minutes maximum',
     })
@@ -1142,7 +1139,7 @@ async function executeIntelligentPolling(
 
   // Process other races with standard single polling
   if (otherRaces.length > 0) {
-    context.log(`Processing standard races (single polling)`, {
+    logDebug(context, `Processing standard races (single polling)`, {
       raceCount: otherRaces.length,
     })
 
@@ -1324,7 +1321,7 @@ async function processSingleRaceData(
           )
           raceStatusUpdated = true
 
-          context.log('Race status updated', {
+          logInfo(context, 'Race status updated', {
             raceId: raceId.slice(-8),
             oldStatus: currentRace.status,
             newStatus: raceEventData.race.status,
@@ -1382,7 +1379,7 @@ async function processSingleRaceData(
           }
         })
 
-        context.log('Processed tote pools data', {
+        logDebug(context, 'Processed tote pools data', {
           raceId: raceId.slice(-8),
           poolsCount: raceEventData.tote_pools.length,
           totalPool: racePoolData.totalRacePool,
@@ -1432,7 +1429,7 @@ async function processSingleRaceData(
       raceEventData.money_tracker.entrants &&
       raceStatus === 'Open'
     ) {
-      context.log('💰 Found money tracker data, starting processing', {
+      logDebug(context, '💰 Found money tracker data, starting processing', {
         raceId: raceId.slice(0, 8) + '...',
         entrantsCount: raceEventData.money_tracker.entrants?.length || 0,
         raceStatus: raceEventData.race?.status,
@@ -1455,7 +1452,7 @@ async function processSingleRaceData(
           entrantOddsData // STORY 4.9 - Pass odds data for timeline storage
         )
 
-        context.log('💰 Money tracker processing completed', {
+        logDebug(context, '💰 Money tracker processing completed', {
           raceId: raceId.slice(0, 8) + '...',
           moneyFlowProcessed,
           processingLatency: `${processingLatency}ms`,
@@ -1476,7 +1473,7 @@ async function processSingleRaceData(
         )
       }
     } else {
-      context.log('⚠️ No money tracker data found', {
+      logDebug(context, '⚠️ No money tracker data found', {
         raceId: raceId.slice(0, 8) + '...',
         hasMoneyTracker: !!raceEventData.money_tracker,
         hasEntrants: !!raceEventData.money_tracker?.entrants,
@@ -1486,7 +1483,7 @@ async function processSingleRaceData(
 
     const processingTime = Date.now() - processingStartTime
 
-    context.log('Single race processing completed', {
+    logDebug(context, 'Single race processing completed', {
       raceId: raceId.slice(-8),
       entrantsProcessed,
       moneyFlowProcessed,
@@ -1617,7 +1614,7 @@ async function saveRaceResults(
         )
       }
 
-      context.log('Race results saved successfully', {
+      logDebug(context, 'Race results saved successfully', {
         raceId: race.$id.slice(-8),
         hasResults: !!resultsData.resultsAvailable,
         hasDividends: !!resultsData.dividendsData,
@@ -1676,7 +1673,7 @@ async function executeInternalPollingLoop(
   let totalMoneyFlowProcessed = 0
   let loopCount = 0
 
-  context.log(`Starting ${priority} internal polling loop`, {
+  logDebug(context, `Starting ${priority} internal polling loop`, {
     raceCount: races.length,
     intervalSeconds,
     maxDurationSeconds,
@@ -1700,7 +1697,7 @@ async function executeInternalPollingLoop(
         if (!['Final', 'Finalized', 'Abandoned'].includes(currentRace.status)) {
           activeRaces.push(raceData)
         } else {
-          context.log(
+          logDebug(context,
             `Race ${raceData.raceId.slice(
               -8
             )} finalized, removing from polling loop`,
@@ -1723,7 +1720,7 @@ async function executeInternalPollingLoop(
 
     // If all races are finalized, exit loop
     if (activeRaces.length === 0) {
-      context.log(`All races finalized, exiting ${priority} polling loop`, {
+      logDebug(context, `All races finalized, exiting ${priority} polling loop`, {
         totalLoops: loopCount,
         durationMs: Date.now() - startTime,
       })
@@ -1738,7 +1735,7 @@ async function executeInternalPollingLoop(
       batches.push(activeRaces.slice(i, i + batchSize))
     }
 
-    context.log(`${priority} polling loop #${loopCount}`, {
+    logDebug(context, `${priority} polling loop #${loopCount}`, {
       activeRaces: activeRaces.length,
       batches: batches.length,
       timeRemaining:
@@ -1837,7 +1834,7 @@ async function executeInternalPollingLoop(
           last_poll_time: now,
         })
       } catch (error) {
-        context.log(
+        logWarn(context,
           `Failed to update last_poll_time for ${raceData.raceId.slice(-8)}`,
           {
             error: error.message,
@@ -1851,7 +1848,7 @@ async function executeInternalPollingLoop(
     const loopTime = Date.now() - loopStartTime
     const timeToNextInterval = Math.max(0, intervalMs - loopTime)
 
-    context.log(`${priority} loop #${loopCount} completed`, {
+    logDebug(context, `${priority} loop #${loopCount} completed`, {
       activeRaces: activeRaces.length,
       loopTimeMs: loopTime,
       nextPollIn: Math.round(timeToNextInterval / 1000) + 's',
@@ -1865,7 +1862,7 @@ async function executeInternalPollingLoop(
 
   const totalLoopTime = Date.now() - startTime
 
-  context.log(`${priority} internal polling loop completed`, {
+  logDebug(context, `${priority} internal polling loop completed`, {
     totalLoops: loopCount,
     totalLoopTimeMs: totalLoopTime,
     successfulRaces: totalSuccessfulRaces,
@@ -1916,7 +1913,7 @@ async function executeStandardPolling(
   let totalUpdatesProcessed = 0
   let totalMoneyFlowProcessed = 0
 
-  context.log(`Starting standard polling with ${batches.length} batches`, {
+  logDebug(context, `Starting standard polling with ${batches.length} batches`, {
     totalRaces: races.length,
     batchSize,
   })
@@ -1926,7 +1923,7 @@ async function executeStandardPolling(
     const batch = batches[batchIndex]
     const batchStartTime = Date.now()
 
-    context.log(
+    logDebug(context,
       `Processing standard batch ${batchIndex + 1}/${batches.length}`,
       {
         batchSize: batch.length,
@@ -1990,7 +1987,7 @@ async function executeStandardPolling(
       }
 
       const batchTime = Date.now() - batchStartTime
-      context.log(
+      logDebug(context,
         `Standard batch ${batchIndex + 1}/${batches.length} completed`,
         {
           batchSize: batch.length,
@@ -2029,7 +2026,7 @@ async function executeStandardPolling(
         last_poll_time: now,
       })
     } catch (error) {
-      context.log('Failed to update last_poll_time', {
+      logWarn(context, 'Failed to update last_poll_time', {
         raceId: raceData.raceId,
         error: error.message,
       })
@@ -2040,7 +2037,7 @@ async function executeStandardPolling(
 
   const executionTime = Date.now() - startTime
 
-  context.log('Standard polling completed', {
+  logDebug(context, 'Standard polling completed', {
     successfulRaces: totalSuccessfulRaces,
     failedRaces: totalFailedRaces,
     executionTimeMs: executionTime,

@@ -4,6 +4,7 @@ import { filterMeetings } from './data-processors.js';
 import { processMeetings, processRaces } from './database-utils.js';
 import { validateEnvironmentVariables, executeApiCallWithTimeout, monitorMemoryUsage, forceGarbageCollection } from './error-handlers.js';
 import { fastLockCheck, updateHeartbeat, releaseLock, setupHeartbeatInterval, shouldTerminateForNzTime } from './lock-manager.js';
+import { logDebug, logInfo, logWarn, logError, logFunctionStart, logFunctionComplete } from './logging-utils.js';
 
 /**
  * Daily Meetings Import Function
@@ -33,8 +34,7 @@ export default async function main(context) {
         const nztabBaseUrl = process.env['NZTAB_API_BASE_URL'] || 'https://api.tab.co.nz';
         const databaseId = 'raceday-db';
 
-        context.log('Daily meetings function started - performing fast lock check', {
-            timestamp: new Date().toISOString(),
+        logFunctionStart(context, 'Daily Meetings Import', {
             nztabBaseUrl,
             functionVersion: '2.1.0-enhanced'
         });
@@ -51,7 +51,7 @@ export default async function main(context) {
 
         if (!lockManager) {
             // Another instance is running - terminate immediately to save resources
-            context.log('Terminating due to active concurrent execution - resources saved', {
+            logInfo(context, 'Terminating due to active concurrent execution - resources saved', {
                 terminationReason: 'concurrent-execution-detected',
                 resourcesSaved: true,
                 executionTimeMs: Date.now() - functionStartTime
@@ -83,7 +83,7 @@ export default async function main(context) {
         await updateHeartbeat(lockManager, progressTracker);
 
         // PHASE 2: Fetch meetings data from NZ TAB API with enhanced retry logic
-        context.log('Fetching meetings data from NZ TAB API with retry protection...');
+        logDebug(context, 'Fetching meetings data from NZ TAB API with retry protection...');
         const meetings = await executeApiCallWithTimeout(
             fetchRacingData,
             [nztabBaseUrl, context],
@@ -101,7 +101,7 @@ export default async function main(context) {
             };
         }
 
-        context.log(`Successfully fetched ${meetings.length} meetings from API`);
+        logDebug(context, `Successfully fetched ${meetings.length} meetings from API`);
         progressTracker.totalMeetingsFetched = meetings.length;
 
         // Check NZ time termination after API call
@@ -119,7 +119,7 @@ export default async function main(context) {
         await updateHeartbeat(lockManager, progressTracker);
 
         const filteredMeetings = filterMeetings(meetings, context);
-        context.log(`Filtered to ${filteredMeetings.length} meetings for processing`);
+        logDebug(context, `Filtered to ${filteredMeetings.length} meetings for processing`);
         progressTracker.filteredMeetings = filteredMeetings.length;
 
         // Monitor memory after data filtering
@@ -132,11 +132,11 @@ export default async function main(context) {
         progressTracker.currentOperation = 'processing-meetings';
         await updateHeartbeat(lockManager, progressTracker);
 
-        context.log('Processing meetings into database...');
+        logInfo(context, 'Processing meetings into database...');
         const { meetingsProcessed } = await processMeetings(databases, databaseId, filteredMeetings, context);
 
         progressTracker.meetingsProcessed = meetingsProcessed;
-        context.log(`Successfully processed ${meetingsProcessed} meetings`);
+        logInfo(context, `Successfully processed ${meetingsProcessed} meetings`);
 
         // Check NZ time termination after meetings processing
         if (shouldTerminateForNzTime(context)) {
@@ -153,13 +153,13 @@ export default async function main(context) {
         progressTracker.currentOperation = 'processing-races';
         await updateHeartbeat(lockManager, progressTracker);
 
-        context.log('Processing races from meetings data...');
+        logInfo(context, 'Processing races from meetings data...');
         const { racesProcessed, raceIds } = await processRaces(databases, databaseId, filteredMeetings, context);
 
         progressTracker.racesProcessed = racesProcessed;
         progressTracker.totalRaceIds = raceIds.length;
 
-        context.log(`Successfully processed ${racesProcessed} races from ${filteredMeetings.length} meetings`);
+        logInfo(context, `Successfully processed ${racesProcessed} races from ${filteredMeetings.length} meetings`);
 
         // Monitor final memory usage
         const finalMemory = monitorMemoryUsage(context);
@@ -182,8 +182,7 @@ export default async function main(context) {
             }
         };
 
-        context.log('Daily meetings function completed successfully', {
-            timestamp: new Date().toISOString(),
+        logFunctionComplete(context, 'Daily Meetings Import', functionStartTime, {
             ...completionStats,
             nzTime: new Date().toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
             performanceMetrics: {
@@ -245,7 +244,7 @@ export default async function main(context) {
             forceGarbageCollection(context);
         }
 
-        context.log('Daily meetings function cleanup completed', {
+        logDebug(context, 'Daily meetings function cleanup completed', {
             finalExecutionTime: Date.now() - functionStartTime,
             cleanupCompleted: true
         });

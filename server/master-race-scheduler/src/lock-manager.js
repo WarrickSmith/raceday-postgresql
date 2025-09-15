@@ -10,6 +10,7 @@
  */
 
 import { ID } from 'node-appwrite';
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
 
 const LOCK_DOCUMENT_ID = 'master-race-scheduler-lock';
 const LOCK_COLLECTION_ID = 'function-locks';
@@ -68,7 +69,7 @@ export async function fastLockCheck(databases, databaseId, context) {
         await databases.createDocument(databaseId, LOCK_COLLECTION_ID, LOCK_DOCUMENT_ID, lockDoc);
 
         const acquisitionTime = Date.now() - startTime;
-        context.log('Ultra-fast lock acquired successfully', {
+        logDebug(context, 'Ultra-fast lock acquired successfully', {
             executionId,
             acquisitionTimeMs: acquisitionTime,
             targetTime: '<15ms',
@@ -110,7 +111,7 @@ export async function fastLockCheck(databases, databaseId, context) {
                 const lockAge = Date.now() - new Date(existingLock.lastHeartbeat).getTime();
 
                 if (lockAge > STALE_LOCK_THRESHOLD_MS) {
-                    context.log('Detected stale lock, attempting cleanup', {
+                    logDebug(context, 'Detected stale lock, attempting cleanup', {
                         staleLockExecutionId: existingLock.executionId,
                         lockAgeMs: lockAge,
                         threshold: STALE_LOCK_THRESHOLD_MS,
@@ -154,7 +155,7 @@ export async function fastLockCheck(databases, databaseId, context) {
                     await databases.createDocument(databaseId, LOCK_COLLECTION_ID, LOCK_DOCUMENT_ID, newLockDoc);
 
                     const totalTime = Date.now() - startTime;
-                    context.log('Lock acquired after stale cleanup', {
+                    logDebug(context, 'Lock acquired after stale cleanup', {
                         executionId,
                         totalAcquisitionTimeMs: totalTime,
                         staleLockCleanedUp: true,
@@ -172,7 +173,7 @@ export async function fastLockCheck(databases, databaseId, context) {
                     // Active lock held by another instance - check for rapid termination detection
                     const rapidTermination = acquisitionTime < 20; // Ultra-fast termination achieved
 
-                    context.log('Lock held by active instance - ultra-fast termination', {
+                    logDebug(context, 'Lock held by active instance - ultra-fast termination', {
                         activeExecutionId: existingLock.executionId,
                         activeLockAge: lockAge,
                         activeStatus: existingLock.status,
@@ -264,7 +265,7 @@ export async function updateHeartbeat(lockManager, progress = {}) {
             updateData
         );
 
-        lockManager.context.log('Micro-heartbeat updated', {
+        logDebug(lockManager.context, 'Micro-heartbeat updated', {
             executionId: lockManager.executionId,
             heartbeatTime: now,
             progress: {
@@ -310,7 +311,7 @@ export async function releaseLock(lockManager, completionStats = {}, status = 'c
         };
 
         // Log completion summary before releasing lock
-        lockManager.context.log('Master scheduler execution completed - releasing lock', {
+        logDebug(lockManager.context, 'Master scheduler execution completed - releasing lock', {
             executionId: lockManager.executionId,
             status,
             executionDurationMs: executionDuration,
@@ -334,7 +335,7 @@ export async function releaseLock(lockManager, completionStats = {}, status = 'c
             LOCK_DOCUMENT_ID
         );
 
-        lockManager.context.log('Master scheduler lock released successfully', {
+        logDebug(lockManager.context, 'Master scheduler lock released successfully', {
             executionId: lockManager.executionId,
             endTime,
             finalStatus: status,
@@ -363,7 +364,7 @@ export function setupHeartbeatInterval(lockManager, progressTracker) {
         await updateHeartbeat(lockManager, progressTracker);
     }, HEARTBEAT_INTERVAL_MS);
 
-    lockManager.context.log('Micro-heartbeat interval established', {
+    logDebug(lockManager.context, 'Micro-heartbeat interval established', {
         executionId: lockManager.executionId,
         intervalMs: HEARTBEAT_INTERVAL_MS,
         intervalSeconds: HEARTBEAT_INTERVAL_MS / 1000,
@@ -391,7 +392,7 @@ export function shouldTerminateForNzTime(context) {
         const shouldTerminate = nzHour >= 1 && nzHour < 9; // Terminate until 9 AM when racing starts
 
         if (shouldTerminate) {
-            context.log('NZ time termination triggered for master scheduler', {
+            logDebug(context, 'NZ time termination triggered for master scheduler', {
                 nzTime,
                 nzHour,
                 terminationReason: 'Outside racing hours (1:00-9:00 AM NZST)',
