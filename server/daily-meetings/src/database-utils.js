@@ -3,6 +3,8 @@
  * Provides performant upsert patterns and error handling
  */
 
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
+
 /**
  * Safely convert and truncate a field to string with max length
  * @param {any} value - The value to process
@@ -93,7 +95,7 @@ export async function processMeetings(databases, databaseId, meetings, context) 
             };
             const success = await performantUpsert(databases, databaseId, 'meetings', meeting.meeting, meetingDoc, context);
             if (success) {
-                context.log('Upserted meeting', { meetingId: meeting.meeting, name: meeting.name });
+                logDebug(context, 'Upserted meeting', { meetingId: meeting.meeting, name: meeting.name });
                 return { success: true, meetingId: meeting.meeting };
             }
             else {
@@ -212,7 +214,7 @@ export async function processRaces(databases, databaseId, meetings, context) {
                 };
                 const success = await performantUpsert(databases, databaseId, 'races', race.id, raceDoc, context);
                 if (success) {
-                    context.log('Upserted race', { raceId: race.id, name: race.name });
+                    logDebug(context, 'Upserted race', { raceId: race.id, name: race.name });
                     return { success: true, raceId: race.id };
                 }
                 else {
@@ -236,7 +238,7 @@ export async function processRaces(databases, databaseId, meetings, context) {
         processedRaceIds.push(...successfulRaceIds);
         racesProcessed += successfulRaces.length;
         
-        context.log('Processed race batch', {
+        logDebug(context, 'Processed race batch', {
             batchNumber: Math.floor(i / batchSize) + 1,
             batchSize: batch.length,
             successful: successfulRaces.length,
@@ -420,14 +422,14 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
 
             if (dailySuccess && historySuccess) {
                 entrantsProcessed++;
-                context.log('Upserted entrant (daily + history)', { 
+                logDebug(context, 'Upserted entrant (daily + history)', { 
                     entrantId: entrant.entrant_id, 
                     name: entrant.name,
                     raceId: raceId
                 });
             } else if (dailySuccess) {
                 entrantsProcessed++;
-                context.log('Upserted entrant (daily only)', { 
+                logDebug(context, 'Upserted entrant (daily only)', { 
                     entrantId: entrant.entrant_id, 
                     name: entrant.name,
                     raceId: raceId,

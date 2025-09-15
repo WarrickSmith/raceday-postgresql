@@ -3,6 +3,8 @@
  * Optimized for s-1vcpu-1gb specification and 300s timeout
  */
 
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
+
 /**
  * Create a timeout protection wrapper for promises
  * @param {Promise} promise - Promise to wrap with timeout
@@ -81,7 +83,7 @@ export async function executeApiCallWithTimeout(apiCall, args, context, timeoutM
             const result = await withTimeout(apiCall(...args), timeoutMs, 'Meeting status API call');
 
             if (attempt > 1) {
-                context.log('Meeting status API call succeeded after retry', {
+                logDebug(context,'Meeting status API call succeeded after retry', {
                     attempt,
                     totalRetries: attempt - 1,
                     totalTimeMs: Date.now() - startTime,
@@ -105,7 +107,7 @@ export async function executeApiCallWithTimeout(apiCall, args, context, timeoutM
 
             if (!isLastAttempt && isRetryable) {
                 const delayMs = calculateBackoffDelay(attempt);
-                context.log(`Retrying meeting status API call with exponential backoff in ${delayMs}ms...`, {
+                logDebug(context,`Retrying meeting status API call with exponential backoff in ${delayMs}ms...`, {
                     attempt,
                     delayMs,
                     nextAttempt: attempt + 1,
@@ -175,7 +177,7 @@ export function validateEnvironmentVariables(requiredVars, context) {
         throw error;
     }
 
-    context.log('Meeting status poller environment variables validated successfully', {
+    logDebug(context,'Meeting status poller environment variables validated successfully', {
         validatedVars: requiredVars,
         function: 'meeting-status-poller'
     });
@@ -189,7 +191,7 @@ export function validateEnvironmentVariables(requiredVars, context) {
  * @returns {Promise} Promise that resolves after delay
  */
 export function rateLimit(delayMs, context, reason = 'NZ TAB API rate limiting') {
-    context.log(`Meeting status poller: Applying rate limit delay: ${delayMs}ms`, {
+    logDebug(context,`Meeting status poller: Applying rate limit delay: ${delayMs}ms`, {
         reason,
         function: 'meeting-status-poller'
     });
@@ -228,7 +230,7 @@ export function monitorMemoryUsage(context, warningThresholdMB = 200, criticalTh
             thresholdExceeded: 'critical'
         });
     } else if (memoryInfo.warningLevel) {
-        context.log('Meeting status poller: High memory usage warning', {
+        logDebug(context,'Meeting status poller: High memory usage warning', {
             ...memoryInfo,
             action: 'Monitor closely for potential memory issues',
             function: 'meeting-status-poller',
@@ -255,7 +257,7 @@ export function forceGarbageCollection(context) {
         const afterHeapMB = Math.round(afterMemory.heapUsed / 1024 / 1024);
         const freedMB = beforeHeapMB - afterHeapMB;
 
-        context.log('Meeting status poller: Forced garbage collection completed', {
+        logDebug(context,'Meeting status poller: Forced garbage collection completed', {
             beforeHeapMB,
             afterHeapMB,
             freedMB,
@@ -266,7 +268,7 @@ export function forceGarbageCollection(context) {
 
         return { beforeMemory, afterMemory, freedMB };
     } else {
-        context.log('Meeting status poller: Garbage collection not available (--expose-gc not set)', {
+        logDebug(context,'Meeting status poller: Garbage collection not available (--expose-gc not set)', {
             currentHeapMB: beforeHeapMB,
             gcAvailable: false,
             function: 'meeting-status-poller'
@@ -300,7 +302,7 @@ class CircuitBreaker {
         if (this.state === 'OPEN') {
             if (Date.now() - this.lastFailureTime >= this.timeout) {
                 this.state = 'HALF_OPEN';
-                context.log('Meeting status poller: Circuit breaker transitioning to HALF_OPEN', {
+                logDebug(context,'Meeting status poller: Circuit breaker transitioning to HALF_OPEN', {
                     function: 'meeting-status-poller',
                     circuitState: this.state
                 });
@@ -329,7 +331,7 @@ class CircuitBreaker {
     onSuccess(context) {
         this.failureCount = 0;
         this.state = 'CLOSED';
-        context.log('Meeting status poller: Circuit breaker reset to CLOSED', {
+        logDebug(context,'Meeting status poller: Circuit breaker reset to CLOSED', {
             function: 'meeting-status-poller',
             circuitState: this.state
         });

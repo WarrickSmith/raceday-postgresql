@@ -5,6 +5,7 @@
  */
 
 import { ID } from 'node-appwrite';
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
 
 const LOCK_DOCUMENT_ID = 'meeting-status-poller-lock';
 const LOCK_COLLECTION_ID = 'function-locks';
@@ -27,7 +28,7 @@ export async function fastLockCheck(databases, databaseId, context) {
         // CRITICAL: Midnight boundary validation before any processing
         const midnightBoundaryCheck = validateMidnightBoundary(context);
         if (!midnightBoundaryCheck.safeToExecute) {
-            context.log('Midnight boundary validation blocked execution', {
+            logDebug(context,'Midnight boundary validation blocked execution', {
                 reason: midnightBoundaryCheck.reason,
                 nzTime: midnightBoundaryCheck.nzTime,
                 nzHour: midnightBoundaryCheck.nzHour,
@@ -64,7 +65,7 @@ export async function fastLockCheck(databases, databaseId, context) {
         await databases.createDocument(databaseId, LOCK_COLLECTION_ID, LOCK_DOCUMENT_ID, lockDoc);
 
         const acquisitionTime = Date.now() - startTime;
-        context.log('Meeting status poller fast lock acquired successfully', {
+        logDebug(context,'Meeting status poller fast lock acquired successfully', {
             executionId,
             acquisitionTimeMs: acquisitionTime,
             targetTime: '<35ms',
@@ -110,7 +111,7 @@ export async function fastLockCheck(databases, databaseId, context) {
                 const midnightAwareStalenessCheck = isLockStaleWithBoundaryCheck(existingLock, lockAge, context);
 
                 if (midnightAwareStalenessCheck.isStale) {
-                    context.log('Detected stale lock with midnight boundary awareness, attempting cleanup', {
+                    logDebug(context,'Detected stale lock with midnight boundary awareness, attempting cleanup', {
                         staleLockExecutionId: existingLock.executionId,
                         lockAgeMs: lockAge,
                         threshold: STALE_LOCK_THRESHOLD_MS,
@@ -125,7 +126,7 @@ export async function fastLockCheck(databases, databaseId, context) {
                     // Re-validate midnight boundary before retry
                     const retryBoundaryCheck = validateMidnightBoundary(context);
                     if (!retryBoundaryCheck.safeToExecute) {
-                        context.log('Midnight boundary blocked retry after stale cleanup', retryBoundaryCheck);
+                        logDebug(context,'Midnight boundary blocked retry after stale cleanup', retryBoundaryCheck);
                         return null;
                     }
 
@@ -161,7 +162,7 @@ export async function fastLockCheck(databases, databaseId, context) {
                     await databases.createDocument(databaseId, LOCK_COLLECTION_ID, LOCK_DOCUMENT_ID, newLockDoc);
 
                     const totalTime = Date.now() - startTime;
-                    context.log('Meeting status poller lock acquired after stale cleanup', {
+                    logDebug(context,'Meeting status poller lock acquired after stale cleanup', {
                         executionId,
                         totalAcquisitionTimeMs: totalTime,
                         staleLockCleanedUp: true,
@@ -178,7 +179,7 @@ export async function fastLockCheck(databases, databaseId, context) {
                     };
                 } else {
                     // Active lock held by another instance
-                    context.log('Lock held by active instance - terminating to save resources', {
+                    logDebug(context,'Lock held by active instance - terminating to save resources', {
                         activeExecutionId: existingLock.executionId,
                         activeLockAge: lockAge,
                         activeStatus: existingLock.status,
@@ -253,7 +254,7 @@ function validateMidnightBoundary(context) {
         };
 
         if (isPastTerminationTime) {
-            context.log('Execution blocked - outside NZ racing hours', {
+            logDebug(context,'Execution blocked - outside NZ racing hours', {
                 nzTime,
                 nzHour,
                 racingHours: '9:00 AM - 11:59 PM NZST',
@@ -370,7 +371,7 @@ export async function updateHeartbeat(lockManager, progress = {}) {
             updateData
         );
 
-        lockManager.context.log('Meeting status poller lock heartbeat updated', {
+        logDebug(lockManager.context, 'Meeting status poller lock heartbeat updated', {
             executionId: lockManager.executionId,
             heartbeatTime: now,
             progress: progress,
@@ -402,7 +403,7 @@ export async function releaseLock(lockManager, completionStats = {}, status = 'c
         const finalCpu = process.cpuUsage();
 
         // Log completion summary before releasing lock
-        lockManager.context.log('Meeting status poller execution completed - releasing lock', {
+        logDebug(lockManager.context, 'Meeting status poller execution completed - releasing lock', {
             executionId: lockManager.executionId,
             status,
             executionDurationMs: executionDuration,
@@ -427,7 +428,7 @@ export async function releaseLock(lockManager, completionStats = {}, status = 'c
             LOCK_DOCUMENT_ID
         );
 
-        lockManager.context.log('Meeting status poller lock released successfully', {
+        logDebug(lockManager.context, 'Meeting status poller lock released successfully', {
             executionId: lockManager.executionId,
             endTime,
             finalStatus: status,
@@ -456,7 +457,7 @@ export function setupHeartbeatInterval(lockManager, progressTracker) {
         await updateHeartbeat(lockManager, progressTracker);
     }, HEARTBEAT_INTERVAL_MS);
 
-    lockManager.context.log('Meeting status poller heartbeat interval established', {
+    logDebug(lockManager.context, 'Meeting status poller heartbeat interval established', {
         executionId: lockManager.executionId,
         intervalMs: HEARTBEAT_INTERVAL_MS,
         intervalMinutes: HEARTBEAT_INTERVAL_MS / 1000 / 60,
@@ -486,7 +487,7 @@ export function shouldTerminateForNzTime(context) {
         const shouldTerminate = nzHour >= 0 && nzHour < 8;
 
         if (shouldTerminate) {
-            context.log('Meeting status poller NZ time termination triggered - outside racing hours', {
+            logDebug(context,'Meeting status poller NZ time termination triggered - outside racing hours', {
                 nzTime,
                 nzHour,
                 terminationReason: 'Outside NZ racing hours',

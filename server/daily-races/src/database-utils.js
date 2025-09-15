@@ -3,6 +3,8 @@
  * Provides performant upsert patterns and error handling
  */
 
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
+
 /**
  * Safely convert and truncate a field to string with max length
  * @param {any} value - The value to process
@@ -88,7 +90,7 @@ export async function processMeetings(databases, databaseId, meetings, context) 
             };
             const success = await performantUpsert(databases, databaseId, 'meetings', meeting.meeting, meetingDoc, context);
             if (success) {
-                context.log('Upserted meeting', { meetingId: meeting.meeting, name: meeting.name });
+                logDebug(context, 'Upserted meeting', { meetingId: meeting.meeting, name: meeting.name });
                 return { success: true, meetingId: meeting.meeting };
             }
             else {
@@ -148,7 +150,7 @@ export async function processRaces(databases, databaseId, meetings, context) {
                 };
                 const success = await performantUpsert(databases, databaseId, 'races', race.id, raceDoc, context);
                 if (success) {
-                    context.log('Upserted race', { raceId: race.id, name: race.name });
+                    logDebug(context, 'Upserted race', { raceId: race.id, name: race.name });
                     return { success: true, raceId: race.id };
                 }
                 else {
@@ -172,7 +174,7 @@ export async function processRaces(databases, databaseId, meetings, context) {
         processedRaceIds.push(...successfulRaceIds);
         racesProcessed += successfulRaces.length;
         
-        context.log('Processed race batch', {
+        logDebug(context, 'Processed race batch', {
             batchNumber: Math.floor(i / batchSize) + 1,
             batchSize: batch.length,
             successful: successfulRaces.length,
@@ -196,7 +198,7 @@ export async function processRaces(databases, databaseId, meetings, context) {
 export async function processEntrants(databases, databaseId, raceId, entrants, context) {
     let entrantsProcessed = 0;
     
-    context.log(`Processing ${entrants.length} entrants for race ${raceId} with comprehensive data`);
+    logDebug(context, `Processing ${entrants.length} entrants for race ${raceId} with comprehensive data`);
     
     // Process each entrant (runner) with comprehensive data
     for (const entrant of entrants) {
@@ -290,7 +292,7 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
             const success = await performantUpsert(databases, databaseId, 'entrants', entrant.entrant_id, entrantDoc, context);
             if (success) {
                 entrantsProcessed++;
-                context.log('Upserted comprehensive entrant data', { 
+                logDebug(context, 'Upserted comprehensive entrant data', { 
                     entrantId: entrant.entrant_id, 
                     name: entrant.name,
                     raceId: raceId,
@@ -309,7 +311,7 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
         }
     }
     
-    context.log(`Finished processing entrants for race ${raceId}: ${entrantsProcessed}/${entrants.length} successful`);
+    logDebug(context, `Finished processing entrants for race ${raceId}: ${entrantsProcessed}/${entrants.length} successful`);
     return entrantsProcessed;
 }
 
@@ -400,7 +402,7 @@ export async function processDetailedRaces(databases, databaseId, detailedRaces,
             const success = await performantUpsert(databases, databaseId, 'races', basicRace.raceId, enhancedRaceDoc, context);
             if (success) {
                 racesProcessed++;
-                context.log('Enhanced race with detailed data', { 
+                logDebug(context, 'Enhanced race with detailed data', { 
                     raceId: basicRace.raceId, 
                     name: enhancedRaceDoc.name,
                     entrantCount: enhancedRaceDoc.entrantCount,

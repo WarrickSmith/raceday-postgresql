@@ -5,6 +5,7 @@
  */
 
 import { Client, Databases, Query } from 'node-appwrite';
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
 
 /**
  * Schema version tracking and migration management
@@ -80,7 +81,7 @@ export const EXPECTED_COLLECTIONS = {
  */
 export async function validatePreSetup(config, context) {
     const startTime = Date.now();
-    context.log('Starting pre-setup validation...');
+    logDebug(context, 'Starting pre-setup validation...');
 
     const validationResults = {
         success: true,
@@ -116,7 +117,7 @@ export async function validatePreSetup(config, context) {
 
         validationResults.duration = Date.now() - startTime;
 
-        context.log('Pre-setup validation completed', {
+        logDebug(context, 'Pre-setup validation completed', {
             success: validationResults.success,
             issuesCount: validationResults.issues.length,
             warningsCount: validationResults.warnings.length,
@@ -173,7 +174,7 @@ async function validateEnvironment(config, context) {
         result.warnings.push(`Node.js version ${process.version} detected - Node.js 22+ recommended`);
     }
 
-    context.log('Environment validation completed', {
+    logDebug(context, 'Environment validation completed', {
         success: result.success,
         issuesCount: result.issues.length,
         warningsCount: result.warnings.length
@@ -208,7 +209,7 @@ async function validateConnectivity(config, context) {
 
         await connectivityTest;
 
-        context.log('Connectivity validation successful');
+        logDebug(context, 'Connectivity validation successful');
 
     } catch (error) {
         result.success = false;
@@ -286,7 +287,7 @@ async function validatePermissions(config, context) {
             }
         }
 
-        context.log('Permissions validation completed', {
+        logDebug(context, 'Permissions validation completed', {
             success: result.success,
             requiredScopes: requiredScopes.length,
             issuesCount: result.issues.length
@@ -313,7 +314,7 @@ async function validatePermissions(config, context) {
  */
 export async function validatePostSetup(config, context) {
     const startTime = Date.now();
-    context.log('Starting post-setup validation...');
+    logDebug(context, 'Starting post-setup validation...');
 
     const validationResults = {
         success: true,
@@ -378,7 +379,7 @@ export async function validatePostSetup(config, context) {
 
         validationResults.duration = Date.now() - startTime;
 
-        context.log('Post-setup validation completed', {
+        logDebug(context, 'Post-setup validation completed', {
             success: validationResults.success,
             completeness: `${validationResults.completeness.toFixed(1)}%`,
             collectionsValid: `${totalValid}/${totalExpected}`,
@@ -466,7 +467,7 @@ async function validateCollection(databases, databaseId, collectionId, expectedS
             result.success = false;
         }
 
-        context.log(`Collection ${collectionId} validation completed`, {
+        logDebug(context, `Collection ${collectionId} validation completed`, {
             success: result.success,
             attributesCount: existingAttributes.length,
             indexesCount: existingIndexes.length,
@@ -561,7 +562,7 @@ async function validateSchemaVersion(databases, databaseId, context) {
  */
 export async function performHealthCheck(config, context) {
     const startTime = Date.now();
-    context.log('Starting database health check...');
+    logDebug(context, 'Starting database health check...');
 
     const healthResults = {
         healthy: true,
@@ -622,7 +623,7 @@ export async function performHealthCheck(config, context) {
 
         healthResults.duration = Date.now() - startTime;
 
-        context.log('Database health check completed', {
+        logDebug(context, 'Database health check completed', {
             healthy: healthResults.healthy,
             issuesCount: healthResults.issues.length,
             warningsCount: healthResults.warnings.length,
@@ -693,7 +694,7 @@ async function checkPerformanceHealth(databases, databaseId, context) {
             }
         }
 
-        context.log('Performance health check completed', {
+        logDebug(context, 'Performance health check completed', {
             hasIssues: performanceResults.hasIssues,
             collectionsChecked: Object.keys(performanceResults.queryPerformance).length
         });
@@ -765,7 +766,7 @@ async function performDataIntegrityChecks(databases, databaseId, context) {
             }
         }
 
-        context.log('Data integrity checks completed', {
+        logDebug(context, 'Data integrity checks completed', {
             healthy: integrityResults.healthy,
             checksPerformed: integrityResults.checksPerformed,
             checksSuccessful: integrityResults.checksSuccessful,
@@ -856,7 +857,7 @@ export async function updateSchemaVersion(databases, databaseId, version, contex
             description: `Schema version ${version} - RaceDay database setup`
         });
 
-        context.log('Schema version updated successfully', { version });
+        logDebug(context, 'Schema version updated successfully', { version });
 
         return { success: true, version };
 

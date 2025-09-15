@@ -4,6 +4,7 @@
  */
 
 import { ID } from 'node-appwrite';
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
 
 const LOCK_DOCUMENT_ID = 'daily-initial-data-lock';
 const LOCK_COLLECTION_ID = 'function-locks';
@@ -48,7 +49,7 @@ export async function fastLockCheck(databases, databaseId, context) {
         await databases.createDocument(databaseId, LOCK_COLLECTION_ID, LOCK_DOCUMENT_ID, lockDoc);
 
         const acquisitionTime = Date.now() - startTime;
-        context.log('Fast lock acquired successfully for daily-initial-data', {
+        logDebug(context, 'Fast lock acquired successfully for daily-initial-data', {
             executionId,
             acquisitionTimeMs: acquisitionTime,
             targetTime: '<50ms',
@@ -88,7 +89,7 @@ export async function fastLockCheck(databases, databaseId, context) {
                 const lockAge = Date.now() - new Date(existingLock.lastHeartbeat).getTime();
 
                 if (lockAge > STALE_LOCK_THRESHOLD_MS) {
-                    context.log('Detected stale daily-initial-data lock, attempting cleanup', {
+                    logDebug(context, 'Detected stale daily-initial-data lock, attempting cleanup', {
                         staleLockExecutionId: existingLock.executionId,
                         lockAgeMs: lockAge,
                         threshold: STALE_LOCK_THRESHOLD_MS,
@@ -127,7 +128,7 @@ export async function fastLockCheck(databases, databaseId, context) {
                     await databases.createDocument(databaseId, LOCK_COLLECTION_ID, LOCK_DOCUMENT_ID, newLockDoc);
 
                     const totalTime = Date.now() - startTime;
-                    context.log('Daily-initial-data lock acquired after stale cleanup', {
+                    logDebug(context, 'Daily-initial-data lock acquired after stale cleanup', {
                         executionId,
                         totalAcquisitionTimeMs: totalTime,
                         staleLockCleanedUp: true
@@ -142,7 +143,7 @@ export async function fastLockCheck(databases, databaseId, context) {
                     };
                 } else {
                     // Active lock held by another instance
-                    context.log('Daily-initial-data lock held by active instance - terminating to save resources', {
+                    logDebug(context, 'Daily-initial-data lock held by active instance - terminating to save resources', {
                         activeExecutionId: existingLock.executionId,
                         activeLockAge: lockAge,
                         activeStatus: existingLock.status,
@@ -217,7 +218,7 @@ export async function updateHeartbeat(lockManager, progress = {}) {
             updateData
         );
 
-        lockManager.context.log('Daily-initial-data lock heartbeat updated', {
+        logDebug(lockManager.context, 'Daily-initial-data lock heartbeat updated', {
             executionId: lockManager.executionId,
             heartbeatTime: now,
             progress: progress,
@@ -248,7 +249,7 @@ export async function releaseLock(lockManager, completionStats = {}, status = 'c
         const finalCpu = process.cpuUsage();
 
         // Log completion summary before releasing lock
-        lockManager.context.log('Daily-initial-data execution completed - releasing lock', {
+        logDebug(lockManager.context, 'Daily-initial-data execution completed - releasing lock', {
             executionId: lockManager.executionId,
             status,
             executionDurationMs: executionDuration,
@@ -270,7 +271,7 @@ export async function releaseLock(lockManager, completionStats = {}, status = 'c
             LOCK_DOCUMENT_ID
         );
 
-        lockManager.context.log('Daily-initial-data lock released successfully', {
+        logDebug(lockManager.context, 'Daily-initial-data lock released successfully', {
             executionId: lockManager.executionId,
             endTime,
             finalStatus: status
@@ -298,7 +299,7 @@ export function setupHeartbeatInterval(lockManager, progressTracker) {
         await updateHeartbeat(lockManager, progressTracker);
     }, HEARTBEAT_INTERVAL_MS);
 
-    lockManager.context.log('Daily-initial-data heartbeat interval established', {
+    logDebug(lockManager.context, 'Daily-initial-data heartbeat interval established', {
         executionId: lockManager.executionId,
         intervalMs: HEARTBEAT_INTERVAL_MS,
         intervalMinutes: HEARTBEAT_INTERVAL_MS / 1000 / 60
@@ -325,7 +326,7 @@ export function shouldTerminateForNzTime(context) {
         const shouldTerminate = nzHour >= 1 && nzHour < 6;
 
         if (shouldTerminate) {
-            context.log('Daily-initial-data NZ time termination triggered', {
+            logDebug(context, 'Daily-initial-data NZ time termination triggered', {
                 nzTime,
                 nzHour,
                 terminationReason: 'Past 1:00 AM NZ time',
