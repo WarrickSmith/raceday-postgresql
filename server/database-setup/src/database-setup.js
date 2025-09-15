@@ -13,6 +13,7 @@
  * with intelligent error isolation and adaptive batching based on Appwrite API limits.
  */
 import { Client, Databases, Permission, Role, RelationshipType, IndexType, ID } from 'node-appwrite';
+import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
 import {
     retryWithExponentialBackoff,
     CircuitBreaker,
@@ -116,7 +117,7 @@ const createAttributesInParallel = async (databases, databaseId, collectionId, a
     }
 
     if (attributesToCreate.length === 0) {
-        context.log('All attributes already exist, skipping creation');
+        logDebug(context, 'All attributes already exist, skipping creation');
         return {
             successful: 0,
             failed: 0,
@@ -127,7 +128,7 @@ const createAttributesInParallel = async (databases, databaseId, collectionId, a
         };
     }
 
-    context.log(`Creating ${attributesToCreate.length} attributes with enhanced parallel processing for collection ${collectionId}`);
+    logDebug(context, `Creating ${attributesToCreate.length} attributes with enhanced parallel processing for collection ${collectionId}`);
 
     // Determine optimal batch size based on attribute count and API limits
     const optimalBatchSize = Math.min(Math.max(Math.floor(attributesToCreate.length / 3), 5), 15);
@@ -185,7 +186,7 @@ const createAttributesInParallel = async (databases, databaseId, collectionId, a
     const successRate = batchResults?.successRate != null ? batchResults.successRate : 100.0;
     const duration = batchResults?.duration || 0;
 
-    context.log(`Attribute creation completed for ${collectionId}`, {
+    logDebug(context, `Attribute creation completed for ${collectionId}`, {
         successful,
         failed,
         total: attributesToCreate.length,
@@ -213,7 +214,7 @@ const createAttributesInParallel = async (databases, databaseId, collectionId, a
  * @returns {Promise<string>} Created attribute key
  */
 async function createSingleAttribute(databases, databaseId, collectionId, attr, context) {
-    context.log(`Creating attribute: ${attr.key} (${attr.type}) in ${collectionId}`);
+    logDebug(context, `Creating attribute: ${attr.key} (${attr.type}) in ${collectionId}`);
 
     try {
         switch (attr.type) {
@@ -276,7 +277,7 @@ async function createSingleAttribute(databases, databaseId, collectionId, attr, 
                 throw new Error(`Unsupported attribute type: ${attr.type}`);
         }
 
-        context.log(`✓ Successfully created attribute: ${attr.key}`);
+        logDebug(context, `✓ Successfully created attribute: ${attr.key}`);
         return attr.key;
 
     } catch (error) {
@@ -301,7 +302,7 @@ async function createSingleAttribute(databases, databaseId, collectionId, attr, 
  * @returns {Promise<boolean>} Whether attribute is available
  */
 const waitForAttributeAvailable = async (databases, databaseId, collectionId, attributeKey, context, maxRetries = 8, baseDelay = 3000) => {
-    context.log(`Waiting for attribute ${attributeKey} to become available...`);
+    logDebug(context, `Waiting for attribute ${attributeKey} to become available...`);
 
     const result = await retryWithExponentialBackoff(
         async () => {
@@ -344,15 +345,15 @@ export async function ensureDatabaseSetup(config, context) {
     let rollbackManager = null;
 
     try {
-        context.log('Starting enhanced database setup with robustness features...');
+        logDebug(context, 'Starting enhanced database setup with robustness features...');
 
         // Pre-setup validation
-        context.log('Performing pre-setup validation...');
+        logDebug(context, 'Performing pre-setup validation...');
         const preValidation = await validatePreSetup(config, context);
         if (!preValidation.success) {
             throw new Error(`Pre-setup validation failed: ${preValidation.issues.join(', ')}`);
         }
-        context.log('Pre-setup validation passed successfully');
+        logDebug(context, 'Pre-setup validation passed successfully');
 
         // Initialize progress tracking and rollback management
         progressTracker = new ProgressTracker(databases, config.databaseId, context);
@@ -362,7 +363,7 @@ export async function ensureDatabaseSetup(config, context) {
         try {
             await progressTracker.initialize();
             await rollbackManager.initialize();
-            context.log('Progress tracking and rollback management initialized successfully');
+            logDebug(context, 'Progress tracking and rollback management initialized successfully');
         } catch (error) {
             context.error('Failed to initialize progress/rollback tracking, continuing without tracking', {
                 error: error.message
@@ -377,7 +378,7 @@ export async function ensureDatabaseSetup(config, context) {
         if (progressTracker) {
             existingProgress = await progressTracker.getProgress();
             if (existingProgress && existingProgress.state === SETUP_STATES.IN_PROGRESS) {
-                context.log('Resuming previous setup from checkpoint', {
+                logDebug(context, 'Resuming previous setup from checkpoint', {
                     previousState: existingProgress.state,
                     completedSteps: existingProgress.completedSteps?.length || 0,
                     lastUpdated: existingProgress.lastUpdated
@@ -388,17 +389,17 @@ export async function ensureDatabaseSetup(config, context) {
         }
 
         // Database creation with circuit breaker protection
-        context.log('Ensuring database exists...');
+        logDebug(context, 'Ensuring database exists...');
         const dbExists = await circuitBreakers.database.execute(async () => {
             return await resourceExists(() => databases.get(config.databaseId));
         }, context);
 
         if (!dbExists) {
-            context.log('Creating database...');
+            logDebug(context, 'Creating database...');
             await circuitBreakers.database.execute(async () => {
                 await databases.create(config.databaseId, 'RaceDay Database');
             }, context);
-            context.log('Database created successfully');
+            logDebug(context, 'Database created successfully');
             if (rollbackManager) {
                 await rollbackManager.addRollbackAction('delete_database', { databaseId: config.databaseId });
             }
@@ -424,11 +425,11 @@ export async function ensureDatabaseSetup(config, context) {
 
             // Skip if already completed in previous run
             if (existingProgress?.completedSteps?.includes(name)) {
-                context.log(`Skipping already completed collection: ${name}`);
+                logDebug(context, `Skipping already completed collection: ${name}`);
                 continue;
             }
 
-            context.log(`Setting up collection: ${name} (${stepProgress.toFixed(1)}% complete)`);
+            logDebug(context, `Setting up collection: ${name} (${stepProgress.toFixed(1)}% complete)`);
             if (progressTracker) {
                 await progressTracker.updateProgress(SETUP_STATES.IN_PROGRESS, name, stepProgress);
             }
@@ -452,7 +453,7 @@ export async function ensureDatabaseSetup(config, context) {
                     await progressTracker.markStepCompleted(name);
                 }
 
-                context.log(`Collection ${name} setup completed`, {
+                logDebug(context, `Collection ${name} setup completed`, {
                     durationMs: collectionDuration,
                     progress: `${stepProgress.toFixed(1)}%`
                 });
@@ -486,14 +487,14 @@ export async function ensureDatabaseSetup(config, context) {
         }
 
         // Schema version tracking
-        context.log('Updating schema version...');
+        logDebug(context, 'Updating schema version...');
         if (progressTracker) {
             await progressTracker.updateProgress(SETUP_STATES.IN_PROGRESS, 'schema_version', 90);
         }
         await updateSchemaVersion(databases, config.databaseId, SCHEMA_VERSION, context);
 
         // Post-setup validation
-        context.log('Performing post-setup validation...');
+        logDebug(context, 'Performing post-setup validation...');
         if (progressTracker) {
             await progressTracker.updateProgress(SETUP_STATES.IN_PROGRESS, 'post_validation', 95);
         }
@@ -512,7 +513,7 @@ export async function ensureDatabaseSetup(config, context) {
         }
 
         // Final health check
-        context.log('Performing final health check...');
+        logDebug(context, 'Performing final health check...');
         const healthCheck = await performHealthCheck(config, context);
 
         if (progressTracker) {
@@ -522,7 +523,7 @@ export async function ensureDatabaseSetup(config, context) {
         const totalDuration = Date.now() - setupStartTime;
         const collectionsSetupDuration = Date.now() - collectionsStart;
 
-        context.log('Database setup completed successfully', {
+        logDebug(context, 'Database setup completed successfully', {
             totalDurationMs: totalDuration,
             collectionsSetupDurationMs: collectionsSetupDuration,
             schemaVersion: SCHEMA_VERSION,
@@ -575,10 +576,10 @@ export async function ensureDatabaseSetup(config, context) {
 
         // Attempt cleanup/rollback on failure
         if (rollbackManager) {
-            context.log('Attempting rollback due to setup failure...');
+            logDebug(context, 'Attempting rollback due to setup failure...');
             try {
                 await rollbackManager.executeRollback();
-                context.log('Rollback completed successfully');
+                logDebug(context, 'Rollback completed successfully');
             } catch (rollbackError) {
                 // Don't fail the entire process if rollback fails
                 context.error('Rollback failed but continuing', {
@@ -630,7 +631,7 @@ function logAttributeResults(attributeResults, collectionName, context) {
     const duration = attributeResults?.duration || 0;
 
     if (failed > 0) {
-        context.log(`${collectionName} collection: ${failed} attributes failed to create`, {
+        logDebug(context, `${collectionName} collection: ${failed} attributes failed to create`, {
             successRate: `${successRate.toFixed(1)}%`,
             successful,
             failed
@@ -641,7 +642,7 @@ async function ensureMeetingsCollection(databases, config, context, progressTrac
     const collectionId = collections.meetings;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
-        context.log('Creating meetings collection...');
+        logDebug(context, 'Creating meetings collection...');
         await databases.createCollection(config.databaseId, collectionId, 'Meetings', [
             Permission.read(Role.any()),
             Permission.create(Role.any()),
@@ -684,15 +685,15 @@ async function ensureMeetingsCollection(databases, config, context, progressTrac
     logAttributeResults(attributeResults, collectionId, context);
     const collection = await databases.getCollection(config.databaseId, collectionId);
     if (!collection.indexes.some((idx) => idx.key === 'idx_date')) {
-        context.log('Creating idx_date index on date...');
+        logDebug(context, 'Creating idx_date index on date...');
         const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'date', context);
         if (!isAvailable) {
-            context.log('date attribute is not available for index creation, skipping idx_date index');
+            logDebug(context, 'date attribute is not available for index creation, skipping idx_date index');
         }
         else {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_date', IndexType.Key, ['date']);
-                context.log('idx_date index created successfully');
+                logDebug(context, 'idx_date index created successfully');
             }
             catch (error) {
                 context.error(`Failed to create idx_date index: ${error}`);
@@ -704,14 +705,14 @@ async function ensureMeetingsCollection(databases, config, context, progressTrac
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_country', IndexType.Key, ['country']);
-                context.log('idx_country index created successfully');
+                logDebug(context, 'idx_country index created successfully');
             }
             catch (error) {
                 context.error(`Failed to create idx_country index: ${error}`);
             }
         }
         else {
-            context.log('country attribute is not available for index creation, skipping idx_country index');
+            logDebug(context, 'country attribute is not available for index creation, skipping idx_country index');
         }
     }
     if (!collection.indexes.some((idx) => idx.key === 'idx_race_type')) {
@@ -719,14 +720,14 @@ async function ensureMeetingsCollection(databases, config, context, progressTrac
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_race_type', IndexType.Key, ['raceType']);
-                context.log('idx_race_type index created successfully');
+                logDebug(context, 'idx_race_type index created successfully');
             }
             catch (error) {
                 context.error(`Failed to create idx_race_type index: ${error}`);
             }
         }
         else {
-            context.log('raceType attribute is not available for index creation, skipping idx_race_type index');
+            logDebug(context, 'raceType attribute is not available for index creation, skipping idx_race_type index');
         }
     }
     if (!collection.indexes.some((idx) => idx.key === 'idx_meeting_id')) {
@@ -734,14 +735,14 @@ async function ensureMeetingsCollection(databases, config, context, progressTrac
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_meeting_id', IndexType.Unique, ['meetingId']);
-                context.log('idx_meeting_id index created successfully');
+                logDebug(context, 'idx_meeting_id index created successfully');
             }
             catch (error) {
                 context.error(`Failed to create idx_meeting_id index: ${error}`);
             }
         }
         else {
-            context.log('meetingId attribute is not available for index creation, skipping idx_meeting_id index');
+            logDebug(context, 'meetingId attribute is not available for index creation, skipping idx_meeting_id index');
         }
     }
 }
@@ -749,7 +750,7 @@ async function ensureRacesCollection(databases, config, context, progressTracker
     const collectionId = collections.races;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
-        context.log('Creating races collection...');
+        logDebug(context, 'Creating races collection...');
         await databases.createCollection(config.databaseId, collectionId, 'Races', [
             Permission.read(Role.any()),
             Permission.create(Role.any()),
@@ -839,7 +840,7 @@ async function ensureRacesCollection(databases, config, context, progressTracker
 
     logAttributeResults(attributeResults, collectionId, context);
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'meeting'))) {
-        context.log('Creating races->meetings relationship...');
+        logDebug(context, 'Creating races->meetings relationship...');
         await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.meetings, RelationshipType.ManyToOne, false, 'meeting', 'races');
     }
     const racesCollection = await databases.getCollection(config.databaseId, collectionId);
@@ -848,14 +849,14 @@ async function ensureRacesCollection(databases, config, context, progressTracker
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_race_id', IndexType.Unique, ['raceId']);
-                context.log('idx_race_id index created successfully');
+                logDebug(context, 'idx_race_id index created successfully');
             }
             catch (error) {
                 context.error(`Failed to create idx_race_id index: ${error}`);
             }
         }
         else {
-            context.log('raceId attribute is not available for index creation, skipping idx_race_id index');
+            logDebug(context, 'raceId attribute is not available for index creation, skipping idx_race_id index');
         }
     }
     if (!racesCollection.indexes.some((idx) => idx.key === 'idx_start_time')) {
@@ -863,14 +864,14 @@ async function ensureRacesCollection(databases, config, context, progressTracker
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_start_time', IndexType.Key, ['startTime']);
-                context.log('idx_start_time index created successfully');
+                logDebug(context, 'idx_start_time index created successfully');
             }
             catch (error) {
                 context.error(`Failed to create idx_start_time index: ${error}`);
             }
         }
         else {
-            context.log('startTime attribute is not available for index creation, skipping idx_start_time index');
+            logDebug(context, 'startTime attribute is not available for index creation, skipping idx_start_time index');
         }
     }
     if (!racesCollection.indexes.some((idx) => idx.key === 'idx_race_number')) {
@@ -878,14 +879,14 @@ async function ensureRacesCollection(databases, config, context, progressTracker
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_race_number', IndexType.Key, ['raceNumber']);
-                context.log('idx_race_number index created successfully');
+                logDebug(context, 'idx_race_number index created successfully');
             }
             catch (error) {
                 context.error(`Failed to create idx_race_number index: ${error}`);
             }
         }
         else {
-            context.log('raceNumber attribute is not available for index creation, skipping idx_race_number index');
+            logDebug(context, 'raceNumber attribute is not available for index creation, skipping idx_race_number index');
         }
     }
 }
@@ -895,7 +896,7 @@ async function ensureRaceResultsCollection(databases, config, context, progressT
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     
     if (!exists) {
-        context.log('Creating race-results collection...');
+        logDebug(context, 'Creating race-results collection...');
         await databases.createCollection(config.databaseId, collectionId, 'Race Results', [
             Permission.read(Role.any()),
             Permission.create(Role.any()),
@@ -929,7 +930,7 @@ async function ensureRaceResultsCollection(databases, config, context, progressT
     
     // Create relationship to races collection
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'race'))) {
-        context.log('Creating race-results->races relationship...');
+        logDebug(context, 'Creating race-results->races relationship...');
         await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.races, RelationshipType.ManyToOne, true, 'race', 'raceResults');
     }
     
@@ -941,7 +942,7 @@ async function ensureEntrantsCollection(databases, config, context, progressTrac
     const collectionId = collections.entrants;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
-        context.log('Creating entrants collection...');
+        logDebug(context, 'Creating entrants collection...');
         await databases.createCollection(config.databaseId, collectionId, 'Entrants', [
             Permission.read(Role.any()),
             Permission.create(Role.any()),
@@ -1040,7 +1041,7 @@ async function ensureEntrantsCollection(databases, config, context, progressTrac
     const successRate = attributeResults?.successRate != null ? attributeResults.successRate : 100.0;
     const duration = attributeResults?.duration || 0;
 
-    context.log(`Entrants collection attribute creation completed`, {
+    logDebug(context, `Entrants collection attribute creation completed`, {
         successful,
         failed,
         total,
@@ -1049,12 +1050,12 @@ async function ensureEntrantsCollection(databases, config, context, progressTrac
     });
 
     if (failed > 0) {
-        context.log(`Entrants collection: ${failed} attributes failed to create`, {
+        logDebug(context, `Entrants collection: ${failed} attributes failed to create`, {
             successRate: `${successRate.toFixed(1)}%`
         });
     }
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'race'))) {
-        context.log('Creating entrants->races relationship...');
+        logDebug(context, 'Creating entrants->races relationship...');
         await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.races, RelationshipType.ManyToOne, false, 'race', 'entrants');
     }
     const entrantsCollection = await databases.getCollection(config.databaseId, collectionId);
@@ -1063,14 +1064,14 @@ async function ensureEntrantsCollection(databases, config, context, progressTrac
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_entrant_id', IndexType.Unique, ['entrantId']);
-                context.log('idx_entrant_id index created successfully');
+                logDebug(context, 'idx_entrant_id index created successfully');
             }
             catch (error) {
                 context.error(`Failed to create idx_entrant_id index: ${error}`);
             }
         }
         else {
-            context.log('entrantId attribute is not available for index creation, skipping idx_entrant_id index');
+            logDebug(context, 'entrantId attribute is not available for index creation, skipping idx_entrant_id index');
         }
     }
     if (!entrantsCollection.indexes.some((idx) => idx.key === 'idx_runner_number')) {
@@ -1078,14 +1079,14 @@ async function ensureEntrantsCollection(databases, config, context, progressTrac
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_runner_number', IndexType.Key, ['runnerNumber']);
-                context.log('idx_runner_number index created successfully');
+                logDebug(context, 'idx_runner_number index created successfully');
             }
             catch (error) {
                 context.error(`Failed to create idx_runner_number index: ${error}`);
             }
         }
         else {
-            context.log('runnerNumber attribute is not available for index creation, skipping idx_runner_number index');
+            logDebug(context, 'runnerNumber attribute is not available for index creation, skipping idx_runner_number index');
         }
     }
 }
@@ -1094,7 +1095,7 @@ async function ensureOddsHistoryCollection(databases, config, context, progressT
     const collectionId = collections.oddsHistory;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
-        context.log('Creating odds history collection...');
+        logDebug(context, 'Creating odds history collection...');
         await databases.createCollection(config.databaseId, collectionId, 'OddsHistory', [
             Permission.read(Role.any()),
             Permission.create(Role.users()),
@@ -1112,7 +1113,7 @@ async function ensureOddsHistoryCollection(databases, config, context, progressT
 
     logAttributeResults(attributeResults, collectionId, context);
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'entrant'))) {
-        context.log('Creating odds history->entrants relationship...');
+        logDebug(context, 'Creating odds history->entrants relationship...');
         await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.entrants, RelationshipType.ManyToOne, false, 'entrant', 'oddsHistory');
     }
     const oddsCollection = await databases.getCollection(config.databaseId, collectionId);
@@ -1121,14 +1122,14 @@ async function ensureOddsHistoryCollection(databases, config, context, progressT
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_timestamp', IndexType.Key, ['eventTimestamp']);
-                context.log('idx_timestamp index created successfully for odds history');
+                logDebug(context, 'idx_timestamp index created successfully for odds history');
             }
             catch (error) {
                 context.error(`Failed to create idx_timestamp index for odds history: ${error}`);
             }
         }
         else {
-            context.log('eventTimestamp attribute is not available for index creation, skipping idx_timestamp index');
+            logDebug(context, 'eventTimestamp attribute is not available for index creation, skipping idx_timestamp index');
         }
     }
     // Note: Appwrite does not support creating compound indexes that include relationship attributes.
@@ -1146,7 +1147,7 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context, prog
     const collectionId = collections.moneyFlowHistory;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
-        context.log('Creating money flow history collection...');
+        logDebug(context, 'Creating money flow history collection...');
         await databases.createCollection(config.databaseId, collectionId, 'MoneyFlowHistory', [
             Permission.read(Role.any()),
             Permission.create(Role.users()),
@@ -1203,19 +1204,19 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context, prog
     logAttributeResults(attributeResults, collectionId, context);
     
     // CRITICAL: Wait for Story 4.9 odds fields to be available before proceeding
-    context.log('Waiting for Story 4.9 odds fields to become available...');
+    logDebug(context, 'Waiting for Story 4.9 odds fields to become available...');
     const oddsFields = ['fixedWinOdds', 'fixedPlaceOdds', 'poolWinOdds', 'poolPlaceOdds'];
     for (const oddsField of oddsFields) {
         const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, oddsField, context);
         if (!isAvailable) {
             context.error(`Failed to wait for ${oddsField} attribute to become available`);
         } else {
-            context.log(`✅ ${oddsField} attribute is now available`);
+            logDebug(context, `✅ ${oddsField} attribute is now available`);
         }
     }
     
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'entrant'))) {
-        context.log('Creating money flow history->entrants relationship...');
+        logDebug(context, 'Creating money flow history->entrants relationship...');
         await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.entrants, RelationshipType.ManyToOne, false, 'entrant', 'moneyFlowHistory');
     }
     const moneyFlowCollection = await databases.getCollection(config.databaseId, collectionId);
@@ -1224,14 +1225,14 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context, prog
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_timestamp', IndexType.Key, ['eventTimestamp']);
-                context.log('idx_timestamp index created successfully for money flow history');
+                logDebug(context, 'idx_timestamp index created successfully for money flow history');
             }
             catch (error) {
                 context.error(`Failed to create idx_timestamp index for money flow history: ${error}`);
             }
         }
         else {
-            context.log('eventTimestamp attribute is not available for index creation, skipping idx_timestamp index');
+            logDebug(context, 'eventTimestamp attribute is not available for index creation, skipping idx_timestamp index');
         }
     }
     
@@ -1241,7 +1242,7 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context, prog
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_time_interval', IndexType.Key, ['timeInterval']);
-                context.log('idx_time_interval index created successfully for money flow history');
+                logDebug(context, 'idx_time_interval index created successfully for money flow history');
             }
             catch (error) {
                 context.error(`Failed to create idx_time_interval index for money flow history: ${error}`);
@@ -1254,7 +1255,7 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context, prog
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_interval_type', IndexType.Key, ['intervalType']);
-                context.log('idx_interval_type index created successfully for money flow history');
+                logDebug(context, 'idx_interval_type index created successfully for money flow history');
             }
             catch (error) {
                 context.error(`Failed to create idx_interval_type index for money flow history: ${error}`);
@@ -1267,7 +1268,7 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context, prog
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_polling_timestamp', IndexType.Key, ['pollingTimestamp']);
-                context.log('idx_polling_timestamp index created successfully for money flow history');
+                logDebug(context, 'idx_polling_timestamp index created successfully for money flow history');
             }
             catch (error) {
                 context.error(`Failed to create idx_polling_timestamp index for money flow history: ${error}`);
@@ -1281,7 +1282,7 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context, prog
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_race_id', IndexType.Key, ['raceId']);
-                context.log('idx_race_id index created successfully for money flow history');
+                logDebug(context, 'idx_race_id index created successfully for money flow history');
             }
             catch (error) {
                 context.error(`Failed to create idx_race_id index for money flow history: ${error}`);
@@ -1295,7 +1296,7 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context, prog
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_data_quality_score', IndexType.Key, ['dataQualityScore']);
-                context.log('idx_data_quality_score index created successfully for money flow history');
+                logDebug(context, 'idx_data_quality_score index created successfully for money flow history');
             }
             catch (error) {
                 context.error(`Failed to create idx_data_quality_score index for money flow history: ${error}`);
@@ -1308,7 +1309,7 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context, prog
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_is_stale', IndexType.Key, ['isStale']);
-                context.log('idx_is_stale index created successfully for money flow history');
+                logDebug(context, 'idx_is_stale index created successfully for money flow history');
             }
             catch (error) {
                 context.error(`Failed to create idx_is_stale index for money flow history: ${error}`);
@@ -1322,7 +1323,7 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context, prog
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_fixed_win_odds', IndexType.Key, ['fixedWinOdds']);
-                context.log('idx_fixed_win_odds index created successfully for money flow history');
+                logDebug(context, 'idx_fixed_win_odds index created successfully for money flow history');
             }
             catch (error) {
                 context.error(`Failed to create idx_fixed_win_odds index for money flow history: ${error}`);
@@ -1335,7 +1336,7 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context, prog
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_fixed_place_odds', IndexType.Key, ['fixedPlaceOdds']);
-                context.log('idx_fixed_place_odds index created successfully for money flow history');
+                logDebug(context, 'idx_fixed_place_odds index created successfully for money flow history');
             }
             catch (error) {
                 context.error(`Failed to create idx_fixed_place_odds index for money flow history: ${error}`);
@@ -1357,7 +1358,7 @@ async function ensureRacePoolsCollection(databases, config, context, progressTra
     const collectionId = collections.racePools;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
-        context.log('Creating race pools collection...');
+        logDebug(context, 'Creating race pools collection...');
         await databases.createCollection(config.databaseId, collectionId, 'RacePools', [
             Permission.read(Role.any()),
             Permission.create(Role.users()),
@@ -1387,14 +1388,14 @@ async function ensureRacePoolsCollection(databases, config, context, progressTra
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_race_id', IndexType.Unique, ['raceId']);
-                context.log('idx_race_id index created successfully for race pools');
+                logDebug(context, 'idx_race_id index created successfully for race pools');
             }
             catch (error) {
                 context.error(`Failed to create idx_race_id index for race pools: ${error}`);
             }
         }
         else {
-            context.log('raceId attribute is not available for index creation, skipping idx_race_id index');
+            logDebug(context, 'raceId attribute is not available for index creation, skipping idx_race_id index');
         }
     }
 }
@@ -1402,7 +1403,7 @@ async function ensureUserAlertConfigsCollection(databases, config, context, prog
     const collectionId = collections.userAlertConfigs;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
-        context.log('Creating user alert configs collection...');
+        logDebug(context, 'Creating user alert configs collection...');
         await databases.createCollection(config.databaseId, collectionId, 'UserAlertConfigs', [
             Permission.read(Role.users()),
             Permission.create(Role.users()),
@@ -1422,7 +1423,7 @@ async function ensureUserAlertConfigsCollection(databases, config, context, prog
 
     logAttributeResults(attributeResults, collectionId, context);
     if (!(await attributeExists(databases, config.databaseId, collectionId, 'entrant'))) {
-        context.log('Creating user alert configs->entrants relationship...');
+        logDebug(context, 'Creating user alert configs->entrants relationship...');
         await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.entrants, RelationshipType.ManyToOne, false, 'entrant', 'alertConfigs');
     }
     const alertConfigsCollection = await databases.getCollection(config.databaseId, collectionId);
@@ -1431,14 +1432,14 @@ async function ensureUserAlertConfigsCollection(databases, config, context, prog
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_user_id', IndexType.Key, ['userId']);
-                context.log('idx_user_id index created successfully for user alert configs');
+                logDebug(context, 'idx_user_id index created successfully for user alert configs');
             }
             catch (error) {
                 context.error(`Failed to create idx_user_id index for user alert configs: ${error}`);
             }
         }
         else {
-            context.log('userId attribute is not available for index creation, skipping idx_user_id index');
+            logDebug(context, 'userId attribute is not available for index creation, skipping idx_user_id index');
         }
     }
     if (!alertConfigsCollection.indexes.some((idx) => idx.key === 'idx_alert_type')) {
@@ -1446,14 +1447,14 @@ async function ensureUserAlertConfigsCollection(databases, config, context, prog
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_alert_type', IndexType.Key, ['alertType']);
-                context.log('idx_alert_type index created successfully for user alert configs');
+                logDebug(context, 'idx_alert_type index created successfully for user alert configs');
             }
             catch (error) {
                 context.error(`Failed to create idx_alert_type index for user alert configs: ${error}`);
             }
         }
         else {
-            context.log('alertType attribute is not available for index creation, skipping idx_alert_type index');
+            logDebug(context, 'alertType attribute is not available for index creation, skipping idx_alert_type index');
         }
     }
 }
@@ -1461,7 +1462,7 @@ async function ensureNotificationsCollection(databases, config, context, progres
     const collectionId = collections.notifications;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
-        context.log('Creating notifications collection...');
+        logDebug(context, 'Creating notifications collection...');
         await databases.createCollection(config.databaseId, collectionId, 'Notifications', [
             Permission.read(Role.users()),
             Permission.create(Role.users()),
@@ -1488,14 +1489,14 @@ async function ensureNotificationsCollection(databases, config, context, progres
         if (isAvailable) {
             try {
                 await databases.createIndex(config.databaseId, collectionId, 'idx_user_id', IndexType.Key, ['userId']);
-                context.log('idx_user_id index created successfully for notifications');
+                logDebug(context, 'idx_user_id index created successfully for notifications');
             }
             catch (error) {
                 context.error(`Failed to create idx_user_id index for notifications: ${error}`);
             }
         }
         else {
-            context.log('userId attribute is not available for index creation, skipping idx_user_id index');
+            logDebug(context, 'userId attribute is not available for index creation, skipping idx_user_id index');
         }
     }
 }
@@ -1514,7 +1515,7 @@ async function ensureFunctionLocksCollection(databases, config, context, progres
     const collectionId = collections.functionLocks;
     const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
     if (!exists) {
-        context.log('Creating function-locks collection...');
+        logDebug(context, 'Creating function-locks collection...');
         await databases.createCollection(config.databaseId, collectionId, 'Function Execution Locks', [
             Permission.read(Role.any()),
             Permission.create(Role.any()),
@@ -1584,7 +1585,7 @@ class ProgressTracker {
                     await this.databases.createStringAttribute(this.databaseId, PROGRESS_COLLECTION, 'errorMessage', 500, false);
                     await new Promise(resolve => setTimeout(resolve, 2000)); // Final wait
 
-                    this.context.log('Progress tracking collection created and attributes initialized');
+                    logDebug(this.context, 'Progress tracking collection created and attributes initialized');
                 }
             }
         } catch (error) {
@@ -1681,7 +1682,7 @@ class ProgressTracker {
             for (const doc of docs.documents) {
                 await this.databases.deleteDocument(this.databaseId, PROGRESS_COLLECTION, doc.$id);
             }
-            this.context.log('Progress tracking cleaned up');
+            logDebug(this.context, 'Progress tracking cleaned up');
         } catch (error) {
             this.context.error('Failed to cleanup progress tracking', {
                 error: error.message
@@ -1724,7 +1725,7 @@ class RollbackManager {
                     await this.databases.createBooleanAttribute(this.databaseId, ROLLBACK_COLLECTION, 'executed', false, false);
                     await new Promise(resolve => setTimeout(resolve, 2000)); // Final wait
 
-                    this.context.log('Rollback tracking collection created and attributes initialized');
+                    logDebug(this.context, 'Rollback tracking collection created and attributes initialized');
                 }
             }
         } catch (error) {
@@ -1747,7 +1748,7 @@ class RollbackManager {
             await this.databases.createDocument(this.databaseId, ROLLBACK_COLLECTION, ID.unique(), rollbackAction);
             this.rollbackActions.push(rollbackAction);
 
-            this.context.log('Rollback action recorded', {
+            logDebug(this.context, 'Rollback action recorded', {
                 action,
                 data: JSON.stringify(data)
             });
@@ -1761,7 +1762,7 @@ class RollbackManager {
 
     async executeRollback() {
         try {
-            this.context.log('Starting rollback execution...');
+            logDebug(this.context, 'Starting rollback execution...');
 
             const docs = await this.databases.listDocuments(this.databaseId, ROLLBACK_COLLECTION);
             const pendingActions = docs.documents.filter(doc => !doc.executed);
@@ -1775,7 +1776,7 @@ class RollbackManager {
                         executed: true
                     });
 
-                    this.context.log(`Rollback action executed: ${actionDoc.action}`);
+                    logDebug(this.context, `Rollback action executed: ${actionDoc.action}`);
                 } catch (error) {
                     this.context.error(`Failed to execute rollback action: ${actionDoc.action}`, {
                         error: error.message,
@@ -1784,7 +1785,7 @@ class RollbackManager {
                 }
             }
 
-            this.context.log('Rollback execution completed');
+            logDebug(this.context, 'Rollback execution completed');
         } catch (error) {
             this.context.error('Failed to execute rollback', {
                 error: error.message
@@ -1797,7 +1798,7 @@ class RollbackManager {
             case 'delete_database':
                 try {
                     await this.databases.delete(data.databaseId);
-                    this.context.log(`Rolled back database: ${data.databaseId}`);
+                    logDebug(this.context, `Rolled back database: ${data.databaseId}`);
                 } catch (error) {
                     if (error.code !== 404) throw error;
                 }
@@ -1806,7 +1807,7 @@ class RollbackManager {
             case 'delete_collection':
                 try {
                     await this.databases.deleteCollection(this.databaseId, data.collectionId);
-                    this.context.log(`Rolled back collection: ${data.collectionId}`);
+                    logDebug(this.context, `Rolled back collection: ${data.collectionId}`);
                 } catch (error) {
                     if (error.code !== 404) throw error;
                 }
@@ -1816,7 +1817,7 @@ class RollbackManager {
                 for (const attributeKey of data.attributes) {
                     try {
                         await this.databases.deleteAttribute(this.databaseId, data.collectionId, attributeKey);
-                        this.context.log(`Rolled back attribute: ${data.collectionId}.${attributeKey}`);
+                        logDebug(this.context, `Rolled back attribute: ${data.collectionId}.${attributeKey}`);
                     } catch (error) {
                         if (error.code !== 404) {
                             this.context.error(`Failed to rollback attribute: ${attributeKey}`, {
@@ -1828,14 +1829,14 @@ class RollbackManager {
                 break;
 
             default:
-                this.context.log(`Unknown rollback action: ${action}`);
+                logDebug(this.context, `Unknown rollback action: ${action}`);
         }
     }
 
     async rollbackCollection(collectionId) {
         try {
             await this.databases.deleteCollection(this.databaseId, collectionId);
-            this.context.log(`Rolled back collection: ${collectionId}`);
+            logDebug(this.context, `Rolled back collection: ${collectionId}`);
         } catch (error) {
             if (error.code !== 404) {
                 this.context.error(`Failed to rollback collection: ${collectionId}`, {
