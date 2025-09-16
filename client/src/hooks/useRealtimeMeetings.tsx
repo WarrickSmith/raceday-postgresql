@@ -6,6 +6,7 @@ import { Meeting, Race } from '@/types/meetings';
 import { SUPPORTED_RACE_TYPE_CODES } from '@/constants/raceTypes';
 import { isSupportedCountry } from '@/constants/countries';
 import { updateRaceInCache } from './useRacesForMeeting';
+import { useLogger } from '@/utils/logging';
 
 // Connection state machine for graceful transitions
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'disconnecting'
@@ -16,6 +17,7 @@ interface UseRealtimeMeetingsOptions {
 }
 
 export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeetingsOptions) {
+  const logger = useLogger('useRealtimeMeetings');
   const [meetings, setMeetings] = useState<Meeting[]>(initialData);
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [isConnected, setIsConnected] = useState(false);
@@ -79,7 +81,7 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
       const races = racesResponse.documents as unknown as Race[];
       return races[0]?.startTime || null;
     } catch (error) {
-      console.error(`Error fetching first race for meeting ${meetingId}:`, error);
+      logger.error(`Error fetching first race for meeting ${meetingId}`, error);
       return null;
     }
   }, []);
@@ -155,7 +157,7 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
             });
           }
         } catch (error) {
-          console.error('Error processing real-time update:', error);
+          logger.error('Error processing real-time update', error);
           onError?.(error as Error);
         }
       });
@@ -187,7 +189,7 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
         continueSetup();
       }
     } catch (error) {
-      console.error('Failed to setup real-time subscriptions:', error);
+      logger.error('Failed to setup real-time subscriptions', error);
       setConnectionState('disconnected');
       setIsConnected(false);
       onError?.(error as Error);
@@ -210,11 +212,11 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
   // Initialize subscriptions - follow hybrid architecture: only subscribe after initial data is ready
   useEffect(() => {
     if (!isInitialDataReady) {
-      console.log('⏳ Waiting for initial meetings data to be ready before subscription');
+      logger.debug('Waiting for initial meetings data to be ready before subscription');
       return;
     }
 
-    console.log('✅ Initial meetings data ready, setting up real-time subscription');
+    logger.info('Initial meetings data ready, setting up real-time subscription');
     setupSubscriptions();
 
     return () => {

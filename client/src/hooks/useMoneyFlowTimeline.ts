@@ -10,6 +10,7 @@ import type {
   MoneyFlowDataPoint,
   EntrantMoneyFlowTimeline,
 } from '@/types/moneyFlow'
+import { useLogger } from '@/utils/logging'
 
 // Server response interface for raw database data
 interface ServerMoneyFlowPoint {
@@ -73,6 +74,7 @@ export function useMoneyFlowTimeline(
     | 'first4' = 'win',
   raceStatus?: string // Add race status to control post-race behavior
 ): UseMoneyFlowTimelineResult {
+  const logger = useLogger('useMoneyFlowTimeline')
   const [timelineData, setTimelineData] = useState<
     Map<string, EntrantMoneyFlowTimeline>
   >(new Map())
@@ -133,21 +135,17 @@ export function useMoneyFlowTimeline(
         documents,
         entrantIds,
         poolType,
-        data.bucketedData
+        data.bucketedData,
+        logger
       )
       setTimelineData(entrantDataMap)
       setLastUpdate(new Date())
 
       return
-      // This code path should no longer be reached due to unified processing above
-      console.warn(
-        '⚠️ Fallback legacy processing path reached - this should not happen'
-      )
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to fetch timeline data'
-      )
-      console.error('Error fetching money flow timeline:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch timeline data'
+      setError(errorMessage)
+      logger.error('Error fetching money flow timeline', err)
     } finally {
       setIsLoading(false)
     }
@@ -184,14 +182,11 @@ export function useMoneyFlowTimeline(
             typeof dataPoint.placePoolAmount === 'number')
 
         if (!hasValidPoolData && !dataPoint.poolPercentage) {
-          console.log(
-            `⚠️ Skipping data point - no valid pool data for ${poolType}:`,
-            {
-              winPoolAmount: dataPoint.winPoolAmount,
-              placePoolAmount: dataPoint.placePoolAmount,
-              poolPercentage: dataPoint.poolPercentage,
-            }
-          )
+          logger.debug(`Skipping data point - no valid pool data for ${poolType}`, {
+            winPoolAmount: dataPoint.winPoolAmount,
+            placePoolAmount: dataPoint.placePoolAmount,
+            poolPercentage: dataPoint.poolPercentage,
+          })
           continue
         }
 
@@ -292,12 +287,10 @@ export function useMoneyFlowTimeline(
     // the unified subscription in useUnifiedRaceRealtime
     // The parent component should trigger refetch when it receives money-flow-history updates
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log(
-        '📊 Money flow timeline using fetch-only mode (no subscription)',
-        { raceId, entrantIds: entrantIds.length }
-      )
-    }
+    logger.debug('Money flow timeline using fetch-only mode (no subscription)', {
+      raceId,
+      entrantIds: entrantIds.length
+    })
 
     return () => {
       // No subscription cleanup needed - using unified subscription architecture
@@ -399,7 +392,8 @@ function processTimelineData(
   documents: ServerMoneyFlowPoint[],
   entrantIds: string[],
   poolType: string,
-  isBucketed: boolean = false
+  isBucketed: boolean = false,
+  logger?: any
 ): Map<string, EntrantMoneyFlowTimeline> {
   const entrantDataMap = new Map<string, EntrantMoneyFlowTimeline>()
 
@@ -411,9 +405,7 @@ function processTimelineData(
     })
 
     if (entrantDocs.length === 0) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`⚠️ No documents found for entrant ${entrantId}`)
-      }
+      logger?.debug(`No documents found for entrant ${entrantId}`)
       // Create empty entry to maintain consistency
       entrantDataMap.set(entrantId, {
         entrantId,
@@ -425,11 +417,7 @@ function processTimelineData(
       continue
     }
 
-    if (process.env.NODE_ENV === 'development') {
-      console.log(
-        `📊 Processing entrant ${entrantId}: ${entrantDocs.length} documents`
-      )
-    }
+    logger?.debug(`Processing entrant ${entrantId}`, { documentCount: entrantDocs.length })
 
     // Group documents by time interval to handle duplicates
     const intervalMap = new Map<number, ServerMoneyFlowPoint[]>()
@@ -438,9 +426,7 @@ function processTimelineData(
       // Use timeInterval if available (bucketed), otherwise timeToStart (legacy)
       const interval = (doc as any).timeInterval ?? doc.timeToStart ?? -999
       if (interval === -999) {
-        console.warn(
-          `⚠️ Document missing time information for entrant ${entrantId}`
-        )
+        logger?.warn(`Document missing time information for entrant ${entrantId}`)
         return
       }
 
@@ -551,22 +537,19 @@ function processTimelineData(
       latestPlaceOdds,
     })
 
-    if (process.env.NODE_ENV === 'development') {
-      console.log(
-        `✅ Processed entrant ${entrantId}: ${timelinePoints.length} timeline points using server pre-calculated data`
-      )
-    }
-  }
-
-  if (process.env.NODE_ENV === 'development') {
-    console.log('📊 Timeline processing complete:', {
-      entrantsProcessed: entrantDataMap.size,
-      totalDataPoints: Array.from(entrantDataMap.values()).reduce(
-        (sum, data) => sum + data.dataPoints.length,
-        0
-      ),
+    logger?.debug(`Processed entrant ${entrantId} timeline points`, {
+      timelinePointsCount: timelinePoints.length,
+      usingServerCalculatedData: true
     })
   }
+
+  logger?.debug('Timeline processing complete', {
+    entrantsProcessed: entrantDataMap.size,
+    totalDataPoints: Array.from(entrantDataMap.values()).reduce(
+      (sum, data) => sum + data.dataPoints.length,
+      0
+    ),
+  })
 
   return entrantDataMap
 }
