@@ -643,8 +643,8 @@ export function useUnifiedRaceRealtime({
               }
             )
 
-            // Fetch race-results document
-            const fetchRaceResults = async () => {
+            // Fetch race-results document with retry mechanism
+            const fetchRaceResults = async (retryCount = 0) => {
               try {
                 const raceResultsResponse = await databases.listDocuments(
                   'raceday-db',
@@ -723,8 +723,20 @@ export function useUnifiedRaceRealtime({
                 } else {
                   debugLog(
                     'No race-results document found yet after status change to',
-                    payload.status
+                    payload.status,
+                    { retryCount, maxRetries: 3 }
                   )
+
+                  // Retry up to 3 times with increasing delays for race-results document creation
+                  if (retryCount < 3) {
+                    const retryDelay = (retryCount + 1) * 2000 // 2s, 4s, 6s delays
+                    debugLog(`Retrying race-results fetch in ${retryDelay}ms (attempt ${retryCount + 1}/3)`)
+                    setTimeout(() => {
+                      fetchRaceResults(retryCount + 1)
+                    }, retryDelay)
+                  } else {
+                    debugLog('Max retries reached for race-results fetch - will rely on periodic check and subscription')
+                  }
                 }
               } catch (error) {
                 errorLog(
@@ -734,7 +746,7 @@ export function useUnifiedRaceRealtime({
               }
             }
 
-            // Execute the fetch asynchronously
+            // Execute the fetch asynchronously (starts with retryCount = 0)
             fetchRaceResults()
           }
         } else if (isRaceResultsEvent && payload) {
