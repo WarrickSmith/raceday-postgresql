@@ -172,8 +172,10 @@ describe('useUnifiedRaceRealtime', () => {
     })
 
     // Should not throw error, just handle gracefully
+    // With conditional logging, expect the new formatted message
     expect(consoleSpy).toHaveBeenCalledWith(
-      '[UnifiedRaceRealtime] Failed to fetch initial data',
+      expect.stringContaining('Failed to fetch initial data'),
+      expect.stringContaining('color: #EF4444'),
       expect.any(Error)
     )
 
