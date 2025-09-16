@@ -1,12 +1,13 @@
 'use client';
 
 import { Client, Databases, Query } from 'appwrite';
+import { logWarn } from '@/utils/logging';
 
 const endpoint = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT;
 const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID;
 
 if (!endpoint || !projectId) {
-  console.warn('Missing Appwrite environment variables, using placeholder values');
+  logWarn('Missing Appwrite environment variables, using placeholder values', { endpoint: !!endpoint, projectId: !!projectId }, 'AppwriteClient');
 }
 
 const client = new Client()
