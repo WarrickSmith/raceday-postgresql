@@ -17,6 +17,7 @@ import { screenReader, AriaLabels } from '@/utils/accessibility'
 import { useRenderTracking, useMemoryOptimization } from '@/utils/performance'
 import { useValueFlash } from '@/hooks/useValueFlash'
 import { JockeySilks } from './JockeySilks'
+import { useLogger } from '@/utils/logging'
 
 // Flash-enabled Win Odds Cell Component
 const WinOddsCell = memo(function WinOddsCell({
@@ -121,6 +122,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   poolData = null,
   moneyFlowUpdateTrigger,
 }: EnhancedEntrantsGridProps) {
+  const logger = useLogger('EnhancedEntrantsGrid');
   const { raceData } = useRace()
 
   // Use real-time entrants data from unified subscription if available
@@ -156,7 +158,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
   // Debug: Log entrant IDs being passed to timeline hook (development only)
   if (process.env.NODE_ENV === 'development') {
-    console.log('🔍 Timeline hook parameters:', {
+    logger.debug('Timeline hook parameters:', {
       raceId: currentRaceId,
       entrantIds: entrantIds.length,
       entrantCount: entrantIds.length,
@@ -224,7 +226,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
     // Debug logging (can be simplified in production)
     if (process.env.NODE_ENV === 'development') {
-      console.log('🔄 EnhancedEntrantsGrid entrants:', {
+      logger.debug('EnhancedEntrantsGrid entrants:', {
         entrantsCount: finalEntrants.length,
         hasRealtimeData: !!realtimeEntrants,
         lastUpdateTime: lastUpdate?.toISOString(),
@@ -256,8 +258,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
     if (difference > tolerance && poolTotal > 100) {
       // Only flag significant discrepancies
-      console.warn(
-        `⚠️ Timeline summation mismatch for ${entrant.name}: timeline sum=${timelineSum}, pool total=${poolTotal}, difference=${difference}`
+      logger.warn(
+        `Timeline summation mismatch for ${entrant.name}`, {
+          timelineSum,
+          poolTotal,
+          difference,
+          entrantName: entrant.name
+        }
       )
       return false
     }
@@ -269,7 +276,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const entrantsWithPoolData = useMemo(() => {
     if (!entrants || entrants.length === 0) return []
 
-    console.log('🔍 Pool calculation debug:', {
+    logger.debug('Pool calculation debug:', {
       entrantsCount: entrants.length,
       timelineDataAvailable: timelineData?.size > 0,
       timelineDataSize: timelineData?.size || 0,
@@ -292,9 +299,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
     return entrants.map((entrant) => {
       if (entrant.isScratched) {
-        console.log(
-          `🐴 Scratched entrant ${entrant.name} (${entrant.runnerNumber}) - returning unchanged`
-        )
+        logger.debug(`Scratched entrant ${entrant.name} (${entrant.runnerNumber}) - returning unchanged`)
         return {
           ...entrant,
           moneyFlowTimeline: undefined, // No timeline for scratched entrants
@@ -309,9 +314,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       if (entrant.holdPercentage && entrant.holdPercentage > 0) {
         poolPercentage = entrant.holdPercentage
         dataSource = 'entrant_real_data'
-        console.log(
-          `✅ Using real entrant data for ${entrant.name}: ${poolPercentage}%`
-        )
+        logger.debug(`Using real entrant data for ${entrant.name}: ${poolPercentage}%`)
       }
 
       // Priority 2: Timeline latest percentage (only if entrant data missing)
@@ -325,9 +328,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         if (latestPercentage && latestPercentage > 0) {
           poolPercentage = latestPercentage
           dataSource = 'timeline_data'
-          console.log(
-            `✅ Using timeline data for ${entrant.name}: ${poolPercentage}%`
-          )
+          logger.debug(`Using timeline data for ${entrant.name}: ${poolPercentage}%`)
         }
       }
 
@@ -346,19 +347,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         if (estimatedPercentage > 0 && estimatedPercentage < 100) {
           poolPercentage = estimatedPercentage
           dataSource = 'calculated_from_odds'
-          console.log(
-            `📊 Calculated from odds for ${
-              entrant.name
-            }: ${poolPercentage.toFixed(2)}% (odds: ${entrant.winOdds})`
-          )
+          logger.debug(`Calculated from odds for ${entrant.name}: ${poolPercentage.toFixed(2)}% (odds: ${entrant.winOdds})`)
         }
       }
 
       // Priority 4: Fallback to dummy data temporarily to ensure display works
       if (!poolPercentage) {
-        console.log(
-          `⚠️ No calculable data for ${entrant.name}, using fallback percentage`
-        )
+        logger.debug(`No calculable data for ${entrant.name}, using fallback percentage`)
         // Use a fallback percentage based on entrant position for testing
         poolPercentage = Math.max(1, 15 - entrant.runnerNumber) // Simple fallback
         dataSource = 'fallback_for_testing'
@@ -381,7 +376,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       const placePoolContribution = placePoolInDollars * holdPercentageDecimal
       const totalPoolContribution = winPoolContribution + placePoolContribution
 
-      console.log(`💰 Real calculation for ${entrant.name}:`, {
+      logger.debug(`Real calculation for ${entrant.name}:`, {
         poolPercentage,
         winPoolContribution: winPoolContribution.toFixed(0),
         placePoolContribution: placePoolContribution.toFixed(0),
@@ -408,7 +403,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
       // Special debugging for "Wal" entrant
       if (entrant.name.toLowerCase().includes('wal')) {
-        console.log(`🔍 DEBUG "Wal" entrant:`, {
+        logger.debug(`DEBUG "Wal" entrant:`, {
           name: entrant.name,
           runnerNumber: entrant.runnerNumber,
           poolPercentage,
@@ -486,7 +481,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   }, [entrantsWithPoolData, sortState])
 
   // Debug: Track pool toggle changes and timeline data
-  console.log('🎯 Timeline data status:', {
+  logger.debug('Timeline data status:', {
     activePool: poolViewState.activePool,
     timelineDataSize: timelineData?.size || 0,
     entrantsCount: sortedEntrants.length,
@@ -651,7 +646,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
         // Only log when intervals change to reduce verbosity
         if (dynamicIntervals.length > 0 && postStartMinutes % 0.5 === 0) {
-          console.log('🕐 Intervals updated:', {
+          logger.debug('Intervals updated:', {
             postStartMinutes,
             intervals: dynamicIntervals.length,
           })
@@ -833,7 +828,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       isCurrentTimeColumn(col.interval)
     )
 
-    console.log('🔄 Auto-scroll update:', {
+    logger.debug('Auto-scroll update:', {
       activeColumnIndex,
       totalColumns: timelineColumns.length,
       activeColumn:
@@ -851,10 +846,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         behavior: 'smooth',
       })
 
-      console.log(
-        '📍 Auto-scrolled to active column at position:',
-        scrollPosition
-      )
+      logger.debug('Auto-scrolled to active column at position:', { scrollPosition })
     }
   }, [
     timelineColumns,
@@ -889,17 +881,14 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
       // Debug logging to help troubleshoot data issues
       if (interval === 60 && process.env.NODE_ENV === 'development') {
-        console.log(
-          `📊 Timeline data for ${entrant.name || entrant.$id} at ${interval}m:`,
-          {
-            entrantId: entrant.$id,
-            interval,
-            selectedView,
-            result,
-            timelineDataSize: timelineData?.size || 0,
-            hasTimelineData: timelineData?.has(entrant.$id) || false,
-          }
-        )
+        logger.debug(`Timeline data for ${entrant.name || entrant.$id} at ${interval}m:`, {
+          entrantId: entrant.$id,
+          interval,
+          selectedView,
+          result,
+          timelineDataSize: timelineData?.size || 0,
+          hasTimelineData: timelineData?.has(entrant.$id) || false,
+        })
       }
 
       return result

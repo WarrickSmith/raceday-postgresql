@@ -20,13 +20,17 @@ import { client, databases } from '@/lib/appwrite-client'
 import { Race, Entrant, Meeting, RaceNavigationData } from '@/types/meetings'
 import type { RacePoolData, RaceResultsData } from '@/types/racePools'
 import { Query } from 'appwrite'
+import { useLogger } from '@/utils/logging'
 
 // Debug logging control - minimal for production
 const DEBUG = process.env.NODE_ENV === 'development'
 
+// Create logger outside component to avoid re-creation
+let logger: ReturnType<typeof useLogger>;
+
 const debugLog = (message: string, data?: any) => {
-  if (DEBUG) {
-    console.log(`[UnifiedRaceRealtime] ${message}`, data)
+  if (logger) {
+    logger.debug(message, data);
   }
 }
 
@@ -38,8 +42,8 @@ const debugRaceStatus = (
   newStatus?: string,
   extra?: any
 ) => {
-  if (DEBUG && oldStatus !== newStatus) {
-    console.log(`🏆 [RaceStatus] ${message}`, {
+  if (logger && oldStatus !== newStatus) {
+    logger.debug(`RaceStatus: ${message}`, {
       raceId,
       oldStatus,
       newStatus,
@@ -50,13 +54,15 @@ const debugRaceStatus = (
 }
 
 const errorLog = (message: string, error: any) => {
-  console.error(`[UnifiedRaceRealtime] ${message}`, error)
+  if (logger) {
+    logger.error(message, error);
+  }
 }
 
 const performanceLog = (operation: string, startTime: number) => {
   const duration = Date.now() - startTime
-  if (duration > 1000) {
-    console.warn(`[UnifiedRaceRealtime] ${operation} took ${duration}ms`)
+  if (duration > 1000 && logger) {
+    logger.warn(`${operation} took ${duration}ms`);
   }
 }
 
@@ -133,6 +139,9 @@ export function useUnifiedRaceRealtime({
   cleanupSignal = 0,
 }: UseUnifiedRaceRealtimeProps): UnifiedRaceRealtimeState &
   UnifiedRaceRealtimeActions {
+  // Initialize logger inside component
+  logger = useLogger('useUnifiedRaceRealtime');
+
   const [state, setState] = useState<UnifiedRaceRealtimeState>({
     race: initialRace,
     raceDocumentId: initialRace?.$id || null,

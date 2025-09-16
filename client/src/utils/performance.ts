@@ -2,11 +2,13 @@
  * Performance optimization utilities for the RaceDay application
  * Includes virtualization, memoization, and monitoring utilities
  * Enhanced for Story 4.8 with memory management integration
+ * Integrated with conditional logging system
  */
 
 import React, { useCallback, useRef, useEffect, useMemo, useState } from 'react';
 import { Entrant } from '@/types/meetings';
 import { memoryManager } from './memoryManager';
+import { logPerformance, logDebug, logWarn, LoggingUtils } from './logging';
 
 // Performance monitoring
 export class PerformanceMonitor {
@@ -30,28 +32,33 @@ export class PerformanceMonitor {
 
   public endMeasure(name: string): number {
     if (!this.enabled) return 0;
-    
+
     try {
       performance.mark(`${name}-end`);
       performance.measure(name, `${name}-start`, `${name}-end`);
-      
+
       const measure = performance.getEntriesByName(name, 'measure')[0];
       const duration = measure?.duration || 0;
-      
+
       // Store metrics for analysis
       if (!this.metrics.has(name)) {
         this.metrics.set(name, []);
       }
       this.metrics.get(name)!.push(duration);
-      
+
+      // Log performance measurement using conditional logging
+      if (LoggingUtils.isDebugEnabled()) {
+        logPerformance(name, Date.now() - duration, { duration });
+      }
+
       // Clean up marks
       performance.clearMarks(`${name}-start`);
       performance.clearMarks(`${name}-end`);
       performance.clearMeasures(name);
-      
+
       return duration;
     } catch (error) {
-      console.warn('Performance measurement failed:', error);
+      logWarn('Performance measurement failed', error, 'PerformanceMonitor');
       return 0;
     }
   }
@@ -94,6 +101,7 @@ export class PerformanceMonitor {
     Object.entries(timing).forEach(([name, stats]) => {
       if (stats.avg > 100) {
         recommendations.push(`Consider optimizing ${name} - average time ${stats.avg.toFixed(2)}ms`);
+        logWarn(`Performance bottleneck detected: ${name}`, { averageTime: stats.avg }, 'PerformanceMonitor');
       }
     });
 
@@ -115,7 +123,7 @@ export class PerformanceMonitor {
           this.metrics.set(name, values.slice(-10));
         }
       });
-      console.log('🧹 Cleaned performance metrics');
+      logDebug('Cleaned performance metrics', {}, 'PerformanceMonitor');
     });
   }
 }
@@ -294,9 +302,7 @@ export const BundleAnalyzer = {
    * Log component render counts for debugging
    */
   logRender: (componentName: string): void => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`🔄 ${componentName} rendered at ${new Date().toISOString()}`);
-    }
+    logDebug(`Component rendered`, { timestamp: new Date().toISOString() }, componentName);
   },
 
   /**
@@ -310,9 +316,7 @@ export const BundleAnalyzer = {
     
     const duration = monitor.endMeasure(`bundle-${feature}`);
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`📦 Bundle impact for ${feature}: ${duration.toFixed(2)}ms`);
-    }
+    logPerformance(`bundle-${feature}`, Date.now() - duration, { duration }, 'BundleAnalyzer');
   }
 };
 
@@ -346,7 +350,7 @@ export function useMemoryOptimization() {
     // Register cleanup with memory manager
     cleanupRef.current = memoryManager.registerCleanupCallback(() => {
       // Component-specific cleanup logic
-      console.log('🧹 Component memory cleanup triggered');
+      logDebug('Component memory cleanup triggered', {}, 'MemoryOptimization');
     });
 
     // Register performance cleanup
@@ -381,13 +385,11 @@ export function useRenderTracking(componentName: string) {
   useEffect(() => {
     renderCount.current++;
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`🔄 ${componentName} render #${renderCount.current}`);
-      
-      // Track excessive re-renders
-      if (renderCount.current > 10) {
-        console.warn(`⚠️ ${componentName} has rendered ${renderCount.current} times - check for optimization opportunities`);
-      }
+    logDebug(`Render #${renderCount.current}`, {}, componentName);
+
+    // Track excessive re-renders
+    if (renderCount.current > 10) {
+      logWarn(`Component has rendered ${renderCount.current} times - check for optimization opportunities`, { renderCount: renderCount.current }, componentName);
     }
   });
 

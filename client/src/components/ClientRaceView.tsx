@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useRace } from '@/contexts/RaceContext';
 import { RacePageContent } from '@/components/race-view/RacePageContent';
+import { useLogger } from '@/utils/logging';
 
 interface ClientRaceViewProps {
   raceId: string;
 }
 
 export function ClientRaceView({ raceId }: ClientRaceViewProps) {
+  const logger = useLogger('ClientRaceView');
   const { raceData, isLoading: contextLoading, loadRaceData, error: contextError } = useRace();
   const [error, setError] = useState<string | null>(null);
 
@@ -17,18 +19,18 @@ export function ClientRaceView({ raceId }: ClientRaceViewProps) {
 
     const currentRaceId = raceData?.race?.raceId;
     
-    console.log('📍 ClientRaceView effect - URL raceId:', raceId, 'current race:', currentRaceId, 'loading:', contextLoading);
+    logger.debug('ClientRaceView effect - URL raceId:', { raceId, currentRaceId, contextLoading });
 
     // If we don't have race data or it doesn't match the requested race ID, load it
     if (!raceData || currentRaceId !== raceId) {
-      console.log('🔄 ClientRaceView loading race data for:', raceId);
+      logger.info('Loading race data for:', { raceId });
       setError(null);
       loadRaceData(raceId).catch((err) => {
-        console.error('❌ Failed to load race data in ClientRaceView:', err);
+        logger.error('Failed to load race data in ClientRaceView:', err);
         setError(err instanceof Error ? err.message : 'Failed to load race data');
       });
     } else if (raceData && currentRaceId === raceId) {
-      console.log('✅ ClientRaceView - race data already matches URL, clearing any errors');
+      logger.debug('Race data already matches URL, clearing any errors');
       setError(null);
     }
   }, [raceId, raceData, contextLoading, loadRaceData]);
