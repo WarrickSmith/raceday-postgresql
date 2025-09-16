@@ -116,7 +116,7 @@ This ensures race results display immediately when available without unnecessary
 **Dynamic Polling (single-race-poller)**:
 - HTTP-triggered by client applications
 - On-demand polling for specific races
-- Enables true 15-second intervals when needed
+- Enables true 30-second intervals when needed
 
 ## Real-Time Subscription Implementation
 
