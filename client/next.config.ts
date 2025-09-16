@@ -17,6 +17,10 @@ const nextConfig: NextConfig = {
         as: '*.js',
       },
     },
+    // Resolve filesystem path issues in development
+    resolveAlias: {
+      '@': './src',
+    },
   },
   
   // Webpack optimizations for production builds
