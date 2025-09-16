@@ -816,7 +816,7 @@ async function executeHttpBatchPolling(
  */
 function categorizeRacesByUrgency(races, now, context) {
   const categories = {
-    ultra_critical: [], // -3m to Final (15-second polling) - highest priority
+    ultra_critical: [], // -3m to Final (30-second polling) - highest priority
     critical: [], // -5m to -3m (30-second polling)
     urgent: [], // -20m to -5m (2.5-minute polling)
     normal: [], // -60m to -20m (5-minute baseline)
@@ -839,7 +839,7 @@ function categorizeRacesByUrgency(races, now, context) {
         race,
         timeToStart: timeToStartMinutes,
         priority: 'ultra_critical',
-        pollingInterval: 15, // 15 seconds
+        pollingInterval: 30, // 30 seconds
       })
     } else if (timeToStartMinutes <= 5 && timeToStartMinutes > 3) {
       categories.critical.push({
@@ -898,7 +898,7 @@ function selectRacesForPolling(categorizedRaces, context) {
     reasonBreakdown: {}
   }
 
-  // ULTRA-CRITICAL races (15-second intervals) - Always poll but with intelligent backoff
+  // ULTRA-CRITICAL races (30-second intervals) - Always poll but with intelligent backoff
   for (const raceData of categorizedRaces.ultra_critical) {
     const lastPoll = raceData.race.last_poll_time
       ? new Date(raceData.race.last_poll_time).getTime()
@@ -1089,9 +1089,9 @@ async function executeIntelligentPolling(
     executionMode,
   })
 
-  // Process ultra-critical races with internal 15-second polling loop
+  // Process ultra-critical races with internal 30-second polling loop
   if (ultraCriticalRaces.length > 0) {
-    logInfo(context, `Starting ultra-critical polling loop (15-second intervals)`, {
+    logInfo(context, `Starting ultra-critical polling loop (30-second intervals)`, {
       raceCount: ultraCriticalRaces.length,
       duration: '4 minutes maximum',
     })
@@ -1101,7 +1101,7 @@ async function executeIntelligentPolling(
       databaseId,
       nztabBaseUrl,
       ultraCriticalRaces,
-      15,
+      30,
       240,
       context,
       'ultra_critical'

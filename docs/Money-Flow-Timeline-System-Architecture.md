@@ -83,7 +83,7 @@ The system follows a **server-heavy, client-light** architecture where:
 
 ### Expected Data Results
 
-- **Response frequency**: Every 10 seconds during active polling
+- **Response frequency**: Every 30 seconds during active polling
 - **Data validation**: Hold percentages should sum to ~100% across all entrants
 - **Pool growth**: Pool totals only increase (increase between time intervals may be proportionally greater for one entrant over another resulting in changed pool % for entrants)
 
@@ -155,17 +155,18 @@ if (timeToStart > 65) intervalType = '5m'    // 5-minute intervals (early baseli
 else if (timeToStart > 30) intervalType = '5m' // 5-minute intervals  
 else if (timeToStart > 5) intervalType = '1m'  // 1-minute intervals
 else if (timeToStart > 3) intervalType = '30s' // 30-second intervals (-5m to -3m)
-else if (timeToStart > 0) intervalType = '15s' // 15-second intervals (-3m to start)
-else intervalType = '15s' // Live updates (post-start until Final)
+else if (timeToStart > 0) intervalType = '30s' // 30-second intervals (-3m to start)
+else intervalType = '30s' // Live updates (post-start until Final)
 
 // Post-race polling
 // After Interim status: 30s polling until Final, then stop
+// Note: Money flow processing stops at Interim, only race details continue
 ```
 
 #### Dual-Phase Polling
 
 - **Early Morning Phase**: Captures 65m+ baseline data for enhanced calculations
-- **High-Frequency Phase**: 15-second polling during critical pre-start and live periods
+- **High-Frequency Phase**: 30-second polling during critical pre-start and live periods
 
 ### Expected Processing Results
 
@@ -182,9 +183,11 @@ else intervalType = '15s' // Live updates (post-start until Final)
 
 ### 3.1 Timeline Interval Mapping
 
+**Updated Bucketing Strategy**: Money flow data is now bucketed into 1-minute intervals for better data consistency. While polling continues every 30 seconds, the timeline buckets use 1-minute granularity.
+
 **Fixed Pre-Start Intervals**: 60m, 55m, 50m, 45m, 40m, 35m, 30m, 25m, 20m, 15m, 10m, 5m, 4m, 3m, 2m, 1m, 0
 
-**Dynamic Post-Start Intervals**: -0.5m (-30s), -1m, -1.5m (-1:30m), -2m, -2.5m, -3m...
+**Dynamic Post-Start Intervals**: -1m, -2m, -3m... (1-minute granularity, new buckets stop at Interim status)
 
 ```javascript
 function getTimelineInterval(timeToStartMinutes) {
@@ -194,9 +197,9 @@ function getTimelineInterval(timeToStartMinutes) {
   // ... continuing pattern
   if (timeToStartMinutes >= 0) return 0
 
-  // Post-start intervals
-  if (timeToStartMinutes >= -0.5) return -0.5
+  // Post-start intervals (1-minute granularity)
   if (timeToStartMinutes >= -1) return -1
+  if (timeToStartMinutes >= -2) return -2
   // ... continuing pattern
 }
 ```

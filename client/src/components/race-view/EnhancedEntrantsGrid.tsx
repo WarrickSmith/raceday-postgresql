@@ -568,7 +568,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     // Pre-scheduled timeline milestones (CORRECTED: positive = before start, negative = after start)
     // Backend uses: timeToStart: 60 = 60min before start, timeToStart: -2 = 2min after start
     const preScheduledMilestones = [
-      60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 4, 3, 2, 1, 0.5, 0,
+      60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 4, 3, 2, 1, 0,
     ]
 
     const columns: TimelineColumn[] = []
@@ -588,8 +588,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         let label: string
         if (interval === 0) {
           label = '0 (Start)'
-        } else if (interval === 0.5) {
-          label = '30s'
         } else {
           label = `${interval}m`
         }
@@ -617,11 +615,12 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       if (raceStatus === 'Open') {
         // FIXED: For open races, show delayed columns progressively based on actual elapsed time
         // Only show columns for time periods that have actually been reached
+        // NOTE: Stop creating new dynamic columns when race status becomes 'Interim' or 'Final'
         const postStartMinutes = actualPostStartMinutes
 
-        // Standard post-start progression: -30s, -1m, -1:30s, -2m, -2:30s, -3m, -4m, etc.
+        // Standard post-start progression: -1m, -2m, -3m, -4m, etc.
         const standardPostStartIntervals = [
-          -0.5, -1.0, -1.5, -2.0, -2.5, -3.0, -4.0, -5.0, -6.0, -7.0, -8.0,
+          -1.0, -2.0, -3.0, -4.0, -5.0, -6.0, -7.0, -8.0,
           -9.0, -10.0,
         ]
 
@@ -645,15 +644,15 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         }
 
         // Only log when intervals change to reduce verbosity
-        if (dynamicIntervals.length > 0 && postStartMinutes % 0.5 === 0) {
+        if (dynamicIntervals.length > 0 && postStartMinutes % 1 === 0) {
           logger.debug('Intervals updated:', {
             postStartMinutes,
             intervals: dynamicIntervals.length,
           })
         }
       } else {
-        // For closed/final/interim/abandoned races, show all columns based on existing data points
-        // Extract ALL intervals from timeline data (both pre and post-race)
+        // For closed/final/interim/abandoned races, show columns based on existing data points
+        // REQUIREMENT: Stop creating new dynamic columns after 'Interim' status
         const dataIntervals = new Set<number>()
         if (timelineData && timelineData.size > 0) {
           for (const [, entrantData] of timelineData) {
@@ -680,12 +679,16 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
             ...Array.from(dataIntervals).sort((a, b) => a - b)
           )
         } else {
-          // Fallback: Show standard post-race intervals for completed races even without data
-          // FIXED: Use standard progression that matches server-side
-          const standardPostRaceIntervals = [
-            -0.5, -1.0, -1.5, -2.0, -2.5, -3.0, -4.0, -5.0,
-          ]
-          dynamicIntervals.push(...standardPostRaceIntervals)
+          // REQUIREMENT: Only add fallback intervals for Final/Abandoned races, not Interim
+          // After Interim status, stop creating new dynamic columns
+          if (raceStatus === 'Final' || raceStatus === 'Finalized' || raceStatus === 'Abandoned') {
+            // Fallback: Show standard post-race intervals for completed races even without data
+            const standardPostRaceIntervals = [
+              -1.0, -2.0, -3.0, -4.0, -5.0,
+            ]
+            dynamicIntervals.push(...standardPostRaceIntervals)
+          }
+          // For 'Interim', 'Closed', 'Running' - only show existing data columns, no fallback
         }
       }
 
@@ -697,19 +700,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         )
         const absInterval = Math.abs(interval)
 
-        // REQUIREMENT: Show labels like "-30s, -1m, -1:30s, -2m" for delayed starts
-        let label: string
-        if (absInterval < 1) {
-          // 30-second intervals: -30s
-          label = `-${(absInterval * 60).toFixed(0)}s`
-        } else if (absInterval % 1 === 0.5) {
-          // Half-minute intervals: -1:30m (1.5m becomes 1:30)
-          const minutes = Math.floor(absInterval)
-          label = `-${minutes}:30m`
-        } else {
-          // Full minute intervals: -1m, -2m, -3m
-          label = `-${absInterval}m`
-        }
+        // REQUIREMENT: Show labels like "-1m, -2m, -3m" for delayed starts
+        // Full minute intervals: -1m, -2m, -3m
+        const label = `-${absInterval}m`
 
         columns.push({
           label,
@@ -741,10 +734,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           const sortedIntervals = timelineColumns
             .filter((col) => col.interval > 0) // Only pre-race intervals
             .map((col) => col.interval)
-            .sort((a, b) => b - a) // Descending: [60, 55, 50, ..., 1, 0.5]
+            .sort((a, b) => b - a) // Descending: [60, 55, 50, ..., 1, 0]
 
           // FIXED: Find the active column - largest interval that is <= current time
-          // Examples: 10.5min → 10m column, 9.9min → 5m column, 0.3min → 0.5m column
+          // Examples: 10.5min → 10m column, 9.9min → 5m column, 0.3min → 0 (Start) column
           let activeInterval = null
 
           // Handle edge case for times > 60 minutes first
@@ -759,9 +752,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
               }
             }
 
-            // If no interval found (time < 0.5), use the smallest interval (0.5)
+            // If no interval found (time < 1), use the smallest interval (0)
             if (!activeInterval && sortedIntervals.length > 0) {
-              activeInterval = sortedIntervals[sortedIntervals.length - 1] // 0.5
+              activeInterval = sortedIntervals[sortedIntervals.length - 1] // 0
             }
           }
 
@@ -771,9 +764,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           const timeAfterStartMinutes = Math.abs(timeToRaceMinutes)
 
           // FIXED: Find active post-start column - largest interval <= elapsed time
-          // Examples: 0.1min elapsed → 0 (Start), 0.6min elapsed → -30s, 1.2min elapsed → -1m
+          // Examples: 0.1min elapsed → 0 (Start), 1.2min elapsed → -1m
 
-          // Get all available post-start intervals sorted by absolute value ascending: [0.5, 1, 1.5, 2, ...]
+          // Get all available post-start intervals sorted by absolute value ascending: [1, 2, 3, ...]
           const postStartIntervals = timelineColumns
             .filter((col) => col.interval < 0)
             .map((col) => Math.abs(col.interval))

@@ -31,9 +31,9 @@ import { logDebug, logInfo, logWarn, logError, logFunctionStart, logFunctionComp
  *
  * Updated polling strategy:
  * - Master scheduler runs every 1 minute (CRON minimum)
- * - High-frequency polling (30s/15s) delegated to enhanced-race-poller internal loops
+ * - High-frequency polling (30s) delegated to enhanced-race-poller internal loops
  * - -5m to -3m: 30 second polling (managed by enhanced-race-poller)
- * - -3m to Final: 15 second polling (managed by enhanced-race-poller)
+ * - -3m to Final: 30 second polling (managed by enhanced-race-poller)
  * - After Interim status: 30 second polling until Final, then stop
  *
  * Architecture:
@@ -563,7 +563,7 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
         success: true,
         message: 'No races due for polling',
         analysis: analysisResults,
-        nextCheckIn: '15 seconds',
+        nextCheckIn: '30 seconds',
       }
     }
 
@@ -865,9 +865,9 @@ async function runEnhancedSchedulerLogic(context, databases, databaseId, lockMan
       },
       nextPollingPrediction: {
         expectedCriticalRaces: criticalRaces.length,
-        nextCriticalPolling: '15 seconds (managed by enhanced-race-poller)',
+        nextCriticalPolling: '30 seconds (managed by enhanced-race-poller)',
         nextProximityPolling:
-          '2.5 minutes (active period 5-60m before race, 15s for <3m)',
+          '2.5 minutes (active period 5-60m before race, 30s for <3m)',
         nextBaselinePolling:
           '30 minutes (early morning phase >65m before race)',
         dualPhaseStrategy:
@@ -926,9 +926,9 @@ function getPollingInterval(timeToStartMinutes, raceStatus) {
     }
     // PHASE 2: Enhanced Proximity Polling (≤65 minutes before race)
     else if (timeToStartMinutes <= 0) {
-      return 0.25 // 15 seconds - critical period (race start time passed) - delegated to enhanced-race-poller
+      return 0.5 // 30 seconds - critical period (race start time passed) - delegated to enhanced-race-poller
     } else if (timeToStartMinutes <= 3) {
-      return 0.25 // 15 seconds - critical approach period (3m to 0s) - delegated to enhanced-race-poller
+      return 0.5 // 30 seconds - critical approach period (3m to 0s) - delegated to enhanced-race-poller
     } else if (timeToStartMinutes <= 5) {
       return 0.5 // 30 seconds - pre-critical period (5m to 3m) - delegated to enhanced-race-poller
     } else if (timeToStartMinutes <= 60) {
@@ -941,9 +941,9 @@ function getPollingInterval(timeToStartMinutes, raceStatus) {
 
   // Post-open status polling (race has actually started transitioning)
   if (raceStatus === 'Closed') {
-    return 0.25 // 15 seconds - closed to running transition - delegated to enhanced-race-poller
+    return 0.5 // 30 seconds - closed to running transition - delegated to enhanced-race-poller
   } else if (raceStatus === 'Running') {
-    return 0.25 // 15 seconds - running to interim transition - delegated to enhanced-race-poller
+    return 0.5 // 30 seconds - running to interim transition - delegated to enhanced-race-poller
   } else if (raceStatus === 'Interim') {
     return 0.5 // 30 seconds - interim to final transition - delegated to enhanced-race-poller
   } else if (
@@ -957,7 +957,7 @@ function getPollingInterval(timeToStartMinutes, raceStatus) {
     if (timeToStartMinutes > 65) {
       return 30 // 30 minutes - early morning baseline phase
     } else if (timeToStartMinutes <= 3) {
-      return 0.25 // 15 seconds for critical period - delegated to enhanced-race-poller
+      return 0.5 // 30 seconds for critical period - delegated to enhanced-race-poller
     } else if (timeToStartMinutes <= 5) {
       return 0.5 // 30 seconds for pre-critical period - delegated to enhanced-race-poller
     } else if (timeToStartMinutes <= 60) {
