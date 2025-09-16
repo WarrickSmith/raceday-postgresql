@@ -722,8 +722,7 @@ export function useUnifiedRaceRealtime({
                   }))
                 } else {
                   debugLog(
-                    'No race-results document found yet after status change to',
-                    payload.status,
+                    `No race-results document found yet after status change to ${payload.status}`,
                     { retryCount, maxRetries: 3 }
                   )
 
