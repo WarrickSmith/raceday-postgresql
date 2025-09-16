@@ -4,6 +4,7 @@ import React, { memo } from 'react'
 import { RaceNavigationData } from '@/types/meetings'
 import { useRaceNavigation } from '@/hooks/useRaceNavigation'
 import { useRace } from '@/contexts/RaceContext'
+import { useLogger } from '@/utils/logging'
 
 interface RaceNavigationProps {
   navigationData: RaceNavigationData
@@ -14,11 +15,12 @@ export const RaceNavigation = memo(function RaceNavigation({
   navigationData,
   currentRaceId,
 }: RaceNavigationProps) {
+  const logger = useLogger('RaceNavigation');
   const { triggerSubscriptionCleanup } = useRace()
-  
+
   // Debug navigation data
-  console.log('🧭 RaceNavigation rendered', { 
-    currentRaceId, 
+  logger.debug('RaceNavigation rendered', {
+    currentRaceId,
     hasNavigationData: !!navigationData,
     navigationData: navigationData ? {
       hasPrevious: !!navigationData.previousRace,
@@ -44,7 +46,7 @@ export const RaceNavigation = memo(function RaceNavigation({
       triggerSubscriptionCleanup()
     },
     onError: (error) => {
-      console.error('Navigation error:', error)
+      logger.error('Navigation error:', error)
     },
   })
 
