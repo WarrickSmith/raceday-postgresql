@@ -18,78 +18,57 @@
 - [ ] User can configure and save alerts.
 - [ ] Saved alerts persist for user.
 
-## Story 5.2: Configure odds change alert
+## Story 5.2: Implement Visual Alert Calculation Engine
 
-**As a** user  
-**I want** to set a percentage increase/decrease threshold for Win odds over a specific time window  
-**So that** I get notified about market moves.
-
-#### Tasks
-
-- Add UI controls for odds threshold and time window.
-- Store alert config in backend.
-- Evaluate odds changes in backend.
-
-#### Acceptance Criteria
-
-- [ ] User can set odds change alert.
-- [ ] Alert triggers when condition is met.
-- [ ] Notification is delivered to user.
-
-## Story 5.3: Configure money flow alert
-
-**As a** user  
-**I want** to set a percentage increase threshold for Money Flow (hold_percentage)  
-**So that** I get notified about large bets.
+**As a** developer
+**I want** to create a calculation engine for visual alert indicators
+**So that** percentage changes in money amounts and odds can be accurately computed and displayed.
 
 #### Tasks
 
-- Add UI controls for money flow alert.
-- Store config in backend.
-- Evaluate money flow changes.
+- Create percentage change calculation logic for Money amounts:
+  - Calculate each entrant's contribution as percentage of total money added in that specific timeframe only
+  - Compare current timeframe percentage vs previous timeframe percentage
+  - Only show increases (current % > previous %), no decreases
+- Create percentage change calculation logic for Win Odds:
+  - Calculate percentage decrease (shortening) compared to previous timeframe for same entrant
+  - Only show when odds shorten (decrease), indicating increased confidence
+- Implement indicator threshold matching system (5-10% through 50%+)
+- Build foundation service that reads user alert configuration from database
 
 #### Acceptance Criteria
 
-- [ ] User can set money flow alert.
-- [ ] Alert triggers when condition is met.
-- [ ] Notification is delivered to user.
+- [ ] Money percentage calculations use timeframe-specific totals, not cumulative pool totals
+- [ ] Money indicators only show increases, never decreases
+- [ ] Odds calculations show shortening (decreases) only for Win Odds
+- [ ] Calculation engine integrates with existing alert configuration from Story 5.1
+- [ ] Threshold matching correctly maps percentage changes to configured indicator ranges
+- [ ] Unit tests cover both money and odds calculation scenarios
 
-## Story 5.4: Implement visual row flash alert
+## Story 5.3: Apply Visual Alerts to Enhanced Entrants Grid
 
-**As a** user  
-**I want** the corresponding row in the race grid to flash visually for 5 seconds when an alert triggers  
-**So that** I notice important changes.
+**As a** user
+**I want** to see visual background color indicators on cells in the Enhanced Entrants Grid
+**So that** I can quickly identify significant changes in money flow and odds movements.
 
 #### Tasks
 
-- Implement visual flash feedback in grid.
-- Trigger flash when alert is received.
+- Integrate alert calculation engine with Enhanced Entrants Grid component
+- Apply background color indicators to Win Money, Place Money, and Win Odds columns based on current view toggle
+- Handle real-time data updates to recalculate and reapply indicators
+- Ensure indicators only show for enabled thresholds from user configuration
+- Respect Win/Place/Odds selector button state for which logic to apply
 
 #### Acceptance Criteria
 
-- [ ] Row flashes when alert triggers.
-- [ ] Flash lasts 5 seconds.
-- [ ] No false positives.
+- [ ] Background colors appear on cells when percentage thresholds are exceeded
+- [ ] Colors match the configured indicator colors from user's alert configuration
+- [ ] Only enabled indicators from configuration are displayed
+- [ ] Visual indicators update in real-time as new race data arrives
+- [ ] Indicators correctly switch between money and odds logic based on view selector
+- [ ] No indicators shown for scratched horses
 
-## Story 5.5: Implement toast notifications for alerts
-
-**As a** user  
-**I want** a toast notification to appear on my screen with a summary when an alert triggers  
-**So that** I am immediately informed.
-
-#### Tasks
-
-- Design toast notification component.
-- Display toast on alert trigger.
-- Include summary details in notification.
-
-#### Acceptance Criteria
-
-- [ ] Toast appears for each alert.
-- [ ] Summary is accurate and complete.
-- [ ] Toast is dismissible.
-
-## Story 5.6: Implement global audible alert toggle
+## Story 5.4: Implement Global Audible Alert Toggle
 
 **As a** user  
 **I want** to enable/disable a global, audible alert that triggers one minute before the start of any race in my filtered view  

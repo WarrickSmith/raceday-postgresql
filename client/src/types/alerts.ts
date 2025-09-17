@@ -32,14 +32,14 @@ export interface AlertsConfig {
   toggleAll: boolean
 }
 
-// Default color constants matching the image specifications
+// Default color constants tuned to soft pastel tones for calmer visuals
 export const DEFAULT_INDICATOR_COLORS = {
-  '5-10': '#888888',   // Gray
-  '10-15': '#3B82F6',  // Blue
-  '15-20': '#FDE047',  // Yellow
-  '20-25': '#10B981',  // Green
-  '25-50': '#EF4444',  // Red
-  '50+': '#A855F7',    // Magenta
+  '5-10': '#E5E7EB',   // Soft Gray
+  '10-15': '#BFDBFE',  // Powder Blue
+  '15-20': '#FEF3C7',  // Pale Amber
+  '20-25': '#BBF7D0',  // Mint Green
+  '25-50': '#FECACA',  // Blush Red
+  '50+': '#F3E8FF',    // Lavender
 } as const
 
 // Default indicator configurations
@@ -110,26 +110,24 @@ export interface ColorOption {
 // Predefined color palette for indicators
 export const INDICATOR_COLOR_PALETTE: ColorOption[] = [
   // Default colors
-  { label: 'Gray', value: DEFAULT_INDICATOR_COLORS['5-10'], isDefault: true },
-  { label: 'Blue', value: DEFAULT_INDICATOR_COLORS['10-15'], isDefault: true },
-  { label: 'Yellow', value: DEFAULT_INDICATOR_COLORS['15-20'], isDefault: true },
-  { label: 'Green', value: DEFAULT_INDICATOR_COLORS['20-25'], isDefault: true },
-  { label: 'Red', value: DEFAULT_INDICATOR_COLORS['25-50'], isDefault: true },
-  { label: 'Magenta', value: DEFAULT_INDICATOR_COLORS['50+'], isDefault: true },
+  { label: 'Soft Gray', value: DEFAULT_INDICATOR_COLORS['5-10'], isDefault: true },
+  { label: 'Powder Blue', value: DEFAULT_INDICATOR_COLORS['10-15'], isDefault: true },
+  { label: 'Pale Amber', value: DEFAULT_INDICATOR_COLORS['15-20'], isDefault: true },
+  { label: 'Mint', value: DEFAULT_INDICATOR_COLORS['20-25'], isDefault: true },
+  { label: 'Blush', value: DEFAULT_INDICATOR_COLORS['25-50'], isDefault: true },
+  { label: 'Lavender', value: DEFAULT_INDICATOR_COLORS['50+'], isDefault: true },
 
-  // Additional color options
-  { label: 'Light Gray', value: '#D1D5DB', isDefault: false },
-  { label: 'Dark Gray', value: '#374151', isDefault: false },
-  { label: 'Light Blue', value: '#60A5FA', isDefault: false },
-  { label: 'Dark Blue', value: '#1E40AF', isDefault: false },
-  { label: 'Light Yellow', value: '#FEF08A', isDefault: false },
-  { label: 'Orange', value: '#F97316', isDefault: false },
-  { label: 'Light Green', value: '#34D399', isDefault: false },
-  { label: 'Dark Green', value: '#059669', isDefault: false },
-  { label: 'Pink', value: '#EC4899', isDefault: false },
-  { label: 'Purple', value: '#8B5CF6', isDefault: false },
-  { label: 'Indigo', value: '#6366F1', isDefault: false },
-  { label: 'Teal', value: '#14B8A6', isDefault: false },
+  // Additional pastel options
+  { label: 'Cloud', value: '#F1F5F9', isDefault: false },
+  { label: 'Sky', value: '#DBEAFE', isDefault: false },
+  { label: 'Sunrise', value: '#FEF9C3', isDefault: false },
+  { label: 'Seafoam', value: '#DCFCE7', isDefault: false },
+  { label: 'Peony', value: '#FDE2E4', isDefault: false },
+  { label: 'Lilac', value: '#EDE9FE', isDefault: false },
+  { label: 'Aqua', value: '#CCFBF1', isDefault: false },
+  { label: 'Periwinkle', value: '#E0E7FF', isDefault: false },
+  { label: 'Rosewater', value: '#FFE4E6', isDefault: false },
+  { label: 'Honeydew', value: '#F0FDF4', isDefault: false },
 ]
 
 // Helper functions

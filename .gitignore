@@ -57,3 +57,6 @@ next-env.d.ts
 
 # temp files
 /SAMPLE Race Data/*
+# BMAD (local only)
+.bmad-core/
+.bmad-*/

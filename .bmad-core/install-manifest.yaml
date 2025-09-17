@@ -1,10 +1,11 @@
 version: 4.43.1
-installed_at: '2025-09-14T23:54:42.905Z'
+installed_at: '2025-09-17T22:04:56.703Z'
 install_type: full
 agent: null
 ides_setup:
   - claude-code
   - roo
+  - codex
 expansion_packs: []
 files:
   - path: .bmad-core/working-in-the-brownfield.md
@@ -13,17 +14,11 @@ files:
   - path: .bmad-core/user-guide.md
     hash: fa8776b4e0bfa3f7
     modified: false
-  - path: .bmad-core/install-manifest.yaml.bak
-    hash: ee387068bac4afa6
-    modified: false
-  - path: .bmad-core/install-manifest.yaml
-    hash: ee387068bac4afa6
-    modified: false
   - path: .bmad-core/enhanced-ide-development-workflow.md
     hash: 39beb3516c070e2b
     modified: false
   - path: .bmad-core/core-config.yaml
-    hash: 94ce5b2faad48235
+    hash: 073cf6d2527c545d
     modified: false
   - path: .bmad-core/workflows/greenfield-ui.yaml
     hash: 2b595f235c095790
@@ -48,9 +43,6 @@ files:
     modified: false
   - path: .bmad-core/utils/bmad-doc-template.md
     hash: 34df6ead8b91abfc
-    modified: false
-  - path: .bmad-core/templates/story-tmpl.yaml.bak
-    hash: 12cc3f6bf24b408a
     modified: false
   - path: .bmad-core/templates/story-tmpl.yaml
     hash: 11e79b87ff700c8f
@@ -160,9 +152,6 @@ files:
   - path: .bmad-core/tasks/advanced-elicitation.md
     hash: d39118bf32237a21
     modified: false
-  - path: .bmad-core/docs/story-creation-guide.md
-    hash: bc2ab4acbffcfea2
-    modified: false
   - path: .bmad-core/data/test-priorities-matrix.md
     hash: 1dd5698a46ab054e
     modified: false
@@ -198,9 +187,6 @@ files:
     modified: false
   - path: .bmad-core/checklists/architect-checklist.md
     hash: 15ef7d01b0e31c3f
-    modified: false
-  - path: .bmad-core/bmad-core/user-guide.md
-    hash: e3b0c44298fc1c14
     modified: false
   - path: .bmad-core/agents/ux-expert.md
     hash: a99c4d3c839db162

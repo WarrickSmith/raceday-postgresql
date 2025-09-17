@@ -135,9 +135,9 @@ describe('AlertsConfigModal', () => {
     })
 
     const firstColorSelect = screen.getAllByRole('combobox')[0]
-    fireEvent.change(firstColorSelect, { target: { value: '#EF4444' } })
+    fireEvent.change(firstColorSelect, { target: { value: '#FECACA' } })
 
-    expect((firstColorSelect as HTMLSelectElement).value).toBe('#EF4444')
+    expect((firstColorSelect as HTMLSelectElement).value).toBe('#FECACA')
   })
 
   it('enables save button when changes are made', async () => {
