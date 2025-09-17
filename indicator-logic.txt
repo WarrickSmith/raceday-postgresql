@@ -1,0 +1,62 @@
+The colours in the data grid are visual indicators that relate to relative changes in the values shown for a race Entrant (runner) within a particular timeframe when compared to the previous timeframe and all the other entrants (runners) in the current and previous timeframe. Our application shows similar values for a single TAB (NZTAB) for Win, Place and Odds values that is toggled on the Enhanced Entrants component.
+
+How the color system works:
+The Indicators panel defines six percentage ranges, each with a corresponding color:
+
+5-10% → Gray
+10-15% → Blue
+15-20% → Yellow
+20-25% → Green
+25-50% → Red
+50%+ → Magenta
+
+
+What the indicators are showing in the data grid:
+These indicators are highlighting betting odds movements/price changes and changes in the amounts of Win or Place money bet on an Entrant (runner), between one time range and the next (current) time range relative to the other entrants.
+
+In the sample application screenshot, you can see various cells with coloured backgrounds that correspond to these percentage ranges. For example:
+
+Cells with blue backgrounds indicate values that have changed by 10-15%
+Cells with green backgrounds show 20-25% changes
+Cells with red backgrounds indicate 25-50% changes
+Cells with purple backgrounds represent changes of 50% or more
+
+The "Toggle All" checkbox at the top allows users to quickly enable/disable all indicator ranges at once. This color-coding system helps traders quickly identify significant price movements or value changes in the betting markets, making it easier to spot opportunities or risks at a glance. The higher the percentage change, the more dramatic the colour (progressing from gray through to purple for the most significant movements).
+
+
+How the change logic should work for Money amounts and Odds (price changes).
+
+For both Money amounts and Odds we are looking for relative changes between Entrants (runners) when compared to each other over time. For example...
+
+Money Amounts:
+
+			T1	T2	T3		Indicators
+Entrant1		+100	+100	+100		None
+Entrant2		+80	+80	+80		None
+Entrant3		+60	+60	+60		None
+Entrant4		+40	+100	+40		Blue at T2
+
+Timeframe Total		280	340	280
+Pool Total		280	620	900
+
+Analysis: Only one entrant here will show an alert over the three time periods (T1-T3). The alert will be 'Blue' for Entrant 4 in the T2 column. This is determined as follows. In T1, entrant 4 has 40 added to the money bet on it. 40 as a percentage of the pool total of 280 at that time is 14%. In T2, Entrant 4 has 100 added to the money bet on it. 100 as a percentage of all the money added at that timeframe is 29%. Comparing the % amount bet on Entrant 4 relative to the other entrants in the current time compared to the % amount bet on Entrant 4 relative to the other entrants in the previous time is (29% - 14%) =  15%. So this would be a 'Blue' indicator of the relative change in the amount bet on Entrant 4 compared to the previous time. In T3, Entrant 4 is back to 14% of the total moneys bet for that timeframe for all entrants - We do not indicate % decreases, only increases in money relative to other entrants.
+
+
+Odds Movements / Price Changes:
+
+			T1	T2	T3		Indicators
+Entrant1		2.00	2.00	2.00		None
+Entrant2		6.00	6.00	6.00		None
+Entrant3		12.00	7.00	12.00		Red at T2
+Entrant4		20.00	20.00	20.00		None
+
+
+Analysis: Only one entrant here will show an alert over the three time periods (T1-T3). The alert will be 'Red' for Entrant 3 in the T2 column. This is determined as follows. In T1, entrant 3 has odds of 12.00. In T2 Entrant 3 has odds of 7.00. This is a 42% decrease in the odds (12-7)/12 as a percentage. For odds, we are only interested when the odds (price) reduces (shortens) as this indicates significant money has been bet on the Entrant and the confidence in there winning or placeing is improving. In our application, we are only interested in the Win Odds, not the place odds. The odds already reflect chances of winning compared to other runners, so the indicator is easier to calculate by just comparing the current timefraeme odds for an Entrant (runner) against the previous timeframe odds for the same Entrant (runner).
+
+The logic to be applied to values in the entrants grid is dependant on the Win/Place/Odds selector button in the grid title. The logic should be applied to values in the grid when the selector changes and as new real-time updates are received to values in the grid.
+
+
+
+
+
+
