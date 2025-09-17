@@ -16,6 +16,8 @@ import { useRace } from '@/contexts/RaceContext'
 import { screenReader, AriaLabels } from '@/utils/accessibility'
 import { useRenderTracking, useMemoryOptimization } from '@/utils/performance'
 import { useValueFlash } from '@/hooks/useValueFlash'
+import { useGridIndicators } from '@/hooks/useGridIndicators'
+import mapIndicatorColorToCellStyle from '@/utils/indicatorColors'
 import { JockeySilks } from './JockeySilks'
 import { useLogger } from '@/utils/logging'
 
@@ -720,6 +722,18 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     return columns.sort((a, b) => b.interval - a.interval)
   }, [currentRaceStartTime, currentTime, currentRace?.status, timelineData])
 
+  const timelineIntervals = useMemo(
+    () => timelineColumns.map((column) => column.interval),
+    [timelineColumns]
+  )
+
+  const { getIndicatorForCell } = useGridIndicators({
+    timelineData,
+    entrants: sortedEntrants,
+    intervals: timelineIntervals,
+    selectedView,
+  })
+
   // Determine if column should be highlighted (current time) - FIXED to highlight only ONE column
   const isCurrentTimeColumn = useCallback(
     (interval: number): boolean => {
@@ -1349,30 +1363,59 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     <PlaceOddsCell entrant={entrant} formatOdds={formatOdds} />
 
                     {/* Timeline Columns */}
-                    {timelineColumns.map((column) => (
-                      <td
-                        key={`${entrant.$id}_${column.interval}`}
-                        className={`px-2 py-1 text-xs text-center border-r border-gray-100 ${
-                          entrant.isScratched
-                            ? 'bg-pink-50'
-                            : column.isScheduledStart
-                            ? 'border-blue-200 bg-blue-100'
-                            : column.isDynamic
-                            ? 'bg-yellow-50'
-                            : ''
-                        } ${
-                          !entrant.isScratched &&
-                          isCurrentTimeColumn(column.interval)
-                            ? 'bg-green-50 border-green-200 font-medium'
-                            : ''
-                        }`}
-                        style={{ verticalAlign: 'middle', height: '30px' }}
-                      >
-                        <div className="text-gray-900 flex items-center justify-center h-full">
-                          {getTimelineData(entrant.$id, column.interval)}
-                        </div>
-                      </td>
-                    ))}
+                    {timelineColumns.map((column) => {
+                      const indicator = !entrant.isScratched
+                        ? getIndicatorForCell(column.interval, entrant.$id)
+                        : null
+                      const indicatorStyle = indicator
+                        ? mapIndicatorColorToCellStyle(indicator.color)
+                        : null
+                      const indicatorTitle = indicator
+                        ? `${indicator.indicatorType} (${indicator.percentageChange.toFixed(
+                            1
+                          )}%)`
+                        : undefined
+                      const indicatorChange = indicator
+                        ? indicator.percentageChange.toFixed(2)
+                        : undefined
+                      const cellValue = getTimelineData(
+                        entrant.$id,
+                        column.interval
+                      )
+
+                      return (
+                        <td
+                          key={`${entrant.$id}_${column.interval}`}
+                          className={`px-2 py-1 text-xs text-center border-r border-gray-100 ${
+                            entrant.isScratched
+                              ? 'bg-pink-50'
+                              : column.isScheduledStart
+                              ? 'border-blue-200 bg-blue-100'
+                              : column.isDynamic
+                              ? 'bg-yellow-50'
+                              : ''
+                          } ${
+                            !entrant.isScratched &&
+                            isCurrentTimeColumn(column.interval)
+                              ? 'bg-green-50 border-green-200 font-medium'
+                              : ''
+                          }`}
+                          style={{ verticalAlign: 'middle', height: '30px' }}
+                        >
+                          <div
+                            className={`flex items-center justify-center h-full w-full text-xs font-medium ${
+                              indicatorStyle ? '' : 'text-gray-900'
+                            } ${indicatorStyle?.className ?? ''}`.trim()}
+                            style={indicatorStyle?.style}
+                            data-indicator={indicator ? indicator.indicatorType : undefined}
+                            data-indicator-change={indicatorChange}
+                            title={indicatorTitle}
+                          >
+                            {cellValue}
+                          </div>
+                        </td>
+                      )
+                    })}
 
                     {/* Right Fixed Columns */}
                     <td
