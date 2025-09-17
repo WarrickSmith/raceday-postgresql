@@ -366,7 +366,7 @@ describe('AlertCalculationService', () => {
     it('validates data point structure', () => {
       const invalidInput = {
         entrantId: '1',
-        currentTimeframe: [{ entrant: '', incrementalAmount: 'invalid' } as any],
+        currentTimeframe: [{ entrant: '', incrementalAmount: 'invalid' as unknown as number } as MoneyFlowDataPoint],
         previousTimeframe: [{ entrant: '1', incrementalAmount: 50 } as MoneyFlowDataPoint],
       }
 
