@@ -4,14 +4,13 @@ import type { IndicatorConfig } from '@/types/alerts'
 import type { EntrantMoneyFlowTimeline } from '@/types/moneyFlow'
 import { DEFAULT_INDICATORS } from '@/types/alerts'
 
-type PartialEntrant = Pick<
-  Entrant,
-  '$id' | '$createdAt' | '$updatedAt' | 'entrantId' | 'name' | 'runnerNumber' | 'isScratched'
->
+type PartialEntrant =
+  Pick<Entrant, '$id' | 'entrantId' | 'name' | 'runnerNumber' | 'isScratched'> &
+  Partial<Pick<Entrant, '$createdAt' | '$updatedAt'>>
 
 const buildEntrant = (overrides: PartialEntrant): Entrant => ({
-  $createdAt: '2024-01-01T00:00:00.000Z',
-  $updatedAt: '2024-01-01T00:00:00.000Z',
+  $createdAt: overrides.$createdAt ?? '2024-01-01T00:00:00.000Z',
+  $updatedAt: overrides.$updatedAt ?? '2024-01-01T00:00:00.000Z',
   jockey: undefined,
   trainerName: undefined,
   weight: undefined,

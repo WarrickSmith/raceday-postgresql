@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Entrant } from '@/types/meetings'
 import type { IndicatorConfig } from '@/types/alerts'
-import type { EntrantMoneyFlowTimeline } from '@/types/moneyFlow'
+import type { EntrantMoneyFlowTimeline, MoneyFlowDataPoint } from '@/types/moneyFlow'
 import type { IndicatorResult } from '@/types/alertCalculations'
 import {
   calculateMoneyChangePercentage,
@@ -64,10 +64,30 @@ const buildMoneyFrame = (
       return dataPoint.incrementalWinAmount ?? dataPoint.incrementalAmount ?? 0
     })()
 
-    return {
+    const basePoint: MoneyFlowDataPoint = {
+      $id: `${entrant.$id}-${interval}-${view}`,
+      $createdAt: dataPoint?.$createdAt ?? '1970-01-01T00:00:00.000Z',
+      $updatedAt: dataPoint?.$updatedAt ?? '1970-01-01T00:00:00.000Z',
       entrant: entrant.$id,
+      pollingTimestamp: dataPoint?.pollingTimestamp ?? '1970-01-01T00:00:00.000Z',
+      timeToStart: interval,
+      timeInterval: interval,
+      winPoolAmount: dataPoint?.winPoolAmount ?? 0,
+      placePoolAmount: dataPoint?.placePoolAmount ?? 0,
+      totalPoolAmount: dataPoint?.totalPoolAmount ?? 0,
+      poolPercentage: dataPoint?.poolPercentage ?? 0,
       incrementalAmount: Math.max(0, rawAmount || 0),
     }
+
+    if (view === 'place') {
+      basePoint.incrementalPlaceAmount = basePoint.incrementalAmount
+      basePoint.incrementalWinAmount = dataPoint?.incrementalWinAmount ?? 0
+    } else {
+      basePoint.incrementalWinAmount = basePoint.incrementalAmount
+      basePoint.incrementalPlaceAmount = dataPoint?.incrementalPlaceAmount ?? 0
+    }
+
+    return basePoint
   })
 
 const computeMoneyIndicators = (
