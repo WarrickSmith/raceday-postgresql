@@ -1,15 +1,19 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRace } from '@/contexts/RaceContext'
 import { RaceDataHeader } from '@/components/race-view/RaceDataHeader'
 import { EnhancedEntrantsGrid } from '@/components/race-view/EnhancedEntrantsGrid'
 import { RaceFooter } from '@/components/race-view/RaceFooter'
 import { useUnifiedRaceRealtime } from '@/hooks/useUnifiedRaceRealtime'
+import AlertsConfigModal from '@/components/alerts/AlertsConfigModal'
 import type { RaceStatus } from '@/types/racePools'
 
 export function RacePageContent() {
   const { raceData, isLoading, error, subscriptionCleanupSignal } = useRace()
+
+  // Alerts Configuration Modal state (moved from EnhancedEntrantsGrid for performance)
+  const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false)
 
   // Unified real-time subscription for all race page data
   const realtimeData = useUnifiedRaceRealtime({
@@ -167,6 +171,7 @@ export function RacePageContent() {
           navigationData={realtimeData.navigationData}
           connectionHealth={realtimeData.getConnectionHealth()}
           lastUpdate={realtimeData.lastRaceUpdate}
+          onConfigureAlerts={() => setIsAlertsModalOpen(true)}
         />
       </header>
 
@@ -350,6 +355,12 @@ export function RacePageContent() {
           }
         }
       `}</style>
+
+      {/* Alerts Configuration Modal - Rendered at page level for performance */}
+      <AlertsConfigModal
+        isOpen={isAlertsModalOpen}
+        onClose={() => setIsAlertsModalOpen(false)}
+      />
     </div>
   )
 }

@@ -179,6 +179,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const [updateNotifications, setUpdateNotifications] = useState(true)
   const [selectedEntrant, setSelectedEntrant] = useState<string | undefined>()
 
+
   // Trigger timeline refetch when unified subscription receives money flow updates
   useEffect(() => {
     if (moneyFlowUpdateTrigger && refetchTimeline) {
@@ -1114,8 +1115,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
             </span>
           </div>
 
-          {/* RIGHT: Audio Toggle and Auto Scroll */}
+          {/* RIGHT: Indicators, Audio Toggle and Auto Scroll */}
           <div className="flex items-center space-x-2">
+
             <button
               onClick={() => setUpdateNotifications(!updateNotifications)}
               className={`text-xs px-2 py-1 rounded transition-colors ${
@@ -1492,6 +1494,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         Showing {sortedEntrants.length} runners. Last update:{' '}
         {lastUpdate ? lastUpdate.toLocaleTimeString() : 'No updates yet'}.
       </div>
+
     </div>
   )
 })
