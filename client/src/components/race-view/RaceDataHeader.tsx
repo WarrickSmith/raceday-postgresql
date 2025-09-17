@@ -24,6 +24,7 @@ interface RaceDataHeaderProps {
     uptime: number
   }
   lastUpdate?: Date | null
+  onConfigureAlerts?: () => void
 }
 
 export const RaceDataHeader = memo(function RaceDataHeader({
@@ -34,6 +35,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
   navigationData: propNavigationData,
   connectionHealth,
   lastUpdate,
+  onConfigureAlerts,
 }: RaceDataHeaderProps) {
   const { raceData } = useRace()
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -202,21 +204,35 @@ export const RaceDataHeader = memo(function RaceDataHeader({
           </div>
         </div>
 
-        {/* Row 2, Col 4: Status with Real-time Health */}
-        <div className="flex items-center justify-start gap-2">
-          <div className="text-xs text-gray-500 font-bold uppercase">
-            STATUS
+        {/* Row 2, Col 4: Status with Real-time Health and Alerts Config */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="text-xs text-gray-500 font-bold uppercase">
+              STATUS
+            </div>
+            <div className="flex items-center gap-1">
+              <div
+                className={`w-2 h-2 rounded-full bg-${healthStatus.color}-500`}
+              ></div>
+              <span
+                className={`text-sm font-semibold text-${healthStatus.color}-800`}
+              >
+                {healthStatus.status}
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <div
-              className={`w-2 h-2 rounded-full bg-${healthStatus.color}-500`}
-            ></div>
-            <span
-              className={`text-sm font-semibold text-${healthStatus.color}-800`}
+
+          {/* Alerts Configuration Button */}
+          {onConfigureAlerts && (
+            <button
+              onClick={onConfigureAlerts}
+              className="text-xs px-2 py-1 rounded transition-colors bg-gray-200 text-gray-600 hover:bg-gray-300 hover:text-gray-700"
+              title="Configure indicators"
+              aria-label="Open indicators configuration"
             >
-              {healthStatus.status}
-            </span>
-          </div>
+              ⚙️
+            </button>
+          )}
         </div>
 
         {/* Row 3, Col 1: Meeting info */}

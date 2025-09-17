@@ -1411,22 +1411,40 @@ async function ensureUserAlertConfigsCollection(databases, config, context, prog
             Permission.delete(Role.users()),
         ]);
     }
+
+    // Story 5.1: Indicator configuration schema - clean implementation
     const requiredAttributes = [
+        // Core identification
         { key: 'userId', type: 'string', size: 50, required: true },
-        { key: 'alertType', type: 'string', size: 50, required: true },
-        { key: 'threshold', type: 'float', required: true },
-        { key: 'timeWindowSeconds', type: 'integer', required: false },
-        { key: 'enabled', type: 'boolean', required: true },
+        { key: 'indicatorType', type: 'string', size: 50, required: true }, // "percentage_range" for our indicators
+
+        // Percentage range definition (5-10%, 10-15%, 15-20%, 20-25%, 25-50%, 50%+)
+        { key: 'percentageRangeMin', type: 'float', required: true }, // 5, 10, 15, 20, 25, 50
+        { key: 'percentageRangeMax', type: 'float', required: false }, // 10, 15, 20, 25, 50, null (for 50%+)
+
+        // Visual configuration
+        { key: 'color', type: 'string', size: 20, required: true }, // Hex color code (#888888, #3B82F6, etc.)
+        { key: 'isDefault', type: 'boolean', required: false, default: true }, // Flag for default color configurations
+
+        // UI behavior
+        { key: 'enabled', type: 'boolean', required: true }, // Enable/disable indicator
+        { key: 'displayOrder', type: 'integer', required: true }, // Order for UI display (1-6)
+
+        // Metadata
+        { key: 'lastUpdated', type: 'datetime', required: false },
+        { key: 'createdAt', type: 'datetime', required: false },
     ];
+
     // Create attributes with enhanced parallel processing and error isolation
     const attributeResults = await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context, rollbackManager);
 
     logAttributeResults(attributeResults, collectionId, context);
-    if (!(await attributeExists(databases, config.databaseId, collectionId, 'entrant'))) {
-        logDebug(context, 'Creating user alert configs->entrants relationship...');
-        await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.entrants, RelationshipType.ManyToOne, false, 'entrant', 'alertConfigs');
-    }
+
+    // Note: Removed entrant relationship as indicators are global user settings, not per-entrant
+
     const alertConfigsCollection = await databases.getCollection(config.databaseId, collectionId);
+
+    // Create indexes for efficient querying
     if (!alertConfigsCollection.indexes.some((idx) => idx.key === 'idx_user_id')) {
         const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'userId', context);
         if (isAvailable) {
@@ -1442,19 +1460,36 @@ async function ensureUserAlertConfigsCollection(databases, config, context, prog
             logDebug(context, 'userId attribute is not available for index creation, skipping idx_user_id index');
         }
     }
-    if (!alertConfigsCollection.indexes.some((idx) => idx.key === 'idx_alert_type')) {
-        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'alertType', context);
+
+    if (!alertConfigsCollection.indexes.some((idx) => idx.key === 'idx_indicator_type')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'indicatorType', context);
         if (isAvailable) {
             try {
-                await databases.createIndex(config.databaseId, collectionId, 'idx_alert_type', IndexType.Key, ['alertType']);
-                logDebug(context, 'idx_alert_type index created successfully for user alert configs');
+                await databases.createIndex(config.databaseId, collectionId, 'idx_indicator_type', IndexType.Key, ['indicatorType']);
+                logDebug(context, 'idx_indicator_type index created successfully for user alert configs');
             }
             catch (error) {
-                context.error(`Failed to create idx_alert_type index for user alert configs: ${error}`);
+                context.error(`Failed to create idx_indicator_type index for user alert configs: ${error}`);
             }
         }
         else {
-            logDebug(context, 'alertType attribute is not available for index creation, skipping idx_alert_type index');
+            logDebug(context, 'indicatorType attribute is not available for index creation, skipping idx_indicator_type index');
+        }
+    }
+
+    if (!alertConfigsCollection.indexes.some((idx) => idx.key === 'idx_display_order')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'displayOrder', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_display_order', IndexType.Key, ['displayOrder']);
+                logDebug(context, 'idx_display_order index created successfully for user alert configs');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_display_order index for user alert configs: ${error}`);
+            }
+        }
+        else {
+            logDebug(context, 'displayOrder attribute is not available for index creation, skipping idx_display_order index');
         }
     }
 }

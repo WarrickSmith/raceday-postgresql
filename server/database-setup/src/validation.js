@@ -61,9 +61,9 @@ export const EXPECTED_COLLECTIONS = {
     },
     'user-alert-configs': {
         name: 'UserAlertConfigs',
-        requiredAttributes: ['userId', 'alertType', 'threshold', 'enabled'],
-        requiredIndexes: ['idx_user_id', 'idx_alert_type'],
-        relationships: ['entrant']
+        requiredAttributes: ['userId', 'indicatorType', 'percentageRangeMin', 'color', 'enabled', 'displayOrder'],
+        requiredIndexes: ['idx_user_id', 'idx_indicator_type', 'idx_display_order'],
+        relationships: []
     },
     'notifications': {
         name: 'Notifications',

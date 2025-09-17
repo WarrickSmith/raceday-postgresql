@@ -1,0 +1,334 @@
+/**
+ * AlertConfigService Tests
+ * Story 5.1: Create Alerts Configuration UI
+ *
+ * Tests for the alert configuration service API integration
+ */
+
+import {
+  loadUserAlertConfig,
+  saveUserAlertConfig,
+  resetToDefaults,
+  validateAlertConfig,
+} from '../alertConfigService'
+import { DEFAULT_INDICATORS, DEFAULT_USER_ID } from '@/types/alerts'
+
+// Mock fetch
+global.fetch = jest.fn()
+
+const mockFetch = fetch as jest.MockedFunction<typeof fetch>
+
+describe('AlertConfigService', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  describe('loadUserAlertConfig', () => {
+    it('loads user configuration successfully', async () => {
+      const mockConfig = {
+        userId: 'test-user',
+        indicators: DEFAULT_INDICATORS.map((ind, index) => ({
+          ...ind,
+          $id: `indicator-${index}`,
+          userId: 'test-user',
+          lastUpdated: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        })),
+        toggleAll: true,
+      }
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockConfig,
+      } as Response)
+
+      const result = await loadUserAlertConfig('test-user')
+
+      expect(mockFetch).toHaveBeenCalledWith('/api/user-alert-configs?userId=test-user')
+      expect(result).toEqual(mockConfig)
+    })
+
+    it('uses default user ID when none provided', async () => {
+      const mockConfig = {
+        userId: DEFAULT_USER_ID,
+        indicators: [],
+        toggleAll: true,
+      }
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockConfig,
+      } as Response)
+
+      await loadUserAlertConfig()
+
+      expect(mockFetch).toHaveBeenCalledWith(`/api/user-alert-configs?userId=${encodeURIComponent(DEFAULT_USER_ID)}`)
+    })
+
+    it('returns defaults on API error', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        statusText: 'Internal Server Error',
+      } as Response)
+
+      const result = await loadUserAlertConfig('test-user')
+
+      expect(result.userId).toBe('test-user')
+      expect(result.indicators).toHaveLength(6)
+      expect(result.toggleAll).toBe(true)
+    })
+
+    it('returns defaults on network error', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Network error'))
+
+      const result = await loadUserAlertConfig('test-user')
+
+      expect(result.userId).toBe('test-user')
+      expect(result.indicators).toHaveLength(6)
+      expect(result.toggleAll).toBe(true)
+    })
+  })
+
+  describe('saveUserAlertConfig', () => {
+    it('saves configuration successfully', async () => {
+      const config = {
+        userId: 'test-user',
+        indicators: DEFAULT_INDICATORS.map((ind, index) => ({
+          ...ind,
+          $id: `indicator-${index}`,
+          userId: 'test-user',
+          lastUpdated: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        })),
+        toggleAll: true,
+      }
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
+      } as Response)
+
+      await saveUserAlertConfig(config)
+
+      expect(mockFetch).toHaveBeenCalledWith('/api/user-alert-configs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: config.userId,
+          indicators: config.indicators,
+        }),
+      })
+    })
+
+    it('throws error on API failure', async () => {
+      const config = {
+        userId: 'test-user',
+        indicators: [],
+        toggleAll: true,
+      }
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        statusText: 'Bad Request',
+      } as Response)
+
+      await expect(saveUserAlertConfig(config)).rejects.toThrow(
+        'Failed to save alert configuration. Please try again.'
+      )
+    })
+
+    it('throws error on network failure', async () => {
+      const config = {
+        userId: 'test-user',
+        indicators: [],
+        toggleAll: true,
+      }
+
+      mockFetch.mockRejectedValueOnce(new Error('Network error'))
+
+      await expect(saveUserAlertConfig(config)).rejects.toThrow(
+        'Failed to save alert configuration. Please try again.'
+      )
+    })
+  })
+
+  describe('resetToDefaults', () => {
+    it('resets configuration successfully', async () => {
+      const mockResetConfig = {
+        userId: 'test-user',
+        indicators: DEFAULT_INDICATORS.map((ind, index) => ({
+          ...ind,
+          $id: `indicator-${index}`,
+          userId: 'test-user',
+          enabled: true,
+          isDefault: true,
+          lastUpdated: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        })),
+        toggleAll: true,
+      }
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResetConfig,
+      } as Response)
+
+      const result = await resetToDefaults('test-user')
+
+      expect(mockFetch).toHaveBeenCalledWith('/api/user-alert-configs/reset', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: 'test-user' }),
+      })
+
+      expect(result).toEqual(mockResetConfig)
+    })
+
+    it('uses default user ID when none provided', async () => {
+      const mockResetConfig = {
+        userId: DEFAULT_USER_ID,
+        indicators: [],
+        toggleAll: true,
+      }
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResetConfig,
+      } as Response)
+
+      await resetToDefaults()
+
+      expect(mockFetch).toHaveBeenCalledWith('/api/user-alert-configs/reset', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: DEFAULT_USER_ID }),
+      })
+    })
+
+    it('throws error on API failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        statusText: 'Internal Server Error',
+      } as Response)
+
+      await expect(resetToDefaults('test-user')).rejects.toThrow(
+        'Failed to reset to default configuration. Please try again.'
+      )
+    })
+  })
+
+  describe('validateAlertConfig', () => {
+    it('validates correct configuration', () => {
+      const validConfig = {
+        userId: 'test-user',
+        indicators: DEFAULT_INDICATORS.map((ind, index) => ({
+          ...ind,
+          $id: `indicator-${index}`,
+          userId: 'test-user',
+          lastUpdated: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        })),
+        toggleAll: true,
+      }
+
+      const errors = validateAlertConfig(validConfig)
+      expect(errors).toEqual([])
+    })
+
+    it('validates missing user ID', () => {
+      const invalidConfig = {
+        userId: '',
+        indicators: DEFAULT_INDICATORS.map((ind, index) => ({
+          ...ind,
+          $id: `indicator-${index}`,
+          userId: '',
+          lastUpdated: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        })),
+        toggleAll: true,
+      }
+
+      const errors = validateAlertConfig(invalidConfig)
+      expect(errors).toContain('User ID is required')
+    })
+
+    it('validates incorrect number of indicators', () => {
+      const invalidConfig = {
+        userId: 'test-user',
+        indicators: DEFAULT_INDICATORS.slice(0, 3).map((ind, index) => ({
+          ...ind,
+          $id: `indicator-${index}`,
+          userId: 'test-user',
+          lastUpdated: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        })),
+        toggleAll: true,
+      }
+
+      const errors = validateAlertConfig(invalidConfig)
+      expect(errors).toContain('Exactly 6 indicators are required')
+    })
+
+    it('validates indicator display order', () => {
+      const invalidConfig = {
+        userId: 'test-user',
+        indicators: DEFAULT_INDICATORS.map((ind, index) => ({
+          ...ind,
+          $id: `indicator-${index}`,
+          userId: 'test-user',
+          displayOrder: index + 2, // Wrong display order
+          lastUpdated: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        })),
+        toggleAll: true,
+      }
+
+      const errors = validateAlertConfig(invalidConfig)
+      expect(errors.length).toBeGreaterThan(0)
+      expect(errors.some(error => error.includes('incorrect display order'))).toBe(true)
+    })
+
+    it('validates mismatched user ID in indicators', () => {
+      const invalidConfig = {
+        userId: 'test-user',
+        indicators: DEFAULT_INDICATORS.map((ind, index) => ({
+          ...ind,
+          $id: `indicator-${index}`,
+          userId: 'different-user', // Mismatched user ID
+          lastUpdated: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        })),
+        toggleAll: true,
+      }
+
+      const errors = validateAlertConfig(invalidConfig)
+      expect(errors.length).toBeGreaterThan(0)
+      expect(errors.some(error => error.includes('mismatched user ID'))).toBe(true)
+    })
+
+    it('validates invalid color format', () => {
+      const invalidConfig = {
+        userId: 'test-user',
+        indicators: DEFAULT_INDICATORS.map((ind, index) => ({
+          ...ind,
+          $id: `indicator-${index}`,
+          userId: 'test-user',
+          color: 'invalid-color', // Invalid color
+          lastUpdated: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        })),
+        toggleAll: true,
+      }
+
+      const errors = validateAlertConfig(invalidConfig)
+      expect(errors.length).toBeGreaterThan(0)
+      expect(errors.some(error => error.includes('invalid color format'))).toBe(true)
+    })
+  })
+})
