@@ -85,10 +85,10 @@ export interface ValidationResult {
 
 // Standard threshold ranges matching the 6-tier system
 export const STANDARD_THRESHOLD_RANGES: ThresholdRange[] = [
-  { min: 5, max: 10, label: '5-10%', defaultColor: '#888888' },
-  { min: 10, max: 15, label: '10-15%', defaultColor: '#3B82F6' },
-  { min: 15, max: 20, label: '15-20%', defaultColor: '#FDE047' },
-  { min: 20, max: 25, label: '20-25%', defaultColor: '#10B981' },
-  { min: 25, max: 50, label: '25-50%', defaultColor: '#EF4444' },
-  { min: 50, max: null, label: '50%+', defaultColor: '#A855F7' },
+  { min: 5, max: 10, label: '5-10%', defaultColor: '#E5E7EB' },
+  { min: 10, max: 15, label: '10-15%', defaultColor: '#BFDBFE' },
+  { min: 15, max: 20, label: '15-20%', defaultColor: '#FEF3C7' },
+  { min: 20, max: 25, label: '20-25%', defaultColor: '#BBF7D0' },
+  { min: 25, max: 50, label: '25-50%', defaultColor: '#FECACA' },
+  { min: 50, max: null, label: '50%+', defaultColor: '#F3E8FF' },
 ]

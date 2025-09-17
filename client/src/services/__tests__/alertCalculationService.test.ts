@@ -209,7 +209,7 @@ describe('AlertCalculationService', () => {
 
       expect(result).toBeDefined()
       expect(result!.indicatorType).toBe('15-20%')
-      expect(result!.color).toBe('#FDE047') // Yellow
+      expect(result!.color).toBe('#FEF3C7') // Pale Amber
       expect(result!.changeType).toBe('money_increase')
     })
 
@@ -218,7 +218,7 @@ describe('AlertCalculationService', () => {
 
       expect(result).toBeDefined()
       expect(result!.indicatorType).toBe('50%+')
-      expect(result!.color).toBe('#A855F7') // Magenta
+      expect(result!.color).toBe('#F3E8FF') // Lavender
       expect(result!.changeType).toBe('odds_shortening')
     })
 
@@ -477,7 +477,7 @@ describe('AlertCalculationService', () => {
         'odds_shortening'
       )
       expect(indicator!.indicatorType).toBe('25-50%')
-      expect(indicator!.color).toBe('#EF4444') // Red
+      expect(indicator!.color).toBe('#FECACA') // Blush
 
       // T2->T3: Odds back to 12.00 (lengthening, ignored)
       const t2ToT3 = calculateOddsChangePercentage({
