@@ -6,7 +6,6 @@
  */
 
 import type {
-  IndicatorConfig,
   AlertsConfig,
 } from '@/types/alerts'
 import { DEFAULT_INDICATORS as DEFAULT_INDICATOR_CONFIGS, DEFAULT_USER_ID } from '@/types/alerts'
