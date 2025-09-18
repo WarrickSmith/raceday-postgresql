@@ -177,33 +177,54 @@ export function useUnifiedRaceRealtime({
   const poolDataFetchInProgress = useRef<boolean>(false)
   const lastCleanupSignal = useRef<number>(0)
   const [isCleaningUp, setIsCleaningUp] = useState<boolean>(false)
+  const [hasRaceScopedMoneyFlowChannel, setHasRaceScopedMoneyFlowChannel] =
+    useState<boolean>(false)
 
   // Throttling for performance optimization
   const pendingUpdates = useRef<AppwriteRealtimeMessage[]>([])
   const updateThrottleTimer = useRef<NodeJS.Timeout | null>(null)
   const THROTTLE_DELAY = 100 // 100ms for critical periods
-const CONNECTION_DRAIN_DELAY = NAVIGATION_DRAIN_DELAY
+  const CONNECTION_DRAIN_DELAY = NAVIGATION_DRAIN_DELAY
+
+  const poolDocumentId = state.poolData?.$id?.trim() || null
 
   // Smart channel management with race status awareness
   const getChannels = useCallback(
     (raceDocId: string | null, raceResultsDocId?: string, raceStatus?: string) => {
       if (!raceDocId) return []
 
-      const channels = [
-        `databases.raceday-db.collections.races.documents.${raceDocId}`,
-        'databases.raceday-db.collections.race-pools.documents',
-        'databases.raceday-db.collections.money-flow-history.documents',
-      ]
+      const channels = new Set<string>()
+
+      // Always subscribe to the primary race document
+      channels.add(`databases.raceday-db.collections.races.documents.${raceDocId}`)
+
+      // Prefer document-specific pool channel when the ID is known
+      if (poolDocumentId) {
+        channels.add(
+          `databases.raceday-db.collections.race-pools.documents.${poolDocumentId}`
+        )
+      } else {
+        channels.add('databases.raceday-db.collections.race-pools.documents')
+      }
+
+      // Money flow: attempt race-scoped channel with collection-level fallback until confirmed
+      channels.add(
+        `databases.raceday-db.collections.money-flow-history.documents.race.${raceDocId}`
+      )
+      if (!hasRaceScopedMoneyFlowChannel) {
+        channels.add('databases.raceday-db.collections.money-flow-history.documents')
+      }
 
       // Add race-results subscription ONLY for races with interim/final status (per hybrid architecture)
-      const shouldSubscribeToResults = raceStatus && ['interim', 'final'].includes(raceStatus.toLowerCase())
+      const shouldSubscribeToResults =
+        raceStatus && ['interim', 'final'].includes(raceStatus.toLowerCase())
       if (shouldSubscribeToResults) {
         if (raceResultsDocId) {
-          channels.push(
+          channels.add(
             `databases.raceday-db.collections.race-results.documents.${raceResultsDocId}`
           )
         } else {
-          channels.push('databases.raceday-db.collections.race-results.documents')
+          channels.add('databases.raceday-db.collections.race-results.documents')
         }
       }
 
@@ -211,18 +232,18 @@ const CONNECTION_DRAIN_DELAY = NAVIGATION_DRAIN_DELAY
       if (state.entrants && state.entrants.length > 0) {
         state.entrants.forEach((entrant) => {
           if (entrant.$id) {
-            channels.push(
+            channels.add(
               `databases.raceday-db.collections.entrants.documents.${entrant.$id}`
             )
           }
         })
       } else {
-        channels.push('databases.raceday-db.collections.entrants.documents')
+        channels.add('databases.raceday-db.collections.entrants.documents')
       }
 
-      return channels
+      return Array.from(channels)
     },
-    [state.entrants]
+    [state.entrants, poolDocumentId, hasRaceScopedMoneyFlowChannel]
   )
 
   // Fetch initial data if not provided
@@ -410,6 +431,7 @@ const CONNECTION_DRAIN_DELAY = NAVIGATION_DRAIN_DELAY
     initialDataFetched.current = false
     initialPoolDataAttempted.current = false
     poolDataFetchInProgress.current = false
+    setHasRaceScopedMoneyFlowChannel(false)
 
     setState((prev) => ({
       ...prev,
@@ -544,6 +566,8 @@ const CONNECTION_DRAIN_DELAY = NAVIGATION_DRAIN_DELAY
 
     debugLog(`Processing ${updates.length} batched updates`)
 
+    let observedRaceScopedMoneyFlowChannel = false
+
     setState((prevState) => {
       const newState = { ...prevState }
       const now = new Date()
@@ -552,6 +576,16 @@ const CONNECTION_DRAIN_DELAY = NAVIGATION_DRAIN_DELAY
       // Process all pending updates in batch
       for (const message of updates) {
         const { events, channels, payload } = message
+
+        if (
+          !hasRaceScopedMoneyFlowChannel &&
+          Array.isArray(channels) &&
+          channels.some((channel) =>
+            channel.includes('money-flow-history.documents.race.')
+          )
+        ) {
+          observedRaceScopedMoneyFlowChannel = true
+        }
 
         // Event-based filtering using Appwrite's events array
         // For race events, check both the document ID and race ID in payload
@@ -596,9 +630,17 @@ const CONNECTION_DRAIN_DELAY = NAVIGATION_DRAIN_DELAY
                 state.entrants.some((e) => e.$id === payload.entrant)))
         )
 
-        const isMoneyFlowEvent = events.some(
-          (event) => event.includes('money-flow-history') && payload.entrant
-        )
+        const moneyFlowMatchesRace =
+          payload &&
+          (payload.raceId === raceId ||
+            payload.raceId === prevState.raceDocumentId ||
+            payload.race === raceId ||
+            payload.race === prevState.raceDocumentId)
+
+        const isMoneyFlowEvent =
+          events.some((event) => event.includes('money-flow-history')) &&
+          !!payload.entrant &&
+          moneyFlowMatchesRace
 
         if (isRaceEvent && payload) {
           debugLog('Race data update received', {
@@ -895,8 +937,11 @@ const CONNECTION_DRAIN_DELAY = NAVIGATION_DRAIN_DELAY
         } else if (isPoolEvent && payload) {
           debugLog('Pool data update received', { raceId: payload.raceId })
 
+          const existingPoolId = newState.poolData?.$id || ''
+          const resolvedPoolId = payload.$id || existingPoolId
+
           newState.poolData = {
-            $id: payload.$id || '',
+            $id: resolvedPoolId,
             $createdAt: payload.$createdAt || new Date().toISOString(),
             $updatedAt: payload.$updatedAt || new Date().toISOString(),
             raceId: payload.raceId,
@@ -955,7 +1000,16 @@ const CONNECTION_DRAIN_DELAY = NAVIGATION_DRAIN_DELAY
 
       return newState
     })
-  }, [raceId, state.raceDocumentId, state.raceResultsDocumentId])
+
+    if (observedRaceScopedMoneyFlowChannel) {
+      setHasRaceScopedMoneyFlowChannel(true)
+    }
+  }, [
+    raceId,
+    state.raceDocumentId,
+    state.raceResultsDocumentId,
+    hasRaceScopedMoneyFlowChannel,
+  ])
 
   // Process incoming Appwrite real-time messages with throttling
   const processRealtimeMessage = useCallback(
