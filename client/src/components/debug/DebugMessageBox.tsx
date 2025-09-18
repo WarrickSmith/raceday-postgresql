@@ -8,7 +8,7 @@ export interface DebugMessage {
   type: 'info' | 'warning' | 'success' | 'error'
   title: string
   message: string
-  data?: any
+  data?: unknown
 }
 
 interface DebugMessageBoxProps {
@@ -199,7 +199,7 @@ export function useDebugMessages() {
     type: DebugMessage['type'],
     title: string,
     message: string,
-    data?: any
+    data?: unknown
   ) => {
     const newMessage: DebugMessage = {
       id: `debug-${Date.now()}-${Math.random()}`,

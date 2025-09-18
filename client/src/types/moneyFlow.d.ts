@@ -13,7 +13,7 @@ export interface MoneyFlowDataPoint {
   // Entrant references
   entrant?:
     | string
-    | { entrantId?: string; $id?: string; name?: string; [k: string]: any }
+    | { entrantId?: string; $id?: string; name?: string; [k: string]: unknown }
   entrantId?: string
 
   // Timing / interval fields
@@ -46,7 +46,7 @@ export interface MoneyFlowDataPoint {
   type?: string
 
   // Misc
-  [key: string]: any
+  [key: string]: unknown
 }
 
 /**
@@ -59,7 +59,7 @@ export interface EntrantMoneyFlowTimeline {
   trend: 'up' | 'down' | 'neutral' | string
   significantChange: boolean
   // Allow additional metadata used by UI components
-  [key: string]: any
+  [key: string]: unknown
 }
 
 /**
