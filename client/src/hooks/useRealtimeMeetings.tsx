@@ -6,6 +6,10 @@ import { Meeting, Race } from '@/types/meetings';
 import { SUPPORTED_RACE_TYPE_CODES } from '@/constants/raceTypes';
 import { isSupportedCountry } from '@/constants/countries';
 import { useLogger } from '@/utils/logging';
+import {
+  NAVIGATION_DRAIN_DELAY,
+  useSubscriptionCleanup,
+} from '@/contexts/SubscriptionCleanupContext';
 
 // Connection state machine for graceful transitions
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'disconnecting'
@@ -39,6 +43,10 @@ export function useRealtimeMeetings({ initialData, onError, onRaceUpdate }: UseR
   const hasWarnedChannelLimitRef = useRef(false);
   const meetingsRef = useRef(meetings);
   const onRaceUpdateRef = useRef(onRaceUpdate);
+  const { signal: cleanupSignal, isCleanupInProgress } = useSubscriptionCleanup();
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
+  const lastCleanupSignalRef = useRef(0);
+  const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { channels: meetingChannels, trimmedCount, totalMeetings } = useMemo(() => {
     if (meetings.length === 0) {
@@ -132,7 +140,12 @@ export function useRealtimeMeetings({ initialData, onError, onRaceUpdate }: UseR
 
   // Setup real-time subscriptions with connection management
   const setupSubscriptions = useCallback(async () => {
-    const connectionDrainDelay = 200; // 200ms drain period for graceful transitions
+    if (isCleaningUp || isCleanupInProgress) {
+      loggerRef.current.debug('Skipping subscription setup during coordinated cleanup');
+      return;
+    }
+
+    const connectionDrainDelay = NAVIGATION_DRAIN_DELAY; // Coordinated drain period
 
     try {
       // Set connecting state
@@ -250,7 +263,17 @@ export function useRealtimeMeetings({ initialData, onError, onRaceUpdate }: UseR
         setupSubscriptions();
       }, getRetryDelay(attempts));
     }
-  }, [connectionAttempts, fetchFirstRaceTime, getRetryDelay, onError, removeMeeting, today, updateMeetings]);
+  }, [
+    connectionAttempts,
+    fetchFirstRaceTime,
+    getRetryDelay,
+    isCleanupInProgress,
+    isCleaningUp,
+    onError,
+    removeMeeting,
+    today,
+    updateMeetings,
+  ]);
 
   // Effect to mark initial data as ready
   useEffect(() => {
@@ -291,7 +314,7 @@ export function useRealtimeMeetings({ initialData, onError, onRaceUpdate }: UseR
 
   // Initialize subscriptions - follow hybrid architecture: only subscribe after initial data is ready
   useEffect(() => {
-    if (!isInitialDataReady) {
+    if (!isInitialDataReady || isCleaningUp || isCleanupInProgress) {
       loggerRef.current.debug('Waiting for initial meetings data to be ready before subscription');
       return;
     }
@@ -308,7 +331,63 @@ export function useRealtimeMeetings({ initialData, onError, onRaceUpdate }: UseR
         clearTimeout(retryTimeoutRef.current);
       }
     };
-  }, [isInitialDataReady, setupSubscriptions, meetingChannelsKey]);
+  }, [
+    isCleaningUp,
+    isCleanupInProgress,
+    isInitialDataReady,
+    meetingChannelsKey,
+    setupSubscriptions,
+  ]);
+
+  // Respond to coordinated cleanup signals
+  useEffect(() => {
+    if (cleanupSignal === 0 || cleanupSignal === lastCleanupSignalRef.current) {
+      return;
+    }
+
+    lastCleanupSignalRef.current = cleanupSignal;
+    loggerRef.current.info('Received coordinated cleanup signal - draining meetings subscriptions', {
+      cleanupSignal,
+    });
+
+    setIsCleaningUp(true);
+    setConnectionState('disconnecting');
+    setIsConnected(false);
+
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+
+    if (unsubscribeRef.current) {
+      try {
+        unsubscribeRef.current();
+      } catch (error) {
+        loggerRef.current.error('Error while cleaning up meeting subscription', error);
+      }
+      unsubscribeRef.current = null;
+    }
+
+    if (cleanupTimeoutRef.current) {
+      clearTimeout(cleanupTimeoutRef.current);
+    }
+
+    cleanupTimeoutRef.current = setTimeout(() => {
+      setIsCleaningUp(false);
+      setConnectionState('disconnected');
+      cleanupTimeoutRef.current = null;
+    }, NAVIGATION_DRAIN_DELAY);
+  }, [cleanupSignal]);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (cleanupTimeoutRef.current) {
+        clearTimeout(cleanupTimeoutRef.current);
+        cleanupTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   return {
     meetings,

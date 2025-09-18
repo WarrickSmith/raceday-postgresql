@@ -21,6 +21,7 @@ import { Race, Entrant, Meeting, RaceNavigationData } from '@/types/meetings'
 import type { RacePoolData, RaceResultsData } from '@/types/racePools'
 import { Query } from 'appwrite'
 import { useLogger } from '@/utils/logging'
+import { NAVIGATION_DRAIN_DELAY } from '@/contexts/SubscriptionCleanupContext'
 
 // Debug logging control - minimal for production
 const DEBUG = process.env.NODE_ENV === 'development'
@@ -181,7 +182,7 @@ export function useUnifiedRaceRealtime({
   const pendingUpdates = useRef<AppwriteRealtimeMessage[]>([])
   const updateThrottleTimer = useRef<NodeJS.Timeout | null>(null)
   const THROTTLE_DELAY = 100 // 100ms for critical periods
-  const CONNECTION_DRAIN_DELAY = 200 // Reduced for faster navigation
+const CONNECTION_DRAIN_DELAY = NAVIGATION_DRAIN_DELAY
 
   // Smart channel management with race status awareness
   const getChannels = useCallback(

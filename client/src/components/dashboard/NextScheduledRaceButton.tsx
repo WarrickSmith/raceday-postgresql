@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Meeting } from '@/types/meetings';
+import { useSubscriptionCleanup } from '@/contexts/SubscriptionCleanupContext';
 
 interface NextScheduledRaceButtonProps {
   meetings: Meeting[];
@@ -24,6 +25,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
   const [nextScheduledRace, setNextScheduledRace] = useState<NextScheduledRace | null>(null);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { requestCleanup } = useSubscriptionCleanup();
 
   // Fetch the next scheduled race from the API
   const fetchNextScheduledRace = useCallback(async () => {
@@ -171,6 +173,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
     
     try {
       console.log('🎯 Navigating to next scheduled race:', nextScheduledRace.raceId);
+      await requestCleanup({ reason: 'next-scheduled-button' });
       router.push(`/race/${nextScheduledRace.raceId}`);
     } catch (error) {
       console.error('❌ Failed to navigate to next scheduled race:', error);

@@ -41,9 +41,9 @@ export const RaceNavigation = memo(function RaceNavigation({
   } = useRaceNavigation({
     navigationData,
     currentRaceId: currentRaceId || '',
-    onNavigationStart: () => {
+    onNavigationStart: (target) => {
       // Trigger clean disconnection of subscriptions before navigation
-      triggerSubscriptionCleanup()
+      return triggerSubscriptionCleanup(`race-navigation:${target}`)
     },
     onError: (error) => {
       logger.error('Navigation error:', error)

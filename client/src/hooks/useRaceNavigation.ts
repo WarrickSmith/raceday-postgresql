@@ -7,7 +7,7 @@ import { RaceNavigationData } from '@/types/meetings';
 interface UseRaceNavigationOptions {
   navigationData: RaceNavigationData | null;
   currentRaceId: string;
-  onNavigationStart?: () => void;
+  onNavigationStart?: (target: string) => void | Promise<void>;
   onNavigationComplete?: () => void;
   onError?: (error: Error) => void;
 }
@@ -71,7 +71,7 @@ export function useRaceNavigation({
       });
 
       try {
-        onNavigationStart?.();
+        await onNavigationStart?.(navigationTarget);
         
         // Navigate immediately - cleanup is non-blocking
         router.push(`/race/${raceId}`);
@@ -113,7 +113,7 @@ export function useRaceNavigation({
   );
 
   // Navigation handlers for each button type
-  const navigateToMeetings = useCallback(() => {
+  const navigateToMeetings = useCallback(async () => {
     const startTime = Date.now();
     console.log(`🏠 [${new Date().toISOString()}] Starting navigation to meetings`);
     
@@ -129,7 +129,7 @@ export function useRaceNavigation({
     });
 
     try {
-      onNavigationStart?.();
+      await onNavigationStart?.('meetings');
       router.push('/');
       
       // Set a timeout to reset state in case the meetings page doesn't unmount this component
@@ -152,7 +152,7 @@ export function useRaceNavigation({
           navigationTarget: null,
           error: null,
         });
-        onNavigationComplete?.();
+      onNavigationComplete?.();
       }, 3000);
     } catch (error) {
       const elapsed = Date.now() - startTime;
