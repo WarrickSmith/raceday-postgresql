@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/appwrite-server'
 import { Query } from 'node-appwrite'
 
-import type { MoneyFlowDataPoint } from '@/types/moneyFlow'
 // Valid pool types for API filtering
 const VALID_POOL_TYPES = ['win', 'place', 'odds'] as const
 type PoolType = typeof VALID_POOL_TYPES[number]
+
+type EntrantValue = string | { entrantId?: string; $id?: string; id?: string | number }
+
+interface MoneyFlowDocument {
+  entrant?: EntrantValue
+  timeInterval?: number
+  timeToStart?: number
+}
 
 export async function GET(
   request: NextRequest,
@@ -146,7 +153,7 @@ export async function GET(
 
     // Add interval coverage analysis for debugging
     const intervalCoverage = analyzeIntervalCoverage(
-      response.documents as unknown as MoneyFlowDataPoint[],
+      response.documents as MoneyFlowDocument[],
       entrantIds
     )
 
@@ -200,81 +207,12 @@ export async function GET(
 }
 
 /**
- * Transform response data based on poolType to optimize for specific view modes
- */
-function transformResponseForPoolType(
-  documents: MoneyFlowDataPoint[],
-  poolType: PoolType
-) {
-  return documents.map(doc => {
-    // Base document with common fields
-    const baseDoc = {
-      $id: doc.$id,
-      $createdAt: doc.$createdAt,
-      $updatedAt: doc.$updatedAt,
-      entrant: doc.entrant,
-      raceId: doc.raceId,
-      pollingTimestamp: doc.pollingTimestamp,
-      timeInterval: doc.timeInterval,
-      timeToStart: doc.timeToStart,
-      intervalType: doc.intervalType,
-      type: doc.type
-    }
-
-    switch (poolType) {
-      case 'win':
-        return {
-          ...baseDoc,
-          // Win pool specific fields
-          winPoolAmount: doc.winPoolAmount,
-          incrementalWinAmount: doc.incrementalWinAmount,
-          winPoolPercentage: doc.winPoolPercentage,
-          // Include incremental amount for backward compatibility
-          incrementalAmount: doc.incrementalWinAmount || doc.incrementalAmount,
-          // Include current odds for reference
-          fixedWinOdds: doc.fixedWinOdds,
-          poolWinOdds: doc.poolWinOdds
-        }
-
-      case 'place':
-        return {
-          ...baseDoc,
-          // Place pool specific fields
-          placePoolAmount: doc.placePoolAmount,
-          incrementalPlaceAmount: doc.incrementalPlaceAmount,
-          placePoolPercentage: doc.placePoolPercentage,
-          // Include incremental amount for backward compatibility
-          incrementalAmount: doc.incrementalPlaceAmount || doc.incrementalAmount,
-          // Include current odds for reference
-          fixedPlaceOdds: doc.fixedPlaceOdds,
-          poolPlaceOdds: doc.poolPlaceOdds
-        }
-
-      case 'odds':
-        return {
-          ...baseDoc,
-          // Odds specific fields (all odds types)
-          fixedWinOdds: doc.fixedWinOdds,
-          fixedPlaceOdds: doc.fixedPlaceOdds,
-          poolWinOdds: doc.poolWinOdds,
-          poolPlaceOdds: doc.poolPlaceOdds,
-          // Include Win pool data as Pool/Pool% columns show Win data in odds view
-          winPoolAmount: doc.winPoolAmount,
-          winPoolPercentage: doc.winPoolPercentage,
-          incrementalAmount: doc.incrementalWinAmount || doc.incrementalAmount
-        }
-
-      default:
-        // Return full document as fallback
-        return doc
-    }
-  })
-}
-
-/**
  * Get poolType-specific query optimizations documentation
  */
-function getPoolTypeOptimizations(poolType: PoolType, bucketedData: boolean): string[] {
+function getPoolTypeOptimizations(
+  poolType: PoolType,
+  bucketedData: boolean
+): string[] {
   const baseOptimizations = [
     'Time interval filtering',
     bucketedData ? 'Bucketed storage' : 'Legacy timeToStart data',
@@ -309,7 +247,7 @@ function getPoolTypeOptimizations(poolType: PoolType, bucketedData: boolean): st
  * Analyze interval coverage to identify gaps in timeline data
  */
 function analyzeIntervalCoverage(
-  documents: MoneyFlowDataPoint[],
+  documents: MoneyFlowDocument[],
   entrantIds: string[]
 ) {
   if (!documents || documents.length === 0) {
@@ -342,10 +280,7 @@ function analyzeIntervalCoverage(
 
   entrantIds.forEach((entrantId: string) => {
     const entrantDocs = documents.filter((doc) => {
-      const docEntrantId =
-        typeof doc.entrant === 'string'
-          ? doc.entrant
-          : (doc.entrant as any)?.entrantId || (doc.entrant as any)?.$id || 'unknown'
+      const docEntrantId = resolveEntrantId(doc.entrant)
       return docEntrantId === entrantId
     })
 
@@ -396,9 +331,9 @@ function analyzeIntervalCoverage(
               ? doc.timeInterval
               : doc.timeToStart
           )
-          .filter((i) => i !== undefined)
+          .filter((interval): interval is number => typeof interval === 'number')
       ),
-    ].sort((a, b) => (b as number) - (a as number)),
+    ].sort((a, b) => b - a),
     criticalPeriodGaps: criticalGaps,
     entrantSampleCoverage: entrantIds.slice(0, 2).map((id) => ({
       entrantId: id.slice(-8),
@@ -409,4 +344,24 @@ function analyzeIntervalCoverage(
     })),
     coverageReport: `${entrantCoverage.size}/${entrantIds.length} entrants have timeline data, ${criticalGaps.length} have 5m-0s gaps`,
   }
+}
+
+function resolveEntrantId(entrant?: EntrantValue): string {
+  if (typeof entrant === 'string') {
+    return entrant
+  }
+
+  if (entrant && typeof entrant === 'object') {
+    if (typeof entrant.entrantId === 'string') {
+      return entrant.entrantId
+    }
+    if (typeof entrant.$id === 'string') {
+      return entrant.$id
+    }
+    if (typeof entrant.id === 'string' || typeof entrant.id === 'number') {
+      return String(entrant.id)
+    }
+  }
+
+  return 'unknown'
 }
