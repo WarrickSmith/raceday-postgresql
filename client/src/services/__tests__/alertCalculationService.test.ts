@@ -39,6 +39,7 @@ describe('AlertCalculationService', () => {
       userId: 'test-user',
       indicators: mockUserIndicators,
       toggleAll: true,
+      audibleAlertsEnabled: true,
     })
   })
 
