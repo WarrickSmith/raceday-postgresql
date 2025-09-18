@@ -21,6 +21,20 @@ jest.mock('@/hooks/useValueFlash', () => ({
   useValueFlash: jest.fn(() => ({ flashClasses: '' })),
 }))
 
+// Mock audible alerts context so the grid can render without provider
+jest.mock('@/contexts/AudibleAlertContext', () => ({
+  useAudibleAlerts: jest.fn(() => ({
+    isEnabled: false,
+    isLoading: false,
+    isPersisting: false,
+    lastError: null,
+    toggle: jest.fn(async () => {}),
+    setEnabled: jest.fn(async () => {}),
+    setFilterPredicate: jest.fn(() => {}),
+    primeAudioWithUserGesture: jest.fn(() => {}),
+  })),
+}))
+
 const { useMoneyFlowTimeline } = jest.requireMock('@/hooks/useMoneyFlowTimeline')
 const { useRace } = jest.requireMock('@/contexts/RaceContext')
 const { useGridIndicators } = jest.requireMock('@/hooks/useGridIndicators')

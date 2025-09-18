@@ -41,6 +41,7 @@ export const AlertsConfigModal = ({
     isLoading: true,
     isSaving: false,
     hasChanges: false,
+    audibleAlertsEnabled: true,
   })
 
   const [originalConfig, setOriginalConfig] = useState<AlertsConfig | null>(null)
@@ -49,14 +50,15 @@ export const AlertsConfigModal = ({
     try {
       setState(prev => ({ ...prev, isLoading: true }))
       const config = await loadUserAlertConfig(userId)
-      setOriginalConfig(config)
       setState(prev => ({
         ...prev,
         indicators: config.indicators,
         toggleAll: config.toggleAll,
         isLoading: false,
         hasChanges: false,
+        audibleAlertsEnabled: config.audibleAlertsEnabled,
       }))
+      setOriginalConfig(config)
     } catch (error) {
       console.error('Failed to load configuration:', error)
       setState(prev => ({ ...prev, isLoading: false }))
@@ -123,6 +125,7 @@ export const AlertsConfigModal = ({
         toggleAll: resetConfig.toggleAll,
         isSaving: false,
         hasChanges: false,
+        audibleAlertsEnabled: resetConfig.audibleAlertsEnabled,
       }))
       setOriginalConfig(resetConfig)
     } catch (error) {
@@ -140,6 +143,7 @@ export const AlertsConfigModal = ({
         userId,
         indicators: state.indicators,
         toggleAll: state.toggleAll,
+        audibleAlertsEnabled: state.audibleAlertsEnabled,
       }
 
       await saveUserAlertConfig(configToSave)
@@ -164,6 +168,7 @@ export const AlertsConfigModal = ({
         indicators: originalConfig.indicators,
         toggleAll: originalConfig.toggleAll,
         hasChanges: false,
+        audibleAlertsEnabled: originalConfig.audibleAlertsEnabled,
       }))
     }
     onClose()

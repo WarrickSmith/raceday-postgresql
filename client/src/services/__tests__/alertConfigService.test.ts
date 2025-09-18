@@ -33,8 +33,10 @@ describe('AlertConfigService', () => {
           userId: 'test-user',
           lastUpdated: new Date().toISOString(),
           createdAt: new Date().toISOString(),
+          audibleAlertsEnabled: true,
         })),
         toggleAll: true,
+        audibleAlertsEnabled: true,
       }
 
       mockFetch.mockResolvedValueOnce({
@@ -53,6 +55,7 @@ describe('AlertConfigService', () => {
         userId: DEFAULT_USER_ID,
         indicators: [],
         toggleAll: true,
+        audibleAlertsEnabled: true,
       }
 
       mockFetch.mockResolvedValueOnce({
@@ -76,6 +79,7 @@ describe('AlertConfigService', () => {
       expect(result.userId).toBe('test-user')
       expect(result.indicators).toHaveLength(6)
       expect(result.toggleAll).toBe(true)
+      expect(result.audibleAlertsEnabled).toBe(true)
     })
 
     it('returns defaults on network error', async () => {
@@ -86,6 +90,7 @@ describe('AlertConfigService', () => {
       expect(result.userId).toBe('test-user')
       expect(result.indicators).toHaveLength(6)
       expect(result.toggleAll).toBe(true)
+      expect(result.audibleAlertsEnabled).toBe(true)
     })
   })
 
@@ -99,8 +104,10 @@ describe('AlertConfigService', () => {
           userId: 'test-user',
           lastUpdated: new Date().toISOString(),
           createdAt: new Date().toISOString(),
+          audibleAlertsEnabled: true,
         })),
         toggleAll: true,
+        audibleAlertsEnabled: true,
       }
 
       mockFetch.mockResolvedValueOnce({
@@ -118,6 +125,7 @@ describe('AlertConfigService', () => {
         body: JSON.stringify({
           userId: config.userId,
           indicators: config.indicators,
+          audibleAlertsEnabled: config.audibleAlertsEnabled,
         }),
       })
     })
@@ -127,6 +135,7 @@ describe('AlertConfigService', () => {
         userId: 'test-user',
         indicators: [],
         toggleAll: true,
+        audibleAlertsEnabled: true,
       }
 
       mockFetch.mockResolvedValueOnce({
@@ -144,6 +153,7 @@ describe('AlertConfigService', () => {
         userId: 'test-user',
         indicators: [],
         toggleAll: true,
+        audibleAlertsEnabled: true,
       }
 
       mockFetch.mockRejectedValueOnce(new Error('Network error'))
@@ -166,8 +176,10 @@ describe('AlertConfigService', () => {
           isDefault: true,
           lastUpdated: new Date().toISOString(),
           createdAt: new Date().toISOString(),
+          audibleAlertsEnabled: true,
         })),
         toggleAll: true,
+        audibleAlertsEnabled: true,
       }
 
       mockFetch.mockResolvedValueOnce({
@@ -193,6 +205,7 @@ describe('AlertConfigService', () => {
         userId: DEFAULT_USER_ID,
         indicators: [],
         toggleAll: true,
+        audibleAlertsEnabled: true,
       }
 
       mockFetch.mockResolvedValueOnce({
@@ -233,8 +246,10 @@ describe('AlertConfigService', () => {
           userId: 'test-user',
           lastUpdated: new Date().toISOString(),
           createdAt: new Date().toISOString(),
+          audibleAlertsEnabled: true,
         })),
         toggleAll: true,
+        audibleAlertsEnabled: true,
       }
 
       const errors = validateAlertConfig(validConfig)
@@ -250,8 +265,10 @@ describe('AlertConfigService', () => {
           userId: '',
           lastUpdated: new Date().toISOString(),
           createdAt: new Date().toISOString(),
+          audibleAlertsEnabled: true,
         })),
         toggleAll: true,
+        audibleAlertsEnabled: true,
       }
 
       const errors = validateAlertConfig(invalidConfig)
@@ -267,8 +284,10 @@ describe('AlertConfigService', () => {
           userId: 'test-user',
           lastUpdated: new Date().toISOString(),
           createdAt: new Date().toISOString(),
+          audibleAlertsEnabled: true,
         })),
         toggleAll: true,
+        audibleAlertsEnabled: true,
       }
 
       const errors = validateAlertConfig(invalidConfig)
@@ -285,8 +304,10 @@ describe('AlertConfigService', () => {
           displayOrder: index + 2, // Wrong display order
           lastUpdated: new Date().toISOString(),
           createdAt: new Date().toISOString(),
+          audibleAlertsEnabled: true,
         })),
         toggleAll: true,
+        audibleAlertsEnabled: true,
       }
 
       const errors = validateAlertConfig(invalidConfig)
@@ -303,8 +324,10 @@ describe('AlertConfigService', () => {
           userId: 'different-user', // Mismatched user ID
           lastUpdated: new Date().toISOString(),
           createdAt: new Date().toISOString(),
+          audibleAlertsEnabled: true,
         })),
         toggleAll: true,
+        audibleAlertsEnabled: true,
       }
 
       const errors = validateAlertConfig(invalidConfig)
@@ -322,13 +345,34 @@ describe('AlertConfigService', () => {
           color: 'invalid-color', // Invalid color
           lastUpdated: new Date().toISOString(),
           createdAt: new Date().toISOString(),
+          audibleAlertsEnabled: true,
         })),
         toggleAll: true,
+        audibleAlertsEnabled: true,
       }
 
       const errors = validateAlertConfig(invalidConfig)
       expect(errors.length).toBeGreaterThan(0)
       expect(errors.some(error => error.includes('invalid color format'))).toBe(true)
+    })
+
+    it('validates audible alerts flag type', () => {
+      const invalidConfig = {
+        userId: 'test-user',
+        indicators: DEFAULT_INDICATORS.map((ind, index) => ({
+          ...ind,
+          $id: `indicator-${index}`,
+          userId: 'test-user',
+          lastUpdated: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          audibleAlertsEnabled: true,
+        })),
+        toggleAll: true,
+        audibleAlertsEnabled: undefined as unknown as boolean,
+      }
+
+      const errors = validateAlertConfig(invalidConfig)
+      expect(errors).toContain('Audible alerts enabled flag must be a boolean')
     })
   })
 })

@@ -71,12 +71,12 @@
 ## Story 5.4: Implement Global Audible Alert Toggle
 
 **As a** user  
-**I want** to enable/disable a global, audible alert that triggers one minute before the start of any race in my filtered view  
+**I want** to enable/disable a global, audible alert that triggers one minute before the start of any scheduled race starttime, irrespective of where I am in the application, meetings or race pages.  
 **So that** I am aware of upcoming races.
 
 #### Tasks
 
-- Add audible alert toggle to UI.
+- Add audible alert toggle to UI (placeholder already on the Enhanced entrants title row).
 - Implement audio notification logic.
 - Respect user filter settings.
 
@@ -86,6 +86,6 @@
 - [ ] User can toggle alert on/off.
 - [ ] Alert only applies to filtered races.
 
-
+NOTE: There is an audio mp3 file at /home/warrick/Dev/raceday/race_start.mp3 to use for the audible announce,emt. This will need to be relocated to an appropriate application resource directory.
 
 ---

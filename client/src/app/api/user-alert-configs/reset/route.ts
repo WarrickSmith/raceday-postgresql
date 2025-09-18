@@ -38,6 +38,7 @@ export async function PUT(request: NextRequest) {
         enabled: true,
         isDefault: true,
         lastUpdated: new Date().toISOString(),
+        audibleAlertsEnabled: true,
       }
 
       return databases.updateDocument(DATABASE_ID, COLLECTION_ID, indicator.$id!, updateData)
@@ -62,6 +63,7 @@ export async function PUT(request: NextRequest) {
       userId,
       indicators: updatedIndicators,
       toggleAll: true,
+      audibleAlertsEnabled: true,
     })
   } catch (error) {
     console.error('Failed to reset to defaults:', error)

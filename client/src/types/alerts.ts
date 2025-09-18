@@ -16,6 +16,7 @@ export interface IndicatorConfig {
   displayOrder: number
   lastUpdated?: string
   createdAt?: string
+  audibleAlertsEnabled?: boolean
 }
 
 export interface AlertsModalState {
@@ -24,12 +25,14 @@ export interface AlertsModalState {
   isLoading: boolean
   isSaving: boolean
   hasChanges: boolean
+  audibleAlertsEnabled: boolean
 }
 
 export interface AlertsConfig {
   userId: string
   indicators: IndicatorConfig[]
   toggleAll: boolean
+  audibleAlertsEnabled: boolean
 }
 
 // Default color constants tuned to soft pastel tones for calmer visuals

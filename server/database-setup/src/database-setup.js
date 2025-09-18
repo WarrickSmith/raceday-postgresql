@@ -1429,6 +1429,7 @@ async function ensureUserAlertConfigsCollection(databases, config, context, prog
         // UI behavior
         { key: 'enabled', type: 'boolean', required: true }, // Enable/disable indicator
         { key: 'displayOrder', type: 'integer', required: true }, // Order for UI display (1-6)
+        { key: 'audibleAlertsEnabled', type: 'boolean', required: false, default: true }, // Global audible alerts preference
 
         // Metadata
         { key: 'lastUpdated', type: 'datetime', required: false },
