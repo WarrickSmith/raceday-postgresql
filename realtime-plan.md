@@ -80,31 +80,31 @@ This development plan consolidates findings from three comprehensive architectur
 
 ### Task 3: Eliminate Redundant Pool Data Subscriptions
 **Status**:
-- ► Not Started
+- Not Started
 - In Progress
-- Complete
+- ► Complete
 
 **Priority**: Critical
 **Impact**: Prevents WebSocket connection duplication
 
-**Problem**: Despite unified race hook, `useRacePoolData.ts:94` creates independent race-pools subscription, violating Appwrite's single connection principle.
+**Problem**: The legacy `useRacePoolData` hook maintained its own Appwrite subscription, creating a second WebSocket connection alongside `useUnifiedRaceRealtime` and undermining the unified model.
 
 **Strategy**:
-1. Add `disableSubscription` parameter to `useRacePoolData` hook
-2. Integrate pool data subscriptions into `useUnifiedRaceRealtime` hook
-3. Modify race pages to disable standalone pool subscriptions when unified hook is active
-4. Ensure pool data updates flow through unified subscription channels
+1. Remove the legacy `useRacePoolData` hook to eliminate duplicate subscriptions
+2. Teach `useUnifiedRaceRealtime` to fetch initial pool documents in addition to handling real-time updates
+3. Update race page components to rely exclusively on unified hook data for pool totals
+4. Reset pool state between races to prevent stale data during navigation
 
 **Key Resources**:
-- File: `/client/src/hooks/useRacePoolData.ts:94`
-- Architecture Guide: `/docs/client-real-time-data-integration.md#unified-subscription-with-intelligent-filtering`
-- Pattern Reference: Unified hook design in `useUnifiedRaceRealtime.ts`
+- Hook: `/client/src/hooks/useUnifiedRaceRealtime.ts`
+- Component: `/client/src/components/race-view/RacePoolsSection.tsx`
+- Component: `/client/src/components/race-view/RaceFooter.tsx`
 
 **Implementation Details**:
-- Add optional `disableSubscription?: boolean` parameter to hook interface
-- Integrate pool document subscription into unified hook's channel array
-- Update race page components to pass `disableSubscription=true`
-- Maintain backward compatibility for non-unified usage
+- Add guarded initial pool fetch within the unified hook and stamp `lastPoolUpdate` when no document exists
+- Clear pool state when the active race changes to avoid leaking data across navigation
+- Remove `useRacePoolData` usage and simplify `RacePoolsSection` to present unified data with lightweight loading states
+- Streamline `RaceFooter` props now that pool data always comes from the unified hook
 
 ### Task 4: Implement Coordinated Navigation Cleanup
 **Status**:
