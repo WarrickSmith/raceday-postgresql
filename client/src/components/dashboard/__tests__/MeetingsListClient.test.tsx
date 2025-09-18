@@ -3,6 +3,7 @@ import { MeetingsListClient } from '../MeetingsListClient';
 import { useRealtimeMeetings } from '@/hooks/useRealtimeMeetings';
 import { Meeting } from '@/types/meetings';
 import { RACE_TYPE_CODES } from '@/constants/raceTypes';
+import { SubscriptionCleanupProvider } from '@/contexts/SubscriptionCleanupContext';
 
 // Mock the real-time hook and Next.js navigation
 jest.mock('@/hooks/useRealtimeMeetings');
@@ -12,9 +13,27 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
   }),
+  usePathname: () => '/',
+}));
+
+jest.mock('next/router', () => ({
+  __esModule: true,
+  default: {
+    events: {
+      on: jest.fn(),
+      off: jest.fn(),
+    },
+  },
 }));
 
 const mockUseRealtimeMeetings = useRealtimeMeetings as jest.MockedFunction<typeof useRealtimeMeetings>;
+
+const renderWithProvider = (ui: React.ReactElement) =>
+  render(ui, {
+    wrapper: ({ children }) => (
+      <SubscriptionCleanupProvider>{children}</SubscriptionCleanupProvider>
+    ),
+  });
 
 describe('MeetingsListClient', () => {
   const mockMeetings: Meeting[] = [
@@ -58,7 +77,7 @@ describe('MeetingsListClient', () => {
   });
 
   it('should render meetings list with connection status', () => {
-    render(<MeetingsListClient initialData={mockMeetings} />);
+    renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
 
     expect(screen.getByText("Today's Meetings")).toBeInTheDocument();
     expect(screen.getByLabelText('Connected')).toBeInTheDocument();
@@ -77,7 +96,7 @@ describe('MeetingsListClient', () => {
       retry: jest.fn(),
     });
 
-    render(<MeetingsListClient initialData={mockMeetings} />);
+    renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
 
     expect(screen.getByText('Reconnecting...')).toBeInTheDocument();
   });
@@ -111,7 +130,7 @@ describe('MeetingsListClient', () => {
       };
     });
 
-    render(<MeetingsListClient initialData={mockMeetings} />);
+    renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
 
     // Wait for error to be set
     await waitFor(() => {
@@ -137,14 +156,14 @@ describe('MeetingsListClient', () => {
       retry: jest.fn(),
     });
 
-    render(<MeetingsListClient initialData={[]} />);
+    renderWithProvider(<MeetingsListClient initialData={[]} />);
 
     expect(screen.getByText('No meetings today')).toBeInTheDocument();
     expect(screen.getByText('There are no race meetings scheduled for today.')).toBeInTheDocument();
   });
 
   it('should display correct meeting count', () => {
-    render(<MeetingsListClient initialData={mockMeetings} />);
+    renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
 
     // The count text might be split across elements, so use a more flexible matcher
     expect(screen.getByText(/2.*meeting.*available/)).toBeInTheDocument();
@@ -161,14 +180,14 @@ describe('MeetingsListClient', () => {
       retry: jest.fn(),
     });
 
-    render(<MeetingsListClient initialData={singleMeeting} />);
+    renderWithProvider(<MeetingsListClient initialData={singleMeeting} />);
 
     // Use flexible matcher for singular meeting text
     expect(screen.getByText(/1.*meeting.*available/)).toBeInTheDocument();
   });
 
   it('should have proper accessibility attributes', () => {
-    render(<MeetingsListClient initialData={mockMeetings} />);
+    renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
 
     const list = screen.getByRole('list', { name: 'Race meetings' });
     expect(list).toBeInTheDocument();
@@ -194,7 +213,9 @@ describe('MeetingsListClient', () => {
       },
     ];
 
-    const { rerender } = render(<MeetingsListClient initialData={mockMeetings} />);
+    const { rerender } = renderWithProvider(
+      <MeetingsListClient initialData={mockMeetings} />
+    );
 
     mockUseRealtimeMeetings.mockReturnValue({
       meetings: updatedMeetings,
@@ -212,7 +233,7 @@ describe('MeetingsListClient', () => {
   });
 
   it('should handle race navigation correctly', async () => {
-    render(<MeetingsListClient initialData={mockMeetings} />);
+    renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
 
     // Wait for component to render properly
     await waitFor(() => {

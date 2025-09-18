@@ -1,8 +1,24 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
+import { Fragment, type ReactNode } from 'react';
 import { useRealtimeMeetings } from '../useRealtimeMeetings';
 import { client, databases } from '@/lib/appwrite-client';
 import type { RealtimeResponseEvent, Models } from 'appwrite';
 import { RACE_TYPE_CODES } from '@/constants/raceTypes';
+import {
+  NAVIGATION_DRAIN_DELAY,
+  SubscriptionCleanupProvider,
+  useSubscriptionCleanup,
+} from '@/contexts/SubscriptionCleanupContext';
+
+jest.mock('next/router', () => ({
+  __esModule: true,
+  default: {
+    events: {
+      on: jest.fn(),
+      off: jest.fn(),
+    },
+  },
+}));
 
 // Mock Appwrite client
 jest.mock('@/lib/appwrite-client', () => ({
@@ -38,6 +54,45 @@ describe('useRealtimeMeetings', () => {
     },
   ];
 
+  type CleanupController = {
+    requestCleanup?: ReturnType<typeof useSubscriptionCleanup>['requestCleanup'];
+  };
+
+  const createWrapper = () => {
+    const controller: CleanupController = {};
+
+    const CleanupAccess = ({ children }: { children: ReactNode }) => {
+      const { requestCleanup } = useSubscriptionCleanup();
+      controller.requestCleanup = requestCleanup;
+      return <Fragment>{children}</Fragment>;
+    };
+
+    const Wrapper = ({ children }: { children: ReactNode }) => (
+      <SubscriptionCleanupProvider>
+        <CleanupAccess>{children}</CleanupAccess>
+      </SubscriptionCleanupProvider>
+    );
+
+    return { Wrapper, controller };
+  };
+
+  const renderWithCoordinator = (
+    options?: Partial<Parameters<typeof useRealtimeMeetings>[0]>
+  ) => {
+    const { Wrapper, controller } = createWrapper();
+    const hookOptions = {
+      initialData: mockInitialData,
+      ...(options || {}),
+    } as Parameters<typeof useRealtimeMeetings>[0];
+
+    const renderResult = renderHook(
+      () => useRealtimeMeetings(hookOptions),
+      { wrapper: Wrapper }
+    );
+
+    return { ...renderResult, controller };
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
@@ -56,9 +111,7 @@ describe('useRealtimeMeetings', () => {
   });
 
   it('should initialize with initial data', () => {
-    const { result } = renderHook(() =>
-      useRealtimeMeetings({ initialData: mockInitialData })
-    );
+    const { result } = renderWithCoordinator();
 
     expect(result.current.meetings).toEqual(mockInitialData);
     // Connection state may be true due to successful mock
@@ -70,9 +123,7 @@ describe('useRealtimeMeetings', () => {
     const mockUnsubscribe = jest.fn();
     mockClient.subscribe.mockReturnValue(mockUnsubscribe);
 
-    const { result } = renderHook(() =>
-      useRealtimeMeetings({ initialData: mockInitialData })
-    );
+    const { result } = renderWithCoordinator();
 
     await waitFor(() => {
       expect(mockClient.subscribe).toHaveBeenCalledWith(
@@ -107,9 +158,7 @@ describe('useRealtimeMeetings', () => {
       total: 1,
     });
 
-    const { result } = renderHook(() =>
-      useRealtimeMeetings({ initialData: mockInitialData })
-    );
+    const { result } = renderWithCoordinator();
 
     await waitFor(() => {
       expect(result.current.isConnected).toBe(true);
@@ -146,9 +195,7 @@ describe('useRealtimeMeetings', () => {
       throw new Error('Connection failed');
     });
 
-    const { result } = renderHook(() =>
-      useRealtimeMeetings({ initialData: mockInitialData })
-    );
+    const { result } = renderWithCoordinator();
 
     await waitFor(() => {
       expect(result.current.isConnected).toBe(false);
@@ -188,9 +235,7 @@ describe('useRealtimeMeetings', () => {
       total: 1,
     });
 
-    const { result } = renderHook(() =>
-      useRealtimeMeetings({ initialData: mockInitialData })
-    );
+    const { result } = renderWithCoordinator();
 
     await waitFor(() => {
       expect(result.current.isConnected).toBe(true);
@@ -221,12 +266,38 @@ describe('useRealtimeMeetings', () => {
     const mockUnsubscribe = jest.fn();
     mockClient.subscribe.mockReturnValue(mockUnsubscribe);
 
-    const { unmount } = renderHook(() =>
-      useRealtimeMeetings({ initialData: mockInitialData })
-    );
+    const { unmount } = renderWithCoordinator();
 
     unmount();
 
     expect(mockUnsubscribe).toHaveBeenCalled();
+  });
+
+  it('should respond to coordinated cleanup signals', async () => {
+    const mockUnsubscribe = jest.fn();
+    mockClient.subscribe.mockReturnValue(mockUnsubscribe);
+
+    const { result, controller } = renderWithCoordinator();
+
+    await waitFor(() => {
+      expect(result.current.isConnected).toBe(true);
+    });
+
+    expect(controller.requestCleanup).toBeDefined();
+
+    await act(async () => {
+      const cleanupPromise = controller.requestCleanup?.({
+        reason: 'test',
+        drainDelay: 0,
+      });
+      jest.runOnlyPendingTimers();
+      await cleanupPromise;
+    });
+
+    expect(mockUnsubscribe).toHaveBeenCalled();
+    expect(result.current.isConnected).toBe(false);
+    expect(['disconnecting', 'disconnected']).toContain(
+      result.current.connectionState
+    );
   });
 });
