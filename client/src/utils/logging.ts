@@ -294,6 +294,8 @@ export function useLogger(componentName?: string) {
   return createComponentLogger(name);
 }
 
+export type ComponentLogger = ReturnType<typeof createComponentLogger>;
+
 /**
  * Development utilities
  */
