@@ -5,11 +5,12 @@ import { client, databases, Query } from '@/lib/appwrite-client';
 import { Meeting, Race } from '@/types/meetings';
 import { SUPPORTED_RACE_TYPE_CODES } from '@/constants/raceTypes';
 import { isSupportedCountry } from '@/constants/countries';
-import { updateRaceInCache } from './useRacesForMeeting';
 import { useLogger } from '@/utils/logging';
 
 // Connection state machine for graceful transitions
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'disconnecting'
+
+const MAX_MEETING_SUBSCRIPTIONS = 60;
 
 interface UseRealtimeMeetingsOptions {
   initialData: Meeting[];
@@ -18,6 +19,7 @@ interface UseRealtimeMeetingsOptions {
 
 export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeetingsOptions) {
   const logger = useLogger('useRealtimeMeetings');
+  const loggerRef = useRef(logger);
   const [meetings, setMeetings] = useState<Meeting[]>(initialData);
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [isConnected, setIsConnected] = useState(false);
@@ -25,6 +27,38 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
   const [isInitialDataReady, setIsInitialDataReady] = useState(initialData.length > 0);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasWarnedChannelLimitRef = useRef(false);
+  const meetingsRef = useRef(meetings);
+
+  const { channels: meetingChannels, trimmedCount, totalMeetings } = useMemo(() => {
+    if (meetings.length === 0) {
+      return { channels: [] as string[], trimmedCount: 0, totalMeetings: 0 };
+    }
+
+    const limitedMeetings = meetings.slice(0, MAX_MEETING_SUBSCRIPTIONS);
+    const ids = new Set<string>();
+    const channels = limitedMeetings.reduce<string[]>((acc, meeting) => {
+      const documentId = meeting.$id || meeting.meetingId;
+      if (documentId && !ids.has(documentId)) {
+        ids.add(documentId);
+        acc.push(`databases.raceday-db.collections.meetings.documents.${documentId}`);
+      }
+      return acc;
+    }, []);
+
+    const trimmed = meetings.length > limitedMeetings.length
+      ? meetings.length - limitedMeetings.length
+      : 0;
+
+    return {
+      channels,
+      trimmedCount: trimmed,
+      totalMeetings: meetings.length
+    };
+  }, [meetings]);
+
+  const meetingChannelsRef = useRef<string[]>(meetingChannels);
+  const meetingChannelsKey = useMemo(() => meetingChannels.join('|'), [meetingChannels]);
 
   // Memoize today's date to avoid recalculation on every real-time update
   const today = useMemo(() => {
@@ -81,7 +115,7 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
       const races = racesResponse.documents as unknown as Race[];
       return races[0]?.startTime || null;
     } catch (error) {
-      logger.error(`Error fetching first race for meeting ${meetingId}`, error);
+      loggerRef.current.error(`Error fetching first race for meeting ${meetingId}`, error);
       return null;
     }
   }, []);
@@ -95,72 +129,62 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
       setConnectionState('connecting');
       setIsConnected(false);
 
-      const continueSetup = async () => {
-        const unsubscribe = client.subscribe([
-        'databases.raceday-db.collections.meetings.documents',
-        'databases.raceday-db.collections.races.documents'
-      ], async (response) => {
-        try {
-          const { events, payload } = response;
-          
-          // Handle meeting updates
-          if (events.some(e => e.includes('meetings.documents'))) {
-            const meeting = payload as Meeting;
-            
-            // Filter for today's meetings only
-            if (meeting.date === today && 
-                isSupportedCountry(meeting.country) &&
-                // Use category codes for consistent filtering
-                SUPPORTED_RACE_TYPE_CODES.includes(meeting.category)) {
-              
-              // Get first race time for chronological sorting
-              const firstRaceTime = await fetchFirstRaceTime(meeting.meetingId);
-              const updatedMeeting = {
-                ...meeting,
-                firstRaceTime: firstRaceTime || meeting.$createdAt
-              };
+      const channels = meetingChannelsRef.current;
 
-              if (events.some(e => e.includes('.create'))) {
-                updateMeetings(updatedMeeting);
-              } else if (events.some(e => e.includes('.update'))) {
-                updateMeetings(updatedMeeting);
-              } else if (events.some(e => e.includes('.delete'))) {
-                removeMeeting(meeting.$id);
+      if (channels.length === 0) {
+        loggerRef.current.warn('No meeting IDs available for meeting-specific subscription');
+        setConnectionState('disconnected');
+        setIsConnected(false);
+        return;
+      }
+
+      const continueSetup = async () => {
+        const unsubscribe = client.subscribe(channels, async (response) => {
+          try {
+            const { events, payload } = response;
+
+            // Handle meeting updates
+            if (events.some(e => e.includes('meetings.documents'))) {
+              const meeting = payload as Meeting;
+
+              // Filter for today's meetings only
+              if (
+                meeting.date === today &&
+                isSupportedCountry(meeting.country) &&
+                SUPPORTED_RACE_TYPE_CODES.includes(meeting.category)
+              ) {
+                // Prefer existing first race time data before hitting database
+                let firstRaceTime = meeting.firstRaceTime;
+                if (!firstRaceTime) {
+                  const existingMeeting = meetingsRef.current.find(
+                    (item) => item.meetingId === meeting.meetingId
+                  );
+                  firstRaceTime = existingMeeting?.firstRaceTime;
+                }
+
+                if (!firstRaceTime) {
+                  firstRaceTime = await fetchFirstRaceTime(meeting.meetingId) || undefined;
+                }
+
+                const updatedMeeting = {
+                  ...meeting,
+                  firstRaceTime: firstRaceTime || meeting.$createdAt
+                };
+
+                if (events.some(e => e.includes('.create'))) {
+                  updateMeetings(updatedMeeting);
+                } else if (events.some(e => e.includes('.update'))) {
+                  updateMeetings(updatedMeeting);
+                } else if (events.some(e => e.includes('.delete'))) {
+                  removeMeeting(meeting.$id);
+                }
               }
             }
+          } catch (error) {
+            loggerRef.current.error('Error processing real-time update', error);
+            onError?.(error as Error);
           }
-          
-          // Handle race updates (for first race time changes and cache updates)
-          if (events.some(e => e.includes('races.documents'))) {
-            const race = payload as Race;
-            
-            // Update race cache for expanded meetings
-            if (events.some(e => e.includes('.update'))) {
-              updateRaceInCache(race.meeting, race);
-            }
-            
-            // Update meeting's first race time if this affects it
-            setMeetings(prev => {
-              const meetingToUpdate = prev.find(m => m.meetingId === race.meeting);
-              if (meetingToUpdate) {
-                // Re-fetch first race time for this meeting
-                fetchFirstRaceTime(race.meeting).then(firstRaceTime => {
-                  if (firstRaceTime && firstRaceTime !== meetingToUpdate.firstRaceTime) {
-                    updateMeetings({
-                      ...meetingToUpdate,
-                      firstRaceTime
-                    });
-                  }
-                });
-              }
-              return prev;
-            });
-          }
-        } catch (error) {
-          logger.error('Error processing real-time update', error);
-          onError?.(error as Error);
-        }
-      });
+        });
 
         unsubscribeRef.current = unsubscribe;
         setConnectionState('connected');
@@ -189,7 +213,7 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
         continueSetup();
       }
     } catch (error) {
-      logger.error('Failed to setup real-time subscriptions', error);
+      loggerRef.current.error('Failed to setup real-time subscriptions', error);
       setConnectionState('disconnected');
       setIsConnected(false);
       onError?.(error as Error);
@@ -202,21 +226,49 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
         setupSubscriptions();
       }, getRetryDelay(attempts));
     }
-  }, [connectionAttempts, getRetryDelay, updateMeetings, removeMeeting, fetchFirstRaceTime, onError, today]);
+  }, [connectionAttempts, fetchFirstRaceTime, getRetryDelay, onError, removeMeeting, today, updateMeetings]);
 
   // Effect to mark initial data as ready
   useEffect(() => {
     setIsInitialDataReady(initialData.length > 0);
   }, [initialData.length]);
 
+  useEffect(() => {
+    loggerRef.current = logger;
+  }, [logger]);
+
+  useEffect(() => {
+    meetingChannelsRef.current = meetingChannels;
+  }, [meetingChannels]);
+
+  useEffect(() => {
+    meetingsRef.current = meetings;
+  }, [meetings]);
+
+  useEffect(() => {
+    if (trimmedCount > 0) {
+      if (!hasWarnedChannelLimitRef.current) {
+        loggerRef.current.warn('Trimming meeting realtime subscriptions to stay under channel limit', {
+          totalMeetings,
+          subscribed: meetingChannels.length,
+          trimmed: trimmedCount,
+          maxSubscriptions: MAX_MEETING_SUBSCRIPTIONS
+        });
+        hasWarnedChannelLimitRef.current = true;
+      }
+    } else if (hasWarnedChannelLimitRef.current) {
+      hasWarnedChannelLimitRef.current = false;
+    }
+  }, [meetingChannels.length, totalMeetings, trimmedCount]);
+
   // Initialize subscriptions - follow hybrid architecture: only subscribe after initial data is ready
   useEffect(() => {
     if (!isInitialDataReady) {
-      logger.debug('Waiting for initial meetings data to be ready before subscription');
+      loggerRef.current.debug('Waiting for initial meetings data to be ready before subscription');
       return;
     }
 
-    logger.info('Initial meetings data ready, setting up real-time subscription');
+    loggerRef.current.info('Initial meetings data ready, setting up real-time subscription');
     setupSubscriptions();
 
     return () => {
@@ -228,7 +280,7 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
         clearTimeout(retryTimeoutRef.current);
       }
     };
-  }, [isInitialDataReady, setupSubscriptions]);
+  }, [isInitialDataReady, setupSubscriptions, meetingChannelsKey]);
 
   return {
     meetings,
