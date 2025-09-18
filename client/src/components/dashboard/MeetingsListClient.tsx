@@ -98,7 +98,7 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
         />
       </div>
     ));
-  }, [meetings, handleRaceClick, selectedMeeting, handleMeetingClick]);
+  }, [meetings, selectedMeeting, handleMeetingClick]);
 
   // Show loading state only if we have no data
   if (!meetings.length && connectionAttempts === 0) {

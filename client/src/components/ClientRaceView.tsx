@@ -33,7 +33,7 @@ export function ClientRaceView({ raceId }: ClientRaceViewProps) {
       logger.debug('Race data already matches URL, clearing any errors');
       setError(null);
     }
-  }, [raceId, raceData, contextLoading, loadRaceData]);
+  }, [raceId, raceData, contextLoading, loadRaceData, logger]);
 
   // Handle errors (prefer context error over local error)
   const displayError = contextError || error;

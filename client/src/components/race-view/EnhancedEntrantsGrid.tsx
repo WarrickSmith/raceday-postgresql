@@ -257,7 +257,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     }
 
     return finalEntrants
-  }, [currentEntrants, initialEntrants, realtimeEntrants, lastUpdate])
+  }, [currentEntrants, initialEntrants, realtimeEntrants, lastUpdate, logger])
 
   // Validation function to check if timeline amounts sum to total pool
   const validateTimelineSummation = useCallback((entrant: Entrant) => {
@@ -293,7 +293,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     }
 
     return true
-  }, [])
+  }, [logger])
 
   // Calculate pool money for each entrant using actual timeline data and pool data
   const entrantsWithPoolData = useMemo(() => {
@@ -439,7 +439,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
       return entrantWithPoolData
     })
-  }, [entrants, racePoolData, timelineData, validateTimelineSummation])
+  }, [entrants, racePoolData, timelineData, validateTimelineSummation, logger])
 
   // Debug logging removed - entrants data structure verified
 
@@ -740,7 +740,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     // Sort columns chronologically: highest positive → 0 → lowest negative
     // Example: 60m, 50m, 40m, ..., 2m, 1m, 0 (Start), +1m, +2m, +4m
     return columns.sort((a, b) => b.interval - a.interval)
-  }, [currentRaceStartTime, currentTime, currentRace?.status, timelineData])
+  }, [currentRaceStartTime, currentTime, currentRace?.status, timelineData, logger])
 
   const timelineIntervals = useMemo(
     () => timelineColumns.map((column) => column.interval),
@@ -882,6 +882,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     autoScroll,
     currentTime,
     isCurrentTimeColumn,
+    logger,
   ])
 
   // Get data for specific timeline point - shows incremental money amounts or odds based on selected view
@@ -928,6 +929,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       getWinPoolData,
       getPlacePoolData,
       getOddsData,
+      logger,
     ]
   )
 
