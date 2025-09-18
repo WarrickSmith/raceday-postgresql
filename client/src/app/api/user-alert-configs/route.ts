@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
         userId,
         indicators: defaultIndicators,
         toggleAll: true,
+        audibleAlertsEnabled: true,
       })
     }
 
@@ -53,11 +54,14 @@ export async function GET(request: NextRequest) {
 
     // Calculate toggleAll state (true if all are enabled)
     const toggleAll = indicators.every(ind => ind.enabled)
+    const audibleAlertsEnabled =
+      indicators[0]?.audibleAlertsEnabled ?? true
 
     return NextResponse.json({
       userId,
       indicators,
       toggleAll,
+      audibleAlertsEnabled,
     })
   } catch (error) {
     console.error('Failed to load user alert config:', error)
@@ -75,7 +79,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { userId = DEFAULT_USER_ID, indicators } = body
+    const {
+      userId = DEFAULT_USER_ID,
+      indicators,
+      audibleAlertsEnabled = true,
+    } = body
 
     if (!indicators || !Array.isArray(indicators)) {
       return NextResponse.json(
@@ -93,6 +101,7 @@ export async function POST(request: NextRequest) {
         color: indicator.color,
         isDefault: indicator.isDefault,
         lastUpdated: new Date().toISOString(),
+        audibleAlertsEnabled,
       }
 
       if (indicator.$id) {
@@ -108,6 +117,7 @@ export async function POST(request: NextRequest) {
           percentageRangeMax: indicator.percentageRangeMax,
           displayOrder: indicator.displayOrder,
           createdAt: new Date().toISOString(),
+          audibleAlertsEnabled,
         }
         return databases.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), createData)
       }
@@ -140,6 +150,7 @@ async function createDefaultIndicators(databases: any, userId: string): Promise<
       displayOrder: defaultConfig.displayOrder,
       createdAt: new Date().toISOString(),
       lastUpdated: new Date().toISOString(),
+      audibleAlertsEnabled: true,
     }
 
     const doc = await databases.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), createData)
@@ -165,6 +176,7 @@ async function createMissingIndicators(databases: any, userId: string, missingOr
       displayOrder: defaultConfig.displayOrder,
       createdAt: new Date().toISOString(),
       lastUpdated: new Date().toISOString(),
+      audibleAlertsEnabled: true,
     }
 
     const doc = await databases.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), createData)

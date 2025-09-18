@@ -28,7 +28,15 @@ export const loadUserAlertConfig = async (userId: string = DEFAULT_USER_ID): Pro
     }
 
     const config = await response.json()
-    return config
+    const audibleAlertsEnabled =
+      config.audibleAlertsEnabled ??
+      config.indicators?.[0]?.audibleAlertsEnabled ??
+      true
+
+    return {
+      ...config,
+      audibleAlertsEnabled,
+    }
   } catch (error) {
     console.error('Failed to load user alert config:', error)
 
@@ -45,6 +53,7 @@ export const loadUserAlertConfig = async (userId: string = DEFAULT_USER_ID): Pro
       userId,
       indicators: defaultIndicators,
       toggleAll: true,
+      audibleAlertsEnabled: true,
     }
   }
 }
@@ -63,6 +72,7 @@ export const saveUserAlertConfig = async (config: AlertsConfig): Promise<void> =
       body: JSON.stringify({
         userId: config.userId,
         indicators: config.indicators,
+        audibleAlertsEnabled: config.audibleAlertsEnabled,
       }),
     })
 
@@ -94,7 +104,14 @@ export const resetToDefaults = async (userId: string = DEFAULT_USER_ID): Promise
     }
 
     const resetConfig = await response.json()
-    return resetConfig
+    const audibleAlertsEnabled =
+      resetConfig.audibleAlertsEnabled ??
+      resetConfig.indicators?.[0]?.audibleAlertsEnabled ??
+      true
+    return {
+      ...resetConfig,
+      audibleAlertsEnabled,
+    }
   } catch (error) {
     console.error('Failed to reset to defaults:', error)
     throw new Error('Failed to reset to default configuration. Please try again.')
@@ -111,6 +128,10 @@ export const validateAlertConfig = (config: AlertsConfig): string[] => {
 
   if (!config.indicators || config.indicators.length !== 6) {
     errors.push('Exactly 6 indicators are required')
+  }
+
+  if (typeof config.audibleAlertsEnabled !== 'boolean') {
+    errors.push('Audible alerts enabled flag must be a boolean')
   }
 
   // Validate each indicator

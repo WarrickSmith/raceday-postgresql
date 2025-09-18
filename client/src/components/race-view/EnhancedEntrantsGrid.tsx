@@ -20,6 +20,7 @@ import { useGridIndicators } from '@/hooks/useGridIndicators'
 import mapIndicatorColorToCellStyle from '@/utils/indicatorColors'
 import { JockeySilks } from './JockeySilks'
 import { useLogger } from '@/utils/logging'
+import { useAudibleAlerts } from '@/contexts/AudibleAlertContext'
 
 // Flash-enabled Win Odds Cell Component
 const WinOddsCell = memo(function WinOddsCell({
@@ -126,6 +127,14 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 }: EnhancedEntrantsGridProps) {
   const logger = useLogger('EnhancedEntrantsGrid');
   const { raceData } = useRace()
+  const {
+    isEnabled: audioAlertsEnabled,
+    isLoading: audioPreferenceLoading,
+    isPersisting: audioPreferencePersisting,
+    toggle: toggleAudioAlerts,
+    lastError: audioPreferenceError,
+    primeAudioWithUserGesture,
+  } = useAudibleAlerts()
 
   // Use real-time entrants data from unified subscription if available
   const currentEntrants =
@@ -178,8 +187,19 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     refetch: refetchTimeline,
   } = useMoneyFlowTimeline(currentRaceId, entrantIds, selectedView === 'odds' ? 'win' : selectedView)
 
-  const [updateNotifications, setUpdateNotifications] = useState(true)
   const [selectedEntrant, setSelectedEntrant] = useState<string | undefined>()
+
+  const handleAudioToggle = useCallback(() => {
+    if (!audioAlertsEnabled) {
+      primeAudioWithUserGesture()
+    }
+
+    toggleAudioAlerts().catch((error) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Failed to toggle audible alerts', error)
+      }
+    })
+  }, [audioAlertsEnabled, primeAudioWithUserGesture, toggleAudioAlerts])
 
 
   // Trigger timeline refetch when unified subscription receives money flow updates
@@ -1131,22 +1151,45 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
           {/* RIGHT: Indicators, Audio Toggle and Auto Scroll */}
           <div className="flex items-center space-x-2">
-
-            <button
-              onClick={() => setUpdateNotifications(!updateNotifications)}
-              className={`text-xs px-2 py-1 rounded transition-colors ${
-                updateNotifications
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-gray-200 text-gray-600'
-              }`}
-              title={
-                updateNotifications
-                  ? 'Disable audio notifications'
-                  : 'Enable audio notifications'
-              }
-            >
-              {updateNotifications ? '🔊' : '🔇'}
-            </button>
+            <div className="flex flex-col items-start">
+              <button
+                type="button"
+                onClick={handleAudioToggle}
+                className={`text-xs px-2 py-1 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 ${
+                  audioAlertsEnabled
+                    ? 'bg-blue-600 text-white hover:bg-blue-500'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                } ${
+                  audioPreferenceLoading || audioPreferencePersisting
+                    ? 'opacity-70 cursor-not-allowed'
+                    : ''
+                }`}
+                aria-pressed={audioAlertsEnabled}
+                aria-label={
+                  audioAlertsEnabled
+                    ? 'Disable global audible race alerts'
+                    : 'Enable global audible race alerts'
+                }
+                disabled={audioPreferenceLoading || audioPreferencePersisting}
+              >
+                {audioPreferenceLoading ? (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" aria-hidden="true" />
+                    <span className="font-medium">Loading…</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1">
+                    <span aria-hidden="true">{audioAlertsEnabled ? '🔊' : '🔇'}</span>
+                    <span className="font-medium">{audioAlertsEnabled ? 'Audio On' : 'Audio Off'}</span>
+                  </span>
+                )}
+              </button>
+              {audioPreferenceError && (
+                <span className="mt-1 text-[10px] text-red-600" role="status" aria-live="polite">
+                  {audioPreferenceError}
+                </span>
+              )}
+            </div>
 
             <button
               onClick={() => setAutoScroll(!autoScroll)}

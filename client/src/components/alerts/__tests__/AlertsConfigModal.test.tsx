@@ -34,8 +34,10 @@ describe('AlertsConfigModal', () => {
       userId: 'test-user',
       lastUpdated: new Date().toISOString(),
       createdAt: new Date().toISOString(),
+      audibleAlertsEnabled: true,
     })),
     toggleAll: true,
+    audibleAlertsEnabled: true,
   }
 
   beforeEach(() => {
