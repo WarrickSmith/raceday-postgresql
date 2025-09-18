@@ -172,6 +172,8 @@ export function useUnifiedRaceRealtime({
   const connectionStartTime = useRef<number>(Date.now())
   const latencySamples = useRef<number[]>([])
   const initialDataFetched = useRef<boolean>(false)
+  const initialPoolDataAttempted = useRef<boolean>(false)
+  const poolDataFetchInProgress = useRef<boolean>(false)
   const lastCleanupSignal = useRef<number>(0)
   const [isCleaningUp, setIsCleaningUp] = useState<boolean>(false)
 
@@ -223,6 +225,66 @@ export function useUnifiedRaceRealtime({
   )
 
   // Fetch initial data if not provided
+  const fetchPoolDataForRace = useCallback(
+    async ({ force = false }: { force?: boolean } = {}) => {
+      if (!raceId) return
+      if (poolDataFetchInProgress.current) return
+      if (!force && initialPoolDataAttempted.current) return
+
+      poolDataFetchInProgress.current = true
+      initialPoolDataAttempted.current = true
+
+      try {
+        const poolDataResponse = await databases.listDocuments(
+          'raceday-db',
+          'race-pools',
+          [Query.equal('raceId', raceId), Query.limit(1)]
+        )
+
+        if (poolDataResponse.documents.length > 0) {
+          const poolDoc = poolDataResponse.documents[0]
+
+          setState((prev) => ({
+            ...prev,
+            poolData: {
+              $id: poolDoc.$id,
+              $createdAt: poolDoc.$createdAt,
+              $updatedAt: poolDoc.$updatedAt,
+              raceId: poolDoc.raceId,
+              winPoolTotal: poolDoc.winPoolTotal || 0,
+              placePoolTotal: poolDoc.placePoolTotal || 0,
+              quinellaPoolTotal: poolDoc.quinellaPoolTotal || 0,
+              trifectaPoolTotal: poolDoc.trifectaPoolTotal || 0,
+              exactaPoolTotal: poolDoc.exactaPoolTotal || 0,
+              first4PoolTotal: poolDoc.first4PoolTotal || 0,
+              totalRacePool: poolDoc.totalRacePool || 0,
+              currency: poolDoc.currency || '$',
+              lastUpdated: poolDoc.$updatedAt,
+              isLive: poolDoc.isLive || false,
+            },
+            lastPoolUpdate: new Date(),
+          }))
+
+          debugLog('Initial pool data loaded', {
+            totalPool: poolDoc.totalRacePool,
+          })
+        } else {
+          debugLog('No pool data document found for race', { raceId })
+          setState((prev) => ({
+            ...prev,
+            poolData: null,
+            lastPoolUpdate: prev.lastPoolUpdate || new Date(),
+          }))
+        }
+      } catch (poolError) {
+        errorLog('Failed to fetch pool data', poolError)
+      } finally {
+        poolDataFetchInProgress.current = false
+      }
+    },
+    [raceId]
+  )
+
   const fetchInitialData = useCallback(async () => {
     if (!raceId || initialDataFetched.current) return
 
@@ -259,41 +321,7 @@ export function useUnifiedRaceRealtime({
       }))
 
       // Fetch pool data separately since API might not include it
-      try {
-        const poolDataResponse = await databases.listDocuments(
-          'raceday-db',
-          'race-pools',
-          [Query.equal('raceId', raceId), Query.limit(1)]
-        )
-
-        if (poolDataResponse.documents.length > 0) {
-          const poolDoc = poolDataResponse.documents[0]
-          setState((prev) => ({
-            ...prev,
-            poolData: {
-              $id: poolDoc.$id,
-              $createdAt: poolDoc.$createdAt,
-              $updatedAt: poolDoc.$updatedAt,
-              raceId: poolDoc.raceId,
-              winPoolTotal: poolDoc.winPoolTotal || 0,
-              placePoolTotal: poolDoc.placePoolTotal || 0,
-              quinellaPoolTotal: poolDoc.quinellaPoolTotal || 0,
-              trifectaPoolTotal: poolDoc.trifectaPoolTotal || 0,
-              exactaPoolTotal: poolDoc.exactaPoolTotal || 0,
-              first4PoolTotal: poolDoc.first4PoolTotal || 0,
-              totalRacePool: poolDoc.totalRacePool || 0,
-              currency: poolDoc.currency || '$',
-              lastUpdated: poolDoc.$updatedAt,
-              isLive: poolDoc.isLive || false,
-            },
-          }))
-          debugLog('Initial pool data loaded', {
-            totalPool: poolDoc.totalRacePool,
-          })
-        }
-      } catch (poolError) {
-        errorLog('Failed to fetch pool data', poolError)
-      }
+      await fetchPoolDataForRace({ force: true })
 
       // Fetch race-results document ID for specific subscriptions
       if (raceData.race?.$id) {
@@ -379,6 +407,14 @@ export function useUnifiedRaceRealtime({
   // Reset fetch flag when race ID changes
   useEffect(() => {
     initialDataFetched.current = false
+    initialPoolDataAttempted.current = false
+    poolDataFetchInProgress.current = false
+
+    setState((prev) => ({
+      ...prev,
+      poolData: null,
+      lastPoolUpdate: null,
+    }))
     debugLog('Race ID changed, reset fetch flag', { raceId })
   }, [raceId])
 
@@ -436,6 +472,15 @@ export function useUnifiedRaceRealtime({
       fetchInitialData()
     }
   }, [raceId, state.race, state.entrants, fetchInitialData])
+
+  // Ensure pool data is fetched at least once per race when unified hook is active
+  useEffect(() => {
+    if (!raceId) return
+    if (state.poolData) return
+    if (initialPoolDataAttempted.current) return
+
+    fetchPoolDataForRace()
+  }, [raceId, state.poolData, fetchPoolDataForRace])
 
   // Periodic check for race-results document creation for active races
   useEffect(() => {
