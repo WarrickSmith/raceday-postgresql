@@ -52,9 +52,9 @@ This development plan consolidates findings from three comprehensive architectur
 
 ### Task 2: Remove NextScheduledRaceButton Redundant Subscription
 **Status**:
-- ► Not Started
+- Not Started
 - In Progress
-- Complete
+- ► Complete
 
 **Priority**: Critical
 **Impact**: Eliminates duplicate collection-wide race subscription
