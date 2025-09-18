@@ -10,6 +10,8 @@ import { Entrant } from '@/types/meetings';
 import { memoryManager } from './memoryManager';
 import { logPerformance, logDebug, logWarn, LoggingUtils } from './logging';
 
+type MemoryPerformanceReport = ReturnType<typeof memoryManager.getPerformanceReport>;
+
 // Performance monitoring
 export class PerformanceMonitor {
   private static instance: PerformanceMonitor;
@@ -89,7 +91,7 @@ export class PerformanceMonitor {
    */
   public getPerformanceReport(): {
     timing: Record<string, { avg: number; min: number; max: number; count: number }>;
-    memory: any;
+    memory: MemoryPerformanceReport;
     recommendations: string[];
   } {
     const timing = this.getMetrics();
@@ -129,13 +131,13 @@ export class PerformanceMonitor {
 }
 
 // Virtual scrolling hook for large lists
-export function useVirtualScrolling({
+export function useVirtualScrolling<T>({
   items,
   itemHeight = 60,
   containerHeight = 400,
   overscan = 5
 }: {
-  items: any[];
+  items: T[];
   itemHeight?: number;
   containerHeight?: number;
   overscan?: number;
@@ -194,19 +196,19 @@ export function useDebouncedValue<T>(value: T, delay: number): T {
 }
 
 // Throttled callback hook
-export function useThrottledCallback<T extends (...args: any[]) => any>(
+export function useThrottledCallback<T extends (...args: unknown[]) => void>(
   callback: T,
   delay: number
-): T {
+): (...args: Parameters<T>) => void {
   const lastRan = useRef(Date.now());
   
   return useCallback(
-    ((...args) => {
+    (...args: Parameters<T>) => {
       if (Date.now() - lastRan.current >= delay) {
         callback(...args);
         lastRan.current = Date.now();
       }
-    }) as T,
+    },
     [callback, delay]
   );
 }

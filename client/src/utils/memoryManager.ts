@@ -27,6 +27,25 @@ interface MemoryThresholds {
   cleanup: number; // 90% of heap limit
 }
 
+interface PerformanceMemoryInfo {
+  usedJSHeapSize: number;
+  totalJSHeapSize: number;
+  jsHeapSizeLimit: number;
+}
+
+interface PerformanceWithMemory extends Performance {
+  memory?: PerformanceMemoryInfo;
+}
+
+type WindowWithGC = Window & { gc?: () => void };
+
+interface NavigatorMemory {
+  addEventListener?: (type: string, listener: () => void) => void;
+  removeEventListener?: (type: string, listener: () => void) => void;
+}
+
+type NavigatorWithMemory = Navigator & { memory?: NavigatorMemory };
+
 class MemoryManager {
   private performanceSnapshots: PerformanceSnapshot[] = [];
   private cleanupCallbacks: Array<() => void> = [];
@@ -49,11 +68,15 @@ class MemoryManager {
    * Get current memory statistics
    */
   getMemoryStats(): MemoryStats | null {
-    if (typeof window === 'undefined' || !('memory' in performance)) {
+    if (typeof window === 'undefined') {
       return null;
     }
 
-    const memory = (performance as any).memory;
+    const performanceWithMemory = performance as PerformanceWithMemory;
+    const memory = performanceWithMemory.memory;
+    if (!memory) {
+      return null;
+    }
     const memoryUsagePercentage = memory.usedJSHeapSize / memory.jsHeapSizeLimit;
 
     return {
@@ -160,12 +183,15 @@ class MemoryManager {
     this.triggerCleanup();
     
     // Force garbage collection if available (Chrome DevTools)
-    if (typeof window !== 'undefined' && 'gc' in window) {
-      try {
-        (window as any).gc();
-        console.log('♻️ Forced garbage collection');
-      } catch (error) {
-        console.log('GC not available');
+    if (typeof window !== 'undefined') {
+      const gc = (window as WindowWithGC).gc;
+      if (gc) {
+        try {
+          gc();
+          console.log('♻️ Forced garbage collection');
+        } catch (error) {
+          console.log('GC not available');
+        }
       }
     }
   }
@@ -188,9 +214,10 @@ class MemoryManager {
     });
 
     // Cleanup on memory pressure (if supported)
-    if ('memory' in navigator) {
+    if (typeof navigator !== 'undefined') {
       try {
-        (navigator as any).memory?.addEventListener?.('memorywarning', () => {
+        const navigatorWithMemory = navigator as NavigatorWithMemory;
+        navigatorWithMemory.memory?.addEventListener?.('memorywarning', () => {
           console.warn('🔴 System memory warning - triggering cleanup');
           this.triggerAggressiveCleanup();
         });
