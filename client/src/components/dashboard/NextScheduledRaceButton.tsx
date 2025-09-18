@@ -19,6 +19,10 @@ interface NextScheduledRace {
   raceNumber: number;
 }
 
+interface NextScheduledRaceApiResponse {
+  nextScheduledRace: NextScheduledRace | null;
+}
+
 export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpdateSignal }: NextScheduledRaceButtonProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +36,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
     try {
       const response = await fetch('/api/next-scheduled-race');
       if (response.ok) {
-        const data = await response.json();
+        const data: NextScheduledRaceApiResponse = await response.json();
         setNextScheduledRace(data.nextScheduledRace);
       } else {
         setNextScheduledRace(null);
@@ -180,7 +184,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
     } finally {
       setIsLoading(false);
     }
-  }, [nextScheduledRace, isLoading, router]);
+  }, [nextScheduledRace, isLoading, router, requestCleanup]);
 
   // Show button always, but disable when no next race is available
   const isDisabled = !nextScheduledRace || isLoading;

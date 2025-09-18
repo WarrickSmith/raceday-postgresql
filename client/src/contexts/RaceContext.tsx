@@ -64,12 +64,15 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
     (data: RaceContextData | null) => {
       setRaceDataInternal(data)
     },
-    [raceData]
+    []
   )
 
-  const updateRaceData = useCallback((data: RaceContextData) => {
-    setRaceData(data)
-  }, [])
+  const updateRaceData = useCallback(
+    (data: RaceContextData) => {
+      setRaceData(data)
+    },
+    [setRaceData]
+  )
 
   // Simple race data loading function (without navigation complexity)
   const loadRaceData = useCallback(async (raceId: string) => {
@@ -81,7 +84,7 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
       if (!response.ok) {
         throw new Error(`Failed to fetch race data: ${response.statusText}`)
       }
-      const newRaceData = await response.json()
+      const newRaceData: RaceContextData = await response.json()
       setRaceData(newRaceData)
     } catch (err) {
       console.error('❌ Error loading race data:', err)
@@ -89,7 +92,7 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [setRaceData])
 
   const invalidateRaceCache = useCallback(
     (raceId: string) => {
