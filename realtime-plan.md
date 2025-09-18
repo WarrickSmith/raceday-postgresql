@@ -50,35 +50,7 @@ This development plan consolidates findings from three comprehensive architectur
 - Update subscription array to use meeting document IDs from initial fetch
 - Remove race-triggered `firstRaceTime` recalculation
 
-### Task 2: Eliminate Redundant Pool Data Subscriptions
-**Status**:
-- ► Not Started
-- In Progress
-- Complete
-
-**Priority**: Critical
-**Impact**: Prevents WebSocket connection duplication
-
-**Problem**: Despite unified race hook, `useRacePoolData.ts:94` creates independent race-pools subscription, violating Appwrite's single connection principle.
-
-**Strategy**:
-1. Add `disableSubscription` parameter to `useRacePoolData` hook
-2. Integrate pool data subscriptions into `useUnifiedRaceRealtime` hook
-3. Modify race pages to disable standalone pool subscriptions when unified hook is active
-4. Ensure pool data updates flow through unified subscription channels
-
-**Key Resources**:
-- File: `/client/src/hooks/useRacePoolData.ts:94`
-- Architecture Guide: `/docs/client-real-time-data-integration.md#unified-subscription-with-intelligent-filtering`
-- Pattern Reference: Unified hook design in `useUnifiedRaceRealtime.ts`
-
-**Implementation Details**:
-- Add optional `disableSubscription?: boolean` parameter to hook interface
-- Integrate pool document subscription into unified hook's channel array
-- Update race page components to pass `disableSubscription=true`
-- Maintain backward compatibility for non-unified usage
-
-### Task 3: Remove NextScheduledRaceButton Redundant Subscription
+### Task 2: Remove NextScheduledRaceButton Redundant Subscription
 **Status**:
 - ► Not Started
 - In Progress
@@ -106,7 +78,67 @@ This development plan consolidates findings from three comprehensive architectur
 - Expose filtered race updates relevant to button functionality
 - Update component to consume shared data stream
 
-### Task 4: Optimize Channel Subscriptions to Document-Level
+### Task 3: Eliminate Redundant Pool Data Subscriptions
+**Status**:
+- ► Not Started
+- In Progress
+- Complete
+
+**Priority**: Critical
+**Impact**: Prevents WebSocket connection duplication
+
+**Problem**: Despite unified race hook, `useRacePoolData.ts:94` creates independent race-pools subscription, violating Appwrite's single connection principle.
+
+**Strategy**:
+1. Add `disableSubscription` parameter to `useRacePoolData` hook
+2. Integrate pool data subscriptions into `useUnifiedRaceRealtime` hook
+3. Modify race pages to disable standalone pool subscriptions when unified hook is active
+4. Ensure pool data updates flow through unified subscription channels
+
+**Key Resources**:
+- File: `/client/src/hooks/useRacePoolData.ts:94`
+- Architecture Guide: `/docs/client-real-time-data-integration.md#unified-subscription-with-intelligent-filtering`
+- Pattern Reference: Unified hook design in `useUnifiedRaceRealtime.ts`
+
+**Implementation Details**:
+- Add optional `disableSubscription?: boolean` parameter to hook interface
+- Integrate pool document subscription into unified hook's channel array
+- Update race page components to pass `disableSubscription=true`
+- Maintain backward compatibility for non-unified usage
+
+### Task 4: Implement Coordinated Navigation Cleanup
+**Status**:
+- ► Not Started
+- In Progress
+- Complete
+
+**Priority**: Critical
+**Impact**: Eliminates orphaned connections during navigation
+
+**Problem**: Navigation cleanup uses fixed drain periods without coordination across multiple subscriptions, potentially leaving orphaned connections and lingering sockets during route transitions and Fast Refresh.
+
+**Strategy**:
+1. Extend existing `triggerSubscriptionCleanup` pattern from race navigation
+2. Create centralized cleanup coordinator for all page subscriptions
+3. Orchestrate drain timing across meetings, race, and button hooks before route changes
+4. Integrate with Next.js navigation events and Fast Refresh lifecycle hooks
+
+**Key Resources**:
+- File: `/components/race-view/RaceNavigation.tsx:44` (existing cleanup pattern)
+- Hook: `/client/src/hooks/useUnifiedRaceRealtime.ts:409` (cleanup implementation)
+- Documentation: `/docs/client-real-time-data-integration.md#enhanced-subscription-patterns`
+
+**Implementation Details**:
+- Implement shared cleanup signal/context consumed by all realtime hooks
+- Emit navigation intent events from router transitions and button handlers
+- Ensure meetings and race hooks acknowledge cleanup before establishing new channels
+- Add regression coverage for rapid navigation and Fast Refresh scenarios
+
+---
+
+## Medium Impact Tasks (Important - Week 2)
+
+### Task 5: Optimize Channel Subscriptions to Document-Level
 **Status**:
 - ► Not Started
 - In Progress
@@ -133,38 +165,6 @@ This development plan consolidates findings from three comprehensive architectur
 - Replace `databases.raceday-db.collections.race-pools.documents` with `databases.raceday-db.collections.race-pools.documents.${poolDocumentId}`
 - Implement fallback to collection-level if document ID unavailable
 - Add progressive channel upgrading when IDs become known
-
----
-
-## Medium Impact Tasks (Important - Week 2)
-
-### Task 5: Implement Coordinated Navigation Cleanup
-**Status**:
-- ► Not Started
-- In Progress
-- Complete
-
-**Priority**: Medium
-**Impact**: Eliminates orphaned connections during navigation
-
-**Problem**: Navigation cleanup uses fixed drain periods without coordination across multiple subscriptions, potentially leaving orphaned connections.
-
-**Strategy**:
-1. Extend existing `triggerSubscriptionCleanup` pattern from race navigation
-2. Create centralized cleanup coordinator for all page subscriptions
-3. Implement proper drain timing coordination across hooks
-4. Add Next.js navigation event integration for automatic cleanup
-
-**Key Resources**:
-- File: `/components/race-view/RaceNavigation.tsx:44` (existing pattern)
-- Hook: `/client/src/hooks/useUnifiedRaceRealtime.ts:409` (cleanup implementation)
-- Documentation: `/docs/client-real-time-data-integration.md#enhanced-subscription-patterns`
-
-**Implementation Details**:
-- Create shared cleanup signal context or custom hook
-- Extend meetings hook with cleanup signal support
-- Add router event listeners for automatic cleanup triggers
-- Coordinate timing across multiple subscription teardowns
 
 ### Task 6: Optimize Entrant Subscription Initialization
 **Status**:
