@@ -228,7 +228,6 @@ export function RacePageContent() {
       {/* Footer - Enhanced with real-time data */}
       <footer className="race-layout-footer">
         <RaceFooter
-          raceId={currentRace.raceId}
           raceStartTime={currentRace.startTime}
           raceStatus={
             (currentRace.status?.toLowerCase() as RaceStatus) || raceStatus

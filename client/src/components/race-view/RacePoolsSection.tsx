@@ -1,10 +1,8 @@
 'use client'
 import { memo } from 'react'
-import { useRacePoolData } from '@/hooks/useRacePoolData'
 import type { RacePoolData } from '@/types/racePools'
 
 interface RacePoolsSectionProps {
-  raceId: string
   poolData?: RacePoolData | null
   className?: string
   lastUpdate?: Date | null
@@ -19,20 +17,15 @@ const formatPoolAmount = (cents: number): string => {
 }
 
 export const RacePoolsSection = memo(function RacePoolsSection({
-  raceId,
   poolData,
   className = '',
   lastUpdate,
 }: RacePoolsSectionProps) {
-  // Use poolData from unified subscription if available, otherwise use fallback hook for data persistence
-  const {
-    poolData: fallbackPoolData,
-    isLoading,
-    error,
-  } = useRacePoolData(poolData ? '' : raceId, !!poolData) // Disable subscription when unified poolData is available
-  const currentPoolData = poolData || fallbackPoolData
+  const currentPoolData = poolData ?? null
+  const isLoading = currentPoolData === null && !lastUpdate
+  const noPoolDataAvailable = currentPoolData === null && !!lastUpdate
 
-  if (isLoading && !poolData) {
+  if (isLoading) {
     return (
       <div className={`${className}`}>
         <div className="animate-pulse">
@@ -48,16 +41,7 @@ export const RacePoolsSection = memo(function RacePoolsSection({
     )
   }
 
-  if (error && !poolData) {
-    return (
-      <div className={`text-red-600 text-sm ${className}`}>
-        <div className="text-xs text-gray-500 mb-1">Pool Data</div>
-        <div>Error loading pool data</div>
-      </div>
-    )
-  }
-
-  if (!currentPoolData) {
+  if (noPoolDataAvailable || !currentPoolData) {
     return (
       <div className={`${className}`}>
         <div className="text-xs text-gray-500 mb-1">Pool Data</div>

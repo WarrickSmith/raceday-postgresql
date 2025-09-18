@@ -23,7 +23,6 @@ const formatPoolAmount = (cents: number): string => {
 }
 
 interface RaceFooterProps {
-  raceId: string
   raceStartTime: string
   raceStatus: RaceStatus
   poolData?: RacePoolData
@@ -50,7 +49,6 @@ interface RaceFooterProps {
 }
 
 export const RaceFooter = memo(function RaceFooter({
-  raceId,
   raceStartTime,
   raceStatus,
   poolData,
@@ -102,7 +100,6 @@ export const RaceFooter = memo(function RaceFooter({
         {/* Column 1: Pools Section */}
         <div className="w-96 flex-shrink-0 pr-4">
           <RacePoolsSection
-            raceId={raceId}
             poolData={currentPoolData}
             lastUpdate={lastPoolUpdate}
           />
