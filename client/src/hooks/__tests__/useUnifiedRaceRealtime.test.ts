@@ -18,7 +18,19 @@ jest.mock('@/lib/appwrite-client', () => ({
 
 // Get the mocked functions
 import { client, databases } from '@/lib/appwrite-client'
-const mockSubscribe = client.subscribe as jest.Mock
+
+type MockRealtimeEvent = {
+  events: string[]
+  channels: string[]
+  timestamp: string
+  payload?: Record<string, unknown>
+}
+
+type SubscribeCallback = (event: MockRealtimeEvent) => void
+
+const mockSubscribe = client.subscribe as jest.MockedFunction<
+  (channels: string | string[], callback: SubscribeCallback) => () => void
+>
 const mockListDocuments = databases.listDocuments as jest.Mock
 
 // Mock global fetch
@@ -230,14 +242,14 @@ describe('useUnifiedRaceRealtime', () => {
 
   it('should handle real-time subscription and message processing', async () => {
     // Mock the subscription callback
-    const mockCallback = jest.fn()
+    const mockCallback = jest.fn<void, [MockRealtimeEvent]>()
     const mockUnsubscribe = jest.fn()
 
     // Setup mock subscription
-    mockSubscribe.mockImplementation(((channels: any, callback: any) => {
+    mockSubscribe.mockImplementation((channels, callback) => {
       mockCallback.mockImplementation(callback)
       return mockUnsubscribe
-    }) as any)
+    })
 
     // Mock the listDocuments to return a race document
     mockListDocuments.mockResolvedValue({
@@ -291,13 +303,13 @@ describe('useUnifiedRaceRealtime', () => {
   })
 
   it('should handle pool data updates from real-time messages', async () => {
-    const mockCallback = jest.fn()
+    const mockCallback = jest.fn<void, [MockRealtimeEvent]>()
     const mockUnsubscribe = jest.fn()
 
-    mockSubscribe.mockImplementation(((channels: any, callback: any) => {
+    mockSubscribe.mockImplementation((channels, callback) => {
       mockCallback.mockImplementation(callback)
       return mockUnsubscribe
-    }) as any)
+    })
 
     // Mock the listDocuments to return a race document
     mockListDocuments.mockResolvedValue({
@@ -362,13 +374,13 @@ describe('useUnifiedRaceRealtime', () => {
   })
 
   it('should batch multiple updates for performance', async () => {
-    const mockCallback = jest.fn()
+    const mockCallback = jest.fn<void, [MockRealtimeEvent]>()
     const mockUnsubscribe = jest.fn()
 
-    mockSubscribe.mockImplementation(((channels: any, callback: any) => {
+    mockSubscribe.mockImplementation((channels, callback) => {
       mockCallback.mockImplementation(callback)
       return mockUnsubscribe
-    }) as any)
+    })
 
     // Mock the listDocuments to return a race document
     mockListDocuments.mockResolvedValue({

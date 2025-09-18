@@ -22,6 +22,7 @@ import type { RacePoolData, RaceResultsData } from '@/types/racePools'
 import { Query } from 'appwrite'
 import { useLogger } from '@/utils/logging'
 import { NAVIGATION_DRAIN_DELAY } from '@/contexts/SubscriptionCleanupContext'
+import type { MoneyFlowDataPoint } from '@/types/moneyFlow'
 
 // Debug logging control - minimal for production
 const DEBUG = process.env.NODE_ENV === 'development'
@@ -29,7 +30,7 @@ const DEBUG = process.env.NODE_ENV === 'development'
 // Create logger outside component to avoid re-creation
 let logger: ReturnType<typeof useLogger>;
 
-const debugLog = (message: string, data?: any) => {
+const debugLog = (message: string, data?: unknown) => {
   if (logger) {
     logger.debug(message, data);
   }
@@ -41,7 +42,7 @@ const debugRaceStatus = (
   raceId: string,
   oldStatus?: string,
   newStatus?: string,
-  extra?: any
+  extra?: Record<string, unknown>
 ) => {
   if (logger && oldStatus !== newStatus) {
     logger.debug(`RaceStatus: ${message}`, {
@@ -54,7 +55,7 @@ const debugRaceStatus = (
   }
 }
 
-const errorLog = (message: string, error: any) => {
+const errorLog = (message: string, error: unknown) => {
   if (logger) {
     logger.error(message, error);
   }
@@ -67,13 +68,41 @@ const performanceLog = (operation: string, startTime: number) => {
   }
 }
 
-// Appwrite subscription message interface
+type RealtimePayloadBase = Partial<Race> &
+  Partial<RacePoolData> &
+  Partial<RaceResultsData> &
+  Partial<Entrant> &
+  Partial<MoneyFlowDataPoint>;
+
+type RealtimePayload = RealtimePayloadBase & {
+  entrant?: string | { entrantId?: string; $id?: string }
+  race?: string
+  resultsAvailable?: boolean
+  [key: string]: unknown
+};
+
+interface RawRealtimeMessage {
+  events: string[]
+  channels?: string[]
+  timestamp: string
+  payload?: RealtimePayload
+}
+
 interface AppwriteRealtimeMessage {
   events: string[]
   channels: string[]
   timestamp: string
-  payload: any
+  payload: RealtimePayload
 }
+
+type RealtimeSubscribeCallback = (message: RawRealtimeMessage) => void;
+
+const normalizeRealtimeMessage = (message: RawRealtimeMessage): AppwriteRealtimeMessage => ({
+  events: message.events,
+  channels: message.channels ?? [],
+  timestamp: message.timestamp,
+  payload: (message.payload ?? {}) as RealtimePayload,
+});
 
 // Hook props interface
 interface UseUnifiedRaceRealtimeProps {
@@ -965,7 +994,9 @@ export function useUnifiedRaceRealtime({
           newState.lastEntrantsUpdate = now
           hasUpdates = true
         } else if (isMoneyFlowEvent && payload) {
-          debugLog('Money flow update received', { entrantId: payload.entrant })
+          debugLog('Money flow update received', {
+            entrantId: resolveEntrantId(payload.entrant),
+          })
 
           newState.entrants = updateEntrantMoneyFlow(newState.entrants, payload)
           newState.lastEntrantsUpdate = now
@@ -1076,16 +1107,13 @@ export function useUnifiedRaceRealtime({
           // Create unified subscription
           unsubscribeFunction.current = client.subscribe(
             channels,
-            (response: any) => {
+            (response: RawRealtimeMessage) => {
               debugLog('📡 Unified subscription event received', {
                 channels: response.channels?.length || 0,
                 events: response.events,
                 hasPayload: !!response.payload,
               })
-              processRealtimeMessage({
-                ...response,
-                channels: response.channels || [],
-              })
+              processRealtimeMessage(normalizeRealtimeMessage(response))
             }
           )
 
@@ -1223,15 +1251,10 @@ export function useUnifiedRaceRealtime({
           )
 
           // Create a new message processor for the upgraded subscription
-          const handleMessage = (response: any) => {
+          const handleMessage: RealtimeSubscribeCallback = (response) => {
             try {
-              // Add to pending updates
-              pendingUpdates.current.push({
-                ...response,
-                channels: response.channels || [],
-              })
+              pendingUpdates.current.push(normalizeRealtimeMessage(response))
 
-              // Clear existing timer and set new one for throttling
               if (updateThrottleTimer.current) {
                 clearTimeout(updateThrottleTimer.current)
               }
@@ -1337,12 +1360,26 @@ function updateEntrantInList(
   })
 }
 
+function resolveEntrantId(entrant: RealtimePayload['entrant']): string | null {
+  if (!entrant) {
+    return null
+  }
+
+  if (typeof entrant === 'string') {
+    return entrant
+  }
+
+  return entrant.entrantId || entrant.$id || null
+}
+
 function updateEntrantMoneyFlow(
   entrants: Entrant[],
-  moneyFlowData: any
+  moneyFlowData: RealtimePayload
 ): Entrant[] {
+  const targetEntrantId = resolveEntrantId(moneyFlowData.entrant)
+
   return entrants.map((entrant) => {
-    if (entrant.$id === moneyFlowData.entrant) {
+    if (targetEntrantId && entrant.$id === targetEntrantId) {
       let trend: 'up' | 'down' | 'neutral' = 'neutral'
 
       // Update hold percentage and calculate trend
