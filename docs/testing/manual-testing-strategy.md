@@ -77,6 +77,57 @@ This document outlines the manual testing procedures for the Race Day applicatio
 
 ---
 
+## Story 5.4: Implement Global Audible Alert Toggle
+
+### **AC1: Audible alert triggers one minute before filtered race start**
+**Test Procedure:**
+1. Ensure audible alerts toggle is enabled from the Race view header.
+2. Using Appwrite console or seed data, set a race to start two minutes from current time that matches active filters.
+3. Navigate between dashboard and race detail views while waiting.
+4. Observe whether the alert fires exactly one minute before the scheduled start.
+
+**Expected Results:**
+- Audio cue plays once exactly at T-60 seconds.
+- Alert does not repeat after initial playback.
+- No alert fires if the race is marked Final/Abandoned before T-60.
+
+**Pass/Fail Criteria:**
+- ✅ PASS: Single audible cue at T-60 for applicable races.
+- ❌ FAIL: Missing cue, delayed cue, or repeated/late playback.
+
+### **AC2: Toggle state persists across session and views**
+**Test Procedure:**
+1. Toggle audible alerts off in the race header.
+2. Refresh the page and navigate to dashboard, then back to any race.
+3. Toggle alerts on, sign out/in (if available) or open a new tab to verify persistence within session scope.
+
+**Expected Results:**
+- Toggle state matches last user choice after navigation/refresh within session.
+- No unexpected reversion to default state.
+- Toggle updates disable audio immediately when set to Off.
+
+**Pass/Fail Criteria:**
+- ✅ PASS: Preference respected across race/dashboard routes and reloads.
+- ❌ FAIL: Preference resets unexpectedly or toggle state desynchronised from stored value.
+
+### **AC3: Alerts honour active filters and avoid overlaps**
+**Test Procedure:**
+1. Apply race filters (e.g., country/type) and confirm only filtered races remain visible.
+2. Schedule two races—one matching filters, one excluded—within two minutes of each other.
+3. Observe audible alerts as both approach start times.
+4. If two filtered races share the same trigger minute, verify playback occurs once without stacking.
+
+**Expected Results:**
+- Only races passing filters trigger audio cues.
+- No alerts for filtered-out races.
+- Concurrent qualifying races produce a single, non-overlapping cue.
+
+**Pass/Fail Criteria:**
+- ✅ PASS: Filter alignment confirmed and no overlapping audio playback.
+- ❌ FAIL: Any excluded race triggers audio or overlapping cues occur.
+
+---
+
 ## Cross-Browser Compatibility Testing
 
 ### **Desktop Browsers**
