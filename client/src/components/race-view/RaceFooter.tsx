@@ -27,13 +27,6 @@ interface RaceFooterProps {
   raceStatus: RaceStatus
   poolData?: RacePoolData
   resultsData?: RaceResultsData
-  entrants?: Array<{
-    $id: string
-    runnerNumber: number
-    name: string
-    winOdds?: number
-    placeOdds?: number
-  }>
   className?: string
   showCountdown?: boolean
   showResults?: boolean
@@ -53,7 +46,6 @@ export const RaceFooter = memo(function RaceFooter({
   raceStatus,
   poolData,
   resultsData,
-  entrants = [],
   className = '',
   showCountdown = true,
   showResults = true,

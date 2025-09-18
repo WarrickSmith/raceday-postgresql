@@ -23,7 +23,6 @@ interface RaceDataHeaderProps {
     avgLatency: number | null
     uptime: number
   }
-  lastUpdate?: Date | null
   onConfigureAlerts?: () => void
 }
 
@@ -34,7 +33,6 @@ export const RaceDataHeader = memo(function RaceDataHeader({
   meeting: propMeeting,
   navigationData: propNavigationData,
   connectionHealth,
-  lastUpdate,
   onConfigureAlerts,
 }: RaceDataHeaderProps) {
   const { raceData } = useRace()

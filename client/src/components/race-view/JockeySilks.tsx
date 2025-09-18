@@ -2,10 +2,9 @@
 
 import { memo, useMemo, useCallback } from 'react';
 import Image from 'next/image';
-import type { 
-  JockeySilk, 
-  SilkDisplayConfig, 
-  SilkRenderData, 
+import type {
+  JockeySilk,
+  SilkDisplayConfig,
   SilkPattern
 } from '@/types/jockeySilks';
 import { DEFAULT_SILK_CONFIG, COMMON_SILK_PATTERNS } from '@/types/jockeySilks';

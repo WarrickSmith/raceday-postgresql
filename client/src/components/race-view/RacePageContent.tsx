@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRace } from '@/contexts/RaceContext'
 import { RaceDataHeader } from '@/components/race-view/RaceDataHeader'
 import { EnhancedEntrantsGrid } from '@/components/race-view/EnhancedEntrantsGrid'
@@ -24,49 +24,6 @@ export function RacePageContent() {
     initialNavigationData: raceData?.navigationData || null,
     cleanupSignal: subscriptionCleanupSignal,
   })
-
-  // Status synchronization monitoring and debug messaging
-  useEffect(() => {
-    if (!raceData?.race || process.env.NODE_ENV !== 'development') return
-
-    const currentRace = realtimeData.race || raceData.race
-    const currentResultsData =
-      realtimeData.resultsData ||
-      (currentRace.resultsAvailable && currentRace.resultsData
-        ? {
-            raceId: currentRace.raceId,
-            results: currentRace.resultsData,
-            dividends: currentRace.dividendsData || [],
-            fixedOddsData: currentRace.fixedOddsData
-              ? typeof currentRace.fixedOddsData === 'string'
-                ? JSON.parse(currentRace.fixedOddsData)
-                : currentRace.fixedOddsData
-              : {},
-            status: currentRace.resultStatus || 'interim',
-            photoFinish: currentRace.photoFinish || false,
-            stewardsInquiry: currentRace.stewardsInquiry || false,
-            protestLodged: currentRace.protestLodged || false,
-            resultTime: currentRace.resultTime || new Date().toISOString(),
-          }
-        : undefined)
-
-    const statusConflict =
-      currentRace.status?.toLowerCase() !==
-      currentRace.resultStatus?.toLowerCase()
-    const resultDataStatus = currentResultsData?.status
-    const finalStatusUsed =
-      realtimeData.resultsData?.status || currentRace.resultStatus || 'interim'
-
-    // Status conflict monitoring without logging
-    if (statusConflict) {
-      // Silently monitor status conflicts without showing modal
-    }
-  }, [
-    raceData?.race,
-    realtimeData.race,
-    realtimeData.resultsData,
-    realtimeData.lastResultsUpdate,
-  ])
 
   if (!raceData) {
     return (
@@ -170,7 +127,6 @@ export function RacePageContent() {
           meeting={currentMeeting}
           navigationData={realtimeData.navigationData}
           connectionHealth={realtimeData.getConnectionHealth()}
-          lastUpdate={realtimeData.lastRaceUpdate}
           onConfigureAlerts={() => setIsAlertsModalOpen(true)}
         />
       </header>
@@ -234,7 +190,6 @@ export function RacePageContent() {
           }
           poolData={currentPoolData || undefined}
           resultsData={currentResultsData || undefined}
-          entrants={currentEntrants}
           showCountdown={true}
           showResults={true}
           lastPoolUpdate={realtimeData.lastPoolUpdate}
