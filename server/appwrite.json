@@ -118,7 +118,7 @@
       "$id": "enhanced-race-poller",
       "name": "Enhanced Race Poller",
       "runtime": "node-22",
-      "specification": "s-4vcpu-4gb",
+      "specification": "s-1vcpu-1gb",
       "path": "enhanced-race-poller",
       "execute": ["any"],
       "events": [],
