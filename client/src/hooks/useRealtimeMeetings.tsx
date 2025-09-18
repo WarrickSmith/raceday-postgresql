@@ -12,12 +12,21 @@ type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'disconnect
 
 const MAX_MEETING_SUBSCRIPTIONS = 60;
 
+export interface RaceUpdateEvent {
+  meetingId: string;
+  eventType: 'create' | 'update';
+  meetingName: string;
+  firstRaceTime?: string;
+  timestamp: number;
+}
+
 interface UseRealtimeMeetingsOptions {
   initialData: Meeting[];
   onError?: (error: Error) => void;
+  onRaceUpdate?: (event: RaceUpdateEvent) => void;
 }
 
-export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeetingsOptions) {
+export function useRealtimeMeetings({ initialData, onError, onRaceUpdate }: UseRealtimeMeetingsOptions) {
   const logger = useLogger('useRealtimeMeetings');
   const loggerRef = useRef(logger);
   const [meetings, setMeetings] = useState<Meeting[]>(initialData);
@@ -29,6 +38,7 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasWarnedChannelLimitRef = useRef(false);
   const meetingsRef = useRef(meetings);
+  const onRaceUpdateRef = useRef(onRaceUpdate);
 
   const { channels: meetingChannels, trimmedCount, totalMeetings } = useMemo(() => {
     if (meetings.length === 0) {
@@ -171,12 +181,26 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
                   firstRaceTime: firstRaceTime || meeting.$createdAt
                 };
 
+                let eventType: RaceUpdateEvent['eventType'] | null = null;
+
                 if (events.some(e => e.includes('.create'))) {
                   updateMeetings(updatedMeeting);
+                  eventType = 'create';
                 } else if (events.some(e => e.includes('.update'))) {
                   updateMeetings(updatedMeeting);
+                  eventType = 'update';
                 } else if (events.some(e => e.includes('.delete'))) {
                   removeMeeting(meeting.$id);
+                }
+
+                if (eventType) {
+                  onRaceUpdateRef.current?.({
+                    meetingId: updatedMeeting.meetingId,
+                    eventType,
+                    meetingName: updatedMeeting.meetingName,
+                    firstRaceTime: updatedMeeting.firstRaceTime,
+                    timestamp: Date.now(),
+                  });
                 }
               }
             }
@@ -244,6 +268,10 @@ export function useRealtimeMeetings({ initialData, onError }: UseRealtimeMeeting
   useEffect(() => {
     meetingsRef.current = meetings;
   }, [meetings]);
+
+  useEffect(() => {
+    onRaceUpdateRef.current = onRaceUpdate;
+  }, [onRaceUpdate]);
 
   useEffect(() => {
     if (trimmedCount > 0) {

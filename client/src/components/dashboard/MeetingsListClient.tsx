@@ -6,7 +6,7 @@ import { MeetingCard } from './MeetingCard';
 import { RacesForMeetingClient } from './RacesForMeetingClient';
 import { MeetingsListSkeleton } from '../skeletons/MeetingCardSkeleton';
 import { NextScheduledRaceButton } from './NextScheduledRaceButton';
-import { useRealtimeMeetings } from '@/hooks/useRealtimeMeetings';
+import { useRealtimeMeetings, type RaceUpdateEvent } from '@/hooks/useRealtimeMeetings';
 import { Meeting } from '@/types/meetings';
 import { racePrefetchService } from '@/services/racePrefetchService';
 
@@ -18,6 +18,7 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+  const [raceUpdateSignal, setRaceUpdateSignal] = useState(0);
 
   const handleError = useCallback((error: Error) => {
     console.error('Real-time connection error:', error);
@@ -43,9 +44,16 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
     router.push(`/race/${raceId}`);
   }, [router]);
 
+  const handleRaceRealtimeUpdate = useCallback((event: RaceUpdateEvent) => {
+    if (event.eventType === 'update' || event.eventType === 'create') {
+      setRaceUpdateSignal((prev) => prev + 1);
+    }
+  }, []);
+
   const { meetings, isConnected, connectionAttempts, retry } = useRealtimeMeetings({
     initialData,
     onError: handleError,
+    onRaceUpdate: handleRaceRealtimeUpdate,
   });
 
   // Auto-select the first meeting on initial load
@@ -100,7 +108,11 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
       {/* Header with connection status and next race button */}
       <div className="col-span-1 lg:col-span-2 flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <NextScheduledRaceButton meetings={meetings} />
+          <NextScheduledRaceButton 
+            meetings={meetings}
+            isRealtimeConnected={isConnected}
+            raceUpdateSignal={raceUpdateSignal}
+          />
         </div>
         
         {/* Real-time connection status */}

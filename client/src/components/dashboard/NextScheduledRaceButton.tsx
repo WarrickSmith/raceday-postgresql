@@ -2,11 +2,12 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Meeting, Race } from '@/types/meetings';
-import { client } from '@/lib/appwrite-client';
+import { Meeting } from '@/types/meetings';
 
 interface NextScheduledRaceButtonProps {
   meetings: Meeting[];
+  isRealtimeConnected: boolean;
+  raceUpdateSignal: number;
 }
 
 interface NextScheduledRace {
@@ -17,12 +18,10 @@ interface NextScheduledRace {
   raceNumber: number;
 }
 
-export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonProps) {
+export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpdateSignal }: NextScheduledRaceButtonProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [nextScheduledRace, setNextScheduledRace] = useState<NextScheduledRace | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const unsubscribeRef = useRef<(() => void) | null>(null);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -72,71 +71,28 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
     }, pollInterval);
   }, [nextScheduledRace, fetchNextScheduledRace]);
 
-  // Setup real-time subscriptions for race status changes
+  // Initial fetch and intelligent polling bootstrap
   useEffect(() => {
-    const setupSubscriptions = async () => {
-      try {
-        // Clean up existing subscription
-        if (unsubscribeRef.current) {
-          unsubscribeRef.current();
-        }
+    let isActive = true;
 
-        const unsubscribe = client.subscribe([
-          'databases.raceday-db.collections.races.documents'
-        ], async (response) => {
-          try {
-            const { events, payload } = response;
-            
-            // Handle race status changes that might affect next scheduled race
-            if (events.some(e => e.includes('races.documents'))) {
-              const race = payload as Race;
-              
-              // If this race status changed to Started, Abandoned, or Finalized,
-              // or if it's a new race, refresh the next scheduled race
-              if (events.some(e => e.includes('.update') || e.includes('.create'))) {
-                if (race.status === 'Running' || race.status === 'Abandoned' || 
-                    race.status === 'Final' || race.status === 'Interim') {
-                  
-                  // Debounce API calls to prevent excessive requests
-                  if (debounceTimeoutRef.current) {
-                    clearTimeout(debounceTimeoutRef.current);
-                  }
-                  
-                  debounceTimeoutRef.current = setTimeout(fetchNextScheduledRace, 2000);
-                }
-              }
-            }
-          } catch (error) {
-            console.error('Error processing race status update:', error);
-          }
-        });
-
-        unsubscribeRef.current = unsubscribe;
-        setIsConnected(true);
-      } catch (error) {
-        console.error('Failed to setup race subscriptions:', error);
-        setIsConnected(false);
-      }
-    };
-
-    // Initial fetch and setup
     fetchNextScheduledRace().then(() => {
-      setupSubscriptions();
-      setupIntelligentPolling();
+      if (isActive) {
+        setupIntelligentPolling();
+      }
     });
 
     return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-      }
+      isActive = false;
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
+        fetchTimeoutRef.current = null;
       }
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
       }
     };
-  }, []);
+  }, [fetchNextScheduledRace, setupIntelligentPolling]);
 
   // Update polling when race changes
   useEffect(() => {
@@ -150,6 +106,37 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
       }
     };
   }, [setupIntelligentPolling]);
+
+  // React to shared real-time update signals from meetings subscription
+  useEffect(() => {
+    if (!raceUpdateSignal) {
+      return;
+    }
+
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    debounceTimeoutRef.current = setTimeout(() => {
+      fetchNextScheduledRace().finally(() => {
+        debounceTimeoutRef.current = null;
+      });
+    }, 2000);
+
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
+      }
+    };
+  }, [raceUpdateSignal, fetchNextScheduledRace]);
+
+  // Reset next race when meetings data clears
+  useEffect(() => {
+    if (meetings.length === 0) {
+      setNextScheduledRace(null);
+    }
+  }, [meetings.length]);
 
   // Handle real-time countdown updates and race transitions
   useEffect(() => {
@@ -275,8 +262,8 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
         {/* Real-time connection indicator */}
         {!isDisabled && (
           <div className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${
-            isConnected ? 'bg-green-400' : 'bg-red-400'
-          }`} title={isConnected ? 'Real-time connected' : 'Offline mode'} />
+            isRealtimeConnected ? 'bg-green-400' : 'bg-red-400'
+          }`} title={isRealtimeConnected ? 'Real-time connected' : 'Offline mode'} />
         )}
       </div>
       
