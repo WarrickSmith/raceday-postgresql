@@ -5,28 +5,55 @@
 
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type {
   MoneyFlowDataPoint,
   EntrantMoneyFlowTimeline,
 } from '@/types/moneyFlow'
 import { useLogger } from '@/utils/logging'
+import type { ComponentLogger } from '@/utils/logging'
 
 // Server response interface for raw database data
+interface ServerEntrant {
+  entrantId?: string
+  name?: string
+  $id?: string
+  id?: string
+  [key: string]: unknown
+}
+
+type EntrantReference = string | ServerEntrant
+
+type TimelinePoolType =
+  | 'win'
+  | 'place'
+  | 'quinella'
+  | 'trifecta'
+  | 'exacta'
+  | 'first4'
+
+type TimelineIntervalType = '30s' | '1m' | '5m' | string
+
 interface ServerMoneyFlowPoint {
   $id: string
   $createdAt: string
   $updatedAt: string
-  entrant: string | { entrantId: string; name: string; [key: string]: any } // Can be string or nested object
+  entrant: EntrantReference
   eventTimestamp?: string
   pollingTimestamp?: string
   timeToStart?: number
+  timeInterval?: number
+  intervalType?: TimelineIntervalType
   holdPercentage?: number
   betPercentage?: number
   winPoolAmount?: number
   placePoolAmount?: number
   type?: string
   poolType?: string
+  incrementalWinAmount?: number
+  incrementalPlaceAmount?: number
+  incrementalAmount?: number
+  totalPoolAmount?: number
   // CONSOLIDATED ODDS DATA (NEW in Story 4.9)
   fixedWinOdds?: number
   fixedPlaceOdds?: number
@@ -34,11 +61,24 @@ interface ServerMoneyFlowPoint {
   poolPlaceOdds?: number
 }
 
+interface MoneyFlowTimelineResponse {
+  success: boolean
+  documents: ServerMoneyFlowPoint[]
+  total?: number
+  raceId?: string
+  entrantIds?: string[]
+  poolType?: string
+  bucketedData?: boolean
+  intervalCoverage?: Record<string, unknown>
+  message?: string
+  queryOptimizations?: string[]
+}
+
 export interface TimelineGridData {
   [timeInterval: number]: {
     [entrantId: string]: {
       incrementalAmount: number
-      poolType: 'win' | 'place' | 'quinella' | 'trifecta' | 'exacta' | 'first4'
+      poolType: TimelinePoolType
       timestamp: string
     }
   }
@@ -65,23 +105,19 @@ interface UseMoneyFlowTimelineResult {
 export function useMoneyFlowTimeline(
   raceId: string,
   entrantIds: string[],
-  poolType:
-    | 'win'
-    | 'place'
-    | 'quinella'
-    | 'trifecta'
-    | 'exacta'
-    | 'first4' = 'win',
+  poolType: TimelinePoolType = 'win',
   raceStatus?: string // Add race status to control post-race behavior
 ): UseMoneyFlowTimelineResult {
   const logger = useLogger('useMoneyFlowTimeline')
+  const loggerRef = useRef(logger)
+  loggerRef.current = logger
+  const entrantKey = useMemo(() => entrantIds.join(','), [entrantIds])
   const [timelineData, setTimelineData] = useState<
     Map<string, EntrantMoneyFlowTimeline>
   >(new Map())
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
-  const [forceRefresh, setForceRefresh] = useState(0)
 
   // Fetch money flow timeline data for all entrants
   const fetchTimelineData = useCallback(async () => {
@@ -103,24 +139,27 @@ export function useMoneyFlowTimeline(
     try {
       // Use API route to fetch money flow timeline data
       const response = await fetch(
-        `/api/race/${raceId}/money-flow-timeline?entrants=${entrantIds.join(
-          ','
-        )}`
+        `/api/race/${raceId}/money-flow-timeline?entrants=${entrantKey}`
       )
 
       if (!response.ok) {
         throw new Error(`Failed to fetch timeline data: ${response.statusText}`)
       }
 
-      const data = await response.json()
-      const documents = data.documents || []
+      const data = (await response.json()) as MoneyFlowTimelineResponse
+      const documents = data.documents ?? []
 
-      // Log interval coverage analysis if available
       if (data.intervalCoverage) {
+        loggerRef.current.debug(
+          'Money flow interval coverage received',
+          data.intervalCoverage
+        )
       }
 
-      // Log the API response for debugging
       if (data.message) {
+        loggerRef.current.info('Money flow timeline message', {
+          message: data.message,
+        })
       }
 
       // Handle empty data gracefully
@@ -134,26 +173,24 @@ export function useMoneyFlowTimeline(
       const entrantDataMap = processTimelineData(
         documents,
         entrantIds,
-        poolType,
-        data.bucketedData,
-        logger
+        loggerRef.current
       )
       setTimelineData(entrantDataMap)
       setLastUpdate(new Date())
-
-      return
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch timeline data'
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to fetch timeline data'
       setError(errorMessage)
-      logger.error('Error fetching money flow timeline', err)
+      loggerRef.current.error('Error fetching money flow timeline', err)
     } finally {
       setIsLoading(false)
     }
-  }, [raceId, entrantIds.join(','), poolType, raceStatus, timelineData.size])
+  }, [raceId, entrantIds, entrantKey, raceStatus, timelineData.size])
 
   // Generate timeline grid data optimized for component display
   const gridData = useMemo(() => {
     const grid: TimelineGridData = {}
+    const currentLogger = loggerRef.current
 
     for (const [entrantId, entrantData] of timelineData) {
       // Skip if no data points
@@ -173,7 +210,7 @@ export function useMoneyFlowTimeline(
 
         // Use the incremental amount that was already calculated in the first processing loop
         // This ensures we maintain the correct chronological incremental calculations
-        const incrementalAmount = dataPoint.incrementalAmount || 0
+        const incrementalAmount = dataPoint.incrementalAmount ?? 0
 
         // Skip if this pool type doesn't match what we're displaying
         const hasValidPoolData =
@@ -182,7 +219,7 @@ export function useMoneyFlowTimeline(
             typeof dataPoint.placePoolAmount === 'number')
 
         if (!hasValidPoolData && !dataPoint.poolPercentage) {
-          logger.debug(`Skipping data point - no valid pool data for ${poolType}`, {
+          currentLogger.debug(`Skipping data point - no valid pool data for ${poolType}`, {
             winPoolAmount: dataPoint.winPoolAmount,
             placePoolAmount: dataPoint.placePoolAmount,
             poolPercentage: dataPoint.poolPercentage,
@@ -193,7 +230,11 @@ export function useMoneyFlowTimeline(
         // Use timeInterval if available (bucketed data), otherwise timeToStart (legacy)
         // This ensures compatibility with both data structures
         const interval =
-          (dataPoint as any).timeInterval ?? dataPoint.timeToStart
+          dataPoint.timeInterval ?? dataPoint.timeToStart
+
+        if (interval === undefined) {
+          continue
+        }
 
         // Add grid data for this interval
         if (!grid[interval]) {
@@ -287,7 +328,7 @@ export function useMoneyFlowTimeline(
     // the unified subscription in useUnifiedRaceRealtime
     // The parent component should trigger refetch when it receives money-flow-history updates
     
-    logger.debug('Money flow timeline using fetch-only mode (no subscription)', {
+    loggerRef.current.debug('Money flow timeline using fetch-only mode (no subscription)', {
       raceId,
       entrantIds: entrantIds.length
     })
@@ -295,7 +336,7 @@ export function useMoneyFlowTimeline(
     return () => {
       // No subscription cleanup needed - using unified subscription architecture
     }
-  }, [raceId, entrantIds.join(','), raceStatus, fetchTimelineData]) // Use entrantIds.join(',') to avoid array reference issues
+  }, [raceId, entrantIds, entrantKey, raceStatus, fetchTimelineData])
 
   // NEW: Get Win pool data for specific entrant and time interval
   const getWinPoolData = useCallback(
@@ -391,9 +432,7 @@ export function useMoneyFlowTimeline(
 function processTimelineData(
   documents: ServerMoneyFlowPoint[],
   entrantIds: string[],
-  poolType: string,
-  isBucketed: boolean = false,
-  logger?: any
+  logger?: ComponentLogger
 ): Map<string, EntrantMoneyFlowTimeline> {
   const entrantDataMap = new Map<string, EntrantMoneyFlowTimeline>()
 
@@ -424,7 +463,7 @@ function processTimelineData(
 
     entrantDocs.forEach((doc) => {
       // Use timeInterval if available (bucketed), otherwise timeToStart (legacy)
-      const interval = (doc as any).timeInterval ?? doc.timeToStart ?? -999
+      const interval = doc.timeInterval ?? doc.timeToStart ?? -999
       if (interval === -999) {
         logger?.warn(`Document missing time information for entrant ${entrantId}`)
         return
@@ -452,25 +491,25 @@ function processTimelineData(
         entrant: entrantId,
         pollingTimestamp: doc.pollingTimestamp || doc.$createdAt,
         timeToStart: doc.timeToStart || 0,
-        timeInterval: (doc as any).timeInterval || interval,
-        intervalType: (doc as any).intervalType || '5m',
-        winPoolAmount: doc.winPoolAmount || 0,
-        placePoolAmount: doc.placePoolAmount || 0,
-        totalPoolAmount: (doc.winPoolAmount || 0) + (doc.placePoolAmount || 0),
-        poolPercentage: doc.holdPercentage || doc.betPercentage || 0,
+        timeInterval: doc.timeInterval ?? interval,
+        intervalType: doc.intervalType || '5m',
+        winPoolAmount: doc.winPoolAmount ?? 0,
+        placePoolAmount: doc.placePoolAmount ?? 0,
+        totalPoolAmount: (doc.winPoolAmount ?? 0) + (doc.placePoolAmount ?? 0),
+        poolPercentage: doc.holdPercentage ?? doc.betPercentage ?? 0,
         // Use server pre-calculated incremental amounts directly
         incrementalAmount:
-          (doc as any).incrementalWinAmount ||
-          (doc as any).incrementalAmount ||
+          doc.incrementalWinAmount ??
+          doc.incrementalAmount ??
           0,
-        incrementalWinAmount: (doc as any).incrementalWinAmount || 0,
-        incrementalPlaceAmount: (doc as any).incrementalPlaceAmount || 0,
-        pollingInterval: getPollingIntervalFromType((doc as any).intervalType),
+        incrementalWinAmount: doc.incrementalWinAmount ?? 0,
+        incrementalPlaceAmount: doc.incrementalPlaceAmount ?? 0,
+        pollingInterval: getPollingIntervalFromType(doc.intervalType),
         // CONSOLIDATED ODDS DATA (NEW in Story 4.9)
-        fixedWinOdds: (doc as any).fixedWinOdds,
-        fixedPlaceOdds: (doc as any).fixedPlaceOdds,
-        poolWinOdds: (doc as any).poolWinOdds,
-        poolPlaceOdds: (doc as any).poolPlaceOdds,
+        fixedWinOdds: doc.fixedWinOdds,
+        fixedPlaceOdds: doc.fixedPlaceOdds,
+        poolWinOdds: doc.poolWinOdds,
+        poolPlaceOdds: doc.poolPlaceOdds,
       }
 
       timelinePoints.push(timelinePoint)
@@ -557,20 +596,30 @@ function processTimelineData(
 /**
  * Extract entrant ID consistently from various data formats
  */
-function extractEntrantId(entrant: any): string {
+function extractEntrantId(entrant: EntrantReference): string {
   if (typeof entrant === 'string') {
     return entrant
   }
+
   if (entrant && typeof entrant === 'object') {
-    return entrant.entrantId || entrant.$id || entrant.id || 'unknown'
+    if (typeof entrant.entrantId === 'string') {
+      return entrant.entrantId
+    }
+    if (typeof entrant.$id === 'string') {
+      return entrant.$id
+    }
+    if (typeof entrant.id === 'string') {
+      return entrant.id
+    }
   }
+
   return 'unknown'
 }
 
 /**
  * Get polling interval from interval type string
  */
-function getPollingIntervalFromType(intervalType?: string): number {
+function getPollingIntervalFromType(intervalType?: TimelineIntervalType): number {
   switch (intervalType) {
     case '30s':
       return 0.5
