@@ -4,6 +4,7 @@ import '@testing-library/jest-dom'
 import EnhancedEntrantsGrid from '../EnhancedEntrantsGrid'
 import type { IndicatorResult } from '@/types/alertCalculations'
 import type { EntrantMoneyFlowTimeline } from '@/types/moneyFlow'
+import type { Entrant } from '@/types/meetings'
 
 jest.mock('@/hooks/useMoneyFlowTimeline', () => ({
   useMoneyFlowTimeline: jest.fn(),
@@ -136,7 +137,7 @@ describe('EnhancedEntrantsGrid timeline indicators', () => {
   })
 
   it('applies indicator styling and metadata to timeline cells', async () => {
-    const entrant = {
+    const entrant: Entrant = {
       $id: 'entrant-1',
       $createdAt: '2024-01-01T00:00:00.000Z',
       $updatedAt: '2024-01-01T00:00:00.000Z',
@@ -147,12 +148,17 @@ describe('EnhancedEntrantsGrid timeline indicators', () => {
       race: 'race-1',
       winOdds: 2.5,
       placeOdds: 1.5,
+      moneyFlowTimeline: undefined,
+      poolMoney: undefined,
+      previousHoldPercentage: undefined,
+      holdPercentage: undefined,
+      moneyFlowTrend: undefined,
     }
 
     await act(async () => {
       render(
         <EnhancedEntrantsGrid
-          initialEntrants={[entrant as any]}
+          initialEntrants={[entrant]}
           raceId="race-1"
           raceStartTime={new Date().toISOString()}
         />

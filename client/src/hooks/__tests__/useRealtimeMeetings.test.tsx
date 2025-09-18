@@ -4,11 +4,7 @@ import { useRealtimeMeetings } from '../useRealtimeMeetings';
 import { client, databases } from '@/lib/appwrite-client';
 import type { RealtimeResponseEvent, Models } from 'appwrite';
 import { RACE_TYPE_CODES } from '@/constants/raceTypes';
-import {
-  NAVIGATION_DRAIN_DELAY,
-  SubscriptionCleanupProvider,
-  useSubscriptionCleanup,
-} from '@/contexts/SubscriptionCleanupContext';
+import { SubscriptionCleanupProvider, useSubscriptionCleanup } from '@/contexts/SubscriptionCleanupContext';
 
 jest.mock('next/router', () => ({
   __esModule: true,

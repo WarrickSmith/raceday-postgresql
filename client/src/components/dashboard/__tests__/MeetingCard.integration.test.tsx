@@ -3,6 +3,14 @@ import { MeetingCard } from '../MeetingCard';
 import { Meeting } from '@/types/meetings';
 import { RACE_TYPE_CODES } from '@/constants/raceTypes';
 
+type MeetingStatusResponseBody = { isCompleted: boolean };
+
+const createFetchResponse = (body: MeetingStatusResponseBody): Response =>
+  new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
 describe('MeetingCard Integration Tests', () => {
   const mockMeeting: Meeting = {
     $id: '1',
@@ -21,12 +29,9 @@ describe('MeetingCard Integration Tests', () => {
     jest.clearAllMocks();
     
     // Mock fetch for meeting completion status
-    global.fetch = jest.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ isCompleted: false }),
-      })
-    ) as jest.Mock;
+    global.fetch = jest.fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>(async () =>
+      createFetchResponse({ isCompleted: false })
+    );
   });
 
   afterEach(() => {
@@ -51,7 +56,9 @@ describe('MeetingCard Integration Tests', () => {
 
   it('should handle API errors gracefully', async () => {
     // Mock API failure
-    global.fetch = jest.fn(() => Promise.reject(new Error('API Error'))) as jest.Mock;
+    global.fetch = jest.fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>(async () => {
+      throw new Error('API Error');
+    });
     
     render(<MeetingCard meeting={mockMeeting} />);
     
@@ -68,12 +75,9 @@ describe('MeetingCard Integration Tests', () => {
   });
 
   it('should show completed status from API response', async () => {
-    global.fetch = jest.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ isCompleted: true }),
-      })
-    ) as jest.Mock;
+    global.fetch = jest.fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>(async () =>
+      createFetchResponse({ isCompleted: true })
+    );
 
     render(<MeetingCard meeting={mockMeeting} />);
     
@@ -85,27 +89,27 @@ describe('MeetingCard Integration Tests', () => {
   });
 
   it('should update status when API response changes', async () => {
-    let resolvePromise: (value: any) => void;
-    const promise = new Promise((resolve) => {
+    let resolvePromise: ((value: Response) => void) | undefined;
+    const responsePromise = new Promise<Response>((resolve) => {
       resolvePromise = resolve;
     });
 
-    global.fetch = jest.fn(() => promise) as jest.Mock;
+    global.fetch = jest.fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>(() => responsePromise);
 
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>;
     const { rerender } = render(<MeetingCard meeting={mockMeeting} />);
     
     // Initially should show loading/default state
     expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
 
     // Resolve the API call
-    resolvePromise!({
-      ok: true,
-      json: () => Promise.resolve({ isCompleted: true }),
-    });
+    resolvePromise?.(createFetchResponse({ isCompleted: true }));
 
     await waitFor(() => {
       expect(screen.getByLabelText('Status: completed')).toBeInTheDocument();
     });
+
+    const initialFetchCallCount = fetchMock.mock.calls.length;
 
     // Re-render with updated meeting (simulating real-time update)
     const updatedMeeting = { ...mockMeeting, $updatedAt: '2024-01-01T09:00:00Z' };
@@ -113,6 +117,7 @@ describe('MeetingCard Integration Tests', () => {
 
     // Should maintain the completed status
     expect(screen.getByLabelText('Status: completed')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.length).toBe(initialFetchCallCount);
   });
 
   it('should handle different country codes properly', async () => {
@@ -225,13 +230,14 @@ describe('MeetingCard Integration Tests', () => {
       expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
     });
     
-    const initialFetchCallCount = (global.fetch as jest.Mock).mock.calls.length;
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>;
+    const initialFetchCallCount = fetchMock.mock.calls.length;
     
     // Re-render with identical props
     rerender(<MeetingCard meeting={mockMeeting} />);
     
     // Should not make additional API calls due to memoization
-    expect((global.fetch as jest.Mock).mock.calls.length).toBe(initialFetchCallCount);
+    expect(fetchMock.mock.calls.length).toBe(initialFetchCallCount);
     
     // Component should still be rendered
     expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
