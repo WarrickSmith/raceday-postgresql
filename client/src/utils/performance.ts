@@ -240,24 +240,6 @@ export const entrantsListComparison = (prev: Entrant[], next: Entrant[]): boolea
   return true;
 };
 
-// DEPRECATED: Odds history processing now handled by MoneyFlowTimeline hook
-// This function is no longer needed since odds data comes from consolidated MoneyFlowHistory
-
-// Efficient array sampling for large datasets
-function sampleArray<T>(array: T[], sampleSize: number): T[] {
-  if (array.length <= sampleSize) return array;
-  
-  const step = array.length / sampleSize;
-  const sampled: T[] = [];
-  
-  for (let i = 0; i < sampleSize; i++) {
-    const index = Math.floor(i * step);
-    sampled.push(array[index]);
-  }
-  
-  return sampled;
-}
-
 // Intersection Observer hook for lazy loading
 export function useIntersectionObserver(
   elementRef: React.RefObject<Element>,
@@ -276,6 +258,10 @@ export function useIntersectionObserver(
   const [entry, setEntry] = useState<IntersectionObserverEntry>();
 
   const frozen = entry?.isIntersecting && freezeOnceVisible;
+  const thresholds = useMemo(
+    () => (Array.isArray(threshold) ? threshold : [threshold]),
+    [threshold]
+  );
 
   const updateEntry = ([entry]: IntersectionObserverEntry[]): void => {
     setEntry(entry);
@@ -287,13 +273,13 @@ export function useIntersectionObserver(
 
     if (!hasIOSupport || frozen || !node) return;
 
-    const observerParams = { threshold, root, rootMargin };
+    const observerParams = { threshold: thresholds, root, rootMargin };
     const observer = new IntersectionObserver(updateEntry, observerParams);
 
     observer.observe(node);
 
     return () => observer.disconnect();
-  }, [elementRef, JSON.stringify(threshold), root, rootMargin, frozen]);
+  }, [elementRef, thresholds, root, rootMargin, frozen]);
 
   return entry;
 }

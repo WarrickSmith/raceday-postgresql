@@ -85,7 +85,6 @@ export const KeyboardHandler = {
     
     if (currentIndex === -1) return;
 
-    const nextIndex = currentIndex;
     const rows = Array.from(gridContainer.querySelectorAll('[role="row"]'));
     const currentRow = currentCell.closest('[role="row"]');
     const currentRowIndex = rows.indexOf(currentRow!);

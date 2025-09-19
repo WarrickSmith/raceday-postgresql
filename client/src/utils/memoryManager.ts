@@ -190,7 +190,7 @@ class MemoryManager {
           gc();
           console.log('♻️ Forced garbage collection');
         } catch (error) {
-          console.log('GC not available');
+          console.log('GC not available', error);
         }
       }
     }
@@ -222,7 +222,7 @@ class MemoryManager {
           this.triggerAggressiveCleanup();
         });
       } catch (error) {
-        // Memory pressure API not available
+        console.debug('Memory pressure API not available', error);
       }
     }
   }
