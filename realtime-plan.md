@@ -168,9 +168,9 @@ This development plan consolidates findings from three comprehensive architectur
 
 ### Task 6: Optimize Entrant Subscription Initialization
 **Status**:
-- ► Not Started
+- Not Started
 - In Progress
-- Complete
+- ► Complete
 
 **Priority**: Medium
 **Impact**: Faster initial subscription establishment
@@ -181,7 +181,7 @@ This development plan consolidates findings from three comprehensive architectur
 1. Extract entrant IDs from `initialEntrants` prop before first subscription
 2. Pre-populate document-specific channels using known entrant IDs
 3. Eliminate collection-level fallback when entrant data is available
-4. Maintain fallback only when no initial entrant data provided
+4. Maintain fallback only when no initial entrant data provided but the fallback should be to display '-', not use collection-level data.
 
 **Key Resources**:
 - File: `/client/src/hooks/useUnifiedRaceRealtime.ts`
