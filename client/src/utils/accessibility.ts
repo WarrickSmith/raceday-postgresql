@@ -180,13 +180,27 @@ export const AriaLabels = {
     trainer: string,
     winOdds?: number,
     placeOdds?: number,
-    isScratched?: boolean
+    isScratched?: boolean,
+    finishingPositionAnnouncement?: string
   ): string => {
     const statusText = isScratched ? 'Scratched runner' : 'Active runner';
     const oddsText = winOdds ? `Win odds ${winOdds.toFixed(2)}` : 'Win odds unavailable';
     const placeOddsText = placeOdds ? `Place odds ${placeOdds.toFixed(2)}` : 'Place odds unavailable';
-    
-    return `${statusText} number ${runnerNumber}, ${runnerName}, jockey ${jockey}, trainer ${trainer}, ${oddsText}, ${placeOddsText}`;
+
+    const parts = [
+      `${statusText} number ${runnerNumber}`,
+      runnerName,
+      `jockey ${jockey}`,
+      `trainer ${trainer}`,
+      oddsText,
+      placeOddsText,
+    ]
+
+    if (finishingPositionAnnouncement) {
+      parts.push(finishingPositionAnnouncement)
+    }
+
+    return parts.join(', ')
   },
 
   /**
