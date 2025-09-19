@@ -180,4 +180,207 @@ describe('EnhancedEntrantsGrid timeline indicators', () => {
     const indicatorElements = document.querySelectorAll('[data-indicator]')
     expect(indicatorElements).toHaveLength(1)
   })
+
+  it('highlights finishing positions on the entrant cell', async () => {
+    const entrants: Entrant[] = [
+      {
+        $id: 'entrant-10',
+        $createdAt: '2024-01-01T00:00:00.000Z',
+        $updatedAt: '2024-01-01T00:00:00.000Z',
+        entrantId: 'entrant-10',
+        name: 'Golden Arrow',
+        runnerNumber: 10,
+        isScratched: false,
+        race: 'race-1',
+        winOdds: 2.1,
+        placeOdds: 1.4,
+        moneyFlowTimeline: undefined,
+        poolMoney: undefined,
+        previousHoldPercentage: undefined,
+        holdPercentage: undefined,
+        moneyFlowTrend: undefined,
+      },
+      {
+        $id: 'entrant-05',
+        $createdAt: '2024-01-01T00:00:00.000Z',
+        $updatedAt: '2024-01-01T00:00:00.000Z',
+        entrantId: 'entrant-05',
+        name: 'Silver Storm',
+        runnerNumber: 5,
+        isScratched: false,
+        race: 'race-1',
+        winOdds: 3.4,
+        placeOdds: 1.9,
+        moneyFlowTimeline: undefined,
+        poolMoney: undefined,
+        previousHoldPercentage: undefined,
+        holdPercentage: undefined,
+        moneyFlowTrend: undefined,
+      },
+      {
+        $id: 'entrant-02',
+        $createdAt: '2024-01-01T00:00:00.000Z',
+        $updatedAt: '2024-01-01T00:00:00.000Z',
+        entrantId: 'entrant-02',
+        name: 'Bronze Bandit',
+        runnerNumber: 2,
+        isScratched: false,
+        race: 'race-1',
+        winOdds: 4.8,
+        placeOdds: 2.5,
+        moneyFlowTimeline: undefined,
+        poolMoney: undefined,
+        previousHoldPercentage: undefined,
+        holdPercentage: undefined,
+        moneyFlowTrend: undefined,
+      },
+    ]
+
+    useRace.mockReturnValue({
+      raceData: {
+        race: {
+          $id: 'race-1',
+          startTime: new Date().toISOString(),
+          status: 'final',
+          resultStatus: 'final',
+          resultsData: [
+            { position: 1, runnerNumber: 10, runnerName: 'Golden Arrow' },
+            { position: 2, runnerNumber: 5, runnerName: 'Silver Storm' },
+            { position: 3, runnerNumber: 2, runnerName: 'Bronze Bandit' },
+          ],
+        },
+        entrants,
+        meeting: null,
+      },
+    })
+
+    await act(async () => {
+      render(
+        <EnhancedEntrantsGrid
+          initialEntrants={entrants}
+          raceId="race-1"
+          raceStartTime={new Date().toISOString()}
+          resultsData={[
+            { position: 1, runnerNumber: 10, runnerName: 'Golden Arrow' },
+            { position: 2, runnerNumber: 5, runnerName: 'Silver Storm' },
+            { position: 3, runnerNumber: 2, runnerName: 'Bronze Bandit' },
+          ]}
+          resultStatus="final"
+        />
+      )
+    })
+
+    const firstPlaceCell = document.querySelector(
+      'td[data-finishing-position="1"]'
+    ) as HTMLElement | null
+    expect(firstPlaceCell).toBeInTheDocument()
+    if (!firstPlaceCell) {
+      throw new Error('First place cell not found')
+    }
+
+    expect(firstPlaceCell.className).toMatch(/bg-amber-100/)
+    expect(firstPlaceCell.getAttribute('title')).toBe('1st place')
+
+    const runnerNumberElement = firstPlaceCell.querySelector('span.text-lg')
+    expect(runnerNumberElement?.className).toMatch(/text-amber-900/)
+
+    const srOnlyElement = firstPlaceCell.querySelector('.sr-only')
+    expect(srOnlyElement).toHaveTextContent('Finished first place')
+
+    const highlightedRow = Array.from(
+      document.querySelectorAll('tr[aria-label]')
+    ).find((row) => row.getAttribute('aria-label')?.includes('Finished first place'))
+    expect(highlightedRow).toBeDefined()
+    expect(highlightedRow?.getAttribute('aria-label')).toContain(
+      'Finished first place'
+    )
+  })
+
+  it('highlights interim results with only a winner', async () => {
+    const entrants: Entrant[] = [
+      {
+        $id: 'entrant-07',
+        $createdAt: '2024-01-01T00:00:00.000Z',
+        $updatedAt: '2024-01-01T00:00:00.000Z',
+        entrantId: 'entrant-07',
+        name: 'Swift Winner',
+        runnerNumber: 7,
+        isScratched: false,
+        race: 'race-1',
+        winOdds: 1.8,
+        placeOdds: 1.2,
+        moneyFlowTimeline: undefined,
+        poolMoney: undefined,
+        previousHoldPercentage: undefined,
+        holdPercentage: undefined,
+        moneyFlowTrend: undefined,
+      },
+      {
+        $id: 'entrant-12',
+        $createdAt: '2024-01-01T00:00:00.000Z',
+        $updatedAt: '2024-01-01T00:00:00.000Z',
+        entrantId: 'entrant-12',
+        name: 'Second Place',
+        runnerNumber: 12,
+        isScratched: false,
+        race: 'race-1',
+        winOdds: 3.2,
+        placeOdds: 1.7,
+        moneyFlowTimeline: undefined,
+        poolMoney: undefined,
+        previousHoldPercentage: undefined,
+        holdPercentage: undefined,
+        moneyFlowTrend: undefined,
+      },
+    ]
+
+    useRace.mockReturnValue({
+      raceData: {
+        race: {
+          $id: 'race-1',
+          startTime: new Date().toISOString(),
+          status: 'interim',
+          resultStatus: 'interim',
+          resultsData: null, // No results in race context - only via props
+        },
+        entrants,
+        meeting: null,
+      },
+    })
+
+    await act(async () => {
+      render(
+        <EnhancedEntrantsGrid
+          initialEntrants={entrants}
+          raceId="race-1"
+          raceStartTime={new Date().toISOString()}
+          resultsData={[
+            { position: 1, runnerNumber: 7, runnerName: 'Swift Winner' }
+          ]}
+          resultStatus="interim"
+        />
+      )
+    })
+
+    // Check that only the winner is highlighted (golden)
+    const winnerCell = document.querySelector(
+      'td[data-finishing-position="1"]'
+    ) as HTMLElement | null
+    expect(winnerCell).toBeInTheDocument()
+    expect(winnerCell?.className).toMatch(/bg-amber-100/)
+    expect(winnerCell?.getAttribute('title')).toBe('1st place')
+
+    // Check that runner #12 (not the winner) is NOT highlighted
+    const nonWinnerRow = Array.from(
+      document.querySelectorAll('tr[aria-label]')
+    ).find((row) =>
+      row.getAttribute('aria-label')?.includes('number 12') &&
+      !row.getAttribute('aria-label')?.includes('Finished first place')
+    )
+    expect(nonWinnerRow).toBeDefined()
+
+    // Verify screen reader announcement for interim winner
+    const srOnlyElement = winnerCell?.querySelector('.sr-only')
+    expect(srOnlyElement).toHaveTextContent('Finished first place')
+  })
 })
