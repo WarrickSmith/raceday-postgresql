@@ -196,8 +196,8 @@ This development plan consolidates findings from three comprehensive architectur
 
 ### Task 6a: Show Race Results Visually
 **Status**:
-- ► Not Started
-- In Progress
+- Not Started
+- ► In Progress
 - Complete
 
 **Priority**: Medium
