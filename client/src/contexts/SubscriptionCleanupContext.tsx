@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 
-const DEFAULT_DRAIN_DELAY = 250
+const DEFAULT_DRAIN_DELAY = 1000
 
 export type CleanupReason =
   | 'navigation'
@@ -24,7 +24,10 @@ interface SubscriptionCleanupContextValue {
   signal: number
   isCleanupInProgress: boolean
   lastReason: string | null
+  connectionCount: number
   requestCleanup: (options?: CleanupOptions) => Promise<void>
+  incrementConnectionCount: () => void
+  decrementConnectionCount: () => void
 }
 
 const SubscriptionCleanupContext = createContext<
@@ -43,12 +46,21 @@ export function SubscriptionCleanupProvider({
   const [signal, setSignal] = useState(0)
   const [isCleanupInProgress, setIsCleanupInProgress] = useState(false)
   const [lastReason, setLastReason] = useState<string | null>(null)
+  const [connectionCount, setConnectionCount] = useState(0)
   const cleanupPromiseRef = useRef<Promise<void> | null>(null)
   const activeRef = useRef(false)
   const drainTimeoutRef = useRef<number | null>(null)
   const prevPathnameRef = useRef<string | null>(null)
   const pathname = usePathname()
   const routeEventsCleanupRef = useRef<(() => void) | null>(null)
+
+  const incrementConnectionCount = useCallback(() => {
+    setConnectionCount(prev => prev + 1)
+  }, [])
+
+  const decrementConnectionCount = useCallback(() => {
+    setConnectionCount(prev => Math.max(0, prev - 1))
+  }, [])
 
   const finalizeCleanup = useCallback(() => {
     activeRef.current = false
@@ -109,7 +121,8 @@ export function SubscriptionCleanupProvider({
 
     if (pathname !== prevPathnameRef.current) {
       prevPathnameRef.current = pathname
-      void requestCleanup({ reason: 'route-change', skipIfInProgress: true })
+      // Trigger immediate cleanup for route changes to prevent connection leaks
+      void requestCleanup({ reason: 'route-change', skipIfInProgress: true, drainDelay: 0 })
     }
   }, [pathname, requestCleanup])
 
@@ -125,7 +138,8 @@ export function SubscriptionCleanupProvider({
         if (!router?.events) return
 
         const handleRouteStart = () => {
-          void requestCleanup({ reason: 'navigation', skipIfInProgress: true })
+          // Trigger immediate cleanup with minimal delay for navigation
+          void requestCleanup({ reason: 'navigation', skipIfInProgress: true, drainDelay: 0 })
         }
 
         router.events.on('routeChangeStart', handleRouteStart)
@@ -209,9 +223,12 @@ export function SubscriptionCleanupProvider({
       signal,
       isCleanupInProgress,
       lastReason,
+      connectionCount,
       requestCleanup,
+      incrementConnectionCount,
+      decrementConnectionCount,
     }),
-    [signal, isCleanupInProgress, lastReason, requestCleanup]
+    [signal, isCleanupInProgress, lastReason, connectionCount, requestCleanup, incrementConnectionCount, decrementConnectionCount]
   )
 
   return (
