@@ -15,7 +15,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { client, databases } from '@/lib/appwrite-client'
 import { Race, Entrant, Meeting, RaceNavigationData } from '@/types/meetings'
 import type { RacePoolData, RaceResultsData } from '@/types/racePools'
@@ -207,6 +207,19 @@ export function useUnifiedRaceRealtime({
 
   const poolDocumentId = state.poolData?.$id?.trim() || null
 
+  const initialEntrantDocumentIds = useMemo(() => {
+    const ids = new Set<string>()
+
+    initialEntrants.forEach((entrant) => {
+      const docId = entrant?.$id?.trim()
+      if (docId) {
+        ids.add(docId)
+      }
+    })
+
+    return Array.from(ids)
+  }, [initialEntrants])
+
   // Smart channel management with race status awareness
   const getChannels = useCallback(
     (raceDocId: string | null, raceResultsDocId?: string, raceStatus?: string) => {
@@ -248,21 +261,24 @@ export function useUnifiedRaceRealtime({
       }
 
       // Add entrant-specific subscriptions if available
+      const entrantDocumentIds = new Set<string>(initialEntrantDocumentIds)
+
       if (state.entrants && state.entrants.length > 0) {
         state.entrants.forEach((entrant) => {
-          if (entrant.$id) {
-            channels.add(
-              `databases.raceday-db.collections.entrants.documents.${entrant.$id}`
-            )
+          const docId = entrant.$id?.trim()
+          if (docId) {
+            entrantDocumentIds.add(docId)
           }
         })
-      } else {
-        channels.add('databases.raceday-db.collections.entrants.documents')
       }
+
+      entrantDocumentIds.forEach((docId) => {
+        channels.add(`databases.raceday-db.collections.entrants.documents.${docId}`)
+      })
 
       return Array.from(channels)
     },
-    [state.entrants, poolDocumentId, hasRaceScopedMoneyFlowChannel]
+    [state.entrants, poolDocumentId, hasRaceScopedMoneyFlowChannel, initialEntrantDocumentIds]
   )
 
   // Fetch initial data if not provided
