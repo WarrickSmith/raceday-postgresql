@@ -178,6 +178,9 @@ export function RacePageContent() {
           }
           poolData={currentPoolData}
           moneyFlowUpdateTrigger={realtimeData.moneyFlowUpdateTrigger}
+          resultsData={currentResultsData?.results}
+          raceStatus={currentRace.status}
+          resultStatus={currentResultsData?.status || currentRace.resultStatus}
         />
       </main>
 
