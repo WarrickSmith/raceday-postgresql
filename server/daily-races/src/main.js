@@ -76,14 +76,30 @@ export default async function main(context) {
         await updateHeartbeat(lockManager, progressTracker);
         
         // PHASE 2: Get today's date for filtering races (using NZ timezone)
+        // Fix: Use proper datetime comparison to avoid timezone boundary issues
+        // where races early in NZ day (e.g., 11:55 AM) fall in previous UTC day
         const nzDate = new Date().toLocaleDateString('en-CA', {
             timeZone: 'Pacific/Auckland',
         });
 
+        // Calculate NZ start of day in UTC for proper database filtering
+        const today = new Date();
+        const nzToday = new Date(today.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }));
+        const localToday = new Date(today.toLocaleString('en-US'));
+        const timezoneOffset = localToday.getTime() - nzToday.getTime();
+
+        const nzStartOfDay = new Date(nzDate + 'T00:00:00');
+        nzStartOfDay.setTime(nzStartOfDay.getTime() - timezoneOffset);
+        const nzStartOfDayISO = nzStartOfDay.toISOString();
+
         // Get basic races from database (that were created by daily-meetings function)
-        logDebug(context, 'Fetching basic races from database for detailed enhancement...');
+        logDebug(context, 'Fetching basic races from database for detailed enhancement...', {
+            nzDate,
+            nzStartOfDayISO,
+            filterCriteria: `startTime >= ${nzStartOfDayISO}`
+        });
         const racesResult = await databases.listDocuments(databaseId, 'races', [
-            Query.greaterThanEqual('startTime', nzDate),
+            Query.greaterThanEqual('startTime', nzStartOfDayISO),
             Query.orderAsc('startTime'),
             Query.limit(999) // Override default 25 limit to get all races
         ]);
