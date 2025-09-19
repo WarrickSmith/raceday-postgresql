@@ -218,31 +218,34 @@ async function createMissingIndicators(
 }
 
 function mapDocumentToIndicator(document: Models.Document): IndicatorConfig {
+  // Cast document to safely access dynamic properties from Appwrite
+  const doc = document as Record<string, unknown>
+
   const percentageRangeMaxValue =
-    document.percentageRangeMax === null || document.percentageRangeMax === undefined
+    doc.percentageRangeMax === null || doc.percentageRangeMax === undefined
       ? null
-      : Number(document.percentageRangeMax)
+      : Number(doc.percentageRangeMax)
 
   return {
     $id: document.$id,
     userId:
-      typeof document.userId === 'string' ? document.userId : DEFAULT_USER_ID,
+      typeof doc.userId === 'string' ? doc.userId : DEFAULT_USER_ID,
     indicatorType: 'percentage_range',
-    percentageRangeMin: Number(document.percentageRangeMin ?? 0),
+    percentageRangeMin: Number(doc.percentageRangeMin ?? 0),
     percentageRangeMax: percentageRangeMaxValue,
     color:
-      typeof document.color === 'string'
-        ? document.color
+      typeof doc.color === 'string'
+        ? doc.color
         : DEFAULT_INDICATORS[0].color,
-    isDefault: Boolean(document.isDefault),
-    enabled: Boolean(document.enabled),
-    displayOrder: Number(document.displayOrder ?? 1),
+    isDefault: Boolean(doc.isDefault),
+    enabled: Boolean(doc.enabled),
+    displayOrder: Number(doc.displayOrder ?? 1),
     lastUpdated:
-      typeof document.lastUpdated === 'string' ? document.lastUpdated : undefined,
-    createdAt: typeof document.createdAt === 'string' ? document.createdAt : undefined,
+      typeof doc.lastUpdated === 'string' ? doc.lastUpdated : undefined,
+    createdAt: typeof doc.$createdAt === 'string' ? doc.$createdAt : undefined,
     audibleAlertsEnabled:
-      typeof document.audibleAlertsEnabled === 'boolean'
-        ? document.audibleAlertsEnabled
+      typeof doc.audibleAlertsEnabled === 'boolean'
+        ? doc.audibleAlertsEnabled
         : undefined,
   }
 }

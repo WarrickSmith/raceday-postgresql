@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 
 export interface DebugMessage {
   id: string
@@ -153,7 +153,7 @@ export function DebugMessageBox({
                       <p className="text-sm text-gray-600 mt-1 break-words">
                         {msg.message}
                       </p>
-                      {msg.data && (
+                      {msg.data && typeof msg.data === 'object' && msg.data !== null ? (
                         <details className="mt-2">
                           <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
                             View details
@@ -162,7 +162,7 @@ export function DebugMessageBox({
                             {JSON.stringify(msg.data, null, 2)}
                           </pre>
                         </details>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                   <button
