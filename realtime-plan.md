@@ -194,6 +194,53 @@ This development plan consolidates findings from three comprehensive architectur
 - Skip collection-level fallback when IDs available
 - Preserve fallback behavior for scenarios without initial data
 
+### Task 6a: Show Race Results Visually
+**Status**:
+- ► Not Started
+- In Progress
+- Complete
+
+**Priority**: Medium
+**Impact**: User can immediately identify 1st, 2nd and 3rd place finishers with visual highlighting
+
+**Problem**: When race results are available for 1st, 2nd or 3rd place positions, these are not immediately obvious to the user. Results can be pre-existing (when reviewing finalized races) or appear dynamically when race status changes to 'interim' or 'final' during live races. The background cell colours for an Entrant's silk, runner number and runner name (the first three cells ONLY) should change to 'Gold', 'Silver', or 'Bronze' colours to represent 1st, 2nd or 3rd place respectively. Use pastel colours approximating 'yellowish', 'greyish' and 'brownish' with appropriate text colour contrast.
+
+**Target Cells (ONLY these three cells):**
+- Silk cell (jockey silk image)
+- Runner number cell
+- Runner name cell
+These are the first three cells in each entrant row in the EnhancedEntrantsGrid - NO other cells should be modified.
+
+**Dynamic Behavior Requirements**:
+- Highlighting must apply immediately when results become available during race viewing
+- Must update dynamically during live races when status changes from 'Open' to 'interim' or 'final'
+- Must work for both pre-existing results (historical races) and real-time result updates
+- Should maintain existing hover, selection, and interaction functionality
+- Color highlighting should override normal cell background but preserve accessibility
+
+**Strategy**:
+1. Create position detection utility to match entrants with race results by runner number
+2. Implement color utility for position-based styling using Tailwind CSS pastel colors
+3. Modify ONLY the main entrant cell (containing silk/runner number/name) to apply position highlighting
+4. Add accessibility support for screen readers to announce finishing positions
+5. Test with both historical finalized races and live race result updates
+
+**Key Resources**:
+- File: `/client/src/components/race-view/EnhancedEntrantsGrid.tsx` (main runner cell around lines 1398-1440)
+- Hook: `useUnifiedRaceRealtime` for results data access
+- Context: `useRace()` for accessing race results via `raceData.race.resultsData`
+- Types: `RaceResult` interface in `/client/src/types/racePools.ts` (lines 37-50)
+
+**Implementation Details**:
+- Access results through `raceData.race.resultsData` from RaceContext
+- Match entrants to results by comparing `entrant.runnerNumber` with `result.runner_number` or `result.runnerNumber`
+- Apply highlighting ONLY to the main runner cell (td element containing silk, number, and name)
+- Use Tailwind pastel classes: 1st=`bg-amber-100 text-amber-900`, 2nd=`bg-gray-100 text-gray-900`, 3rd=`bg-orange-100 text-orange-900`
+- Only highlight when race status is 'interim' or 'final' and results are available
+- Ensure proper color contrast and accessibility compliance
+- Update ARIA labels to announce finishing positions to screen readers
+- DO NOT modify WinOddsCell, PlaceOddsCell, or any other cells beyond the main runner information cell
+
 ### Task 7: Fix Hard-coded Appwrite Project ID
 **Status**:
 - ► Not Started
