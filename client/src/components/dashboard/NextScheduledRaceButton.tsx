@@ -7,7 +7,7 @@ import { useSubscriptionCleanup } from '@/contexts/SubscriptionCleanupContext';
 
 interface NextScheduledRaceButtonProps {
   meetings: Meeting[];
-  isRealtimeConnected: boolean;
+  isRealtimeConnected: boolean; // Note: Now represents polling connection status
   raceUpdateSignal: number;
 }
 
@@ -71,7 +71,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
     }
 
     fetchTimeoutRef.current = setTimeout(() => {
-      fetchNextScheduledRace().then(() => {
+      void fetchNextScheduledRace().then(() => {
         setupIntelligentPolling(); // Schedule next poll
       });
     }, pollInterval);
@@ -81,7 +81,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
   useEffect(() => {
     let isActive = true;
 
-    fetchNextScheduledRace().then(() => {
+    void fetchNextScheduledRace().then(() => {
       if (isActive) {
         setupIntelligentPolling();
       }
@@ -113,7 +113,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
     };
   }, [setupIntelligentPolling]);
 
-  // React to shared real-time update signals from meetings subscription
+  // React to shared update signals from meetings polling system
   useEffect(() => {
     if (!raceUpdateSignal) {
       return;
@@ -124,7 +124,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
     }
 
     debounceTimeoutRef.current = setTimeout(() => {
-      fetchNextScheduledRace().finally(() => {
+      void fetchNextScheduledRace().finally(() => {
         debounceTimeoutRef.current = null;
       });
     }, 2000);
@@ -144,7 +144,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
     }
   }, [meetings.length]);
 
-  // Handle real-time countdown updates and race transitions
+  // Handle countdown updates and race transitions
   useEffect(() => {
     if (!nextScheduledRace) return;
 
@@ -158,7 +158,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
       if (diff <= 0 && !hasTriggeredNextFetch) {
         console.log('🏁 Race has started, fetching next scheduled race');
         hasTriggeredNextFetch = true;
-        fetchNextScheduledRace();
+        void fetchNextScheduledRace();
         return;
       }
       
@@ -266,11 +266,11 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        {/* Real-time connection indicator */}
+        {/* Polling connection indicator */}
         {!isDisabled && (
           <div className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${
             isRealtimeConnected ? 'bg-green-400' : 'bg-red-400'
-          }`} title={isRealtimeConnected ? 'Real-time connected' : 'Offline mode'} />
+          }`} title={isRealtimeConnected ? 'Data polling active' : 'Offline mode'} />
         )}
       </div>
       

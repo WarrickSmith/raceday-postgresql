@@ -39,7 +39,7 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
       }
     };
 
-    checkMeetingCompletion();
+    void checkMeetingCompletion();
   }, [meeting.meetingId, meeting.firstRaceTime]);
   const formatTime = (dateTimeString: string) => {
     try {
