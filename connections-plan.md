@@ -97,9 +97,9 @@ This development plan addresses critical Appwrite database connection leak issue
 
 **Status**:
 
-- ► Not Started
+- Not Started
 - In Progress
-- Complete
+- ► Complete
 
 **Priority**: High
 **Impact**: Eliminates connection leaks during race-results document discovery
