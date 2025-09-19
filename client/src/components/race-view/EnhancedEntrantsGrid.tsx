@@ -10,7 +10,7 @@ import {
   DEFAULT_GRID_DISPLAY_CONFIG,
   DEFAULT_POOL_VIEW_STATE,
 } from '@/types/enhancedGrid'
-import type { RacePoolData } from '@/types/racePools'
+import type { RacePoolData, RaceResult } from '@/types/racePools'
 import { useMoneyFlowTimeline } from '@/hooks/useMoneyFlowTimeline'
 import { useRace } from '@/contexts/RaceContext'
 import { screenReader, AriaLabels } from '@/utils/accessibility'
@@ -21,6 +21,40 @@ import mapIndicatorColorToCellStyle from '@/utils/indicatorColors'
 import { JockeySilks } from './JockeySilks'
 import { useLogger } from '@/utils/logging'
 import { useAudibleAlerts } from '@/contexts/AudibleAlertContext'
+
+interface PositionHighlightStyle {
+  backgroundClass: string
+  textClass: string
+  srLabel: string
+  shortLabel: string
+}
+
+const POSITION_HIGHLIGHT_STYLES: Record<number, PositionHighlightStyle> = {
+  1: {
+    backgroundClass: 'bg-amber-100',
+    textClass: 'text-amber-900',
+    srLabel: 'Finished first place',
+    shortLabel: '1st place',
+  },
+  2: {
+    backgroundClass: 'bg-gray-100',
+    textClass: 'text-gray-900',
+    srLabel: 'Finished second place',
+    shortLabel: '2nd place',
+  },
+  3: {
+    backgroundClass: 'bg-orange-100',
+    textClass: 'text-orange-900',
+    srLabel: 'Finished third place',
+    shortLabel: '3rd place',
+  },
+}
+
+interface ResultHighlightInfo extends PositionHighlightStyle {
+  position: number
+  runnerNumber: number
+  runnerName: string
+}
 
 // Flash-enabled Win Odds Cell Component
 const WinOddsCell = memo(function WinOddsCell({
@@ -93,7 +127,7 @@ interface EnhancedEntrantsGridProps {
   dataFreshness?: {
     lastUpdated: string
     entrantsDataAge: number
-    oddsHistoryCount: number // DEPRECATED: Always 0, odds data comes from MoneyFlowHistory  
+    oddsHistoryCount: number // DEPRECATED: Always 0, odds data comes from MoneyFlowHistory
     moneyFlowHistoryCount: number
   }
   className?: string
@@ -105,6 +139,11 @@ interface EnhancedEntrantsGridProps {
   poolData?: RacePoolData | null
   // Trigger for timeline refetch when unified subscription receives money flow updates
   moneyFlowUpdateTrigger?: number
+  // Results data for position highlighting (merged from real-time and persistent sources)
+  resultsData?: RaceResult[]
+  // Race status for determining when to show results highlighting
+  raceStatus?: string
+  resultStatus?: string
 }
 
 // Enhanced single-component architecture with integrated timeline:
@@ -124,6 +163,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   lastUpdate,
   poolData = null,
   moneyFlowUpdateTrigger,
+  resultsData,
+  raceStatus,
+  resultStatus,
 }: EnhancedEntrantsGridProps) {
   const logger = useLogger('EnhancedEntrantsGrid');
   const { raceData } = useRace()
@@ -211,6 +253,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
   // Timeline-related state
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const resultAnnouncementRef = useRef<string>('')
   const [autoScroll, setAutoScroll] = useState(true)
   const [currentTime, setCurrentTime] = useState(new Date())
   // State-dependent variables removed - now using data-driven approach for timeline persistence
@@ -502,6 +545,146 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
     return sorted
   }, [entrantsWithPoolData, sortState])
+
+  const resultHighlights = useMemo(() => {
+    const highlights = new Map<number, ResultHighlightInfo>()
+
+    // Use props data first, fallback to race context for backward compatibility
+    const results = resultsData || currentRace?.resultsData
+
+    if (!Array.isArray(results) || results.length === 0) {
+      return highlights
+    }
+
+    // Use props status first, fallback to race context
+    const status = (resultStatus || raceStatus || currentRace?.resultStatus || currentRace?.status || '')
+      .toString()
+      .toLowerCase()
+
+    // Debug logging to track data flow
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('Result highlighting check:', {
+        hasResultsData: !!results,
+        resultsLength: results?.length || 0,
+        status,
+        fromProps: { resultsData: !!resultsData, resultStatus, raceStatus },
+        fromContext: {
+          resultsData: !!currentRace?.resultsData,
+          resultStatus: currentRace?.resultStatus,
+          status: currentRace?.status
+        }
+      })
+    }
+
+    if (!['interim', 'final'].includes(status)) {
+      return highlights
+    }
+
+    const extractRunnerNumber = (result: RaceResult): number | undefined => {
+      const rawNumber =
+        (result.runnerNumber ?? result.runner_number) as
+          | number
+          | string
+          | undefined
+
+      if (rawNumber === undefined || rawNumber === null) {
+        return undefined
+      }
+
+      if (typeof rawNumber === 'number') {
+        return Number.isFinite(rawNumber) ? rawNumber : undefined
+      }
+
+      const parsed = parseInt(rawNumber, 10)
+      return Number.isFinite(parsed) ? parsed : undefined
+    }
+
+    const extractRunnerName = (result: RaceResult): string | undefined => {
+      return result.runnerName || result.name
+    }
+
+    const maxTrackedPositions = 3
+
+    results.forEach((result, index) => {
+      if (highlights.size >= maxTrackedPositions) {
+        return
+      }
+
+      const runnerNumber = extractRunnerNumber(result)
+      if (runnerNumber === undefined) {
+        return
+      }
+
+      const normalizedPosition =
+        typeof result.position === 'number' && result.position > 0
+          ? result.position
+          : index + 1
+
+      const style = POSITION_HIGHLIGHT_STYLES[normalizedPosition]
+      if (!style) {
+        return
+      }
+
+      if (highlights.has(runnerNumber)) {
+        return
+      }
+
+      const fallbackName =
+        extractRunnerName(result) ||
+        sortedEntrants.find((entrant) => entrant.runnerNumber === runnerNumber)
+          ?.name ||
+        `Runner ${runnerNumber}`
+
+      highlights.set(runnerNumber, {
+        ...style,
+        position: normalizedPosition,
+        runnerNumber,
+        runnerName: fallbackName,
+      })
+    })
+
+    return highlights
+  }, [
+    resultsData,
+    resultStatus,
+    raceStatus,
+    currentRace?.resultsData,
+    currentRace?.resultStatus,
+    currentRace?.status,
+    sortedEntrants,
+    logger
+  ])
+
+  const highlightAnnouncements = useMemo(() => {
+    if (resultHighlights.size === 0) {
+      return []
+    }
+
+    return Array.from(resultHighlights.values())
+      .sort((a, b) => a.position - b.position)
+      .map(
+        (info) =>
+          `${info.shortLabel}: number ${info.runnerNumber} ${info.runnerName}`.trim()
+      )
+  }, [resultHighlights])
+
+  useEffect(() => {
+    if (!screenReader) {
+      return
+    }
+
+    if (highlightAnnouncements.length === 0) {
+      resultAnnouncementRef.current = ''
+      return
+    }
+
+    const summary = `Race results updated. ${highlightAnnouncements.join('. ')}`
+
+    if (summary !== resultAnnouncementRef.current) {
+      screenReader.announce(summary, 'polite')
+      resultAnnouncementRef.current = summary
+    }
+  }, [highlightAnnouncements])
 
   // Debug: Track pool toggle changes and timeline data
   logger.debug('Timeline data status:', {
@@ -1333,134 +1516,156 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
               {/* Unified Body */}
               <tbody className="bg-white divide-y divide-gray-100">
-                {sortedEntrants.map((entrant) => (
-                  <tr
-                    key={entrant.$id}
-                    className={`hover:bg-gray-50 focus-within:bg-blue-50 transition-colors ${
-                      entrant.isScratched ? 'opacity-50 bg-pink-50' : ''
-                    } ${
-                      selectedEntrant === entrant.$id ? 'bg-blue-100' : ''
-                    } cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset`}
-                    onClick={() => handleEntrantClick(entrant.$id)}
-                    onKeyDown={(e) => handleKeyDown(e, entrant.$id)}
-                    tabIndex={0}
-                    style={{
-                      height: '30px',
-                      minHeight: '30px',
-                      maxHeight: '30px',
-                    }}
-                    aria-label={AriaLabels.generateRunnerRowLabel(
-                      entrant.runnerNumber,
-                      entrant.name,
-                      entrant.jockey || 'Unknown jockey',
-                      entrant.trainerName || 'Unknown trainer',
-                      entrant.winOdds,
-                      entrant.placeOdds,
-                      entrant.isScratched
-                    )}
-                  >
-                    {/* Left Fixed Columns - Sticky */}
-                    <td
-                      className="px-2 py-1 whitespace-nowrap border-r border-gray-200 sticky left-0 bg-white z-20"
-                      style={{ verticalAlign: 'middle', height: '30px' }}
+                {sortedEntrants.map((entrant) => {
+                  const resultHighlight = resultHighlights.get(
+                    entrant.runnerNumber
+                  )
+                  const runnerCellBackgroundClass =
+                    resultHighlight?.backgroundClass ?? 'bg-white'
+                  const runnerCellTextClass =
+                    resultHighlight?.textClass ?? 'text-gray-900'
+                  const finishingAnnouncement = resultHighlight?.srLabel
+
+                  return (
+                    <tr
+                      key={entrant.$id}
+                      className={`hover:bg-gray-50 focus-within:bg-blue-50 transition-colors ${
+                        entrant.isScratched ? 'opacity-50 bg-pink-50' : ''
+                      } ${
+                        selectedEntrant === entrant.$id ? 'bg-blue-100' : ''
+                      } cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset`}
+                      onClick={() => handleEntrantClick(entrant.$id)}
+                      onKeyDown={(e) => handleKeyDown(e, entrant.$id)}
+                      tabIndex={0}
+                      style={{
+                        height: '30px',
+                        minHeight: '30px',
+                        maxHeight: '30px',
+                      }}
+                      aria-label={AriaLabels.generateRunnerRowLabel(
+                        entrant.runnerNumber,
+                        entrant.name,
+                        entrant.jockey || 'Unknown jockey',
+                        entrant.trainerName || 'Unknown trainer',
+                        entrant.winOdds,
+                        entrant.placeOdds,
+                        entrant.isScratched,
+                        finishingAnnouncement
+                      )}
                     >
-                      <div className="flex items-center space-x-3 h-full">
-                        <div className="flex items-center space-x-2">
-                          {displayConfig.showJockeySilks && (
-                            <JockeySilks
-                              silk={entrant.silk}
-                              runnerNumber={entrant.runnerNumber}
-                              runnerName={entrant.name}
-                              jockey={entrant.jockey}
-                              fallbackUrl={
-                                entrant.silkUrl128 ||
-                                entrant.silkUrl64 ||
-                                entrant.silkUrl
-                              }
-                              config={{ size: 'small' }}
-                            />
-                          )}
-                          <div className="flex flex-col items-center min-w-[32px]">
-                            <span className="text-lg font-bold text-gray-900">
-                              {entrant.runnerNumber}
-                            </span>
-                            {entrant.isScratched && (
-                              <span className="text-xs text-red-600 font-medium">
-                                SCR
+                      {/* Left Fixed Columns - Sticky */}
+                      <td
+                        className={`px-2 py-1 whitespace-nowrap border-r border-gray-200 sticky left-0 z-20 ${runnerCellBackgroundClass}`}
+                        style={{ verticalAlign: 'middle', height: '30px' }}
+                        data-finishing-position={
+                          resultHighlight ? String(resultHighlight.position) : undefined
+                        }
+                        title={resultHighlight?.shortLabel}
+                      >
+                        <div className="flex items-center space-x-3 h-full">
+                          <div className="flex items-center space-x-2">
+                            {displayConfig.showJockeySilks && (
+                              <JockeySilks
+                                silk={entrant.silk}
+                                runnerNumber={entrant.runnerNumber}
+                                runnerName={entrant.name}
+                                jockey={entrant.jockey}
+                                fallbackUrl={
+                                  entrant.silkUrl128 ||
+                                  entrant.silkUrl64 ||
+                                  entrant.silkUrl
+                                }
+                                config={{ size: 'small' }}
+                              />
+                            )}
+                            <div className="flex flex-col items-center min-w-[32px]">
+                              <span
+                                className={`text-lg font-bold ${runnerCellTextClass}`}
+                              >
+                                {entrant.runnerNumber}
                               </span>
+                              {entrant.isScratched && (
+                                <span className="text-xs text-red-600 font-medium">
+                                  SCR
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex-1 overflow-hidden">
+                            <div
+                              className={`text-sm font-medium truncate ${runnerCellTextClass}`}
+                            >
+                              {entrant.name}
+                            </div>
+                            {entrant.jockey && (
+                              <div className="text-xs text-gray-600 truncate">
+                                {entrant.jockey}
+                              </div>
                             )}
                           </div>
                         </div>
-                        <div className="flex-1 overflow-hidden">
-                          <div className="text-sm font-medium text-gray-900 truncate">
-                            {entrant.name}
-                          </div>
-                          {entrant.jockey && (
-                            <div className="text-xs text-gray-600 truncate">
-                              {entrant.jockey}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
+                        {resultHighlight && (
+                          <span className="sr-only">{resultHighlight.srLabel}</span>
+                        )}
+                      </td>
 
-                    <WinOddsCell entrant={entrant} formatOdds={formatOdds} />
-                    <PlaceOddsCell entrant={entrant} formatOdds={formatOdds} />
+                      <WinOddsCell entrant={entrant} formatOdds={formatOdds} />
+                      <PlaceOddsCell entrant={entrant} formatOdds={formatOdds} />
 
-                    {/* Timeline Columns */}
-                    {timelineColumns.map((column) => {
-                      const indicator = !entrant.isScratched
-                        ? getIndicatorForCell(column.interval, entrant.$id)
-                        : null
-                      const indicatorStyle = indicator
-                        ? mapIndicatorColorToCellStyle(indicator.color)
-                        : null
-                      const indicatorTitle = indicator
-                        ? `${indicator.indicatorType} (${indicator.percentageChange.toFixed(
-                            1
-                          )}%)`
-                        : undefined
-                      const indicatorChange = indicator
-                        ? indicator.percentageChange.toFixed(2)
-                        : undefined
-                      const cellValue = getTimelineData(
-                        entrant.$id,
-                        column.interval
-                      )
+                      {/* Timeline Columns */}
+                      {timelineColumns.map((column) => {
+                        const indicator = !entrant.isScratched
+                          ? getIndicatorForCell(column.interval, entrant.$id)
+                          : null
+                        const indicatorStyle = indicator
+                          ? mapIndicatorColorToCellStyle(indicator.color)
+                          : null
+                        const indicatorTitle = indicator
+                          ? `${indicator.indicatorType} (${indicator.percentageChange.toFixed(
+                              1
+                            )}%)`
+                          : undefined
+                        const indicatorChange = indicator
+                          ? indicator.percentageChange.toFixed(2)
+                          : undefined
+                        const cellValue = getTimelineData(
+                          entrant.$id,
+                          column.interval
+                        )
 
-                      return (
-                        <td
-                          key={`${entrant.$id}_${column.interval}`}
-                          className={`px-2 py-1 text-xs text-center border-r border-gray-100 ${
-                            entrant.isScratched
-                              ? 'bg-pink-50'
-                              : column.isScheduledStart
-                              ? 'border-blue-200 bg-blue-100'
-                              : column.isDynamic
-                              ? 'bg-yellow-50'
-                              : ''
-                          } ${
-                            !entrant.isScratched &&
-                            isCurrentTimeColumn(column.interval)
-                              ? 'bg-green-50 border-green-200 font-medium'
-                              : ''
-                          }`}
-                          style={{ verticalAlign: 'middle', height: '30px' }}
-                        >
-                          <div
-                            className={`flex items-center justify-center h-full w-full text-xs font-medium ${
-                              indicatorStyle ? '' : 'text-gray-900'
-                            } ${indicatorStyle?.className ?? ''}`.trim()}
-                            style={indicatorStyle?.style}
-                            data-indicator={indicator ? indicator.indicatorType : undefined}
-                            data-indicator-change={indicatorChange}
-                            title={indicatorTitle}
+                        return (
+                          <td
+                            key={`${entrant.$id}_${column.interval}`}
+                            className={`px-2 py-1 text-xs text-center border-r border-gray-100 ${
+                              entrant.isScratched
+                                ? 'bg-pink-50'
+                                : column.isScheduledStart
+                                ? 'border-blue-200 bg-blue-100'
+                                : column.isDynamic
+                                ? 'bg-yellow-50'
+                                : ''
+                            } ${
+                              !entrant.isScratched &&
+                              isCurrentTimeColumn(column.interval)
+                                ? 'bg-green-50 border-green-200 font-medium'
+                                : ''
+                            }`}
+                            style={{ verticalAlign: 'middle', height: '30px' }}
                           >
-                            {cellValue}
-                          </div>
-                        </td>
-                      )
-                    })}
+                            <div
+                              className={`flex items-center justify-center h-full w-full text-xs font-medium ${
+                                indicatorStyle ? '' : 'text-gray-900'
+                              } ${indicatorStyle?.className ?? ''}`.trim()}
+                              style={indicatorStyle?.style}
+                              data-indicator={indicator ? indicator.indicatorType : undefined}
+                              data-indicator-change={indicatorChange}
+                              title={indicatorTitle}
+                            >
+                              {cellValue}
+                            </div>
+                          </td>
+                        )
+                      })}
 
                     {/* Right Fixed Columns */}
                     <td
@@ -1518,7 +1723,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                       </div>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
