@@ -74,7 +74,7 @@ type RealtimePayload = RealtimePayloadBase & {
 interface RawRealtimeMessage {
   events: string[]
   channels?: string[]
-  timestamp: string
+  timestamp: string | number
   payload?: RealtimePayload
 }
 
@@ -85,12 +85,11 @@ interface AppwriteRealtimeMessage {
   payload: RealtimePayload
 }
 
-type RealtimeSubscribeCallback = (message: RawRealtimeMessage) => void;
 
 const normalizeRealtimeMessage = (message: RawRealtimeMessage): AppwriteRealtimeMessage => ({
   events: message.events,
   channels: message.channels ?? [],
-  timestamp: message.timestamp,
+  timestamp: typeof message.timestamp === 'number' ? message.timestamp.toString() : message.timestamp,
   payload: (message.payload ?? {}) as RealtimePayload,
 });
 
@@ -222,7 +221,7 @@ export function useUnifiedRaceRealtime({
 
   // Smart channel management with race status awareness
   const getChannels = useCallback(
-    (raceDocId: string | null, raceResultsDocId?: string, raceStatus?: string) => {
+    (raceDocId: string | null, raceResultsDocId?: string) => {
       if (!raceDocId) return []
 
       const channels = new Set<string>()
@@ -247,17 +246,15 @@ export function useUnifiedRaceRealtime({
         channels.add('databases.raceday-db.collections.money-flow-history.documents')
       }
 
-      // Add race-results subscription ONLY for races with interim/final status (per hybrid architecture)
-      const shouldSubscribeToResults =
-        raceStatus && ['interim', 'final'].includes(raceStatus.toLowerCase())
-      if (shouldSubscribeToResults) {
-        if (raceResultsDocId) {
-          channels.add(
-            `databases.raceday-db.collections.race-results.documents.${raceResultsDocId}`
-          )
-        } else {
-          channels.add('databases.raceday-db.collections.race-results.documents')
-        }
+      // ALWAYS include race-results subscription to avoid connection upgrades
+      // Use document-specific channel if we have the ID, otherwise collection-level
+      if (raceResultsDocId) {
+        channels.add(
+          `databases.raceday-db.collections.race-results.documents.${raceResultsDocId}`
+        )
+      } else {
+        // Always subscribe to collection-level race-results to catch document creation
+        channels.add('databases.raceday-db.collections.race-results.documents')
       }
 
       // Add entrant-specific subscriptions if available
@@ -649,13 +646,16 @@ export function useUnifiedRaceRealtime({
             }
             return false
           }) &&
-          // Document-specific subscription
-          (payload.$id === currentRaceResultsDocumentId ||
-            // Collection-level: check if this event is for our race
+          // ENHANCED FILTERING: Since we always subscribe to race-results, filter more strictly
+          (// Document-specific subscription: exact match
+            payload.$id === currentRaceResultsDocumentId ||
+            // Collection-level: ensure this is for our specific race
             payload.race === currentRaceDocumentId ||
             payload.race === raceId ||
-            // Handle document creation events
-            (payload.race === currentRaceDocumentId && payload.resultsAvailable))
+            // Handle document creation events for our race only
+            (payload.race === currentRaceDocumentId && payload.resultsAvailable) ||
+            // Filter out events for other races when using collection-level subscription
+            (payload.raceId === raceId))
 
         const isPoolEvent = events.some(
           (event) => event.includes('race-pools') && payload.raceId === raceId
@@ -964,7 +964,7 @@ export function useUnifiedRaceRealtime({
               resultsData: parsedResultsData,
               dividendsData: parsedDividendsData,
               fixedOddsData: parsedFixedOddsData,
-              resultStatus: payload.resultStatus?.toLowerCase() || 'interim',
+              resultStatus: (payload.resultStatus?.toLowerCase() || 'interim') as 'interim' | 'final',
               // Update race status based on result status
               status:
                 payload.resultStatus === 'final'
@@ -976,13 +976,13 @@ export function useUnifiedRaceRealtime({
           debugLog('Pool data update received', { raceId: payload.raceId })
 
           const existingPoolId = newState.poolData?.$id || ''
-          const resolvedPoolId = payload.$id || existingPoolId
+          const resolvedPoolId = payload.$id || existingPoolId || ''
 
           newState.poolData = {
             $id: resolvedPoolId,
             $createdAt: payload.$createdAt || new Date().toISOString(),
             $updatedAt: payload.$updatedAt || new Date().toISOString(),
-            raceId: payload.raceId,
+            raceId: payload.raceId || raceId,
             winPoolTotal: payload.winPoolTotal || 0,
             placePoolTotal: payload.placePoolTotal || 0,
             quinellaPoolTotal: payload.quinellaPoolTotal || 0,
@@ -998,7 +998,9 @@ export function useUnifiedRaceRealtime({
         } else if (isEntrantEvent && payload) {
           debugLog('Entrant update received', { entrantId: payload.$id })
 
-          newState.entrants = updateEntrantInList(newState.entrants, payload)
+          if (payload.$id) {
+            newState.entrants = updateEntrantInList(newState.entrants, payload as Partial<Entrant> & { $id: string })
+          }
           newState.lastEntrantsUpdate = now
         } else if (isMoneyFlowEvent && payload) {
           debugLog('Money flow update received', {
@@ -1100,8 +1102,7 @@ export function useUnifiedRaceRealtime({
           // Get smart channels based on current state and race status
           const channels = getChannels(
             state.raceDocumentId,
-            state.raceResultsDocumentId || undefined,
-            state.race?.status
+            state.raceResultsDocumentId || undefined
           )
           debugLog('Subscription channels:', channels)
 
@@ -1222,78 +1223,8 @@ export function useUnifiedRaceRealtime({
     CONNECTION_DRAIN_DELAY,
   ])
 
-  // Dynamic subscription upgrade when race-results document is discovered
-  useEffect(() => {
-    if (
-      state.raceResultsDocumentId &&
-      unsubscribeFunction.current &&
-      state.isConnected
-    ) {
-      debugLog('🎯 Upgrading to document-specific race-results subscription', {
-        raceResultsDocumentId: state.raceResultsDocumentId,
-        wasUsingCollectionLevel: !state.raceResultsDocumentId,
-      })
-
-      // Recreate subscription with document-specific race-results channel
-      const setupSubscription = () => {
-        try {
-          if (unsubscribeFunction.current) {
-            unsubscribeFunction.current()
-            unsubscribeFunction.current = null
-          }
-
-          const channels = getChannels(
-            state.raceDocumentId,
-            state.raceResultsDocumentId || undefined,
-            state.race?.status
-          )
-          debugLog(
-            '🔄 Recreated subscription with document-specific race-results channel',
-            channels
-          )
-
-          // Create a new message processor for the upgraded subscription
-          const handleMessage: RealtimeSubscribeCallback = (response) => {
-            try {
-              pendingUpdates.current.push(normalizeRealtimeMessage(response))
-
-              if (updateThrottleTimer.current) {
-                clearTimeout(updateThrottleTimer.current)
-              }
-
-              updateThrottleTimer.current = setTimeout(
-                applyPendingUpdates,
-                THROTTLE_DELAY
-              )
-            } catch (error) {
-              errorLog(
-                'Error processing real-time message in upgraded subscription',
-                error
-              )
-            }
-          }
-
-          unsubscribeFunction.current = client.subscribe(
-            channels,
-            handleMessage
-          )
-        } catch (error) {
-          errorLog('Failed to upgrade subscription:', error)
-        }
-      }
-
-      // Add a small delay to ensure state is fully updated
-      const timer = setTimeout(setupSubscription, 100)
-      return () => clearTimeout(timer)
-    }
-  }, [
-    state.raceResultsDocumentId,
-    state.raceDocumentId,
-    state.race?.status,
-    state.isConnected,
-    getChannels,
-    applyPendingUpdates,
-  ])
+  // REMOVED: Dynamic subscription upgrade logic that caused connection leaks
+  // Now using single subscription approach with event filtering instead
 
   // Manual reconnection function
   const reconnect = useCallback(() => {
@@ -1378,7 +1309,12 @@ function resolveEntrantId(entrant: RealtimePayload['entrant']): string | null {
     return entrant
   }
 
-  return entrant.entrantId || entrant.$id || null
+  if (typeof entrant === 'object' && entrant !== null) {
+    return (entrant as { entrantId?: string; $id?: string }).entrantId ||
+           (entrant as { entrantId?: string; $id?: string }).$id || null
+  }
+
+  return null
 }
 
 function updateEntrantMoneyFlow(
