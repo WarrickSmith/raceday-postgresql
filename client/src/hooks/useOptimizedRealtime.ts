@@ -124,7 +124,7 @@ export function useOptimizedRealtime({
 
     // Update performance metrics
     updateConnectionMetrics(batch.length);
-  }, [maxHistorySize]);
+  }, [maxHistorySize, updateConnectionMetrics]);
 
   // Performance metrics calculation
   const updateConnectionMetrics = useCallback((updateCount: number) => {

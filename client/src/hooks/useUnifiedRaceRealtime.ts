@@ -24,9 +24,6 @@ import { useLogger } from '@/utils/logging'
 import { NAVIGATION_DRAIN_DELAY } from '@/contexts/SubscriptionCleanupContext'
 import type { MoneyFlowDataPoint } from '@/types/moneyFlow'
 
-// Debug logging control - minimal for production
-const DEBUG = process.env.NODE_ENV === 'development'
-
 // Create logger outside component to avoid re-creation
 let logger: ReturnType<typeof useLogger>;
 
@@ -58,13 +55,6 @@ const debugRaceStatus = (
 const errorLog = (message: string, error: unknown) => {
   if (logger) {
     logger.error(message, error);
-  }
-}
-
-const performanceLog = (operation: string, startTime: number) => {
-  const duration = Date.now() - startTime
-  if (duration > 1000 && logger) {
-    logger.warn(`${operation} took ${duration}ms`);
   }
 }
 
@@ -453,7 +443,7 @@ export function useUnifiedRaceRealtime({
     } catch (error) {
       errorLog('Failed to fetch initial data', error)
     }
-  }, [raceId])
+  }, [raceId, fetchPoolDataForRace, state.raceResultsDocumentId])
 
   // Reset fetch flag when race ID changes
   useEffect(() => {
@@ -510,7 +500,7 @@ export function useUnifiedRaceRealtime({
         }))
       }, CONNECTION_DRAIN_DELAY)
     }
-  }, [cleanupSignal, raceId])
+  }, [cleanupSignal, raceId, CONNECTION_DRAIN_DELAY])
 
   // Fetch initial data when race ID changes
   useEffect(() => {
@@ -600,11 +590,16 @@ export function useUnifiedRaceRealtime({
     setState((prevState) => {
       const newState = { ...prevState }
       const now = new Date()
-      let hasUpdates = false
 
       // Process all pending updates in batch
       for (const message of updates) {
         const { events, channels, payload } = message
+
+        const currentRaceDocumentId =
+          newState.raceDocumentId ?? prevState.raceDocumentId
+        const currentRaceResultsDocumentId =
+          newState.raceResultsDocumentId ?? prevState.raceResultsDocumentId
+        const currentEntrants = newState.entrants ?? prevState.entrants
 
         if (
           !hasRaceScopedMoneyFlowChannel &&
@@ -624,12 +619,12 @@ export function useUnifiedRaceRealtime({
             if (event.includes('races.')) {
               // Extract document ID from event
               const eventId = event.split('races.')[1]
-              return eventId === state.raceDocumentId
+              return eventId === currentRaceDocumentId
             }
             return false
           }) ||
           (events.some((event) => event.includes('races.')) &&
-            payload.raceId === raceId)
+            (payload.raceId === raceId || payload.race === currentRaceDocumentId))
 
         const isRaceResultsEvent =
           events.some((event) => {
@@ -639,12 +634,12 @@ export function useUnifiedRaceRealtime({
             return false
           }) &&
           // Document-specific subscription
-          (payload.$id === state.raceResultsDocumentId ||
+          (payload.$id === currentRaceResultsDocumentId ||
             // Collection-level: check if this event is for our race
-            payload.race === state.raceDocumentId ||
+            payload.race === currentRaceDocumentId ||
             payload.race === raceId ||
             // Handle document creation events
-            (payload.race === state.raceDocumentId && payload.resultsAvailable))
+            (payload.race === currentRaceDocumentId && payload.resultsAvailable))
 
         const isPoolEvent = events.some(
           (event) => event.includes('race-pools') && payload.raceId === raceId
@@ -653,18 +648,18 @@ export function useUnifiedRaceRealtime({
         const isEntrantEvent = events.some(
           (event) =>
             event.includes('entrants') &&
-            (payload.race === state.raceDocumentId ||
+            (payload.race === currentRaceDocumentId ||
               payload.raceId === raceId ||
               (payload.entrant &&
-                state.entrants.some((e) => e.$id === payload.entrant)))
+                currentEntrants.some((e) => e.$id === payload.entrant)))
         )
 
         const moneyFlowMatchesRace =
           payload &&
           (payload.raceId === raceId ||
-            payload.raceId === prevState.raceDocumentId ||
+            payload.raceId === currentRaceDocumentId ||
             payload.race === raceId ||
-            payload.race === prevState.raceDocumentId)
+            payload.race === currentRaceDocumentId)
 
         const isMoneyFlowEvent =
           events.some((event) => event.includes('money-flow-history')) &&
@@ -689,7 +684,7 @@ export function useUnifiedRaceRealtime({
           const updatedRace: Race = {
             ...newState.race,
             ...payload,
-            $id: payload.$id || newState.race?.$id || state.raceDocumentId,
+            $id: payload.$id || newState.race?.$id || currentRaceDocumentId,
             raceId: payloadRaceId,
             // Critical: Always update status from payload if present
             status: newStatus,
@@ -731,7 +726,6 @@ export function useUnifiedRaceRealtime({
 
           newState.race = updatedRace
           newState.lastRaceUpdate = now
-          hasUpdates = true
 
           // Debug log for status changes
           if (payload.status && newState.race) {
@@ -766,7 +760,7 @@ export function useUnifiedRaceRealtime({
                 const raceResultsResponse = await databases.listDocuments(
                   'raceday-db',
                   'race-results',
-                  [Query.equal('race', state.raceDocumentId!), Query.limit(1)]
+                  [Query.equal('race', currentRaceDocumentId!), Query.limit(1)]
                 )
 
                 if (raceResultsResponse.documents.length > 0) {
@@ -875,7 +869,7 @@ export function useUnifiedRaceRealtime({
           })
 
           // If this is a new race-results document, store its ID
-          if (payload.$id && !state.raceResultsDocumentId) {
+          if (payload.$id && !currentRaceResultsDocumentId) {
             debugLog('🎯 New race-results document detected', {
               documentId: payload.$id,
               resultStatus: payload.resultStatus,
@@ -934,14 +928,13 @@ export function useUnifiedRaceRealtime({
 
           newState.resultsData = updatedResultsData
           newState.lastResultsUpdate = now
-          hasUpdates = true
 
           // Debug log for results status changes
           if (payload.resultStatus && payload.resultsAvailable) {
             debugRaceStatus(
               'Race results status update',
               raceId,
-              state.resultsData?.status,
+              prevState.resultsData?.status,
               payload.resultStatus?.toLowerCase(),
               { source: 'race-results', documentId: payload.$id }
             )
@@ -986,13 +979,11 @@ export function useUnifiedRaceRealtime({
             isLive: payload.isLive || false,
           }
           newState.lastPoolUpdate = now
-          hasUpdates = true
         } else if (isEntrantEvent && payload) {
           debugLog('Entrant update received', { entrantId: payload.$id })
 
           newState.entrants = updateEntrantInList(newState.entrants, payload)
           newState.lastEntrantsUpdate = now
-          hasUpdates = true
         } else if (isMoneyFlowEvent && payload) {
           debugLog('Money flow update received', {
             entrantId: resolveEntrantId(payload.entrant),
@@ -1001,7 +992,6 @@ export function useUnifiedRaceRealtime({
           newState.entrants = updateEntrantMoneyFlow(newState.entrants, payload)
           newState.lastEntrantsUpdate = now
           newState.moneyFlowUpdateTrigger = prevState.moneyFlowUpdateTrigger + 1
-          hasUpdates = true
         }
       }
 
@@ -1035,12 +1025,7 @@ export function useUnifiedRaceRealtime({
     if (observedRaceScopedMoneyFlowChannel) {
       setHasRaceScopedMoneyFlowChannel(true)
     }
-  }, [
-    raceId,
-    state.raceDocumentId,
-    state.raceResultsDocumentId,
-    hasRaceScopedMoneyFlowChannel,
-  ])
+  }, [raceId, hasRaceScopedMoneyFlowChannel])
 
   // Process incoming Appwrite real-time messages with throttling
   const processRealtimeMessage = useCallback(
@@ -1218,6 +1203,7 @@ export function useUnifiedRaceRealtime({
     isCleaningUp,
     getChannels,
     processRealtimeMessage,
+    CONNECTION_DRAIN_DELAY,
   ])
 
   // Dynamic subscription upgrade when race-results document is discovered
@@ -1284,7 +1270,14 @@ export function useUnifiedRaceRealtime({
       const timer = setTimeout(setupSubscription, 100)
       return () => clearTimeout(timer)
     }
-  }, [state.raceResultsDocumentId, getChannels, applyPendingUpdates])
+  }, [
+    state.raceResultsDocumentId,
+    state.raceDocumentId,
+    state.race?.status,
+    state.isConnected,
+    getChannels,
+    applyPendingUpdates,
+  ])
 
   // Manual reconnection function
   const reconnect = useCallback(() => {
