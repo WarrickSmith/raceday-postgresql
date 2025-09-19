@@ -132,10 +132,6 @@ describe('useUnifiedRaceRealtime', () => {
   it('should clear update history', () => {
     const { result } = renderHook(() => useUnifiedRaceRealtime(mockProps))
 
-    // Get initial state
-    const initialTotalUpdates = result.current.totalUpdates
-    const initialLastUpdate = result.current.lastUpdate
-
     // Call clear history
     act(() => {
       result.current.clearHistory()
@@ -148,7 +144,7 @@ describe('useUnifiedRaceRealtime', () => {
   })
 
   it('should fetch initial data when raceId changes', async () => {
-    const { result } = renderHook(() =>
+    renderHook(() =>
       useUnifiedRaceRealtime({
         raceId: 'race-456',
         initialRace: null, // No initial race data - this should trigger fetch
@@ -170,7 +166,7 @@ describe('useUnifiedRaceRealtime', () => {
 
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('API Error'))
 
-    const { result } = renderHook(() =>
+    renderHook(() =>
       useUnifiedRaceRealtime({
         raceId: 'test-race-id',
         initialRace: null, // Force fetch

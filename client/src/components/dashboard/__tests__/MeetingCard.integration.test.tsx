@@ -5,11 +5,20 @@ import { RACE_TYPE_CODES } from '@/constants/raceTypes';
 
 type MeetingStatusResponseBody = { isCompleted: boolean };
 
-const createFetchResponse = (body: MeetingStatusResponseBody): Response =>
-  new Response(JSON.stringify(body), {
+const createFetchResponse = (body: MeetingStatusResponseBody): Response => {
+  if (typeof Response === 'undefined') {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => body,
+    } as unknown as Response;
+  }
+
+  return new Response(JSON.stringify(body), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   });
+};
 
 describe('MeetingCard Integration Tests', () => {
   const mockMeeting: Meeting = {
