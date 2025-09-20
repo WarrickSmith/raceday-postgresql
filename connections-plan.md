@@ -142,7 +142,7 @@ This development plan addresses critical Appwrite database connection leak issue
 
 **Strategy**:
 
-1. Create development-time connection monitoring dashboard
+1. Create development-time connection monitoring dashboard (toggle dropdown row from bottom of race header component above race body (entrants grid))
 2. Add connection count tracking to Appwrite client wrapper
 3. Implement connection health metrics and alerts
 4. Create fallback mechanism when connection limits approached
@@ -156,7 +156,7 @@ This development plan addresses critical Appwrite database connection leak issue
 **Implementation Details**:
 
 - Wrap Appwrite client to track active subscriptions
-- Add connection count display in development mode
+- Add connection count display (toggle dropdown row from bottom of race header component above race body (entrants grid))
 - Implement warning thresholds (>10 connections)
 - Create emergency fallback to disable real-time if limits exceeded
 - Add connection health metrics (average latency, failure rates)
