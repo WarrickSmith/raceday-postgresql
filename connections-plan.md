@@ -223,25 +223,20 @@ This development plan addresses critical Appwrite database connection leak issue
 3. Client hook optimization (race-scoped channel selection)
 4. Testing and validation (verify real-time delivery works correctly)
 
-### Task 6: Implement Connection Pooling
+### ~~Task 6: Implement Connection Pooling~~ (REMOVED)
 
-**Status**:
+**Status**: Removed - Counterproductive
 
-- ► Not Started
-- In Progress
-- Complete
+**Reason for Removal**: Connection pooling would reintroduce the exact performance and data contamination problems that Tasks 1 and 5 are designed to solve.
 
-**Priority**: Medium
-**Impact**: Enables connection reuse across components
+**Why Connection Pooling is Problematic**:
+- Forces ALL channels to be active simultaneously across components
+- Creates data contamination (components receive irrelevant notifications)
+- Increases unnecessary server-to-client data push from Appwrite
+- Breaks clean per-page connection lifecycle
+- Creates tight coupling between unrelated components
 
-**Problem**: Each hook creates independent Appwrite client connections instead of sharing a connection pool.
-
-**Strategy**:
-
-1. Create centralized connection manager for WebSocket pooling
-2. Implement connection sharing between compatible hooks
-3. Add connection lifecycle management
-4. Maintain proper cleanup and error handling
+**Current Architecture is Optimal**: The existing `useUnifiedRaceRealtime.ts` approach with connection monitoring via `appwrite-client.ts` already provides the benefits (tracking, metrics, emergency fallback) without the drawbacks.
 
 ---
 
