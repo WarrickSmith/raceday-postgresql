@@ -83,14 +83,9 @@ export default async function main(context) {
         });
 
         // Calculate NZ start of day in UTC for proper database filtering
-        const today = new Date();
-        const nzToday = new Date(today.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }));
-        const localToday = new Date(today.toLocaleString('en-US'));
-        const timezoneOffset = localToday.getTime() - nzToday.getTime();
-
-        const nzStartOfDay = new Date(nzDate + 'T00:00:00');
-        nzStartOfDay.setTime(nzStartOfDay.getTime() - timezoneOffset);
-        const nzStartOfDayISO = nzStartOfDay.toISOString();
+        // Since we're running on Sept 19 UTC but it's Sept 20 in NZ,
+        // we need the start of Sept 20 NZ time in UTC format
+        const nzStartOfDayISO = new Date(nzDate + 'T00:00:00+13:00').toISOString();
 
         // Get basic races from database (that were created by daily-meetings function)
         logDebug(context, 'Fetching basic races from database for detailed enhancement...', {
