@@ -165,7 +165,7 @@ This development plan addresses critical Appwrite database connection leak issue
 
 ## Medium Impact Tasks (Week 2)
 
-### Task 5: Optimize Channel Selection Strategy
+### Task 5: Optimize Channel Selection Strategy (REVISED)
 
 **Status**:
 
@@ -174,16 +174,54 @@ This development plan addresses critical Appwrite database connection leak issue
 - Complete
 
 **Priority**: Medium
-**Impact**: Further reduces connection overhead
+**Impact**: Reduces connection overhead while preventing performance-killing collection-level subscriptions
 
-**Problem**: Current channel selection creates too many document-specific subscriptions when collection-level filtering could be more efficient.
+**Problem**: The original approach would create severe performance issues by subscribing to entire collections (`money-flow-history.documents`, `race-results.documents`) that continuously grow, pushing irrelevant data for all races to every client. Current individual entrant document subscriptions (20+ channels per race) are also inefficient.
 
-**Strategy**:
+**Optimized Strategy**: Race-Specific Channel Filtering
 
-1. Analyze which subscriptions benefit from document-specific vs collection-level channels
-2. Implement client-side filtering for collection-level subscriptions
-3. Reduce total channel count per race page subscription
-4. Maintain same real-time functionality with fewer channels
+**Key Implementation Requirements**:
+
+1. **Database Schema Updates**:
+   - Add `raceId` attribute to `entrants` collection for efficient race-based filtering
+   - Remove obsolete attributes: `isEmergency`, `emergencyPosition` (approaching attribute limits)
+   - Create `raceId` index for `entrants` collection for optimal performance
+   - Add `raceId` attribute to `race-results` collection with index
+   - Verify existing `raceId` in `money-flow-history` collection (already present)
+
+2. **Channel Selection Optimization**:
+   - Replace 20+ individual entrant document subscriptions with single race-scoped channel
+   - Use race-specific filtering: `entrants.documents.raceId.{raceId}`
+   - Apply same pattern to money-flow and race-results collections
+   - Maintain client-side event filtering for race-specific processing
+
+3. **Server Function Updates**:
+   - Update `enhanced-race-poller` function to populate `raceId` in entrant records
+   - Update race-results creation to include `raceId` field
+   - Verify money-flow-history already includes `raceId` (confirmed present)
+
+4. **Client Hook Updates**:
+   - Modify `getChannels()` in `useUnifiedRaceRealtime.ts` to use race-scoped channels
+   - Replace individual document subscriptions with attribute-based channel selection
+   - Maintain identical real-time functionality with optimized delivery
+
+**Performance Benefits**:
+- Reduces channel count from 20+ per race to 3-4 channels
+- Eliminates irrelevant data push from growing collections
+- Improves navigation performance with cleaner connection lifecycle
+- Prevents future performance degradation as data volumes grow
+- Follows Appwrite best practices for attribute-based channel filtering
+
+**Files Affected**:
+- `/server/database-setup/src/database-setup.js` (schema updates)
+- `/client/src/hooks/useUnifiedRaceRealtime.ts` (channel selection)
+- `/server/functions/enhanced-race-poller/` (raceId population)
+
+**Implementation Sequence**:
+1. Database schema updates (add raceId, indexes, remove obsolete attributes)
+2. Server function updates (populate raceId in new records)
+3. Client hook optimization (race-scoped channel selection)
+4. Testing and validation (verify real-time delivery works correctly)
 
 ### Task 6: Implement Connection Pooling
 
