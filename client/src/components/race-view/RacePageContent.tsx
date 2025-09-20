@@ -6,6 +6,7 @@ import { RaceDataHeader } from '@/components/race-view/RaceDataHeader'
 import { EnhancedEntrantsGrid } from '@/components/race-view/EnhancedEntrantsGrid'
 import { RaceFooter } from '@/components/race-view/RaceFooter'
 import { useUnifiedRaceRealtime } from '@/hooks/useUnifiedRaceRealtime'
+import { ConnectionMonitor } from '@/components/dev/ConnectionMonitor'
 import AlertsConfigModal from '@/components/alerts/AlertsConfigModal'
 import type { RaceStatus } from '@/types/racePools'
 
@@ -14,6 +15,9 @@ export function RacePageContent() {
 
   // Alerts Configuration Modal state (moved from EnhancedEntrantsGrid for performance)
   const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false)
+
+  // Connection Monitor state (development only)
+  const [showConnectionMonitor, setShowConnectionMonitor] = useState(false)
 
   // Unified real-time subscription for all race page data
   const realtimeData = useUnifiedRaceRealtime({
@@ -128,8 +132,17 @@ export function RacePageContent() {
           navigationData={realtimeData.navigationData}
           connectionHealth={realtimeData.getConnectionHealth()}
           onConfigureAlerts={() => setIsAlertsModalOpen(true)}
+          onToggleConnectionMonitor={() => setShowConnectionMonitor(!showConnectionMonitor)}
+          showConnectionMonitor={showConnectionMonitor}
         />
       </header>
+
+      {/* Connection Monitor - Between Header and Body */}
+      <ConnectionMonitor
+        isOpen={showConnectionMonitor}
+        onToggle={() => setShowConnectionMonitor(!showConnectionMonitor)}
+        className="race-layout-connection-monitor"
+      />
 
       {/* Error Message */}
       {error && (
@@ -205,9 +218,10 @@ export function RacePageContent() {
       <style jsx global>{`
         .race-page-layout {
           display: grid;
-          grid-template-rows: auto 1fr auto;
+          grid-template-rows: auto auto 1fr auto;
           grid-template-areas:
             'header'
+            'connection-monitor'
             'content'
             'footer';
           height: 100vh;
@@ -223,6 +237,12 @@ export function RacePageContent() {
           min-height: 140px;
           max-height: 160px;
           overflow: visible;
+        }
+
+        .race-layout-connection-monitor {
+          grid-area: connection-monitor;
+          overflow: visible;
+          max-height: 400px;
         }
 
         .race-layout-content {

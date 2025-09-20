@@ -16,7 +16,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { client, databases } from '@/lib/appwrite-client'
+import { client, databases, connectionMonitor } from '@/lib/appwrite-client'
 import { Race, Entrant, Meeting, RaceNavigationData } from '@/types/meetings'
 import type { RacePoolData, RaceResultsData } from '@/types/racePools'
 import { Query } from 'appwrite'
@@ -146,6 +146,14 @@ interface UnifiedRaceRealtimeActions {
     isHealthy: boolean
     avgLatency: number | null
     uptime: number
+    connectionCount?: number
+    activeConnections?: number
+    totalChannels?: number
+    uniqueChannels?: string[]
+    totalMessages?: number
+    totalErrors?: number
+    isOverLimit?: boolean
+    emergencyFallback?: boolean
   }
 }
 
@@ -1260,18 +1268,30 @@ export function useUnifiedRaceRealtime({
           latencySamples.current.length
         : null
 
+    // Get connection monitoring metrics
+    const monitorMetrics = connectionMonitor.getMetrics()
+
     debugLog('Connection health check', {
       isConnected: state.isConnected,
       connectionAttempts: state.connectionAttempts,
       latencySamples: latencySamples.current.length,
       avgLatency,
       uptime,
+      monitorMetrics,
     })
 
     return {
-      isHealthy: state.isConnected && state.connectionAttempts < 3,
+      isHealthy: state.isConnected && state.connectionAttempts < 3 && !connectionMonitor.shouldDisableRealtime(),
       avgLatency,
       uptime,
+      connectionCount: monitorMetrics?.totalConnections,
+      activeConnections: monitorMetrics?.activeConnections,
+      totalChannels: monitorMetrics?.totalChannels,
+      uniqueChannels: monitorMetrics?.uniqueChannels,
+      totalMessages: monitorMetrics?.totalMessages,
+      totalErrors: monitorMetrics?.totalErrors,
+      isOverLimit: monitorMetrics?.isOverLimit,
+      emergencyFallback: monitorMetrics?.emergencyFallback,
     }
   }, [state.isConnected, state.connectionAttempts])
 

@@ -5,6 +5,7 @@ import { useRace } from '@/contexts/RaceContext'
 import { formatDistance, formatRaceTime } from '@/utils/raceFormatters'
 import { RaceNavigation } from './RaceNavigation'
 import { getRaceTypeDisplay } from '@/constants/raceTypes'
+import { showDevelopmentFeatures } from '@/utils/environment'
 import type {
   Race,
   Entrant,
@@ -22,8 +23,18 @@ interface RaceDataHeaderProps {
     isHealthy: boolean
     avgLatency: number | null
     uptime: number
+    connectionCount?: number
+    activeConnections?: number
+    totalChannels?: number
+    uniqueChannels?: string[]
+    totalMessages?: number
+    totalErrors?: number
+    isOverLimit?: boolean
+    emergencyFallback?: boolean
   }
   onConfigureAlerts?: () => void
+  onToggleConnectionMonitor?: () => void
+  showConnectionMonitor?: boolean
 }
 
 export const RaceDataHeader = memo(function RaceDataHeader({
@@ -34,6 +45,8 @@ export const RaceDataHeader = memo(function RaceDataHeader({
   navigationData: propNavigationData,
   connectionHealth,
   onConfigureAlerts,
+  onToggleConnectionMonitor,
+  showConnectionMonitor = false,
 }: RaceDataHeaderProps) {
   const { raceData } = useRace()
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -218,19 +231,54 @@ export const RaceDataHeader = memo(function RaceDataHeader({
                 {healthStatus.status}
               </span>
             </div>
+            {/* Connection & Channel Count Indicators (Development Only) */}
+            {showDevelopmentFeatures() && connectionHealth?.connectionCount !== undefined && (
+              <div className="flex items-center gap-1">
+                <div className={`text-xs px-1 py-0.5 rounded font-mono ${
+                  connectionHealth.isOverLimit ? 'bg-red-100 text-red-700' :
+                  (connectionHealth.connectionCount || 0) > 7 ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-green-100 text-green-700'
+                }`}>
+                  C[{connectionHealth.connectionCount}]
+                </div>
+                {connectionHealth.totalChannels !== undefined && (
+                  <div className="text-xs px-1 py-0.5 rounded font-mono bg-purple-100 text-purple-700">
+                    Ch[{connectionHealth.totalChannels}]
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Alerts Configuration Button */}
-          {onConfigureAlerts && (
-            <button
-              onClick={onConfigureAlerts}
-              className="text-xs px-2 py-1 rounded transition-colors bg-gray-200 text-gray-600 hover:bg-gray-300 hover:text-gray-700"
-              title="Configure indicators"
-              aria-label="Open indicators configuration"
-            >
-              ⚙️
-            </button>
-          )}
+          <div className="flex items-center gap-1">
+            {/* Connection Monitor Toggle (Development Only) */}
+            {showDevelopmentFeatures() && onToggleConnectionMonitor && (
+              <button
+                onClick={onToggleConnectionMonitor}
+                className={`text-xs px-2 py-1 rounded transition-colors ${
+                  showConnectionMonitor
+                    ? 'bg-blue-200 text-blue-700 hover:bg-blue-300'
+                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300 hover:text-gray-700'
+                }`}
+                title="Toggle connection monitor"
+                aria-label="Toggle connection monitoring panel"
+              >
+                🔧
+              </button>
+            )}
+
+            {/* Alerts Configuration Button */}
+            {onConfigureAlerts && (
+              <button
+                onClick={onConfigureAlerts}
+                className="text-xs px-2 py-1 rounded transition-colors bg-gray-200 text-gray-600 hover:bg-gray-300 hover:text-gray-700"
+                title="Configure indicators"
+                aria-label="Open indicators configuration"
+              >
+                ⚙️
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Row 3, Col 1: Meeting info */}
