@@ -132,10 +132,10 @@ class TrackedClient extends Client {
   constructor() {
     super();
     this.originalSubscribe = this.subscribe.bind(this);
-    this.subscribe = this.trackedSubscribe.bind(this) as any;
+    this.subscribe = this.trackedSubscribe.bind(this) as typeof Client.prototype.subscribe;
   }
 
-  private trackedSubscribe(channels: string | string[], callback?: (payload: any) => void) {
+  private trackedSubscribe(channels: string | string[], callback?: (payload: unknown) => void) {
     const channelArray = Array.isArray(channels) ? channels : [channels];
     const connectionId = `conn_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
@@ -143,7 +143,7 @@ class TrackedClient extends Client {
     connectionMonitor.trackConnection(connectionId, channelArray);
 
     // Wrap the callback to track activity
-    const wrappedCallback = callback ? (payload: any) => {
+    const wrappedCallback = callback ? (payload: unknown) => {
       const startTime = Date.now();
       connectionMonitor.updateConnection(connectionId, {
         status: 'connected',
