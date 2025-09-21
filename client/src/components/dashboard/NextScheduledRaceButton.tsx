@@ -2,11 +2,13 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Meeting, Race } from '@/types/meetings';
-import { client } from '@/lib/appwrite-client';
+import { Meeting } from '@/types/meetings';
+import { useSubscriptionCleanup } from '@/contexts/SubscriptionCleanupContext';
 
 interface NextScheduledRaceButtonProps {
   meetings: Meeting[];
+  isRealtimeConnected: boolean; // Note: Now represents polling connection status
+  raceUpdateSignal: number;
 }
 
 interface NextScheduledRace {
@@ -17,21 +19,24 @@ interface NextScheduledRace {
   raceNumber: number;
 }
 
-export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonProps) {
+interface NextScheduledRaceApiResponse {
+  nextScheduledRace: NextScheduledRace | null;
+}
+
+export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpdateSignal }: NextScheduledRaceButtonProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [nextScheduledRace, setNextScheduledRace] = useState<NextScheduledRace | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const unsubscribeRef = useRef<(() => void) | null>(null);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { requestCleanup } = useSubscriptionCleanup();
 
   // Fetch the next scheduled race from the API
   const fetchNextScheduledRace = useCallback(async () => {
     try {
       const response = await fetch('/api/next-scheduled-race');
       if (response.ok) {
-        const data = await response.json();
+        const data: NextScheduledRaceApiResponse = await response.json();
         setNextScheduledRace(data.nextScheduledRace);
       } else {
         setNextScheduledRace(null);
@@ -66,77 +71,34 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
     }
 
     fetchTimeoutRef.current = setTimeout(() => {
-      fetchNextScheduledRace().then(() => {
+      void fetchNextScheduledRace().then(() => {
         setupIntelligentPolling(); // Schedule next poll
       });
     }, pollInterval);
   }, [nextScheduledRace, fetchNextScheduledRace]);
 
-  // Setup real-time subscriptions for race status changes
+  // Initial fetch and intelligent polling bootstrap
   useEffect(() => {
-    const setupSubscriptions = async () => {
-      try {
-        // Clean up existing subscription
-        if (unsubscribeRef.current) {
-          unsubscribeRef.current();
-        }
+    let isActive = true;
 
-        const unsubscribe = client.subscribe([
-          'databases.raceday-db.collections.races.documents'
-        ], async (response) => {
-          try {
-            const { events, payload } = response;
-            
-            // Handle race status changes that might affect next scheduled race
-            if (events.some(e => e.includes('races.documents'))) {
-              const race = payload as Race;
-              
-              // If this race status changed to Started, Abandoned, or Finalized,
-              // or if it's a new race, refresh the next scheduled race
-              if (events.some(e => e.includes('.update') || e.includes('.create'))) {
-                if (race.status === 'Running' || race.status === 'Abandoned' || 
-                    race.status === 'Final' || race.status === 'Interim') {
-                  
-                  // Debounce API calls to prevent excessive requests
-                  if (debounceTimeoutRef.current) {
-                    clearTimeout(debounceTimeoutRef.current);
-                  }
-                  
-                  debounceTimeoutRef.current = setTimeout(fetchNextScheduledRace, 2000);
-                }
-              }
-            }
-          } catch (error) {
-            console.error('Error processing race status update:', error);
-          }
-        });
-
-        unsubscribeRef.current = unsubscribe;
-        setIsConnected(true);
-      } catch (error) {
-        console.error('Failed to setup race subscriptions:', error);
-        setIsConnected(false);
+    void fetchNextScheduledRace().then(() => {
+      if (isActive) {
+        setupIntelligentPolling();
       }
-    };
-
-    // Initial fetch and setup
-    fetchNextScheduledRace().then(() => {
-      setupSubscriptions();
-      setupIntelligentPolling();
     });
 
     return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-      }
+      isActive = false;
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
+        fetchTimeoutRef.current = null;
       }
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
       }
     };
-  }, []);
+  }, [fetchNextScheduledRace, setupIntelligentPolling]);
 
   // Update polling when race changes
   useEffect(() => {
@@ -151,7 +113,38 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
     };
   }, [setupIntelligentPolling]);
 
-  // Handle real-time countdown updates and race transitions
+  // React to shared update signals from meetings polling system
+  useEffect(() => {
+    if (!raceUpdateSignal) {
+      return;
+    }
+
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    debounceTimeoutRef.current = setTimeout(() => {
+      void fetchNextScheduledRace().finally(() => {
+        debounceTimeoutRef.current = null;
+      });
+    }, 2000);
+
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
+      }
+    };
+  }, [raceUpdateSignal, fetchNextScheduledRace]);
+
+  // Reset next race when meetings data clears
+  useEffect(() => {
+    if (meetings.length === 0) {
+      setNextScheduledRace(null);
+    }
+  }, [meetings.length]);
+
+  // Handle countdown updates and race transitions
   useEffect(() => {
     if (!nextScheduledRace) return;
 
@@ -165,7 +158,7 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
       if (diff <= 0 && !hasTriggeredNextFetch) {
         console.log('🏁 Race has started, fetching next scheduled race');
         hasTriggeredNextFetch = true;
-        fetchNextScheduledRace();
+        void fetchNextScheduledRace();
         return;
       }
       
@@ -184,13 +177,14 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
     
     try {
       console.log('🎯 Navigating to next scheduled race:', nextScheduledRace.raceId);
+      await requestCleanup({ reason: 'next-scheduled-button' });
       router.push(`/race/${nextScheduledRace.raceId}`);
     } catch (error) {
       console.error('❌ Failed to navigate to next scheduled race:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [nextScheduledRace, isLoading, router]);
+  }, [nextScheduledRace, isLoading, router, requestCleanup]);
 
   // Show button always, but disable when no next race is available
   const isDisabled = !nextScheduledRace || isLoading;
@@ -272,11 +266,11 @@ export function NextScheduledRaceButton({ meetings }: NextScheduledRaceButtonPro
         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        {/* Real-time connection indicator */}
+        {/* Polling connection indicator */}
         {!isDisabled && (
           <div className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${
-            isConnected ? 'bg-green-400' : 'bg-red-400'
-          }`} title={isConnected ? 'Real-time connected' : 'Offline mode'} />
+            isRealtimeConnected ? 'bg-green-400' : 'bg-red-400'
+          }`} title={isRealtimeConnected ? 'Data polling active' : 'Offline mode'} />
         )}
       </div>
       

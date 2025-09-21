@@ -10,6 +10,8 @@ import { Entrant } from '@/types/meetings';
 import { memoryManager } from './memoryManager';
 import { logPerformance, logDebug, logWarn, LoggingUtils } from './logging';
 
+type MemoryPerformanceReport = ReturnType<typeof memoryManager.getPerformanceReport>;
+
 // Performance monitoring
 export class PerformanceMonitor {
   private static instance: PerformanceMonitor;
@@ -89,7 +91,7 @@ export class PerformanceMonitor {
    */
   public getPerformanceReport(): {
     timing: Record<string, { avg: number; min: number; max: number; count: number }>;
-    memory: any;
+    memory: MemoryPerformanceReport;
     recommendations: string[];
   } {
     const timing = this.getMetrics();
@@ -129,13 +131,13 @@ export class PerformanceMonitor {
 }
 
 // Virtual scrolling hook for large lists
-export function useVirtualScrolling({
+export function useVirtualScrolling<T>({
   items,
   itemHeight = 60,
   containerHeight = 400,
   overscan = 5
 }: {
-  items: any[];
+  items: T[];
   itemHeight?: number;
   containerHeight?: number;
   overscan?: number;
@@ -194,19 +196,19 @@ export function useDebouncedValue<T>(value: T, delay: number): T {
 }
 
 // Throttled callback hook
-export function useThrottledCallback<T extends (...args: any[]) => any>(
+export function useThrottledCallback<T extends (...args: unknown[]) => void>(
   callback: T,
   delay: number
-): T {
+): (...args: Parameters<T>) => void {
   const lastRan = useRef(Date.now());
   
   return useCallback(
-    ((...args) => {
+    (...args: Parameters<T>) => {
       if (Date.now() - lastRan.current >= delay) {
         callback(...args);
         lastRan.current = Date.now();
       }
-    }) as T,
+    },
     [callback, delay]
   );
 }
@@ -238,24 +240,6 @@ export const entrantsListComparison = (prev: Entrant[], next: Entrant[]): boolea
   return true;
 };
 
-// DEPRECATED: Odds history processing now handled by MoneyFlowTimeline hook
-// This function is no longer needed since odds data comes from consolidated MoneyFlowHistory
-
-// Efficient array sampling for large datasets
-function sampleArray<T>(array: T[], sampleSize: number): T[] {
-  if (array.length <= sampleSize) return array;
-  
-  const step = array.length / sampleSize;
-  const sampled: T[] = [];
-  
-  for (let i = 0; i < sampleSize; i++) {
-    const index = Math.floor(i * step);
-    sampled.push(array[index]);
-  }
-  
-  return sampled;
-}
-
 // Intersection Observer hook for lazy loading
 export function useIntersectionObserver(
   elementRef: React.RefObject<Element>,
@@ -274,6 +258,10 @@ export function useIntersectionObserver(
   const [entry, setEntry] = useState<IntersectionObserverEntry>();
 
   const frozen = entry?.isIntersecting && freezeOnceVisible;
+  const thresholds = useMemo(
+    () => (Array.isArray(threshold) ? threshold : [threshold]),
+    [threshold]
+  );
 
   const updateEntry = ([entry]: IntersectionObserverEntry[]): void => {
     setEntry(entry);
@@ -285,13 +273,13 @@ export function useIntersectionObserver(
 
     if (!hasIOSupport || frozen || !node) return;
 
-    const observerParams = { threshold, root, rootMargin };
+    const observerParams = { threshold: thresholds, root, rootMargin };
     const observer = new IntersectionObserver(updateEntry, observerParams);
 
     observer.observe(node);
 
     return () => observer.disconnect();
-  }, [elementRef, JSON.stringify(threshold), root, rootMargin, frozen]);
+  }, [elementRef, thresholds, root, rootMargin, frozen]);
 
   return entry;
 }

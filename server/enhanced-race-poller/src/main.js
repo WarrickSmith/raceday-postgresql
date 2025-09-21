@@ -1538,6 +1538,8 @@ async function saveRaceResults(
     const timestamp = new Date().toISOString()
     const resultsData = {
       race: race.$id,
+      // TASK 5: Add raceId for efficient race-based filtering
+      raceId: race.raceId || race.$id,
       resultTime: timestamp,
     }
 

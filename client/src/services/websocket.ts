@@ -4,14 +4,13 @@
  */
 
 import React from 'react';
-import { Entrant } from '@/types/meetings';
 import { performanceMonitor } from '@/utils/performance';
 
 export interface WebSocketMessage {
   type: 'entrant_update' | 'race_status' | 'money_flow' | 'connection' | 'heartbeat';
   raceId?: string;
   entrantId?: string;
-  data?: any;
+  data?: Record<string, unknown>;
   timestamp: string;
   messageId: string;
 }
@@ -361,7 +360,7 @@ export class EnhancedWebSocketService {
     return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  private log(...args: any[]): void {
+  private log(...args: unknown[]): void {
     if (this.config.enableLogging) {
       console.log('[WebSocket]', ...args);
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, Query } from '@/lib/appwrite-server'
 import { ID } from 'node-appwrite'
+import type { Databases, Models } from 'node-appwrite'
 import type { IndicatorConfig } from '@/types/alerts'
 import { DEFAULT_INDICATORS, DEFAULT_USER_ID } from '@/types/alerts'
 
@@ -29,7 +30,9 @@ export async function GET(request: NextRequest) {
       ]
     )
 
-    const indicators = response.documents as unknown as IndicatorConfig[]
+    const indicators = response.documents.map((document) =>
+      mapDocumentToIndicator(document as Models.Document)
+    )
 
     // If no indicators found, create defaults
     if (indicators.length === 0) {
@@ -111,7 +114,7 @@ export async function POST(request: NextRequest) {
         // Create new indicator
         const createData = {
           ...updateData,
-          userId: indicator.userId,
+          userId: indicator.userId ?? userId,
           indicatorType: indicator.indicatorType,
           percentageRangeMin: indicator.percentageRangeMin,
           percentageRangeMax: indicator.percentageRangeMax,
@@ -137,9 +140,15 @@ export async function POST(request: NextRequest) {
 
 
 // Helper function to create default indicators for a new user
-async function createDefaultIndicators(databases: any, userId: string): Promise<IndicatorConfig[]> {
+async function createDefaultIndicators(
+  databases: Databases,
+  userId: string
+): Promise<IndicatorConfig[]> {
   const createPromises = DEFAULT_INDICATORS.map(async (defaultConfig) => {
-    const createData = {
+    const timestamp = new Date().toISOString()
+    const indicatorId = ID.unique()
+
+    const createPayload: Omit<IndicatorConfig, '$id'> = {
       userId,
       indicatorType: defaultConfig.indicatorType,
       percentageRangeMin: defaultConfig.percentageRangeMin,
@@ -148,24 +157,40 @@ async function createDefaultIndicators(databases: any, userId: string): Promise<
       isDefault: defaultConfig.isDefault,
       enabled: defaultConfig.enabled,
       displayOrder: defaultConfig.displayOrder,
-      createdAt: new Date().toISOString(),
-      lastUpdated: new Date().toISOString(),
+      createdAt: timestamp,
+      lastUpdated: timestamp,
       audibleAlertsEnabled: true,
     }
 
-    const doc = await databases.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), createData)
-    return doc as unknown as IndicatorConfig
+    await databases.createDocument(
+      DATABASE_ID,
+      COLLECTION_ID,
+      indicatorId,
+      createPayload
+    )
+
+    return { $id: indicatorId, ...createPayload }
   })
 
   return Promise.all(createPromises)
 }
 
 // Helper function to create missing indicators
-async function createMissingIndicators(databases: any, userId: string, missingOrders: number[]): Promise<IndicatorConfig[]> {
+async function createMissingIndicators(
+  databases: Databases,
+  userId: string,
+  missingOrders: number[]
+): Promise<IndicatorConfig[]> {
   const createPromises = missingOrders.map(async (order) => {
-    const defaultConfig = DEFAULT_INDICATORS[order - 1] // Convert to 0-based index
+    const defaultConfig = DEFAULT_INDICATORS[order - 1]
+    if (!defaultConfig) {
+      throw new Error(`Missing default indicator configuration for order ${order}`)
+    }
 
-    const createData = {
+    const timestamp = new Date().toISOString()
+    const indicatorId = ID.unique()
+
+    const createPayload: Omit<IndicatorConfig, '$id'> = {
       userId,
       indicatorType: defaultConfig.indicatorType,
       percentageRangeMin: defaultConfig.percentageRangeMin,
@@ -174,14 +199,53 @@ async function createMissingIndicators(databases: any, userId: string, missingOr
       isDefault: defaultConfig.isDefault,
       enabled: defaultConfig.enabled,
       displayOrder: defaultConfig.displayOrder,
-      createdAt: new Date().toISOString(),
-      lastUpdated: new Date().toISOString(),
+      createdAt: timestamp,
+      lastUpdated: timestamp,
       audibleAlertsEnabled: true,
     }
 
-    const doc = await databases.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), createData)
-    return doc as unknown as IndicatorConfig
+    await databases.createDocument(
+      DATABASE_ID,
+      COLLECTION_ID,
+      indicatorId,
+      createPayload
+    )
+
+    return { $id: indicatorId, ...createPayload }
   })
 
   return Promise.all(createPromises)
+}
+
+function mapDocumentToIndicator(document: Models.Document): IndicatorConfig {
+  // Cast document to safely access dynamic properties from Appwrite
+  const doc = document as Record<string, unknown>
+
+  const percentageRangeMaxValue =
+    doc.percentageRangeMax === null || doc.percentageRangeMax === undefined
+      ? null
+      : Number(doc.percentageRangeMax)
+
+  return {
+    $id: document.$id,
+    userId:
+      typeof doc.userId === 'string' ? doc.userId : DEFAULT_USER_ID,
+    indicatorType: 'percentage_range',
+    percentageRangeMin: Number(doc.percentageRangeMin ?? 0),
+    percentageRangeMax: percentageRangeMaxValue,
+    color:
+      typeof doc.color === 'string'
+        ? doc.color
+        : DEFAULT_INDICATORS[0].color,
+    isDefault: Boolean(doc.isDefault),
+    enabled: Boolean(doc.enabled),
+    displayOrder: Number(doc.displayOrder ?? 1),
+    lastUpdated:
+      typeof doc.lastUpdated === 'string' ? doc.lastUpdated : undefined,
+    createdAt: typeof doc.$createdAt === 'string' ? doc.$createdAt : undefined,
+    audibleAlertsEnabled:
+      typeof doc.audibleAlertsEnabled === 'boolean'
+        ? doc.audibleAlertsEnabled
+        : undefined,
+  }
 }

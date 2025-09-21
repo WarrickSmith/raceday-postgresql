@@ -928,8 +928,9 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
         barrier: entrant.barrier,
         isScratched: entrant.is_scratched || false,
         isLateScratched: entrant.is_late_scratched || false,
-        isEmergency: entrant.is_emergency || false,
         race: raceId,
+        // TASK 5: Add raceId for efficient race-based filtering
+        raceId: raceId,
         // Enhanced metadata
         lastUpdated: new Date().toISOString(),
         dataSource: 'NZTAB'

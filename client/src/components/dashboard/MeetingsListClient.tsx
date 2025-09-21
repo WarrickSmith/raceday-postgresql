@@ -6,9 +6,10 @@ import { MeetingCard } from './MeetingCard';
 import { RacesForMeetingClient } from './RacesForMeetingClient';
 import { MeetingsListSkeleton } from '../skeletons/MeetingCardSkeleton';
 import { NextScheduledRaceButton } from './NextScheduledRaceButton';
-import { useRealtimeMeetings } from '@/hooks/useRealtimeMeetings';
+import { useMeetingsPolling, type RaceUpdateEvent } from '@/hooks/useMeetingsPolling';
 import { Meeting } from '@/types/meetings';
 import { racePrefetchService } from '@/services/racePrefetchService';
+import { useSubscriptionCleanup } from '@/contexts/SubscriptionCleanupContext';
 
 interface MeetingsListClientProps {
   initialData: Meeting[];
@@ -18,11 +19,13 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+  const [raceUpdateSignal, setRaceUpdateSignal] = useState(0);
+  const { requestCleanup } = useSubscriptionCleanup();
 
   const handleError = useCallback((error: Error) => {
-    console.error('Real-time connection error:', error);
-    setError('Connection issue - trying to reconnect...');
-    
+    console.error('Data polling error:', error);
+    setError('Data update issue - trying to reconnect...');
+
     // Clear error after 5 seconds
     setTimeout(() => setError(null), 5000);
   }, []);
@@ -30,22 +33,29 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
   // Enhanced race click handler with pre-fetching for immediate rendering
   const handleRaceClick = useCallback(async (raceId: string) => {
     console.log('🎯 Race click - pre-fetching basic data for:', raceId);
-    
+    const cleanupPromise = requestCleanup({ reason: 'dashboard-race-click' });
+
     try {
-      // Pre-fetch basic race data for immediate rendering
       await racePrefetchService.prefetchForNavigation(raceId);
       console.log('✅ Pre-fetch completed, navigating to:', raceId);
     } catch (error) {
       console.warn('⚠️ Pre-fetch failed, proceeding with navigation:', error);
     }
-    
-    // Navigate to race page - will use cached data if available
-    router.push(`/race/${raceId}`);
-  }, [router]);
 
-  const { meetings, isConnected, connectionAttempts, retry } = useRealtimeMeetings({
+    await cleanupPromise;
+    router.push(`/race/${raceId}`);
+  }, [requestCleanup, router]);
+
+  const handleRaceRealtimeUpdate = useCallback((event: RaceUpdateEvent) => {
+    if (event.eventType === 'update' || event.eventType === 'create') {
+      setRaceUpdateSignal((prev) => prev + 1);
+    }
+  }, []);
+
+  const { meetings, isConnected, connectionAttempts, retry } = useMeetingsPolling({
     initialData,
     onError: handleError,
+    onRaceUpdate: handleRaceRealtimeUpdate,
   });
 
   // Auto-select the first meeting on initial load
@@ -88,7 +98,7 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
         />
       </div>
     ));
-  }, [meetings, handleRaceClick, selectedMeeting, handleMeetingClick]);
+  }, [meetings, selectedMeeting, handleMeetingClick]);
 
   // Show loading state only if we have no data
   if (!meetings.length && connectionAttempts === 0) {
@@ -100,19 +110,23 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
       {/* Header with connection status and next race button */}
       <div className="col-span-1 lg:col-span-2 flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <NextScheduledRaceButton meetings={meetings} />
+          <NextScheduledRaceButton 
+            meetings={meetings}
+            isRealtimeConnected={isConnected}
+            raceUpdateSignal={raceUpdateSignal}
+          />
         </div>
         
-        {/* Real-time connection status */}
+        {/* Data polling status */}
         <div className="flex items-center space-x-2">
           <div
             className={`w-2 h-2 rounded-full ${
               isConnected ? 'bg-green-400' : 'bg-red-400'
             }`}
-            aria-label={isConnected ? 'Connected' : 'Disconnected'}
+            aria-label={isConnected ? 'Data current' : 'Updating data'}
           />
           <span className="text-sm text-gray-500">
-            {isConnected ? 'Live' : 'Reconnecting...'}
+            {isConnected ? 'Data current' : 'Updating...'}
           </span>
         </div>
       </div>

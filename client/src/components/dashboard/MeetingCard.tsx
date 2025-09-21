@@ -9,6 +9,10 @@ interface MeetingCardProps {
   meeting: Meeting;
 }
 
+interface MeetingStatusResponse {
+  isCompleted: boolean;
+}
+
 function MeetingCardComponent({ meeting }: MeetingCardProps) {
   const [isCompleted, setIsCompleted] = useState<boolean | null>(null);
 
@@ -19,7 +23,7 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
         // Make a lightweight API call to check race statuses
         const response = await fetch(`/api/meetings/${meeting.meetingId}/status`);
         if (response.ok) {
-          const data = await response.json();
+          const data: MeetingStatusResponse = await response.json();
           setIsCompleted(data.isCompleted);
         }
       } catch (error) {
@@ -35,7 +39,7 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
       }
     };
 
-    checkMeetingCompletion();
+    void checkMeetingCompletion();
   }, [meeting.meetingId, meeting.firstRaceTime]);
   const formatTime = (dateTimeString: string) => {
     try {

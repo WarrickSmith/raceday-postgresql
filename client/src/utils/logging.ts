@@ -19,6 +19,7 @@ const LOG_LEVELS = {
 } as const;
 
 type LogLevel = keyof typeof LOG_LEVELS;
+type FormattedLogMessage = [string, string, ...unknown[]];
 
 /**
  * Get current log level from environment variable
@@ -73,14 +74,14 @@ function getComponentContext(): string {
 function formatLogMessage(
   level: LogLevel,
   message: string,
-  data?: any,
+  data?: unknown,
   component?: string
-): [string, ...any[]] {
+): FormattedLogMessage {
   const timestamp = new Date().toISOString().slice(11, 23); // HH:mm:ss.SSS
   const ctx = component || getComponentContext();
 
   // Browser console styling
-  const styles = {
+  const styles: Record<LogLevel, string> = {
     SILENT: '',
     DEBUG: 'color: #9CA3AF; font-weight: normal',
     INFO: 'color: #3B82F6; font-weight: normal',
@@ -101,7 +102,7 @@ function formatLogMessage(
 /**
  * Conditional logging function for debug messages
  */
-export function logDebug(message: string, data?: any, component?: string): void {
+export function logDebug(message: string, data?: unknown, component?: string): void {
   if (isLogLevelEnabled('DEBUG')) {
     const [msg, style, ...args] = formatLogMessage('DEBUG', message, data, component);
     console.log(msg, style, ...args);
@@ -111,7 +112,7 @@ export function logDebug(message: string, data?: any, component?: string): void 
 /**
  * Conditional logging function for info messages
  */
-export function logInfo(message: string, data?: any, component?: string): void {
+export function logInfo(message: string, data?: unknown, component?: string): void {
   if (isLogLevelEnabled('INFO')) {
     const [msg, style, ...args] = formatLogMessage('INFO', message, data, component);
     console.log(msg, style, ...args);
@@ -121,7 +122,7 @@ export function logInfo(message: string, data?: any, component?: string): void {
 /**
  * Conditional logging function for warning messages
  */
-export function logWarn(message: string, data?: any, component?: string): void {
+export function logWarn(message: string, data?: unknown, component?: string): void {
   if (isLogLevelEnabled('WARN')) {
     const [msg, style, ...args] = formatLogMessage('WARN', message, data, component);
     console.warn(msg, style, ...args);
@@ -132,7 +133,7 @@ export function logWarn(message: string, data?: any, component?: string): void {
  * Conditional logging function for error messages
  * Always logs unless SILENT level is set
  */
-export function logError(message: string, error?: any, component?: string): void {
+export function logError(message: string, error?: unknown, component?: string): void {
   if (isLogLevelEnabled('ERROR')) {
     const [msg, style, ...args] = formatLogMessage('ERROR', message, error, component);
     console.error(msg, style, ...args);
@@ -145,7 +146,7 @@ export function logError(message: string, error?: any, component?: string): void
 export function logPerformance(
   operation: string,
   startTime: number,
-  metrics: Record<string, any> = {},
+  metrics: Record<string, unknown> = {},
   component?: string
 ): void {
   if (isLogLevelEnabled('ERROR')) {
@@ -164,7 +165,7 @@ export function logPerformance(
 /**
  * Log React component render with render count tracking
  */
-export function logRender(componentName: string, props?: any): void {
+export function logRender(componentName: string, props?: Record<string, unknown>): void {
   if (isLogLevelEnabled('DEBUG')) {
     const renderData = {
       timestamp: new Date().toISOString(),
@@ -181,7 +182,7 @@ export function logRender(componentName: string, props?: any): void {
  */
 export function logRealtime(
   event: 'connect' | 'disconnect' | 'update' | 'error',
-  details?: any,
+  details?: unknown,
   component?: string
 ): void {
   const level = event === 'error' ? 'ERROR' : 'DEBUG';
@@ -250,7 +251,7 @@ export function logGroup(
  */
 export function logMemory(
   operation: string,
-  memoryInfo?: any,
+  memoryInfo?: Record<string, unknown>,
   component?: string
 ): void {
   if (isLogLevelEnabled('DEBUG')) {
@@ -270,18 +271,18 @@ export function logMemory(
  */
 export function createComponentLogger(componentName: string) {
   return {
-    debug: (message: string, data?: any) => logDebug(message, data, componentName),
-    info: (message: string, data?: any) => logInfo(message, data, componentName),
-    warn: (message: string, data?: any) => logWarn(message, data, componentName),
-    error: (message: string, error?: any) => logError(message, error, componentName),
-    render: (props?: any) => logRender(componentName, props),
-    performance: (operation: string, startTime: number, metrics?: any) =>
+    debug: (message: string, data?: unknown) => logDebug(message, data, componentName),
+    info: (message: string, data?: unknown) => logInfo(message, data, componentName),
+    warn: (message: string, data?: unknown) => logWarn(message, data, componentName),
+    error: (message: string, error?: unknown) => logError(message, error, componentName),
+    render: (props?: Record<string, unknown>) => logRender(componentName, props),
+    performance: (operation: string, startTime: number, metrics?: Record<string, unknown>) =>
       logPerformance(operation, startTime, metrics, componentName),
-    realtime: (event: 'connect' | 'disconnect' | 'update' | 'error', details?: any) =>
+    realtime: (event: 'connect' | 'disconnect' | 'update' | 'error', details?: unknown) =>
       logRealtime(event, details, componentName),
     api: (method: string, url: string, status?: number, timing?: number) =>
       logAPI(method, url, status, timing, componentName),
-    memory: (operation: string, memoryInfo?: any) =>
+    memory: (operation: string, memoryInfo?: Record<string, unknown>) =>
       logMemory(operation, memoryInfo, componentName)
   };
 }
@@ -293,6 +294,8 @@ export function useLogger(componentName?: string) {
   const name = componentName || getComponentContext();
   return createComponentLogger(name);
 }
+
+export type ComponentLogger = ReturnType<typeof createComponentLogger>;
 
 /**
  * Development utilities

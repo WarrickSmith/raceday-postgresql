@@ -1,20 +1,39 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MeetingsListClient } from '../MeetingsListClient';
-import { useRealtimeMeetings } from '@/hooks/useRealtimeMeetings';
+import { useMeetingsPolling } from '@/hooks/useMeetingsPolling';
 import { Meeting } from '@/types/meetings';
 import { RACE_TYPE_CODES } from '@/constants/raceTypes';
+import { SubscriptionCleanupProvider } from '@/contexts/SubscriptionCleanupContext';
 
-// Mock the real-time hook and Next.js navigation
-jest.mock('@/hooks/useRealtimeMeetings');
+// Mock the polling hook and Next.js navigation
+jest.mock('@/hooks/useMeetingsPolling');
 
 const mockPush = jest.fn();
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
   }),
+  usePathname: () => '/',
 }));
 
-const mockUseRealtimeMeetings = useRealtimeMeetings as jest.MockedFunction<typeof useRealtimeMeetings>;
+jest.mock('next/router', () => ({
+  __esModule: true,
+  default: {
+    events: {
+      on: jest.fn(),
+      off: jest.fn(),
+    },
+  },
+}));
+
+const mockUseMeetingsPolling = useMeetingsPolling as jest.MockedFunction<typeof useMeetingsPolling>;
+
+const renderWithProvider = (ui: React.ReactElement) =>
+  render(ui, {
+    wrapper: ({ children }) => (
+      <SubscriptionCleanupProvider>{children}</SubscriptionCleanupProvider>
+    ),
+  });
 
 describe('MeetingsListClient', () => {
   const mockMeetings: Meeting[] = [
@@ -47,7 +66,7 @@ describe('MeetingsListClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPush.mockClear();
-    mockUseRealtimeMeetings.mockReturnValue({
+    mockUseMeetingsPolling.mockReturnValue({
       meetings: mockMeetings,
       isConnected: true,
       connectionState: 'connected' as const,
@@ -58,17 +77,17 @@ describe('MeetingsListClient', () => {
   });
 
   it('should render meetings list with connection status', () => {
-    render(<MeetingsListClient initialData={mockMeetings} />);
+    renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
 
     expect(screen.getByText("Today's Meetings")).toBeInTheDocument();
-    expect(screen.getByLabelText('Connected')).toBeInTheDocument();
+    expect(screen.getByLabelText('Data current')).toBeInTheDocument();
     // Meetings appear in both meeting cards and race cards, so expect multiple instances
     expect(screen.getAllByText('Flemington Race Meeting').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Addington Harness').length).toBeGreaterThan(0);
   });
 
   it('should show disconnected status when not connected', () => {
-    mockUseRealtimeMeetings.mockReturnValue({
+    mockUseMeetingsPolling.mockReturnValue({
       meetings: mockMeetings,
       isConnected: false,
       connectionState: 'disconnected' as const,
@@ -77,9 +96,9 @@ describe('MeetingsListClient', () => {
       retry: jest.fn(),
     });
 
-    render(<MeetingsListClient initialData={mockMeetings} />);
+    renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
 
-    expect(screen.getByText('Reconnecting...')).toBeInTheDocument();
+    expect(screen.getByText('Updating...')).toBeInTheDocument();
   });
 
   it('should display error banner when error occurs', async () => {
@@ -88,7 +107,7 @@ describe('MeetingsListClient', () => {
     console.error = jest.fn();
     
     const mockRetry = jest.fn();
-    mockUseRealtimeMeetings.mockReturnValue({
+    mockUseMeetingsPolling.mockReturnValue({
       meetings: mockMeetings,
       isConnected: false,
       connectionState: 'disconnected' as const,
@@ -98,9 +117,9 @@ describe('MeetingsListClient', () => {
     });
 
     // Simulate error by calling the hook with an error handler
-    mockUseRealtimeMeetings.mockImplementation(({ onError: errorHandler }) => {
+    mockUseMeetingsPolling.mockImplementation(({ onError: errorHandler }) => {
       // Simulate error after some time
-      setTimeout(() => errorHandler?.(new Error('Connection failed')), 100);
+      setTimeout(() => errorHandler?.(new Error('Data fetch failed')), 100);
       return {
         meetings: mockMeetings,
         isConnected: false,
@@ -111,11 +130,11 @@ describe('MeetingsListClient', () => {
       };
     });
 
-    render(<MeetingsListClient initialData={mockMeetings} />);
+    renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
 
     // Wait for error to be set
     await waitFor(() => {
-      expect(screen.getByText(/Connection issue/)).toBeInTheDocument();
+      expect(screen.getByText(/Data update issue/)).toBeInTheDocument();
     });
 
     // Test retry button
@@ -128,7 +147,7 @@ describe('MeetingsListClient', () => {
   });
 
   it('should show empty state when no meetings', () => {
-    mockUseRealtimeMeetings.mockReturnValue({
+    mockUseMeetingsPolling.mockReturnValue({
       meetings: [],
       isConnected: true,
       connectionState: 'connected' as const,
@@ -137,14 +156,14 @@ describe('MeetingsListClient', () => {
       retry: jest.fn(),
     });
 
-    render(<MeetingsListClient initialData={[]} />);
+    renderWithProvider(<MeetingsListClient initialData={[]} />);
 
     expect(screen.getByText('No meetings today')).toBeInTheDocument();
     expect(screen.getByText('There are no race meetings scheduled for today.')).toBeInTheDocument();
   });
 
   it('should display correct meeting count', () => {
-    render(<MeetingsListClient initialData={mockMeetings} />);
+    renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
 
     // The count text might be split across elements, so use a more flexible matcher
     expect(screen.getByText(/2.*meeting.*available/)).toBeInTheDocument();
@@ -152,7 +171,7 @@ describe('MeetingsListClient', () => {
 
   it('should display singular meeting count correctly', () => {
     const singleMeeting = [mockMeetings[0]];
-    mockUseRealtimeMeetings.mockReturnValue({
+    mockUseMeetingsPolling.mockReturnValue({
       meetings: singleMeeting,
       isConnected: true,
       connectionState: 'connected' as const,
@@ -161,14 +180,14 @@ describe('MeetingsListClient', () => {
       retry: jest.fn(),
     });
 
-    render(<MeetingsListClient initialData={singleMeeting} />);
+    renderWithProvider(<MeetingsListClient initialData={singleMeeting} />);
 
     // Use flexible matcher for singular meeting text
     expect(screen.getByText(/1.*meeting.*available/)).toBeInTheDocument();
   });
 
   it('should have proper accessibility attributes', () => {
-    render(<MeetingsListClient initialData={mockMeetings} />);
+    renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
 
     const list = screen.getByRole('list', { name: 'Race meetings' });
     expect(list).toBeInTheDocument();
@@ -177,7 +196,7 @@ describe('MeetingsListClient', () => {
     expect(articles).toHaveLength(2);
   });
 
-  it('should handle real-time updates correctly', () => {
+  it('should handle polling updates correctly', () => {
     const updatedMeetings = [
       ...mockMeetings,
       {
@@ -194,9 +213,11 @@ describe('MeetingsListClient', () => {
       },
     ];
 
-    const { rerender } = render(<MeetingsListClient initialData={mockMeetings} />);
+    const { rerender } = renderWithProvider(
+      <MeetingsListClient initialData={mockMeetings} />
+    );
 
-    mockUseRealtimeMeetings.mockReturnValue({
+    mockUseMeetingsPolling.mockReturnValue({
       meetings: updatedMeetings,
       isConnected: true,
       connectionState: 'connected' as const,
@@ -212,7 +233,7 @@ describe('MeetingsListClient', () => {
   });
 
   it('should handle race navigation correctly', async () => {
-    render(<MeetingsListClient initialData={mockMeetings} />);
+    renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
 
     // Wait for component to render properly
     await waitFor(() => {

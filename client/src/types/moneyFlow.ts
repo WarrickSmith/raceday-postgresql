@@ -40,7 +40,7 @@ export interface MoneyFlowDataPoint {
   poolPlaceOdds?: number // Pool Place odds (tote) at this time bucket
 
   // Allow other optional properties that may appear on server docs
-  [k: string]: any
+  [k: string]: unknown
 }
 
 // Money flow timeline data for an entrant (all time periods)

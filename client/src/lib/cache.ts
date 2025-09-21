@@ -209,6 +209,7 @@ export const cacheInvalidation = {
   },
 
   onEntrantUpdate: (raceId: string, entrantId: string) => {
+    void entrantId;
     entrantsCache.invalidate(`entrants:${raceId}`);
     poolsCache.invalidatePattern(new RegExp(`pools:${raceId}`));
   },

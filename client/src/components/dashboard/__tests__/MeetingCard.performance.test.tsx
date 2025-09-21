@@ -3,6 +3,23 @@ import { MeetingCard } from '../MeetingCard';
 import { Meeting } from '@/types/meetings';
 import { RACE_TYPE_CODES } from '@/constants/raceTypes';
 
+type MeetingStatusResponseBody = { isCompleted: boolean };
+
+const createFetchResponse = (body: MeetingStatusResponseBody): Response => {
+  if (typeof Response === 'undefined') {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => body,
+    } as unknown as Response;
+  }
+
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+};
+
 // Mock performance measurement
 const mockPerformance = {
   now: jest.fn(),
@@ -37,12 +54,9 @@ describe('MeetingCard Performance Tests', () => {
     mockPerformance.now.mockReturnValue(100);
     
     // Mock fetch for meeting completion status
-    global.fetch = jest.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ isCompleted: false }),
-      })
-    ) as jest.Mock;
+    global.fetch = jest.fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>(async () =>
+      createFetchResponse({ isCompleted: false })
+    );
   });
 
   afterEach(() => {
@@ -158,8 +172,6 @@ describe('MeetingCard Performance Tests', () => {
   });
 
   it('should optimize render performance with stable props', async () => {
-    const renderStartTime = performance.now();
-    
     const { rerender } = render(<MeetingCard meeting={mockMeeting} />);
     
     // Wait for initial render
@@ -204,16 +216,14 @@ describe('MeetingCard Performance Tests', () => {
 
   it('should handle async operations efficiently', async () => {
     // Mock a slower API response
-    global.fetch = jest.fn(() =>
-      new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({
-            ok: true,
-            json: () => Promise.resolve({ isCompleted: true }),
-          } as Response);
-        }, 50);
-      })
-    ) as jest.Mock;
+    global.fetch = jest.fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>(
+      () =>
+        new Promise<Response>((resolve) => {
+          setTimeout(() => {
+            resolve(createFetchResponse({ isCompleted: true }));
+          }, 50);
+        })
+    );
 
     const startTime = performance.now();
     
@@ -236,9 +246,9 @@ describe('MeetingCard Performance Tests', () => {
 
   it('should handle error states efficiently', async () => {
     // Mock fetch failure
-    global.fetch = jest.fn(() =>
-      Promise.reject(new Error('Network error'))
-    ) as jest.Mock;
+    global.fetch = jest.fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>(async () => {
+      throw new Error('Network error');
+    });
 
     const startTime = performance.now();
     

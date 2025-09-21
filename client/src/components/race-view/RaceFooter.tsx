@@ -23,18 +23,10 @@ const formatPoolAmount = (cents: number): string => {
 }
 
 interface RaceFooterProps {
-  raceId: string
   raceStartTime: string
   raceStatus: RaceStatus
   poolData?: RacePoolData
   resultsData?: RaceResultsData
-  entrants?: Array<{
-    $id: string
-    runnerNumber: number
-    name: string
-    winOdds?: number
-    placeOdds?: number
-  }>
   className?: string
   showCountdown?: boolean
   showResults?: boolean
@@ -50,12 +42,10 @@ interface RaceFooterProps {
 }
 
 export const RaceFooter = memo(function RaceFooter({
-  raceId,
   raceStartTime,
   raceStatus,
   poolData,
   resultsData,
-  entrants = [],
   className = '',
   showCountdown = true,
   showResults = true,
@@ -102,7 +92,6 @@ export const RaceFooter = memo(function RaceFooter({
         {/* Column 1: Pools Section */}
         <div className="w-96 flex-shrink-0 pr-4">
           <RacePoolsSection
-            raceId={raceId}
             poolData={currentPoolData}
             lastUpdate={lastPoolUpdate}
           />

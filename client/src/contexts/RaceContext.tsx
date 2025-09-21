@@ -10,6 +10,10 @@ import React, {
 import { Race, Meeting, Entrant, RaceNavigationData } from '@/types/meetings'
 import { cacheInvalidation } from '@/lib/cache'
 import { useMemoryOptimization } from '@/utils/performance'
+import {
+  useSubscriptionCleanup,
+  type CleanupReason,
+} from '@/contexts/SubscriptionCleanupContext'
 
 interface RaceContextData {
   race: Race
@@ -33,7 +37,7 @@ interface RaceContextValue {
   invalidateRaceCache: (raceId: string) => void
   // New cleanup signal for subscription management
   subscriptionCleanupSignal: number
-  triggerSubscriptionCleanup: () => void
+  triggerSubscriptionCleanup: (reason?: CleanupReason) => Promise<void>
 }
 
 const RaceContext = createContext<RaceContextValue | undefined>(undefined)
@@ -49,22 +53,26 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
   )
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [subscriptionCleanupSignal, setSubscriptionCleanupSignal] = useState(0)
 
   // Memory optimization for RaceContext
   const { triggerCleanup } = useMemoryOptimization()
+  const { signal: subscriptionCleanupSignal, requestCleanup } =
+    useSubscriptionCleanup()
 
   // Internal setter for race data (no debug logging in production)
   const setRaceData = useCallback(
     (data: RaceContextData | null) => {
       setRaceDataInternal(data)
     },
-    [raceData]
+    []
   )
 
-  const updateRaceData = useCallback((data: RaceContextData) => {
-    setRaceData(data)
-  }, [])
+  const updateRaceData = useCallback(
+    (data: RaceContextData) => {
+      setRaceData(data)
+    },
+    [setRaceData]
+  )
 
   // Simple race data loading function (without navigation complexity)
   const loadRaceData = useCallback(async (raceId: string) => {
@@ -76,7 +84,7 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
       if (!response.ok) {
         throw new Error(`Failed to fetch race data: ${response.statusText}`)
       }
-      const newRaceData = await response.json()
+      const newRaceData: RaceContextData = await response.json()
       setRaceData(newRaceData)
     } catch (err) {
       console.error('❌ Error loading race data:', err)
@@ -84,7 +92,7 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [setRaceData])
 
   const invalidateRaceCache = useCallback(
     (raceId: string) => {
@@ -97,9 +105,11 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
   )
 
   // Trigger subscription cleanup for navigation
-  const triggerSubscriptionCleanup = useCallback(() => {
-    setSubscriptionCleanupSignal(prev => prev + 1)
-  }, [])
+  const triggerSubscriptionCleanup = useCallback(
+    (reason?: CleanupReason) =>
+      requestCleanup({ reason: reason ?? 'race-navigation' }),
+    [requestCleanup]
+  )
 
   const value: RaceContextValue = {
     raceData,

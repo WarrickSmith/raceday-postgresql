@@ -93,15 +93,26 @@ export default async function main(context) {
         await updateHeartbeat(lockManager, progressTracker);
 
         // PHASE 2: Get today's races that need initial data population
+        // Fix: Use proper datetime comparison to avoid timezone boundary issues
+        // where races early in NZ day (e.g., 11:55 AM) fall in previous UTC day
         const nzDate = new Date().toLocaleDateString('en-CA', {
             timeZone: 'Pacific/Auckland',
         });
 
-        logDebug(context,'Fetching today\'s races for initial data population...', { nzDate });
+        // Calculate NZ start of day in UTC for proper database filtering
+        // Since we're running on Sept 19 UTC but it's Sept 20 in NZ,
+        // we need the start of Sept 20 NZ time in UTC format
+        const nzStartOfDayISO = new Date(nzDate + 'T00:00:00+13:00').toISOString();
+
+        logDebug(context,'Fetching today\'s races for initial data population...', {
+            nzDate,
+            nzStartOfDayISO,
+            filterCriteria: `startTime >= ${nzStartOfDayISO}`
+        });
         const functions = new Functions(client);
 
         const racesResult = await databases.listDocuments(databaseId, 'races', [
-            Query.greaterThanEqual('startTime', nzDate),
+            Query.greaterThanEqual('startTime', nzStartOfDayISO),
             Query.orderAsc('startTime'),
             Query.limit(999) // Get all races for the day
         ]);

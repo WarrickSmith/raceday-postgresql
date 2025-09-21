@@ -907,6 +907,9 @@ async function ensureRaceResultsCollection(databases, config, context, progressT
     
     // Race results collection - stores race results and dividends data
     const requiredAttributes = [
+        // TASK 5: Race ID for efficient race-based filtering
+        { key: 'raceId', type: 'string', size: 50, required: false },
+
         // Core identifiers and status
         { key: 'resultsAvailable', type: 'boolean', required: false, default: false }, // Whether results data is available
         { key: 'resultStatus', type: 'string', size: 20, required: false }, // 'interim', 'final', 'protest'
@@ -933,7 +936,25 @@ async function ensureRaceResultsCollection(databases, config, context, progressT
         logDebug(context, 'Creating race-results->races relationship...');
         await databases.createRelationshipAttribute(config.databaseId, collectionId, collections.races, RelationshipType.ManyToOne, true, 'race', 'raceResults');
     }
-    
+
+    // TASK 5: Add raceId index for efficient race-based filtering
+    const raceResultsCollection = await databases.getCollection(config.databaseId, collectionId);
+    if (!raceResultsCollection.indexes.some((idx) => idx.key === 'idx_race_id')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'raceId', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_race_id', IndexType.Key, ['raceId']);
+                logDebug(context, 'idx_race_id index created successfully for race-results collection');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_race_id index for race-results: ${error}`);
+            }
+        }
+        else {
+            logDebug(context, 'raceId attribute is not available for index creation, skipping idx_race_id index for race-results');
+        }
+    }
+
     // Note: Cannot create indexes on relationship attributes in Appwrite
     // The relationship itself provides efficient lookups via the relationship system
 }
@@ -957,13 +978,14 @@ async function ensureEntrantsCollection(databases, config, context, progressTrac
         { key: 'name', type: 'string', size: 255, required: true },
         { key: 'runnerNumber', type: 'integer', required: true },
         { key: 'barrier', type: 'integer', required: false },
-        
+
+        // TASK 5: Race ID for efficient race-based filtering
+        { key: 'raceId', type: 'string', size: 50, required: false },
+
         // Current status information (updated frequently during race day)
         { key: 'isScratched', type: 'boolean', required: false, default: false },
         { key: 'isLateScratched', type: 'boolean', required: false, default: false },
-        { key: 'isEmergency', type: 'boolean', required: false, default: false },
         { key: 'scratchTime', type: 'integer', required: false }, // Unix timestamp
-        { key: 'emergencyPosition', type: 'string', size: 20, required: false },
         { key: 'runnerChange', type: 'string', size: 500, required: false },
         
         // Current odds (updated frequently during betting)
@@ -1087,6 +1109,23 @@ async function ensureEntrantsCollection(databases, config, context, progressTrac
         }
         else {
             logDebug(context, 'runnerNumber attribute is not available for index creation, skipping idx_runner_number index');
+        }
+    }
+
+    // TASK 5: Add raceId index for efficient race-based filtering
+    if (!entrantsCollection.indexes.some((idx) => idx.key === 'idx_race_id')) {
+        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'raceId', context);
+        if (isAvailable) {
+            try {
+                await databases.createIndex(config.databaseId, collectionId, 'idx_race_id', IndexType.Key, ['raceId']);
+                logDebug(context, 'idx_race_id index created successfully for entrants collection');
+            }
+            catch (error) {
+                context.error(`Failed to create idx_race_id index for entrants: ${error}`);
+            }
+        }
+        else {
+            logDebug(context, 'raceId attribute is not available for index creation, skipping idx_race_id index for entrants');
         }
     }
 }

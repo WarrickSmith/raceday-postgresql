@@ -109,6 +109,16 @@ RaceDay is a real-time horse racing dashboard built with Next.js 15+ and Appwrit
 3. Use `npm run setup:appwrite` from client directory to initialize database schema
 4. Create required user role labels in Appwrite console: "user" and "admin"
 5. Ensure real-time subscriptions are properly configured for live data flow
+6. **Connection Monitoring**: Set `NEXT_PUBLIC_ENABLE_CONNECTION_MONITOR=true` in `.env.local` to enable connection monitoring panel
+
+### Connection Monitoring (Development Feature)
+- **Enable**: Set `NEXT_PUBLIC_ENABLE_CONNECTION_MONITOR=true` in `.env.local`
+- **Disable**: Set `NEXT_PUBLIC_ENABLE_CONNECTION_MONITOR=false` or omit the variable entirely
+- **Access**: Click the 🔧 button in the race header status area (when enabled)
+- **Features**: Real-time connection count, channel count, latency metrics, active subscription details
+- **Warning System**: Visual alerts when connection limits exceeded (>10 connections)
+- **Emergency Fallback**: Automatic real-time disable if connection limits reached
+- **Performance Impact**: Zero overhead when disabled
 
 ### Prerequisites
 - Node.js v22.17.0+ (server functions require Node.js 22)

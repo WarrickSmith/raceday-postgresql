@@ -1,6 +1,6 @@
 import type { SUPPORTED_RACE_TYPE_CODES } from '@/constants/raceTypes'
-import type { MoneyFlowDataPoint, EntrantMoneyFlowTimeline } from './moneyFlow'
-import type { RacePoolData, PoolType, RaceResult, PoolDividend } from './racePools'
+import type { EntrantMoneyFlowTimeline } from './moneyFlow'
+import type { RaceResult, PoolDividend } from './racePools'
 import type { JockeySilk } from './jockeySilks'
 
 type SupportedRaceTypeCode = (typeof SUPPORTED_RACE_TYPE_CODES)[number]

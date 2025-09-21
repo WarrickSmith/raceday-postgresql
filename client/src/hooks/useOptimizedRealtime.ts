@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Entrant } from '@/types/meetings';
-import { performanceMonitor, useDebouncedValue, useThrottledCallback } from '@/utils/performance';
+import { performanceMonitor, useDebouncedValue } from '@/utils/performance';
 
 interface OptimizedRealtimeConfig {
   initialEntrants: Entrant[];
@@ -53,20 +53,10 @@ export function useOptimizedRealtime({
 
   // Performance tracking
   const updateQueue = useRef<RealtimeUpdate[]>([]);
-  const latencyBuffer = useRef<number[]>([]);
   const updateCountBuffer = useRef<{ timestamp: number; count: number }[]>([]);
-  const lastProcessTime = useRef<number>(Date.now());
 
   // Debounced entrants to prevent excessive re-renders
   const debouncedEntrants = useDebouncedValue(entrants, 16); // ~60fps
-
-  // Throttled connection state updates
-  const throttledConnectionUpdate = useThrottledCallback(
-    (newState: Partial<OptimizedConnectionState>) => {
-      setConnectionState(prev => ({ ...prev, ...newState }));
-    },
-    200
-  );
 
   // Optimized entrant update function
   const updateEntrant = useCallback((entrantId: string, updates: Partial<Entrant>) => {
@@ -122,38 +112,15 @@ export function useOptimizedRealtime({
       return newUpdates;
     });
 
-    // Update performance metrics
-    updateConnectionMetrics(batch.length);
-  }, [maxHistorySize]);
-
-  // Performance metrics calculation
-  const updateConnectionMetrics = useCallback((updateCount: number) => {
+    // Update performance metrics (inline to avoid dependency issue)
     const now = Date.now();
-    
-    // Track update rate
-    updateCountBuffer.current.push({ timestamp: now, count: updateCount });
+    updateCountBuffer.current.push({ timestamp: now, count: batch.length });
     updateCountBuffer.current = updateCountBuffer.current.filter(
       entry => now - entry.timestamp < 60000 // Keep last minute
     );
+  }, [maxHistorySize]);
 
-    const totalUpdates = updateCountBuffer.current.reduce((sum, entry) => sum + entry.count, 0);
-    const updateRate = totalUpdates / 60; // updates per second over last minute
-
-    // Update latency tracking
-    const processingTime = now - lastProcessTime.current;
-    latencyBuffer.current.push(processingTime);
-    latencyBuffer.current = latencyBuffer.current.slice(-20); // Keep last 20 measurements
-
-    const averageLatency = latencyBuffer.current.reduce((sum, lat) => sum + lat, 0) / latencyBuffer.current.length;
-
-    throttledConnectionUpdate({
-      lastUpdate: new Date(),
-      averageLatency,
-      updateRate
-    });
-
-    lastProcessTime.current = now;
-  }, [throttledConnectionUpdate]);
+  // Removed updateConnectionMetrics function - logic is now inlined in processBatch
 
   // Simulated WebSocket connection (replace with actual WebSocket implementation)
   useEffect(() => {

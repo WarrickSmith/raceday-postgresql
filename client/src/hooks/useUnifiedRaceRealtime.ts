@@ -16,19 +16,18 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { client, databases } from '@/lib/appwrite-client'
+import { client, databases, connectionMonitor } from '@/lib/appwrite-client'
 import { Race, Entrant, Meeting, RaceNavigationData } from '@/types/meetings'
 import type { RacePoolData, RaceResultsData } from '@/types/racePools'
 import { Query } from 'appwrite'
 import { useLogger } from '@/utils/logging'
-
-// Debug logging control - minimal for production
-const DEBUG = process.env.NODE_ENV === 'development'
+import { NAVIGATION_DRAIN_DELAY } from '@/contexts/SubscriptionCleanupContext'
+import type { MoneyFlowDataPoint } from '@/types/moneyFlow'
 
 // Create logger outside component to avoid re-creation
 let logger: ReturnType<typeof useLogger>;
 
-const debugLog = (message: string, data?: any) => {
+const debugLog = (message: string, data?: unknown) => {
   if (logger) {
     logger.debug(message, data);
   }
@@ -40,7 +39,7 @@ const debugRaceStatus = (
   raceId: string,
   oldStatus?: string,
   newStatus?: string,
-  extra?: any
+  extra?: Record<string, unknown>
 ) => {
   if (logger && oldStatus !== newStatus) {
     logger.debug(`RaceStatus: ${message}`, {
@@ -53,26 +52,46 @@ const debugRaceStatus = (
   }
 }
 
-const errorLog = (message: string, error: any) => {
+const errorLog = (message: string, error: unknown) => {
   if (logger) {
     logger.error(message, error);
   }
 }
 
-const performanceLog = (operation: string, startTime: number) => {
-  const duration = Date.now() - startTime
-  if (duration > 1000 && logger) {
-    logger.warn(`${operation} took ${duration}ms`);
-  }
+type RealtimePayloadBase = Partial<Race> &
+  Partial<RacePoolData> &
+  Partial<RaceResultsData> &
+  Partial<Entrant> &
+  Partial<MoneyFlowDataPoint>;
+
+type RealtimePayload = RealtimePayloadBase & {
+  entrant?: string | { entrantId?: string; $id?: string }
+  race?: string
+  resultsAvailable?: boolean
+  [key: string]: unknown
+};
+
+interface RawRealtimeMessage {
+  events: string[]
+  channels?: string[]
+  timestamp: string | number
+  payload?: RealtimePayload
 }
 
-// Appwrite subscription message interface
 interface AppwriteRealtimeMessage {
   events: string[]
   channels: string[]
   timestamp: string
-  payload: any
+  payload: RealtimePayload
 }
+
+
+const normalizeRealtimeMessage = (message: RawRealtimeMessage): AppwriteRealtimeMessage => ({
+  events: message.events,
+  channels: message.channels ?? [],
+  timestamp: typeof message.timestamp === 'number' ? message.timestamp.toString() : message.timestamp,
+  payload: (message.payload ?? {}) as RealtimePayload,
+});
 
 // Hook props interface
 interface UseUnifiedRaceRealtimeProps {
@@ -127,6 +146,14 @@ interface UnifiedRaceRealtimeActions {
     isHealthy: boolean
     avgLatency: number | null
     uptime: number
+    connectionCount?: number
+    activeConnections?: number
+    totalChannels?: number
+    uniqueChannels?: string[]
+    totalMessages?: number
+    totalErrors?: number
+    isOverLimit?: boolean
+    emergencyFallback?: boolean
   }
 }
 
@@ -172,6 +199,8 @@ export function useUnifiedRaceRealtime({
   const connectionStartTime = useRef<number>(Date.now())
   const latencySamples = useRef<number[]>([])
   const initialDataFetched = useRef<boolean>(false)
+  const initialPoolDataAttempted = useRef<boolean>(false)
+  const poolDataFetchInProgress = useRef<boolean>(false)
   const lastCleanupSignal = useRef<number>(0)
   const [isCleaningUp, setIsCleaningUp] = useState<boolean>(false)
 
@@ -179,50 +208,111 @@ export function useUnifiedRaceRealtime({
   const pendingUpdates = useRef<AppwriteRealtimeMessage[]>([])
   const updateThrottleTimer = useRef<NodeJS.Timeout | null>(null)
   const THROTTLE_DELAY = 100 // 100ms for critical periods
-  const CONNECTION_DRAIN_DELAY = 200 // Reduced for faster navigation
+  const CONNECTION_DRAIN_DELAY = NAVIGATION_DRAIN_DELAY
+
+  const poolDocumentId = state.poolData?.$id?.trim() || null
 
   // Smart channel management with race status awareness
   const getChannels = useCallback(
-    (raceDocId: string | null, raceResultsDocId?: string, raceStatus?: string) => {
+    (raceDocId: string | null, raceResultsDocId?: string) => {
       if (!raceDocId) return []
 
-      const channels = [
-        `databases.raceday-db.collections.races.documents.${raceDocId}`,
-        'databases.raceday-db.collections.race-pools.documents',
-        'databases.raceday-db.collections.money-flow-history.documents',
-      ]
+      const channels = new Set<string>()
 
-      // Add race-results subscription ONLY for races with interim/final status (per hybrid architecture)
-      const shouldSubscribeToResults = raceStatus && ['interim', 'final'].includes(raceStatus.toLowerCase())
-      if (shouldSubscribeToResults) {
-        if (raceResultsDocId) {
-          channels.push(
-            `databases.raceday-db.collections.race-results.documents.${raceResultsDocId}`
-          )
-        } else {
-          channels.push('databases.raceday-db.collections.race-results.documents')
-        }
-      }
+      // Always subscribe to the primary race document
+      channels.add(`databases.raceday-db.collections.races.documents.${raceDocId}`)
 
-      // Add entrant-specific subscriptions if available
-      if (state.entrants && state.entrants.length > 0) {
-        state.entrants.forEach((entrant) => {
-          if (entrant.$id) {
-            channels.push(
-              `databases.raceday-db.collections.entrants.documents.${entrant.$id}`
-            )
-          }
-        })
+      // Prefer document-specific pool channel when the ID is known
+      if (poolDocumentId) {
+        channels.add(
+          `databases.raceday-db.collections.race-pools.documents.${poolDocumentId}`
+        )
       } else {
-        channels.push('databases.raceday-db.collections.entrants.documents')
+        channels.add('databases.raceday-db.collections.race-pools.documents')
       }
 
-      return channels
+      // TASK 5 RESTORED: Use race-specific channel subscriptions for optimal performance
+      // Both entrants and money-flow-history collections have raceId attributes for filtering
+      channels.add(`databases.raceday-db.collections.entrants.documents.raceId.${raceId}`)
+      channels.add(`databases.raceday-db.collections.money-flow-history.documents.raceId.${raceId}`)
+
+      // TASK 5 RESTORED: Use race-specific subscription for race-results
+      if (raceResultsDocId) {
+        // Use document-specific channel when we have the specific document ID
+        channels.add(
+          `databases.raceday-db.collections.race-results.documents.${raceResultsDocId}`
+        )
+      } else {
+        // Use race-specific channel filtering instead of collection-wide subscription
+        channels.add(`databases.raceday-db.collections.race-results.documents.raceId.${raceId}`)
+      }
+
+      return Array.from(channels)
     },
-    [state.entrants]
+    [poolDocumentId, raceId]
   )
 
   // Fetch initial data if not provided
+  const fetchPoolDataForRace = useCallback(
+    async ({ force = false }: { force?: boolean } = {}) => {
+      if (!raceId) return
+      if (poolDataFetchInProgress.current) return
+      if (!force && initialPoolDataAttempted.current) return
+
+      poolDataFetchInProgress.current = true
+      initialPoolDataAttempted.current = true
+
+      try {
+        const poolDataResponse = await databases.listDocuments(
+          'raceday-db',
+          'race-pools',
+          [Query.equal('raceId', raceId), Query.limit(1)]
+        )
+
+        if (poolDataResponse.documents.length > 0) {
+          const poolDoc = poolDataResponse.documents[0]
+
+          setState((prev) => ({
+            ...prev,
+            poolData: {
+              $id: poolDoc.$id,
+              $createdAt: poolDoc.$createdAt,
+              $updatedAt: poolDoc.$updatedAt,
+              raceId: poolDoc.raceId,
+              winPoolTotal: poolDoc.winPoolTotal || 0,
+              placePoolTotal: poolDoc.placePoolTotal || 0,
+              quinellaPoolTotal: poolDoc.quinellaPoolTotal || 0,
+              trifectaPoolTotal: poolDoc.trifectaPoolTotal || 0,
+              exactaPoolTotal: poolDoc.exactaPoolTotal || 0,
+              first4PoolTotal: poolDoc.first4PoolTotal || 0,
+              totalRacePool: poolDoc.totalRacePool || 0,
+              currency: poolDoc.currency || '$',
+              lastUpdated: poolDoc.$updatedAt,
+              isLive: poolDoc.isLive || false,
+            },
+            lastPoolUpdate: new Date(),
+          }))
+
+          debugLog('Initial pool data loaded', {
+            totalPool: poolDoc.totalRacePool,
+          })
+        } else {
+          debugLog('No pool data document found for race', { raceId })
+          setState((prev) => ({
+            ...prev,
+            poolData: null,
+            lastPoolUpdate: prev.lastPoolUpdate || new Date(),
+          }))
+        }
+      } catch (poolError) {
+        errorLog('Failed to fetch pool data', poolError)
+      } finally {
+        poolDataFetchInProgress.current = false
+      }
+    },
+    [raceId]
+  )
+
   const fetchInitialData = useCallback(async () => {
     if (!raceId || initialDataFetched.current) return
 
@@ -259,41 +349,7 @@ export function useUnifiedRaceRealtime({
       }))
 
       // Fetch pool data separately since API might not include it
-      try {
-        const poolDataResponse = await databases.listDocuments(
-          'raceday-db',
-          'race-pools',
-          [Query.equal('raceId', raceId), Query.limit(1)]
-        )
-
-        if (poolDataResponse.documents.length > 0) {
-          const poolDoc = poolDataResponse.documents[0]
-          setState((prev) => ({
-            ...prev,
-            poolData: {
-              $id: poolDoc.$id,
-              $createdAt: poolDoc.$createdAt,
-              $updatedAt: poolDoc.$updatedAt,
-              raceId: poolDoc.raceId,
-              winPoolTotal: poolDoc.winPoolTotal || 0,
-              placePoolTotal: poolDoc.placePoolTotal || 0,
-              quinellaPoolTotal: poolDoc.quinellaPoolTotal || 0,
-              trifectaPoolTotal: poolDoc.trifectaPoolTotal || 0,
-              exactaPoolTotal: poolDoc.exactaPoolTotal || 0,
-              first4PoolTotal: poolDoc.first4PoolTotal || 0,
-              totalRacePool: poolDoc.totalRacePool || 0,
-              currency: poolDoc.currency || '$',
-              lastUpdated: poolDoc.$updatedAt,
-              isLive: poolDoc.isLive || false,
-            },
-          }))
-          debugLog('Initial pool data loaded', {
-            totalPool: poolDoc.totalRacePool,
-          })
-        }
-      } catch (poolError) {
-        errorLog('Failed to fetch pool data', poolError)
-      }
+      await fetchPoolDataForRace({ force: true })
 
       // Fetch race-results document ID for specific subscriptions
       if (raceData.race?.$id) {
@@ -374,11 +430,19 @@ export function useUnifiedRaceRealtime({
     } catch (error) {
       errorLog('Failed to fetch initial data', error)
     }
-  }, [raceId])
+  }, [raceId, fetchPoolDataForRace, state.raceResultsDocumentId])
 
   // Reset fetch flag when race ID changes
   useEffect(() => {
     initialDataFetched.current = false
+    initialPoolDataAttempted.current = false
+    poolDataFetchInProgress.current = false
+
+    setState((prev) => ({
+      ...prev,
+      poolData: null,
+      lastPoolUpdate: null,
+    }))
     debugLog('Race ID changed, reset fetch flag', { raceId })
   }, [raceId])
 
@@ -422,7 +486,7 @@ export function useUnifiedRaceRealtime({
         }))
       }, CONNECTION_DRAIN_DELAY)
     }
-  }, [cleanupSignal, raceId])
+  }, [cleanupSignal, raceId, CONNECTION_DRAIN_DELAY])
 
   // Fetch initial data when race ID changes
   useEffect(() => {
@@ -436,6 +500,15 @@ export function useUnifiedRaceRealtime({
       fetchInitialData()
     }
   }, [raceId, state.race, state.entrants, fetchInitialData])
+
+  // Ensure pool data is fetched at least once per race when unified hook is active
+  useEffect(() => {
+    if (!raceId) return
+    if (state.poolData) return
+    if (initialPoolDataAttempted.current) return
+
+    fetchPoolDataForRace()
+  }, [raceId, state.poolData, fetchPoolDataForRace])
 
   // Periodic check for race-results document creation for active races
   useEffect(() => {
@@ -501,11 +574,23 @@ export function useUnifiedRaceRealtime({
     setState((prevState) => {
       const newState = { ...prevState }
       const now = new Date()
-      let hasUpdates = false
 
       // Process all pending updates in batch
       for (const message of updates) {
-        const { events, channels, payload } = message
+        const { events, payload } = message
+
+        // TASK 5 RESTORED: Debug race-specific subscription events
+        debugLog('Realtime event received', {
+          events: events.slice(0, 3), // Show first 3 events to avoid spam
+          payloadType: payload?.$collectionId || 'unknown',
+          payloadRaceId: payload?.raceId || payload?.race || 'none',
+          targetRaceId: raceId
+        })
+
+        const currentRaceDocumentId =
+          newState.raceDocumentId ?? prevState.raceDocumentId
+        const currentRaceResultsDocumentId =
+          newState.raceResultsDocumentId ?? prevState.raceResultsDocumentId
 
         // Event-based filtering using Appwrite's events array
         // For race events, check both the document ID and race ID in payload
@@ -515,44 +600,29 @@ export function useUnifiedRaceRealtime({
             if (event.includes('races.')) {
               // Extract document ID from event
               const eventId = event.split('races.')[1]
-              return eventId === state.raceDocumentId
+              return eventId === currentRaceDocumentId
             }
             return false
           }) ||
           (events.some((event) => event.includes('races.')) &&
-            payload.raceId === raceId)
+            (payload.raceId === raceId || payload.race === currentRaceDocumentId))
 
+        // TASK 5 RESTORED: Simplified race-results event detection (race-specific channel ensures relevance)
         const isRaceResultsEvent =
-          events.some((event) => {
-            if (typeof event === 'string' && event.includes('race-results')) {
-              return true
-            }
-            return false
-          }) &&
-          // Document-specific subscription
-          (payload.$id === state.raceResultsDocumentId ||
-            // Collection-level: check if this event is for our race
-            payload.race === state.raceDocumentId ||
-            payload.race === raceId ||
-            // Handle document creation events
-            (payload.race === state.raceDocumentId && payload.resultsAvailable))
+          events.some((event) => event.includes('race-results')) && payload
 
         const isPoolEvent = events.some(
           (event) => event.includes('race-pools') && payload.raceId === raceId
         )
 
-        const isEntrantEvent = events.some(
-          (event) =>
-            event.includes('entrants') &&
-            (payload.race === state.raceDocumentId ||
-              payload.raceId === raceId ||
-              (payload.entrant &&
-                state.entrants.some((e) => e.$id === payload.entrant)))
-        )
+        // TASK 5 RESTORED: Simplified entrant event detection (race-specific channel ensures relevance)
+        const isEntrantEvent = events.some((event) => event.includes('entrants')) && payload
 
-        const isMoneyFlowEvent = events.some(
-          (event) => event.includes('money-flow-history') && payload.entrant
-        )
+        // TASK 5 RESTORED: Simplified money-flow event detection (race-specific channel ensures relevance)
+        const isMoneyFlowEvent =
+          events.some((event) => event.includes('money-flow-history')) &&
+          payload &&
+          !!payload.entrant
 
         if (isRaceEvent && payload) {
           debugLog('Race data update received', {
@@ -572,7 +642,7 @@ export function useUnifiedRaceRealtime({
           const updatedRace: Race = {
             ...newState.race,
             ...payload,
-            $id: payload.$id || newState.race?.$id || state.raceDocumentId,
+            $id: payload.$id || newState.race?.$id || currentRaceDocumentId,
             raceId: payloadRaceId,
             // Critical: Always update status from payload if present
             status: newStatus,
@@ -614,7 +684,6 @@ export function useUnifiedRaceRealtime({
 
           newState.race = updatedRace
           newState.lastRaceUpdate = now
-          hasUpdates = true
 
           // Debug log for status changes
           if (payload.status && newState.race) {
@@ -649,7 +718,7 @@ export function useUnifiedRaceRealtime({
                 const raceResultsResponse = await databases.listDocuments(
                   'raceday-db',
                   'race-results',
-                  [Query.equal('race', state.raceDocumentId!), Query.limit(1)]
+                  [Query.equal('race', currentRaceDocumentId!), Query.limit(1)]
                 )
 
                 if (raceResultsResponse.documents.length > 0) {
@@ -758,7 +827,7 @@ export function useUnifiedRaceRealtime({
           })
 
           // If this is a new race-results document, store its ID
-          if (payload.$id && !state.raceResultsDocumentId) {
+          if (payload.$id && !currentRaceResultsDocumentId) {
             debugLog('🎯 New race-results document detected', {
               documentId: payload.$id,
               resultStatus: payload.resultStatus,
@@ -817,14 +886,13 @@ export function useUnifiedRaceRealtime({
 
           newState.resultsData = updatedResultsData
           newState.lastResultsUpdate = now
-          hasUpdates = true
 
           // Debug log for results status changes
           if (payload.resultStatus && payload.resultsAvailable) {
             debugRaceStatus(
               'Race results status update',
               raceId,
-              state.resultsData?.status,
+              prevState.resultsData?.status,
               payload.resultStatus?.toLowerCase(),
               { source: 'race-results', documentId: payload.$id }
             )
@@ -838,7 +906,7 @@ export function useUnifiedRaceRealtime({
               resultsData: parsedResultsData,
               dividendsData: parsedDividendsData,
               fixedOddsData: parsedFixedOddsData,
-              resultStatus: payload.resultStatus?.toLowerCase() || 'interim',
+              resultStatus: (payload.resultStatus?.toLowerCase() || 'interim') as 'interim' | 'final',
               // Update race status based on result status
               status:
                 payload.resultStatus === 'final'
@@ -849,11 +917,14 @@ export function useUnifiedRaceRealtime({
         } else if (isPoolEvent && payload) {
           debugLog('Pool data update received', { raceId: payload.raceId })
 
+          const existingPoolId = newState.poolData?.$id || ''
+          const resolvedPoolId = payload.$id || existingPoolId || ''
+
           newState.poolData = {
-            $id: payload.$id || '',
+            $id: resolvedPoolId,
             $createdAt: payload.$createdAt || new Date().toISOString(),
             $updatedAt: payload.$updatedAt || new Date().toISOString(),
-            raceId: payload.raceId,
+            raceId: payload.raceId || raceId,
             winPoolTotal: payload.winPoolTotal || 0,
             placePoolTotal: payload.placePoolTotal || 0,
             quinellaPoolTotal: payload.quinellaPoolTotal || 0,
@@ -866,20 +937,25 @@ export function useUnifiedRaceRealtime({
             isLive: payload.isLive || false,
           }
           newState.lastPoolUpdate = now
-          hasUpdates = true
         } else if (isEntrantEvent && payload) {
-          debugLog('Entrant update received', { entrantId: payload.$id })
+          debugLog('Entrant update received (TASK 5 race-specific)', {
+            entrantId: payload.$id,
+            raceId: payload.raceId || payload.race
+          })
 
-          newState.entrants = updateEntrantInList(newState.entrants, payload)
+          if (payload.$id) {
+            newState.entrants = updateEntrantInList(newState.entrants, payload as Partial<Entrant> & { $id: string })
+          }
           newState.lastEntrantsUpdate = now
-          hasUpdates = true
         } else if (isMoneyFlowEvent && payload) {
-          debugLog('Money flow update received', { entrantId: payload.entrant })
+          debugLog('Money flow update received (TASK 5 race-specific)', {
+            entrantId: resolveEntrantId(payload.entrant),
+            raceId: payload.raceId || payload.race
+          })
 
           newState.entrants = updateEntrantMoneyFlow(newState.entrants, payload)
           newState.lastEntrantsUpdate = now
           newState.moneyFlowUpdateTrigger = prevState.moneyFlowUpdateTrigger + 1
-          hasUpdates = true
         }
       }
 
@@ -909,7 +985,7 @@ export function useUnifiedRaceRealtime({
 
       return newState
     })
-  }, [raceId, state.raceDocumentId, state.raceResultsDocumentId])
+  }, [raceId])
 
   // Process incoming Appwrite real-time messages with throttling
   const processRealtimeMessage = useCallback(
@@ -968,24 +1044,20 @@ export function useUnifiedRaceRealtime({
           // Get smart channels based on current state and race status
           const channels = getChannels(
             state.raceDocumentId,
-            state.raceResultsDocumentId || undefined,
-            state.race?.status
+            state.raceResultsDocumentId || undefined
           )
           debugLog('Subscription channels:', channels)
 
           // Create unified subscription
           unsubscribeFunction.current = client.subscribe(
             channels,
-            (response: any) => {
+            (response: RawRealtimeMessage) => {
               debugLog('📡 Unified subscription event received', {
                 channels: response.channels?.length || 0,
                 events: response.events,
                 hasPayload: !!response.payload,
               })
-              processRealtimeMessage({
-                ...response,
-                channels: response.channels || [],
-              })
+              processRealtimeMessage(normalizeRealtimeMessage(response))
             }
           )
 
@@ -1090,78 +1162,11 @@ export function useUnifiedRaceRealtime({
     isCleaningUp,
     getChannels,
     processRealtimeMessage,
+    CONNECTION_DRAIN_DELAY,
   ])
 
-  // Dynamic subscription upgrade when race-results document is discovered
-  useEffect(() => {
-    if (
-      state.raceResultsDocumentId &&
-      unsubscribeFunction.current &&
-      state.isConnected
-    ) {
-      debugLog('🎯 Upgrading to document-specific race-results subscription', {
-        raceResultsDocumentId: state.raceResultsDocumentId,
-        wasUsingCollectionLevel: !state.raceResultsDocumentId,
-      })
-
-      // Recreate subscription with document-specific race-results channel
-      const setupSubscription = () => {
-        try {
-          if (unsubscribeFunction.current) {
-            unsubscribeFunction.current()
-            unsubscribeFunction.current = null
-          }
-
-          const channels = getChannels(
-            state.raceDocumentId,
-            state.raceResultsDocumentId || undefined,
-            state.race?.status
-          )
-          debugLog(
-            '🔄 Recreated subscription with document-specific race-results channel',
-            channels
-          )
-
-          // Create a new message processor for the upgraded subscription
-          const handleMessage = (response: any) => {
-            try {
-              // Add to pending updates
-              pendingUpdates.current.push({
-                ...response,
-                channels: response.channels || [],
-              })
-
-              // Clear existing timer and set new one for throttling
-              if (updateThrottleTimer.current) {
-                clearTimeout(updateThrottleTimer.current)
-              }
-
-              updateThrottleTimer.current = setTimeout(
-                applyPendingUpdates,
-                THROTTLE_DELAY
-              )
-            } catch (error) {
-              errorLog(
-                'Error processing real-time message in upgraded subscription',
-                error
-              )
-            }
-          }
-
-          unsubscribeFunction.current = client.subscribe(
-            channels,
-            handleMessage
-          )
-        } catch (error) {
-          errorLog('Failed to upgrade subscription:', error)
-        }
-      }
-
-      // Add a small delay to ensure state is fully updated
-      const timer = setTimeout(setupSubscription, 100)
-      return () => clearTimeout(timer)
-    }
-  }, [state.raceResultsDocumentId, getChannels, applyPendingUpdates])
+  // REMOVED: Dynamic subscription upgrade logic that caused connection leaks
+  // Now using single subscription approach with event filtering instead
 
   // Manual reconnection function
   const reconnect = useCallback(() => {
@@ -1197,18 +1202,30 @@ export function useUnifiedRaceRealtime({
           latencySamples.current.length
         : null
 
+    // Get connection monitoring metrics
+    const monitorMetrics = connectionMonitor.getMetrics()
+
     debugLog('Connection health check', {
       isConnected: state.isConnected,
       connectionAttempts: state.connectionAttempts,
       latencySamples: latencySamples.current.length,
       avgLatency,
       uptime,
+      monitorMetrics,
     })
 
     return {
-      isHealthy: state.isConnected && state.connectionAttempts < 3,
+      isHealthy: state.isConnected && state.connectionAttempts < 3 && !connectionMonitor.shouldDisableRealtime(),
       avgLatency,
       uptime,
+      connectionCount: monitorMetrics?.totalConnections,
+      activeConnections: monitorMetrics?.activeConnections,
+      totalChannels: monitorMetrics?.totalChannels,
+      uniqueChannels: monitorMetrics?.uniqueChannels,
+      totalMessages: monitorMetrics?.totalMessages,
+      totalErrors: monitorMetrics?.totalErrors,
+      isOverLimit: monitorMetrics?.isOverLimit,
+      emergencyFallback: monitorMetrics?.emergencyFallback,
     }
   }, [state.isConnected, state.connectionAttempts])
 
@@ -1237,12 +1254,31 @@ function updateEntrantInList(
   })
 }
 
+function resolveEntrantId(entrant: RealtimePayload['entrant']): string | null {
+  if (!entrant) {
+    return null
+  }
+
+  if (typeof entrant === 'string') {
+    return entrant
+  }
+
+  if (typeof entrant === 'object' && entrant !== null) {
+    return (entrant as { entrantId?: string; $id?: string }).entrantId ||
+           (entrant as { entrantId?: string; $id?: string }).$id || null
+  }
+
+  return null
+}
+
 function updateEntrantMoneyFlow(
   entrants: Entrant[],
-  moneyFlowData: any
+  moneyFlowData: RealtimePayload
 ): Entrant[] {
+  const targetEntrantId = resolveEntrantId(moneyFlowData.entrant)
+
   return entrants.map((entrant) => {
-    if (entrant.$id === moneyFlowData.entrant) {
+    if (targetEntrantId && entrant.$id === targetEntrantId) {
       let trend: 'up' | 'down' | 'neutral' = 'neutral'
 
       // Update hold percentage and calculate trend

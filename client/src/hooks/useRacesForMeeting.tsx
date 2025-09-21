@@ -117,7 +117,7 @@ export function useRacesForMeeting({
         const delay = Math.min(1000 * Math.pow(2, retryAttempt), 5000);
         setTimeout(() => {
           if (!abortController.signal.aborted) {
-            fetchRaces(meetingId, retryAttempt + 1);
+            void fetchRaces(meetingId, retryAttempt + 1);
           }
         }, delay);
         return;
@@ -132,16 +132,16 @@ export function useRacesForMeeting({
     }
   }, [getCachedRaces, setCachedRaces, onError]);
 
-  // Setup cache event listening for real-time updates from useRealtimeMeetings
+  // Setup cache event listening for polling-based updates from meetings data
   const setupCacheEventListening = useCallback(() => {
     if (!enabled || !meetingId) return;
 
-    const handleCacheUpdate = (event: CustomEvent) => {
+    const handleCacheUpdate = (event: CustomEvent<{ meetingId: string; races: Race[] }>) => {
       const { meetingId: updatedMeetingId, races: updatedRaces } = event.detail;
       
       // Only update if this is for our meeting and we have races loaded
       if (updatedMeetingId === meetingId && races.length > 0) {
-        console.log('🔄 Updating races from real-time cache update for meeting:', meetingId);
+        console.log('🔄 Updating races from polling cache update for meeting:', meetingId);
         setRaces(updatedRaces);
         setIsConnected(true);
       }
@@ -179,7 +179,7 @@ export function useRacesForMeeting({
     
     fetchAttemptRef.current += 1;
     
-    fetchRaces(meetingId).catch(() => {
+    void fetchRaces(meetingId).catch(() => {
       // Error handling is done in fetchRaces
     });
 
@@ -191,13 +191,13 @@ export function useRacesForMeeting({
     };
   }, [enabled, meetingId, fetchRaces]);
 
-  // Setup cache event listening for real-time updates after races are loaded
+  // Setup cache event listening for polling-based updates after races are loaded
   useEffect(() => {
     let cleanup: (() => void) | undefined;
     
     if (races.length > 0) {
       cleanup = setupCacheEventListening();
-      setIsConnected(true); // Connected through useRealtimeMeetings global subscription
+      setIsConnected(true); // Connected through meetings polling system
     }
     
     return () => {
@@ -224,7 +224,7 @@ export function useRacesForMeeting({
   };
 }
 
-// Update races in existing cache when real-time updates occur
+// Update races in existing cache when polling updates occur
 export function updateRaceInCache(meetingId: string, updatedRace: Race): void {
   const cached = racesCache.get(meetingId);
   if (cached) {
