@@ -169,9 +169,9 @@ This development plan addresses critical Appwrite database connection leak issue
 
 **Status**:
 
-- ► Not Started
+- Not Started
 - In Progress
-- Complete
+- ► Complete
 
 **Priority**: Medium
 **Impact**: Reduces connection overhead while preventing performance-killing collection-level subscriptions
