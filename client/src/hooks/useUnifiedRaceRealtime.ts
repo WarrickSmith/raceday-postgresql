@@ -15,7 +15,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { client, databases, connectionMonitor } from '@/lib/appwrite-client'
 import { Race, Entrant, Meeting, RaceNavigationData } from '@/types/meetings'
 import type { RacePoolData, RaceResultsData } from '@/types/racePools'
@@ -203,8 +203,6 @@ export function useUnifiedRaceRealtime({
   const poolDataFetchInProgress = useRef<boolean>(false)
   const lastCleanupSignal = useRef<number>(0)
   const [isCleaningUp, setIsCleaningUp] = useState<boolean>(false)
-  const [hasRaceScopedMoneyFlowChannel, setHasRaceScopedMoneyFlowChannel] =
-    useState<boolean>(false)
 
   // Throttling for performance optimization
   const pendingUpdates = useRef<AppwriteRealtimeMessage[]>([])
@@ -213,19 +211,6 @@ export function useUnifiedRaceRealtime({
   const CONNECTION_DRAIN_DELAY = NAVIGATION_DRAIN_DELAY
 
   const poolDocumentId = state.poolData?.$id?.trim() || null
-
-  const initialEntrantDocumentIds = useMemo(() => {
-    const ids = new Set<string>()
-
-    initialEntrants.forEach((entrant) => {
-      const docId = entrant?.$id?.trim()
-      if (docId) {
-        ids.add(docId)
-      }
-    })
-
-    return Array.from(ids)
-  }, [initialEntrants])
 
   // Smart channel management with race status awareness
   const getChannels = useCallback(
@@ -246,44 +231,25 @@ export function useUnifiedRaceRealtime({
         channels.add('databases.raceday-db.collections.race-pools.documents')
       }
 
-      // Money flow: attempt race-scoped channel with collection-level fallback until confirmed
-      channels.add(
-        `databases.raceday-db.collections.money-flow-history.documents.race.${raceDocId}`
-      )
-      if (!hasRaceScopedMoneyFlowChannel) {
-        channels.add('databases.raceday-db.collections.money-flow-history.documents')
-      }
+      // TASK 5 RESTORED: Use race-specific channel subscriptions for optimal performance
+      // Both entrants and money-flow-history collections have raceId attributes for filtering
+      channels.add(`databases.raceday-db.collections.entrants.documents.raceId.${raceId}`)
+      channels.add(`databases.raceday-db.collections.money-flow-history.documents.raceId.${raceId}`)
 
-      // ALWAYS include race-results subscription to avoid connection upgrades
-      // Use document-specific channel if we have the ID, otherwise collection-level
+      // TASK 5 RESTORED: Use race-specific subscription for race-results
       if (raceResultsDocId) {
+        // Use document-specific channel when we have the specific document ID
         channels.add(
           `databases.raceday-db.collections.race-results.documents.${raceResultsDocId}`
         )
       } else {
-        // Always subscribe to collection-level race-results to catch document creation
-        channels.add('databases.raceday-db.collections.race-results.documents')
+        // Use race-specific channel filtering instead of collection-wide subscription
+        channels.add(`databases.raceday-db.collections.race-results.documents.raceId.${raceId}`)
       }
-
-      // Add entrant-specific subscriptions if available
-      const entrantDocumentIds = new Set<string>(initialEntrantDocumentIds)
-
-      if (state.entrants && state.entrants.length > 0) {
-        state.entrants.forEach((entrant) => {
-          const docId = entrant.$id?.trim()
-          if (docId) {
-            entrantDocumentIds.add(docId)
-          }
-        })
-      }
-
-      entrantDocumentIds.forEach((docId) => {
-        channels.add(`databases.raceday-db.collections.entrants.documents.${docId}`)
-      })
 
       return Array.from(channels)
     },
-    [state.entrants, poolDocumentId, hasRaceScopedMoneyFlowChannel, initialEntrantDocumentIds]
+    [poolDocumentId, raceId]
   )
 
   // Fetch initial data if not provided
@@ -471,7 +437,6 @@ export function useUnifiedRaceRealtime({
     initialDataFetched.current = false
     initialPoolDataAttempted.current = false
     poolDataFetchInProgress.current = false
-    setHasRaceScopedMoneyFlowChannel(false)
 
     setState((prev) => ({
       ...prev,
@@ -606,31 +571,26 @@ export function useUnifiedRaceRealtime({
 
     debugLog(`Processing ${updates.length} batched updates`)
 
-    let observedRaceScopedMoneyFlowChannel = false
-
     setState((prevState) => {
       const newState = { ...prevState }
       const now = new Date()
 
       // Process all pending updates in batch
       for (const message of updates) {
-        const { events, channels, payload } = message
+        const { events, payload } = message
+
+        // TASK 5 RESTORED: Debug race-specific subscription events
+        debugLog('Realtime event received', {
+          events: events.slice(0, 3), // Show first 3 events to avoid spam
+          payloadType: payload?.$collectionId || 'unknown',
+          payloadRaceId: payload?.raceId || payload?.race || 'none',
+          targetRaceId: raceId
+        })
 
         const currentRaceDocumentId =
           newState.raceDocumentId ?? prevState.raceDocumentId
         const currentRaceResultsDocumentId =
           newState.raceResultsDocumentId ?? prevState.raceResultsDocumentId
-        const currentEntrants = newState.entrants ?? prevState.entrants
-
-        if (
-          !hasRaceScopedMoneyFlowChannel &&
-          Array.isArray(channels) &&
-          channels.some((channel) =>
-            channel.includes('money-flow-history.documents.race.')
-          )
-        ) {
-          observedRaceScopedMoneyFlowChannel = true
-        }
 
         // Event-based filtering using Appwrite's events array
         // For race events, check both the document ID and race ID in payload
@@ -647,48 +607,22 @@ export function useUnifiedRaceRealtime({
           (events.some((event) => event.includes('races.')) &&
             (payload.raceId === raceId || payload.race === currentRaceDocumentId))
 
+        // TASK 5 RESTORED: Simplified race-results event detection (race-specific channel ensures relevance)
         const isRaceResultsEvent =
-          events.some((event) => {
-            if (typeof event === 'string' && event.includes('race-results')) {
-              return true
-            }
-            return false
-          }) &&
-          // ENHANCED FILTERING: Since we always subscribe to race-results, filter more strictly
-          (// Document-specific subscription: exact match
-            payload.$id === currentRaceResultsDocumentId ||
-            // Collection-level: ensure this is for our specific race
-            payload.race === currentRaceDocumentId ||
-            payload.race === raceId ||
-            // Handle document creation events for our race only
-            (payload.race === currentRaceDocumentId && payload.resultsAvailable) ||
-            // Filter out events for other races when using collection-level subscription
-            (payload.raceId === raceId))
+          events.some((event) => event.includes('race-results')) && payload
 
         const isPoolEvent = events.some(
           (event) => event.includes('race-pools') && payload.raceId === raceId
         )
 
-        const isEntrantEvent = events.some(
-          (event) =>
-            event.includes('entrants') &&
-            (payload.race === currentRaceDocumentId ||
-              payload.raceId === raceId ||
-              (payload.entrant &&
-                currentEntrants.some((e) => e.$id === payload.entrant)))
-        )
+        // TASK 5 RESTORED: Simplified entrant event detection (race-specific channel ensures relevance)
+        const isEntrantEvent = events.some((event) => event.includes('entrants')) && payload
 
-        const moneyFlowMatchesRace =
-          payload &&
-          (payload.raceId === raceId ||
-            payload.raceId === currentRaceDocumentId ||
-            payload.race === raceId ||
-            payload.race === currentRaceDocumentId)
-
+        // TASK 5 RESTORED: Simplified money-flow event detection (race-specific channel ensures relevance)
         const isMoneyFlowEvent =
           events.some((event) => event.includes('money-flow-history')) &&
-          !!payload.entrant &&
-          moneyFlowMatchesRace
+          payload &&
+          !!payload.entrant
 
         if (isRaceEvent && payload) {
           debugLog('Race data update received', {
@@ -1004,15 +938,19 @@ export function useUnifiedRaceRealtime({
           }
           newState.lastPoolUpdate = now
         } else if (isEntrantEvent && payload) {
-          debugLog('Entrant update received', { entrantId: payload.$id })
+          debugLog('Entrant update received (TASK 5 race-specific)', {
+            entrantId: payload.$id,
+            raceId: payload.raceId || payload.race
+          })
 
           if (payload.$id) {
             newState.entrants = updateEntrantInList(newState.entrants, payload as Partial<Entrant> & { $id: string })
           }
           newState.lastEntrantsUpdate = now
         } else if (isMoneyFlowEvent && payload) {
-          debugLog('Money flow update received', {
+          debugLog('Money flow update received (TASK 5 race-specific)', {
             entrantId: resolveEntrantId(payload.entrant),
+            raceId: payload.raceId || payload.race
           })
 
           newState.entrants = updateEntrantMoneyFlow(newState.entrants, payload)
@@ -1047,11 +985,7 @@ export function useUnifiedRaceRealtime({
 
       return newState
     })
-
-    if (observedRaceScopedMoneyFlowChannel) {
-      setHasRaceScopedMoneyFlowChannel(true)
-    }
-  }, [raceId, hasRaceScopedMoneyFlowChannel])
+  }, [raceId])
 
   // Process incoming Appwrite real-time messages with throttling
   const processRealtimeMessage = useCallback(
