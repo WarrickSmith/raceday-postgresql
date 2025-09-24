@@ -5,11 +5,25 @@
 
 import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
 
-function setIfDefined(target, key, value, transform) {
-    if (value === undefined || value === null) {
-        return;
+function safeStringField(value, maxLength) {
+    if (value === null || value === undefined) {
+        return undefined;
     }
-    target[key] = transform ? transform(value) : value;
+
+    let stringValue;
+    if (typeof value === 'string') {
+        stringValue = value;
+    }
+    else if (typeof value === 'object') {
+        stringValue = JSON.stringify(value);
+    }
+    else {
+        stringValue = String(value);
+    }
+
+    return stringValue.length > maxLength
+        ? stringValue.substring(0, maxLength)
+        : stringValue;
 }
 
 function tryParseInteger(value) {
@@ -17,27 +31,161 @@ function tryParseInteger(value) {
     return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-/**
- * Safely convert and truncate a field to string with max length
- * @param {any} value - The value to process
- * @param {number} maxLength - Maximum allowed length
- * @returns {string|undefined} Processed string or undefined if no value
- */
-function safeStringField(value, maxLength) {
-    if (value === null || value === undefined) {
+function setIfDefined(target, key, value, transform) {
+    if (value === undefined || value === null) {
+        return;
+    }
+    target[key] = transform ? transform(value) : value;
+}
+
+function resolveValue(...candidates) {
+    for (const candidate of candidates) {
+        if (candidate !== undefined && candidate !== null) {
+            return candidate;
+        }
+    }
+    return undefined;
+}
+
+function normalizeActualStart(actualStart) {
+    if (actualStart === undefined || actualStart === null) {
         return undefined;
     }
-    
-    let stringValue;
-    if (typeof value === 'string') {
-        stringValue = value;
-    } else if (typeof value === 'object') {
-        stringValue = JSON.stringify(value);
-    } else {
-        stringValue = String(value);
+    if (typeof actualStart === 'number') {
+        return new Date(actualStart * 1000).toISOString();
     }
-    
-    return stringValue.length > maxLength ? stringValue.substring(0, maxLength) : stringValue;
+    return actualStart;
+}
+
+function buildMeetingDocument(meeting, timestamp = new Date().toISOString()) {
+    const meetingDoc = {
+        meetingId: meeting.meeting ?? meeting.meetingId ?? meeting.$id,
+        meetingName: meeting.name ?? meeting.meetingName,
+        country: meeting.country,
+        status: 'active',
+        lastUpdated: timestamp,
+        dataSource: 'NZTAB'
+    };
+
+    setIfDefined(meetingDoc, 'state', meeting.state);
+    setIfDefined(meetingDoc, 'raceType', resolveValue(meeting.category_name, meeting.raceType));
+    setIfDefined(meetingDoc, 'category', meeting.category);
+    setIfDefined(meetingDoc, 'categoryName', meeting.category_name ?? meeting.categoryName);
+    setIfDefined(meetingDoc, 'date', meeting.date);
+    setIfDefined(meetingDoc, 'trackCondition', meeting.track_condition ?? meeting.trackCondition);
+    setIfDefined(meetingDoc, 'apiGeneratedTime', meeting.generated_time ?? meeting.apiGeneratedTime);
+
+    return meetingDoc;
+}
+
+function buildRaceDocument(race, meetingId, timestamp = new Date().toISOString()) {
+    const raceDoc = {
+        raceId: resolveValue(race.id, race.raceId, race.$id),
+        name: resolveValue(race.name, race.description),
+        raceNumber: resolveValue(race.race_number, race.raceNumber),
+        startTime: resolveValue(race.start_time, race.startTime),
+        status: resolveValue(race.status, race.raceStatus),
+        meeting: meetingId,
+        lastUpdated: timestamp,
+        importedAt: timestamp
+    };
+
+    setIfDefined(raceDoc, 'actualStart', normalizeActualStart(resolveValue(race.actual_start, race.actualStart)));
+    setIfDefined(raceDoc, 'toteStartTime', resolveValue(race.tote_start_time, race.toteStartTime));
+    setIfDefined(raceDoc, 'startTimeNz', resolveValue(race.start_time_nz, race.startTimeNz));
+    setIfDefined(raceDoc, 'raceDateNz', resolveValue(race.race_date_nz, race.raceDateNz));
+    setIfDefined(raceDoc, 'distance', resolveValue(race.distance, race.raceDistance));
+    setIfDefined(raceDoc, 'trackCondition', resolveValue(race.track_condition, race.trackCondition));
+    setIfDefined(raceDoc, 'trackSurface', resolveValue(race.track_surface, race.trackSurface));
+    setIfDefined(raceDoc, 'weather', resolveValue(race.weather, race.raceWeather));
+    setIfDefined(raceDoc, 'type', resolveValue(race.type, race.raceType));
+
+    const prizeMoneySource = resolveValue(race.prize_monies, race.prizeMonies);
+    if (prizeMoneySource && typeof prizeMoneySource === 'object') {
+        setIfDefined(raceDoc, 'totalPrizeMoney', prizeMoneySource.total_value ?? prizeMoneySource.totalPrizeMoney);
+    }
+    else {
+        setIfDefined(raceDoc, 'totalPrizeMoney', resolveValue(race.total_prize_money, race.totalPrizeMoney));
+    }
+
+    setIfDefined(raceDoc, 'entrantCount', resolveValue(race.entrant_count, race.entrantCount));
+    setIfDefined(raceDoc, 'fieldSize', resolveValue(race.field_size, race.fieldSize));
+    setIfDefined(raceDoc, 'positionsPaid', resolveValue(race.positions_paid, race.positionsPaid));
+    setIfDefined(raceDoc, 'silkUrl', resolveValue(race.silk_url, race.silkUrl));
+    setIfDefined(raceDoc, 'silkBaseUrl', resolveValue(race.silk_base_url, race.silkBaseUrl));
+
+    const videoChannels = resolveValue(race.video_channels, race.videoChannels);
+    if (Array.isArray(videoChannels) && videoChannels.length > 0) {
+        raceDoc.videoChannels = JSON.stringify(videoChannels);
+    }
+
+    return raceDoc;
+}
+
+function buildEntrantDocument(entrant, raceId, timestamp = new Date().toISOString()) {
+    const entrantDoc = {
+        entrantId: resolveValue(entrant.entrant_id, entrant.entrantId, entrant.$id),
+        name: entrant.name,
+        runnerNumber: resolveValue(entrant.runner_number, entrant.runnerNumber),
+        isScratched: resolveValue(entrant.is_scratched, entrant.isScratched, false) || false,
+        race: raceId,
+        raceId,
+        lastUpdated: timestamp,
+        importedAt: timestamp
+    };
+
+    setIfDefined(entrantDoc, 'barrier', resolveValue(entrant.barrier, entrant.barrierNumber));
+
+    const isLateScratched = resolveValue(entrant.is_late_scratched, entrant.isLateScratched);
+    if (isLateScratched !== undefined) {
+        entrantDoc.isLateScratched = isLateScratched;
+    }
+
+    const scratchTimeValue = tryParseInteger(resolveValue(entrant.scratch_time, entrant.scratchTime));
+    if (scratchTimeValue !== undefined) {
+        entrantDoc.scratchTime = scratchTimeValue;
+    }
+
+    const runnerChange = safeStringField(resolveValue(entrant.runner_change, entrant.runnerChange), 500);
+    if (runnerChange !== undefined) {
+        entrantDoc.runnerChange = runnerChange;
+    }
+
+    const favourite = resolveValue(entrant.favourite, entrant.isFavourite);
+    if (favourite !== undefined) {
+        entrantDoc.favourite = favourite;
+    }
+
+    const mover = resolveValue(entrant.mover, entrant.isMover);
+    if (mover !== undefined) {
+        entrantDoc.mover = mover;
+    }
+
+    const jockey = safeStringField(resolveValue(entrant.jockey, entrant.jockeyName), 255);
+    if (jockey !== undefined) {
+        entrantDoc.jockey = jockey;
+    }
+
+    const trainerName = safeStringField(resolveValue(entrant.trainer_name, entrant.trainerName), 255);
+    if (trainerName !== undefined) {
+        entrantDoc.trainerName = trainerName;
+    }
+
+    const odds = resolveValue(entrant.odds, entrant.fixedOdds);
+    setIfDefined(entrantDoc, 'fixedWinOdds', resolveValue(entrant.fixedWinOdds, odds?.fixed_win));
+    setIfDefined(entrantDoc, 'fixedPlaceOdds', resolveValue(entrant.fixedPlaceOdds, odds?.fixed_place));
+    setIfDefined(entrantDoc, 'poolWinOdds', resolveValue(entrant.poolWinOdds, odds?.pool_win));
+    setIfDefined(entrantDoc, 'poolPlaceOdds', resolveValue(entrant.poolPlaceOdds, odds?.pool_place));
+
+    const silkColours = safeStringField(resolveValue(entrant.silk_colours, entrant.silkColours), 100);
+    if (silkColours !== undefined) {
+        entrantDoc.silkColours = silkColours;
+    }
+
+    setIfDefined(entrantDoc, 'silkUrl64', resolveValue(entrant.silk_url_64x64, entrant.silkUrl64));
+    setIfDefined(entrantDoc, 'silkUrl128', resolveValue(entrant.silk_url_128x128, entrant.silkUrl128));
+
+    return entrantDoc;
 }
 
 /**
@@ -92,14 +240,7 @@ export async function processMeetings(databases, databaseId, meetings, context) 
     
     const meetingPromises = meetings.map(async (meeting) => {
         try {
-            const meetingDoc = {
-                meetingId: meeting.meeting,
-                meetingName: meeting.name,
-                country: meeting.country,
-                raceType: meeting.category_name,
-                date: meeting.date,
-                status: 'active'
-            };
+            const meetingDoc = buildMeetingDocument(meeting);
             const success = await performantUpsert(databases, databaseId, 'meetings', meeting.meeting, meetingDoc, context);
             if (success) {
                 logDebug(context, 'Upserted meeting', { meetingId: meeting.meeting, name: meeting.name });
@@ -149,35 +290,7 @@ export async function processRaces(databases, databaseId, meetings, context) {
         const batch = allRaces.slice(i, i + batchSize);
         const racePromises = batch.map(async ({ meeting, race }) => {
             try {
-                const raceDoc = {
-                    raceId: race.id,
-                    name: race.name,
-                    raceNumber: race.race_number,
-                    startTime: race.start_time,
-                    status: race.status,
-                    meeting: meeting,
-                    lastUpdated: new Date().toISOString(),
-                    importedAt: new Date().toISOString()
-                };
-
-                setIfDefined(raceDoc, 'actualStart', race.actual_start);
-                setIfDefined(raceDoc, 'toteStartTime', race.tote_start_time);
-                setIfDefined(raceDoc, 'startTimeNz', race.start_time_nz);
-                setIfDefined(raceDoc, 'raceDateNz', race.race_date_nz);
-                setIfDefined(raceDoc, 'distance', race.distance);
-                setIfDefined(raceDoc, 'trackCondition', race.track_condition);
-                setIfDefined(raceDoc, 'trackSurface', race.track_surface);
-                setIfDefined(raceDoc, 'weather', race.weather);
-                setIfDefined(raceDoc, 'type', race.type);
-                setIfDefined(raceDoc, 'totalPrizeMoney', race.prize_monies?.total_value);
-                setIfDefined(raceDoc, 'entrantCount', race.entrant_count);
-                setIfDefined(raceDoc, 'fieldSize', race.field_size);
-                setIfDefined(raceDoc, 'positionsPaid', race.positions_paid);
-                setIfDefined(raceDoc, 'silkUrl', race.silk_url);
-                setIfDefined(raceDoc, 'silkBaseUrl', race.silk_base_url);
-                if (Array.isArray(race.video_channels) && race.video_channels.length > 0) {
-                    raceDoc.videoChannels = JSON.stringify(race.video_channels);
-                }
+                const raceDoc = buildRaceDocument(race, meeting);
                 const success = await performantUpsert(databases, databaseId, 'races', race.id, raceDoc, context);
                 if (success) {
                     logDebug(context, 'Upserted race', { raceId: race.id, name: race.name });
@@ -233,46 +346,7 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
     // Process each entrant (runner) with comprehensive data
     for (const entrant of entrants) {
         try {
-            const timestamp = new Date().toISOString();
-            const entrantDoc = {
-                entrantId: entrant.entrant_id,
-                name: entrant.name,
-                runnerNumber: entrant.runner_number,
-                isScratched: entrant.is_scratched || false,
-                race: raceId,
-                raceId,
-                lastUpdated: timestamp,
-                importedAt: timestamp
-            };
-
-            setIfDefined(entrantDoc, 'barrier', entrant.barrier);
-            if (entrant.is_late_scratched !== undefined) {
-                entrantDoc.isLateScratched = entrant.is_late_scratched;
-            }
-            const scratchTime = tryParseInteger(entrant.scratch_time);
-            if (scratchTime !== undefined) {
-                entrantDoc.scratchTime = scratchTime;
-            }
-            setIfDefined(entrantDoc, 'runnerChange', safeStringField(entrant.runner_change, 500));
-            if (entrant.favourite !== undefined) entrantDoc.favourite = entrant.favourite;
-            if (entrant.mover !== undefined) entrantDoc.mover = entrant.mover;
-            const jockey = safeStringField(entrant.jockey, 255);
-            if (jockey) entrantDoc.jockey = jockey;
-            const trainerName = safeStringField(entrant.trainer_name, 255);
-            if (trainerName) entrantDoc.trainerName = trainerName;
-
-            if (entrant.odds) {
-                setIfDefined(entrantDoc, 'fixedWinOdds', entrant.odds.fixed_win);
-                setIfDefined(entrantDoc, 'fixedPlaceOdds', entrant.odds.fixed_place);
-                setIfDefined(entrantDoc, 'poolWinOdds', entrant.odds.pool_win);
-                setIfDefined(entrantDoc, 'poolPlaceOdds', entrant.odds.pool_place);
-            }
-
-            if (entrant.silk_colours) {
-                entrantDoc.silkColours = safeStringField(entrant.silk_colours, 100);
-            }
-            setIfDefined(entrantDoc, 'silkUrl64', entrant.silk_url_64x64);
-            setIfDefined(entrantDoc, 'silkUrl128', entrant.silk_url_128x128);
+            const entrantDoc = buildEntrantDocument(entrant, raceId);
 
             const success = await performantUpsert(databases, databaseId, 'entrants', entrant.entrant_id, entrantDoc, context);
             if (success) {
@@ -314,37 +388,32 @@ export async function processDetailedRaces(databases, databaseId, detailedRaces,
     // Process each race with detailed data
     for (const { basicRace, detailedData } of detailedRaces) {
         try {
-            const enhancedRaceDoc = {
-                raceId: basicRace.raceId,
+            const timestamp = new Date().toISOString();
+            const combinedRaceData = {
+                id: basicRace.raceId,
                 name: detailedData.description || basicRace.name,
-                raceNumber: basicRace.raceNumber,
-                startTime: basicRace.startTime,
+                race_number: basicRace.raceNumber,
+                start_time: basicRace.startTime,
                 status: detailedData.status || basicRace.status,
-                meeting: basicRace.meeting,
-                lastUpdated: new Date().toISOString(),
-                importedAt: new Date().toISOString()
+                actual_start: detailedData.actual_start ?? basicRace.actualStart,
+                tote_start_time: detailedData.tote_start_time ?? basicRace.toteStartTime,
+                start_time_nz: detailedData.start_time_nz ?? basicRace.startTimeNz,
+                race_date_nz: detailedData.race_date_nz ?? basicRace.raceDateNz,
+                distance: detailedData.distance ?? basicRace.distance,
+                track_condition: detailedData.track_condition ?? basicRace.trackCondition,
+                track_surface: detailedData.track_surface ?? basicRace.trackSurface,
+                weather: detailedData.weather ?? basicRace.weather,
+                type: detailedData.type ?? basicRace.type,
+                prize_monies: detailedData.prize_monies ?? basicRace.prizeMonies,
+                entrant_count: detailedData.entrant_count ?? basicRace.entrantCount,
+                field_size: detailedData.field_size ?? basicRace.fieldSize,
+                positions_paid: detailedData.positions_paid ?? basicRace.positionsPaid,
+                silk_url: detailedData.silk_url ?? basicRace.silkUrl,
+                silk_base_url: detailedData.silk_base_url ?? basicRace.silkBaseUrl,
+                video_channels: detailedData.video_channels ?? basicRace.videoChannels
             };
 
-            if (detailedData.actual_start) {
-                enhancedRaceDoc.actualStart = new Date(detailedData.actual_start * 1000).toISOString();
-            }
-            setIfDefined(enhancedRaceDoc, 'toteStartTime', detailedData.tote_start_time);
-            setIfDefined(enhancedRaceDoc, 'startTimeNz', detailedData.start_time_nz);
-            setIfDefined(enhancedRaceDoc, 'raceDateNz', detailedData.race_date_nz);
-            setIfDefined(enhancedRaceDoc, 'distance', detailedData.distance);
-            setIfDefined(enhancedRaceDoc, 'trackCondition', detailedData.track_condition);
-            setIfDefined(enhancedRaceDoc, 'trackSurface', detailedData.track_surface);
-            setIfDefined(enhancedRaceDoc, 'weather', detailedData.weather);
-            setIfDefined(enhancedRaceDoc, 'type', detailedData.type);
-            setIfDefined(enhancedRaceDoc, 'totalPrizeMoney', detailedData.prize_monies?.total_value);
-            setIfDefined(enhancedRaceDoc, 'entrantCount', detailedData.entrant_count);
-            setIfDefined(enhancedRaceDoc, 'fieldSize', detailedData.field_size);
-            setIfDefined(enhancedRaceDoc, 'positionsPaid', detailedData.positions_paid);
-            setIfDefined(enhancedRaceDoc, 'silkUrl', detailedData.silk_url);
-            setIfDefined(enhancedRaceDoc, 'silkBaseUrl', detailedData.silk_base_url);
-            if (Array.isArray(detailedData.video_channels) && detailedData.video_channels.length > 0) {
-                enhancedRaceDoc.videoChannels = JSON.stringify(detailedData.video_channels);
-            }
+            const enhancedRaceDoc = buildRaceDocument(combinedRaceData, basicRace.meeting, timestamp);
 
             const success = await performantUpsert(databases, databaseId, 'races', basicRace.raceId, enhancedRaceDoc, context);
             if (success) {
