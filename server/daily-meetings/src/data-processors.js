@@ -24,15 +24,15 @@ function tryParseInteger(value) {
  */
 export function filterMeetings(meetings, context) {
     const allowedCountries = ['AUS', 'NZ'];
-    const allowedCategories = ['T', 'H']; // T = Thoroughbred, H = Harness
+    const allowedCategories = ['Thoroughbred Horse Racing', 'Harness Horse Racing'];
     const countriesFound = [...new Set(meetings.map(meeting => meeting.country))];
-    const categoriesFound = [...new Set(meetings.map(meeting => meeting.category))];
-    
+    const categoriesFound = [...new Set(meetings.map(meeting => meeting.category_name))];
+
     const filtered = meetings.filter(meeting => {
         if (!allowedCountries.includes(meeting.country)) {
             return false;
         }
-        if (!allowedCategories.includes(meeting.category)) {
+        if (!allowedCategories.includes(meeting.category_name)) {
             return false;
         }
         return true;
@@ -45,7 +45,9 @@ export function filterMeetings(meetings, context) {
         allowedCategories,
         countriesFound,
         categoriesFound,
-        filteredOut: meetings.length - filtered.length
+        countriesFiltered: meetings.length - filtered.length > 0 ?
+            `Filtered out: ${meetings.length - filtered.length} meetings` :
+            'No filtering needed'
     });
     
     return filtered;
