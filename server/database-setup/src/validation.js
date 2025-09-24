@@ -38,7 +38,7 @@ export const EXPECTED_COLLECTIONS = {
     'entrants': {
         name: 'Entrants',
         requiredAttributes: ['entrantId', 'name', 'runnerNumber'],
-        requiredIndexes: ['idx_entrant_id', 'idx_runner_number'],
+        requiredIndexes: ['idx_entrant_id', 'idx_runner_number', 'idx_race_id'],
         relationships: ['race']
     },
     'odds-history': {
@@ -63,12 +63,6 @@ export const EXPECTED_COLLECTIONS = {
         name: 'UserAlertConfigs',
         requiredAttributes: ['userId', 'indicatorType', 'percentageRangeMin', 'color', 'enabled', 'displayOrder'],
         requiredIndexes: ['idx_user_id', 'idx_indicator_type', 'idx_display_order'],
-        relationships: []
-    },
-    'notifications': {
-        name: 'Notifications',
-        requiredAttributes: ['userId', 'title', 'message', 'type'],
-        requiredIndexes: ['idx_user_id'],
         relationships: []
     }
 };

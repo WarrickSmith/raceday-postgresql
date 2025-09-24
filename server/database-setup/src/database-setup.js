@@ -38,7 +38,6 @@ const collections = {
     moneyFlowHistory: 'money-flow-history',
     racePools: 'race-pools',
     userAlertConfigs: 'user-alert-configs',
-    notifications: 'notifications',
     functionLocks: 'function-locks',
 };
 
@@ -416,7 +415,6 @@ export async function ensureDatabaseSetup(config, context) {
             { name: 'money-flow-history', func: ensureMoneyFlowHistoryCollection },
             { name: 'race-pools', func: ensureRacePoolsCollection },
             { name: 'user-alert-configs', func: ensureUserAlertConfigsCollection },
-            { name: 'notifications', func: ensureNotificationsCollection },
             { name: 'function-locks', func: ensureFunctionLocksCollection }
         ];
 
@@ -770,61 +768,25 @@ async function ensureRacesCollection(databases, config, context, progressTracker
         { key: 'toteStartTime', type: 'string', size: 20, required: false }, // tote_start_time
         { key: 'startTimeNz', type: 'string', size: 30, required: false }, // start_time_nz
         { key: 'raceDateNz', type: 'string', size: 15, required: false }, // race_date_nz
-        
+
         // Race details
         { key: 'distance', type: 'integer', required: false },
         { key: 'trackCondition', type: 'string', size: 100, required: false },
+        { key: 'trackSurface', type: 'string', size: 50, required: false }, // track_surface
         { key: 'weather', type: 'string', size: 50, required: false },
         { key: 'status', type: 'string', size: 50, required: true },
         
-        // Track information
-        { key: 'trackDirection', type: 'string', size: 20, required: false }, // track_direction
-        { key: 'trackSurface', type: 'string', size: 50, required: false }, // track_surface
-        { key: 'railPosition', type: 'string', size: 100, required: false }, // rail_position
-        { key: 'trackHomeStraight', type: 'integer', required: false }, // track_home_straight
-        
         // Race classification
         { key: 'type', type: 'string', size: 10, required: false }, // race type (T, H, G)
-        { key: 'startType', type: 'string', size: 50, required: false }, // start_type
-        { key: 'group', type: 'string', size: 50, required: false }, // Grade, Listed, etc
-        { key: 'class', type: 'string', size: 20, required: false }, // C1, C2, etc
-        { key: 'gait', type: 'string', size: 20, required: false }, // for harness racing
-        
+
         // Prize and field information
         { key: 'totalPrizeMoney', type: 'integer', required: false }, // prize_monies.total_value
         { key: 'entrantCount', type: 'integer', required: false }, // entrant_count
         { key: 'fieldSize', type: 'integer', required: false }, // field_size
         { key: 'positionsPaid', type: 'integer', required: false }, // positions_paid
-        
-        // Race conditions and restrictions
-        { key: 'genderConditions', type: 'string', size: 100, required: false },
-        { key: 'ageConditions', type: 'string', size: 100, required: false },
-        { key: 'weightConditions', type: 'string', size: 200, required: false },
-        { key: 'allowanceConditions', type: 'boolean', required: false },
-        { key: 'specialConditions', type: 'string', size: 500, required: false },
-        { key: 'jockeyConditions', type: 'string', size: 200, required: false },
-        
-        // Form and commentary
-        { key: 'formGuide', type: 'string', size: 2000, required: false },
-        { key: 'comment', type: 'string', size: 2000, required: false },
-        { key: 'description', type: 'string', size: 255, required: false },
-        
-        // Visual and media
-        { key: 'silkUrl', type: 'string', size: 500, required: false },
-        { key: 'silkBaseUrl', type: 'string', size: 200, required: false },
-        { key: 'videoChannels', type: 'string', size: 500, required: false }, // JSON array as string
-        
-        // Betting options
-        { key: 'ffwinOptionNumber', type: 'integer', required: false },
-        { key: 'fftop3OptionNumber', type: 'integer', required: false },
-        
-        // Rate information for harness/trots
-        { key: 'mileRate400', type: 'string', size: 20, required: false },
-        { key: 'mileRate800', type: 'string', size: 20, required: false },
-        
+
         // Import metadata
         { key: 'lastUpdated', type: 'datetime', required: false },
-        { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
         { key: 'importedAt', type: 'datetime', required: false },
         
         // Polling coordination (for master race scheduler)
@@ -834,6 +796,11 @@ async function ensureRacesCollection(databases, config, context, progressTracker
         { key: 'lastStatusChange', type: 'datetime', required: false }, // Timestamp of last status change
         { key: 'finalizedAt', type: 'datetime', required: false }, // Timestamp when race status became Final/Finalized
         { key: 'abandonedAt', type: 'datetime', required: false }, // Timestamp when race was abandoned
+
+        // Visual and media
+        { key: 'silkUrl', type: 'string', size: 500, required: false },
+        { key: 'silkBaseUrl', type: 'string', size: 200, required: false },
+        { key: 'videoChannels', type: 'string', size: 500, required: false }, // JSON array as string
     ];
     // Create attributes with enhanced parallel processing and error isolation
     const attributeResults = await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context, rollbackManager);
@@ -979,7 +946,7 @@ async function ensureEntrantsCollection(databases, config, context, progressTrac
         { key: 'runnerNumber', type: 'integer', required: true },
         { key: 'barrier', type: 'integer', required: false },
 
-        // TASK 5: Race ID for efficient race-based filtering
+        // Race linkage for filtering support
         { key: 'raceId', type: 'string', size: 50, required: false },
 
         // Current status information (updated frequently during race day)
@@ -1001,56 +968,14 @@ async function ensureEntrantsCollection(databases, config, context, progressTrac
         // Current race connections (may change on race day)
         { key: 'jockey', type: 'string', size: 255, required: false },
         { key: 'trainerName', type: 'string', size: 255, required: false },
-        { key: 'apprenticeIndicator', type: 'string', size: 50, required: false },
-        { key: 'gear', type: 'string', size: 200, required: false },
-        
-        // Weight information (finalized on race day)
-        { key: 'weight', type: 'string', size: 50, required: false },
-        { key: 'allocatedWeight', type: 'string', size: 20, required: false },
-        { key: 'totalWeight', type: 'string', size: 20, required: false },
-        { key: 'allowanceWeight', type: 'string', size: 20, required: false },
-        
-        // Current market information
-        { key: 'marketName', type: 'string', size: 100, required: false }, // Final Field, etc
-        { key: 'primaryMarket', type: 'boolean', required: false, default: true },
-        
-        // Speedmap positioning for live race strategy
-        { key: 'settlingLengths', type: 'integer', required: false },
-        
-        // Static entrant information (rarely changes)
-        { key: 'age', type: 'integer', required: false },
-        { key: 'sex', type: 'string', size: 10, required: false }, // M, F, G, etc
-        { key: 'colour', type: 'string', size: 20, required: false }, // B, BR, CH, etc
-        { key: 'foalingDate', type: 'string', size: 20, required: false }, // "Dec 23" format
-        { key: 'sire', type: 'string', size: 100, required: false },
-        { key: 'dam', type: 'string', size: 100, required: false },
-        { key: 'breeding', type: 'string', size: 200, required: false },
-        { key: 'owners', type: 'string', size: 255, required: false },
-        { key: 'trainerLocation', type: 'string', size: 100, required: false },
-        { key: 'country', type: 'string', size: 10, required: false }, // NZL, AUS
-        
-        // Performance and form data
-        { key: 'prizeMoney', type: 'string', size: 20, required: false }, // "4800" format
-        { key: 'bestTime', type: 'string', size: 20, required: false }, // "17.37" format
-        { key: 'lastTwentyStarts', type: 'string', size: 30, required: false }, // "21331" format
-        { key: 'winPercentage', type: 'string', size: 10, required: false }, // "40%" format
-        { key: 'placePercentage', type: 'string', size: 10, required: false }, // "100%" format
-        { key: 'rating', type: 'string', size: 20, required: false },
-        { key: 'handicapRating', type: 'string', size: 20, required: false },
-        { key: 'classLevel', type: 'string', size: 20, required: false },
-        
-        // Current race day specific information
-        { key: 'firstStartIndicator', type: 'boolean', required: false, default: false },
-        { key: 'formComment', type: 'string', size: 500, required: false },
-        
+
         // Silk and visual information
         { key: 'silkColours', type: 'string', size: 100, required: false },
         { key: 'silkUrl64', type: 'string', size: 500, required: false },
         { key: 'silkUrl128', type: 'string', size: 500, required: false },
-        
+
         // Import and update metadata
         { key: 'lastUpdated', type: 'datetime', required: false },
-        { key: 'dataSource', type: 'string', size: 50, required: false }, // 'NZTAB'
         { key: 'importedAt', type: 'datetime', required: false },
     ];
     // Create attributes with enhanced parallel processing and error isolation
@@ -1111,8 +1036,6 @@ async function ensureEntrantsCollection(databases, config, context, progressTrac
             logDebug(context, 'runnerNumber attribute is not available for index creation, skipping idx_runner_number index');
         }
     }
-
-    // TASK 5: Add raceId index for efficient race-based filtering
     if (!entrantsCollection.indexes.some((idx) => idx.key === 'idx_race_id')) {
         const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'raceId', context);
         if (isAvailable) {
@@ -1533,49 +1456,6 @@ async function ensureUserAlertConfigsCollection(databases, config, context, prog
         }
     }
 }
-async function ensureNotificationsCollection(databases, config, context, progressTracker = null, rollbackManager = null) {
-    const collectionId = collections.notifications;
-    const exists = await resourceExists(() => databases.getCollection(config.databaseId, collectionId));
-    if (!exists) {
-        logDebug(context, 'Creating notifications collection...');
-        await databases.createCollection(config.databaseId, collectionId, 'Notifications', [
-            Permission.read(Role.users()),
-            Permission.create(Role.users()),
-            Permission.update(Role.users()),
-            Permission.delete(Role.users()),
-        ]);
-    }
-    const requiredAttributes = [
-        { key: 'userId', type: 'string', size: 50, required: true },
-        { key: 'title', type: 'string', size: 255, required: true },
-        { key: 'message', type: 'string', size: 1000, required: true },
-        { key: 'type', type: 'string', size: 50, required: true },
-        { key: 'read', type: 'boolean', required: false, default: false },
-        { key: 'raceId', type: 'string', size: 50, required: false },
-        { key: 'entrantId', type: 'string', size: 50, required: false },
-    ];
-    // Create attributes with enhanced parallel processing and error isolation
-    const attributeResults = await createAttributesInParallel(databases, config.databaseId, collectionId, requiredAttributes, context, rollbackManager);
-
-    logAttributeResults(attributeResults, collectionId, context);
-    const notificationsCollection = await databases.getCollection(config.databaseId, collectionId);
-    if (!notificationsCollection.indexes.some((idx) => idx.key === 'idx_user_id')) {
-        const isAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'userId', context);
-        if (isAvailable) {
-            try {
-                await databases.createIndex(config.databaseId, collectionId, 'idx_user_id', IndexType.Key, ['userId']);
-                logDebug(context, 'idx_user_id index created successfully for notifications');
-            }
-            catch (error) {
-                context.error(`Failed to create idx_user_id index for notifications: ${error}`);
-            }
-        }
-        else {
-            logDebug(context, 'userId attribute is not available for index creation, skipping idx_user_id index');
-        }
-    }
-}
-
 /**
  * Set up function-locks collection for execution lock management
  * Used by daily-meetings and other functions for preventing concurrent execution
