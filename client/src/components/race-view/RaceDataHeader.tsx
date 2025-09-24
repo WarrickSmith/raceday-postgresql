@@ -5,7 +5,6 @@ import { useRace } from '@/contexts/RaceContext'
 import { formatDistance, formatRaceTime } from '@/utils/raceFormatters'
 import { RaceNavigation } from './RaceNavigation'
 import { getRaceTypeDisplay } from '@/constants/raceTypes'
-import { showDevelopmentFeatures } from '@/utils/environment'
 import type {
   Race,
   Entrant,
@@ -19,22 +18,7 @@ interface RaceDataHeaderProps {
   entrants?: Entrant[]
   meeting?: Meeting | null
   navigationData?: RaceNavigationData | null
-  connectionHealth?: {
-    isHealthy: boolean
-    avgLatency: number | null
-    uptime: number
-    connectionCount?: number
-    activeConnections?: number
-    totalChannels?: number
-    uniqueChannels?: string[]
-    totalMessages?: number
-    totalErrors?: number
-    isOverLimit?: boolean
-    emergencyFallback?: boolean
-  }
   onConfigureAlerts?: () => void
-  onToggleConnectionMonitor?: () => void
-  showConnectionMonitor?: boolean
 }
 
 export const RaceDataHeader = memo(function RaceDataHeader({
@@ -43,10 +27,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
   entrants: propEntrants,
   meeting: propMeeting,
   navigationData: propNavigationData,
-  connectionHealth,
   onConfigureAlerts,
-  onToggleConnectionMonitor,
-  showConnectionMonitor = false,
 }: RaceDataHeaderProps) {
   const { raceData } = useRace()
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -71,15 +52,26 @@ export const RaceDataHeader = memo(function RaceDataHeader({
     return () => clearInterval(timer)
   }, [])
 
-  // Get connection health status
-  const healthStatus = useMemo(() => {
-    if (!connectionHealth) return { status: 'unknown', color: 'gray' }
+  const statusDisplay = useMemo(() => {
+    const status = race?.status?.toLowerCase() ?? 'unknown'
 
-    if (connectionHealth.isHealthy) return { status: 'Live', color: 'green' }
-    if (connectionHealth.avgLatency && connectionHealth.avgLatency > 0)
-      return { status: 'Slow', color: 'yellow' }
-    return { status: 'Offline', color: 'red' }
-  }, [connectionHealth])
+    switch (status) {
+      case 'open':
+        return { label: 'Open', color: 'green' }
+      case 'closed':
+        return { label: 'Closed', color: 'yellow' }
+      case 'interim':
+        return { label: 'Interim', color: 'blue' }
+      case 'final':
+        return { label: 'Final', color: 'purple' }
+      case 'abandoned':
+        return { label: 'Abandoned', color: 'red' }
+      case 'postponed':
+        return { label: 'Postponed', color: 'orange' }
+      default:
+        return { label: 'Unknown', color: 'gray' }
+    }
+  }, [race?.status])
 
   // Memoized calculations to reduce re-renders (move before early return to avoid hook call errors)
   const formattedTime = useMemo(
@@ -97,10 +89,6 @@ export const RaceDataHeader = memo(function RaceDataHeader({
   const scratchedCount = useMemo(
     () => entrants.filter((e) => e.isScratched).length || 0,
     [entrants]
-  )
-  const avgLatency = useMemo(
-    () => connectionHealth?.avgLatency || null,
-    [connectionHealth]
   )
   const formattedRaceType = useMemo(() => {
     if (!meeting) return ''
@@ -215,7 +203,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
           </div>
         </div>
 
-        {/* Row 2, Col 4: Status with Real-time Health and Alerts Config */}
+        {/* Row 2, Col 4: Race Status and Alerts Config */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <div className="text-xs text-gray-500 font-bold uppercase">
@@ -223,50 +211,17 @@ export const RaceDataHeader = memo(function RaceDataHeader({
             </div>
             <div className="flex items-center gap-1">
               <div
-                className={`w-2 h-2 rounded-full bg-${healthStatus.color}-500`}
+                className={`w-2 h-2 rounded-full bg-${statusDisplay.color}-500`}
               ></div>
               <span
-                className={`text-sm font-semibold text-${healthStatus.color}-800`}
+                className={`text-sm font-semibold text-${statusDisplay.color}-800`}
               >
-                {healthStatus.status}
+                {statusDisplay.label}
               </span>
             </div>
-            {/* Connection & Channel Count Indicators (Development Only) */}
-            {showDevelopmentFeatures() && connectionHealth?.connectionCount !== undefined && (
-              <div className="flex items-center gap-1">
-                <div className={`text-xs px-1 py-0.5 rounded font-mono ${
-                  connectionHealth.isOverLimit ? 'bg-red-100 text-red-700' :
-                  (connectionHealth.connectionCount || 0) > 7 ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-green-100 text-green-700'
-                }`}>
-                  C[{connectionHealth.connectionCount}]
-                </div>
-                {connectionHealth.totalChannels !== undefined && (
-                  <div className="text-xs px-1 py-0.5 rounded font-mono bg-purple-100 text-purple-700">
-                    Ch[{connectionHealth.totalChannels}]
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           <div className="flex items-center gap-1">
-            {/* Connection Monitor Toggle (Development Only) */}
-            {showDevelopmentFeatures() && onToggleConnectionMonitor && (
-              <button
-                onClick={onToggleConnectionMonitor}
-                className={`text-xs px-2 py-1 rounded transition-colors ${
-                  showConnectionMonitor
-                    ? 'bg-blue-200 text-blue-700 hover:bg-blue-300'
-                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300 hover:text-gray-700'
-                }`}
-                title="Toggle connection monitor"
-                aria-label="Toggle connection monitoring panel"
-              >
-                🔧
-              </button>
-            )}
-
             {/* Alerts Configuration Button */}
             {onConfigureAlerts && (
               <button
@@ -325,23 +280,13 @@ export const RaceDataHeader = memo(function RaceDataHeader({
           </div>
         </div>
 
-        {/* Row 3, Col 4: Real-time Connection Latency */}
+        {/* Row 3, Col 4: Data Refresh Indicator */}
         <div className="flex items-center justify-start gap-2">
           <div className="text-xs text-gray-500 font-bold uppercase">
-            LATENCY
+            STATUS DETAIL
           </div>
-          <div
-            className={`text-sm font-semibold ${
-              avgLatency === null
-                ? 'text-gray-600'
-                : avgLatency > 200
-                ? 'text-red-800'
-                : avgLatency > 100
-                ? 'text-yellow-800'
-                : 'text-green-800'
-            }`}
-          >
-            {avgLatency === null ? '—' : `${avgLatency.toFixed(2)}ms`}
+          <div className="text-sm font-semibold text-gray-700">
+            {race?.status || '—'}
           </div>
         </div>
       </div>

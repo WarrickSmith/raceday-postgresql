@@ -3,7 +3,6 @@ import { MeetingsListClient } from '../MeetingsListClient';
 import { useMeetingsPolling } from '@/hooks/useMeetingsPolling';
 import { Meeting } from '@/types/meetings';
 import { RACE_TYPE_CODES } from '@/constants/raceTypes';
-import { SubscriptionCleanupProvider } from '@/contexts/SubscriptionCleanupContext';
 
 // Mock the polling hook and Next.js navigation
 jest.mock('@/hooks/useMeetingsPolling');
@@ -28,12 +27,7 @@ jest.mock('next/router', () => ({
 
 const mockUseMeetingsPolling = useMeetingsPolling as jest.MockedFunction<typeof useMeetingsPolling>;
 
-const renderWithProvider = (ui: React.ReactElement) =>
-  render(ui, {
-    wrapper: ({ children }) => (
-      <SubscriptionCleanupProvider>{children}</SubscriptionCleanupProvider>
-    ),
-  });
+const renderWithProvider = (ui: React.ReactElement) => render(ui);
 
 describe('MeetingsListClient', () => {
   const mockMeetings: Meeting[] = [

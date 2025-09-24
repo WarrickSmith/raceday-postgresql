@@ -9,7 +9,6 @@ import { NextScheduledRaceButton } from './NextScheduledRaceButton';
 import { useMeetingsPolling, type RaceUpdateEvent } from '@/hooks/useMeetingsPolling';
 import { Meeting } from '@/types/meetings';
 import { racePrefetchService } from '@/services/racePrefetchService';
-import { useSubscriptionCleanup } from '@/contexts/SubscriptionCleanupContext';
 
 interface MeetingsListClientProps {
   initialData: Meeting[];
@@ -20,7 +19,6 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [raceUpdateSignal, setRaceUpdateSignal] = useState(0);
-  const { requestCleanup } = useSubscriptionCleanup();
 
   const handleError = useCallback((error: Error) => {
     console.error('Data polling error:', error);
@@ -33,18 +31,14 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
   // Enhanced race click handler with pre-fetching for immediate rendering
   const handleRaceClick = useCallback(async (raceId: string) => {
     console.log('🎯 Race click - pre-fetching basic data for:', raceId);
-    const cleanupPromise = requestCleanup({ reason: 'dashboard-race-click' });
-
     try {
       await racePrefetchService.prefetchForNavigation(raceId);
       console.log('✅ Pre-fetch completed, navigating to:', raceId);
     } catch (error) {
       console.warn('⚠️ Pre-fetch failed, proceeding with navigation:', error);
     }
-
-    await cleanupPromise;
     router.push(`/race/${raceId}`);
-  }, [requestCleanup, router]);
+  }, [router]);
 
   const handleRaceRealtimeUpdate = useCallback((event: RaceUpdateEvent) => {
     if (event.eventType === 'update' || event.eventType === 'create') {

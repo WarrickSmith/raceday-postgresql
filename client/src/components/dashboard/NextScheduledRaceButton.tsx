@@ -3,11 +3,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Meeting } from '@/types/meetings';
-import { useSubscriptionCleanup } from '@/contexts/SubscriptionCleanupContext';
 
 interface NextScheduledRaceButtonProps {
   meetings: Meeting[];
-  isRealtimeConnected: boolean; // Note: Now represents polling connection status
+  isRealtimeConnected: boolean; // Represents latest meetings fetch status
   raceUpdateSignal: number;
 }
 
@@ -29,7 +28,6 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
   const [nextScheduledRace, setNextScheduledRace] = useState<NextScheduledRace | null>(null);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { requestCleanup } = useSubscriptionCleanup();
 
   // Fetch the next scheduled race from the API
   const fetchNextScheduledRace = useCallback(async () => {
@@ -177,14 +175,13 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
     
     try {
       console.log('🎯 Navigating to next scheduled race:', nextScheduledRace.raceId);
-      await requestCleanup({ reason: 'next-scheduled-button' });
       router.push(`/race/${nextScheduledRace.raceId}`);
     } catch (error) {
       console.error('❌ Failed to navigate to next scheduled race:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [nextScheduledRace, isLoading, router, requestCleanup]);
+  }, [nextScheduledRace, isLoading, router]);
 
   // Show button always, but disable when no next race is available
   const isDisabled = !nextScheduledRace || isLoading;
