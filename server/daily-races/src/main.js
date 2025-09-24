@@ -179,7 +179,12 @@ export default async function main(context) {
                     // Fetch detailed race event data with enhanced retry logic
                     const raceEventData = await executeApiCallWithTimeout(
                         fetchRaceEventData,
-                        [nztabBaseUrl, basicRace.raceId, context],
+                        [
+                            nztabBaseUrl,
+                            basicRace.raceId,
+                            context,
+                            { raceStatus: basicRace.status }
+                        ],
                         context,
                         15000, // 15-second timeout
                         2 // Enhanced retry attempts
