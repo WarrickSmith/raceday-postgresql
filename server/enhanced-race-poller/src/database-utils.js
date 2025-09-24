@@ -7,6 +7,114 @@
 import { ID, Query } from 'node-appwrite'
 import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
 
+function safeStringField(value, maxLength) {
+  if (value === null || value === undefined) {
+    return undefined
+  }
+
+  let stringValue
+  if (typeof value === 'string') {
+    stringValue = value
+  }
+  else if (typeof value === 'object') {
+    stringValue = JSON.stringify(value)
+  }
+  else {
+    stringValue = String(value)
+  }
+
+  return stringValue.length > maxLength
+    ? stringValue.substring(0, maxLength)
+    : stringValue
+}
+
+function tryParseInteger(value) {
+  const parsed = typeof value === 'string' ? parseInt(value, 10) : value
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+function setIfDefined(target, key, value, transform) {
+  if (value === undefined || value === null) {
+    return
+  }
+  target[key] = transform ? transform(value) : value
+}
+
+function resolveValue(...candidates) {
+  for (const candidate of candidates) {
+    if (candidate !== undefined && candidate !== null) {
+      return candidate
+    }
+  }
+  return undefined
+}
+
+function buildEntrantDocument(entrant, raceId, timestamp = new Date().toISOString()) {
+  const entrantDoc = {
+    entrantId: resolveValue(entrant.entrant_id, entrant.entrantId, entrant.$id),
+    name: entrant.name,
+    runnerNumber: resolveValue(entrant.runner_number, entrant.runnerNumber),
+    isScratched: resolveValue(entrant.is_scratched, entrant.isScratched, false) || false,
+    race: raceId,
+    raceId,
+    lastUpdated: timestamp,
+    importedAt: timestamp
+  }
+
+  setIfDefined(entrantDoc, 'barrier', resolveValue(entrant.barrier, entrant.barrierNumber))
+
+  const isLateScratched = resolveValue(entrant.is_late_scratched, entrant.isLateScratched)
+  if (isLateScratched !== undefined) {
+    entrantDoc.isLateScratched = isLateScratched
+  }
+
+  const scratchTimeValue = tryParseInteger(resolveValue(entrant.scratch_time, entrant.scratchTime))
+  if (scratchTimeValue !== undefined) {
+    entrantDoc.scratchTime = scratchTimeValue
+  }
+
+  const runnerChange = safeStringField(resolveValue(entrant.runner_change, entrant.runnerChange), 500)
+  if (runnerChange !== undefined) {
+    entrantDoc.runnerChange = runnerChange
+  }
+
+  const favourite = resolveValue(entrant.favourite, entrant.isFavourite)
+  if (favourite !== undefined) {
+    entrantDoc.favourite = favourite
+  }
+
+  const mover = resolveValue(entrant.mover, entrant.isMover)
+  if (mover !== undefined) {
+    entrantDoc.mover = mover
+  }
+
+  const jockey = safeStringField(resolveValue(entrant.jockey, entrant.jockeyName), 255)
+  if (jockey !== undefined) {
+    entrantDoc.jockey = jockey
+  }
+
+  const trainerName = safeStringField(resolveValue(entrant.trainer_name, entrant.trainerName), 255)
+  if (trainerName !== undefined) {
+    entrantDoc.trainerName = trainerName
+  }
+
+  const odds = resolveValue(entrant.odds, entrant.fixedOdds)
+  setIfDefined(entrantDoc, 'fixedWinOdds', resolveValue(entrant.fixedWinOdds, odds?.fixed_win))
+  setIfDefined(entrantDoc, 'fixedPlaceOdds', resolveValue(entrant.fixedPlaceOdds, odds?.fixed_place))
+  setIfDefined(entrantDoc, 'poolWinOdds', resolveValue(entrant.poolWinOdds, odds?.pool_win))
+  setIfDefined(entrantDoc, 'poolPlaceOdds', resolveValue(entrant.poolPlaceOdds, odds?.pool_place))
+
+  const silkColours = safeStringField(resolveValue(entrant.silk_colours, entrant.silkColours), 100)
+  if (silkColours !== undefined) {
+    entrantDoc.silkColours = silkColours
+  }
+
+  setIfDefined(entrantDoc, 'silkUrl64', resolveValue(entrant.silk_url_64x64, entrant.silkUrl64))
+  setIfDefined(entrantDoc, 'silkUrl128', resolveValue(entrant.silk_url_128x128, entrant.silkUrl128))
+
+  return entrantDoc
+}
+
 /**
  * Enhanced pool totals extraction with validation
  * @param {Array} tote_pools - Array of pool objects from NZTAB API
@@ -186,43 +294,6 @@ export function validateRacePoolData(raceData, entrantData, context) {
   }
 
   return validationResults
-}
-
-/**
- * Safely convert and truncate a field to string with max length
- * @param {any} value - The value to process
- * @param {number} maxLength - Maximum allowed length
- * @returns {string|undefined} Processed string or undefined if no value
- */
-function safeStringField(value, maxLength) {
-  if (value === null || value === undefined) {
-    return undefined
-  }
-
-  let stringValue
-  if (typeof value === 'string') {
-    stringValue = value
-  } else if (typeof value === 'object') {
-    stringValue = JSON.stringify(value)
-  } else {
-    stringValue = String(value)
-  }
-
-  return stringValue.length > maxLength
-    ? stringValue.substring(0, maxLength)
-    : stringValue
-}
-
-function setIfDefined(target, key, value, transform) {
-  if (value === undefined || value === null) {
-    return
-  }
-  target[key] = transform ? transform(value) : value
-}
-
-function tryParseInteger(value) {
-  const parsed = typeof value === 'string' ? parseInt(value, 10) : value
-  return Number.isFinite(parsed) ? parsed : undefined
 }
 
 /**
@@ -932,33 +1003,7 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
 
   for (const entrant of entrants) {
     try {
-      const timestamp = new Date().toISOString()
-      const entrantDoc = {
-        entrantId: entrant.entrant_id,
-        name: entrant.name,
-        runnerNumber: entrant.runner_number,
-        isScratched: entrant.is_scratched || false,
-        race: raceId,
-        raceId: raceId,
-        lastUpdated: timestamp,
-        importedAt: timestamp
-      }
-
-      setIfDefined(entrantDoc, 'barrier', entrant.barrier)
-      if (entrant.is_late_scratched !== undefined) {
-        entrantDoc.isLateScratched = entrant.is_late_scratched
-      }
-      const scratchTime = tryParseInteger(entrant.scratch_time)
-      if (scratchTime !== undefined) {
-        entrantDoc.scratchTime = scratchTime
-      }
-      if (entrant.runner_change) {
-        entrantDoc.runnerChange = safeStringField(entrant.runner_change, 500)
-      }
-      if (entrant.favourite !== undefined) entrantDoc.favourite = entrant.favourite
-      if (entrant.mover !== undefined) entrantDoc.mover = entrant.mover
-      if (entrant.jockey) entrantDoc.jockey = entrant.jockey
-      if (entrant.trainer_name) entrantDoc.trainerName = entrant.trainer_name
+      const entrantDoc = buildEntrantDocument(entrant, raceId)
 
       // Current odds with validation
       if (entrant.odds) {
@@ -996,11 +1041,6 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
           hasPoolPlace: processedOdds.pool_place !== null
         })
       }
-
-      // Visual information
-      if (entrant.silk_colours) entrantDoc.silkColours = safeStringField(entrant.silk_colours, 100)
-      if (entrant.silk_url_64x64) entrantDoc.silkUrl64 = entrant.silk_url_64x64
-      if (entrant.silk_url_128x128) entrantDoc.silkUrl128 = entrant.silk_url_128x128
 
       // Save odds history if odds changed (preserved from original implementation)
       if (entrant.odds) {
