@@ -46,7 +46,7 @@ Appwrite Server Functions are experiencing performance issues due to excessive d
 - **Tests**: Verify initial race import maintains essential data
 
 ## Phase 2: Database Schema Optimization (High Impact, Medium Risk)
-**Status**: Not Started
+**Status**: Completed
 
 ### Task 2.1: Remove Notifications Collection Entirely
 - **Problem**: Unused collection consuming resources
@@ -56,36 +56,73 @@ Appwrite Server Functions are experiencing performance issues due to excessive d
 - **Expected Impact**: Eliminate unused collection overhead
 - **Tests**: Verify no client dependencies exist
 
-### Task 2.2: Optimize Races Collection (Remove 25 unused attributes)
+### Task 2.2: Optimize Races Collection (Remove unused attributes)
 - **Problem**: 74% of races collection attributes unused by client
 - **Client Usage**: Only `raceId`, `name`, `raceNumber`, `startTime`, `status`, `distance`, `trackCondition`, `weather`, `type`, `meeting`, `resultsAvailable`, `resultsData`, `dividendsData`, `fixedOddsData`, `resultStatus`
-- **Remove From Schema**:
+- **Removed From Schema (archived for rollback)**:
   ```
   trackHomeStraight, startType, group, class, gait, genderConditions,
   ageConditions, weightConditions, allowanceConditions, specialConditions,
   jockeyConditions, formGuide, comment, ffwinOptionNumber, fftop3OptionNumber,
-  mileRate400, mileRate800, dataSource, silkUrl, silkBaseUrl, videoChannels,
-  totalPrizeMoney, entrantCount, fieldSize, positionsPaid, description,
-  actualStart, toteStartTime, startTimeNz, raceDateNz, trackDirection, trackSurface, railPosition
+  mileRate400, mileRate800, dataSource, description, trackDirection, railPosition
+  ```
+- **Reinstated After QA Review**:
+  ```
+  actualStart, toteStartTime, startTimeNz, raceDateNz, trackSurface,
+  totalPrizeMoney, entrantCount, fieldSize, positionsPaid, silkUrl,
+  silkBaseUrl, videoChannels
   ```
 - **Files to Update**:
   - `server/database-setup/src/database-setup.js:784-836`
 - **Expected Impact**: 60% reduction in races collection storage
 
-### Task 2.3: Optimize Entrants Collection (Remove 23 unused attributes)
+### Task 2.3: Optimize Entrants Collection (Remove unused attributes)
 - **Problem**: 50% of entrants collection attributes unused by client
 - **Client Usage**: Only `entrantId`, `name`, `runnerNumber`, `jockey`, `trainerName`, `isScratched`, `race`, `winOdds`, `placeOdds`, `poolWinOdds`, `poolPlaceOdds`, `holdPercentage`, `silkColours`, `silkUrl64`, `silkUrl128`
-- **Remove From Schema**:
+- **Removed From Schema (archived for rollback)**:
   ```
   apprenticeIndicator, gear, weight, allocatedWeight, totalWeight, allowanceWeight,
   marketName, primaryMarket, settlingLengths, age, sex, colour, foalingDate,
   sire, dam, breeding, owners, trainerLocation, country, prizeMoney, bestTime,
   lastTwentyStarts, winPercentage, placePercentage, rating, handicapRating,
-  classLevel, firstStartIndicator, formComment, barrier, raceId (duplicate)
+  classLevel, firstStartIndicator, formComment, dataSource
+  ```
+- **Reinstated After QA Review**:
+  ```
+  barrier, raceId
   ```
 - **Files to Update**:
   - `server/database-setup/src/database-setup.js:1004-1044`
 - **Expected Impact**: 45% reduction in entrants collection storage
+
+### Phase 2 Removal Audit Log
+- **Collections removed**:
+  - `notifications` (unused Appwrite collection removed to reduce maintenance overhead)
+- **Races collection attributes archived for potential rollback**:
+  ```
+  trackHomeStraight, startType, group, class, gait, genderConditions,
+  ageConditions, weightConditions, allowanceConditions, specialConditions,
+  jockeyConditions, formGuide, comment, ffwinOptionNumber, fftop3OptionNumber,
+  mileRate400, mileRate800, dataSource, description, trackDirection, railPosition
+  ```
+- **Races attributes reinstated after QA**:
+  ```
+  actualStart, toteStartTime, startTimeNz, raceDateNz, trackSurface,
+  totalPrizeMoney, entrantCount, fieldSize, positionsPaid, silkUrl,
+  silkBaseUrl, videoChannels
+  ```
+- **Entrants collection attributes archived for potential rollback**:
+  ```
+  apprenticeIndicator, gear, weight, allocatedWeight, totalWeight, allowanceWeight,
+  marketName, primaryMarket, settlingLengths, age, sex, colour, foalingDate,
+  sire, dam, breeding, owners, trainerLocation, country, prizeMoney, bestTime,
+  lastTwentyStarts, winPercentage, placePercentage, rating, handicapRating,
+  classLevel, firstStartIndicator, formComment, dataSource
+  ```
+- **Entrants attributes reinstated after QA**:
+  ```
+  barrier, raceId
+  ```
 
 ## Phase 3: Data Processor Optimization (Medium Impact, Low Risk)
 **Status**: Not Started
@@ -208,9 +245,9 @@ Appwrite Server Functions are experiencing performance issues due to excessive d
 - [ ] Task 1.2: Implement conditional API parameters in daily-races
 
 ### Phase 2: Database Schema Optimization
-- [ ] Task 2.1: Remove notifications collection entirely
-- [ ] Task 2.2: Optimize races collection (remove 25 unused attributes)
-- [ ] Task 2.3: Optimize entrants collection (remove 23 unused attributes)
+- [x] Task 2.1: Remove notifications collection entirely
+- [x] Task 2.2: Optimize races collection (remove 25 unused attributes)
+- [x] Task 2.3: Optimize entrants collection (remove 23 unused attributes)
 
 ### Phase 3: Data Processor Optimization
 - [ ] Task 3.1: Update daily meetings data processing
