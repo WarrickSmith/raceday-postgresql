@@ -32,11 +32,6 @@ interface RaceFooterProps {
   showResults?: boolean
   lastPoolUpdate?: Date | null
   lastResultsUpdate?: Date | null
-  connectionHealth?: {
-    isHealthy: boolean
-    avgLatency: number | null
-    uptime: number
-  }
   // Real-time race data from unified subscription
   race?: Race | null
 }

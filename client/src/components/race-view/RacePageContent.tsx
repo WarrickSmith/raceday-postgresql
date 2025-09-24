@@ -5,29 +5,14 @@ import { useRace } from '@/contexts/RaceContext'
 import { RaceDataHeader } from '@/components/race-view/RaceDataHeader'
 import { EnhancedEntrantsGrid } from '@/components/race-view/EnhancedEntrantsGrid'
 import { RaceFooter } from '@/components/race-view/RaceFooter'
-import { useUnifiedRaceRealtime } from '@/hooks/useUnifiedRaceRealtime'
-import { ConnectionMonitor } from '@/components/dev/ConnectionMonitor'
 import AlertsConfigModal from '@/components/alerts/AlertsConfigModal'
 import type { RaceStatus } from '@/types/racePools'
 
 export function RacePageContent() {
-  const { raceData, isLoading, error, subscriptionCleanupSignal } = useRace()
+  const { raceData, isLoading, error } = useRace()
 
   // Alerts Configuration Modal state (moved from EnhancedEntrantsGrid for performance)
   const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false)
-
-  // Connection Monitor state (development only)
-  const [showConnectionMonitor, setShowConnectionMonitor] = useState(false)
-
-  // Unified real-time subscription for all race page data
-  const realtimeData = useUnifiedRaceRealtime({
-    raceId: raceData?.race?.raceId || '',
-    initialRace: raceData?.race || null,
-    initialEntrants: raceData?.entrants || [],
-    initialMeeting: raceData?.meeting || null,
-    initialNavigationData: raceData?.navigationData || null,
-    cleanupSignal: subscriptionCleanupSignal,
-  })
 
   if (!raceData) {
     return (
@@ -45,37 +30,31 @@ export function RacePageContent() {
 
   const { dataFreshness } = raceData
 
-  // Use real-time data from unified subscription
-  const currentRace = realtimeData.race || raceData.race
-  const currentEntrants = realtimeData.entrants || raceData.entrants || []
-  const currentMeeting = realtimeData.meeting || raceData.meeting
-  const currentPoolData = realtimeData.poolData
+  const currentRace = raceData.race
+  const currentEntrants = raceData.entrants || []
+  const currentMeeting = raceData.meeting
+  const navigationData = raceData.navigationData
+  const currentPoolData = null
 
-  // Build results data from persistent race data or real-time updates
-  // Allow interim results to display even without dividends data
-  // CRITICAL FIX: Prioritize real-time results data status over persistent race object status
+  // Build results data from persistent race data
   const currentResultsData =
-    realtimeData.resultsData ||
-    (currentRace.resultsAvailable && currentRace.resultsData
+    currentRace.resultsAvailable && currentRace.resultsData
       ? {
           raceId: currentRace.raceId,
           results: currentRace.resultsData,
-          dividends: currentRace.dividendsData || [], // Dividends optional for interim results
-          // Parse fixedOddsData from race data (critical for win/place display)
+          dividends: currentRace.dividendsData || [],
           fixedOddsData: currentRace.fixedOddsData
             ? typeof currentRace.fixedOddsData === 'string'
               ? JSON.parse(currentRace.fixedOddsData)
               : currentRace.fixedOddsData
             : {},
-          // FIXED: Use real-time updated resultStatus from race object (updated by subscription)
-          // This ensures status changes from race-results collection are reflected in UI
-          status: currentRace.resultStatus || 'interim', // Real-time updated by subscription
+          status: currentRace.resultStatus || 'interim',
           photoFinish: currentRace.photoFinish || false,
           stewardsInquiry: currentRace.stewardsInquiry || false,
           protestLodged: currentRace.protestLodged || false,
           resultTime: currentRace.resultTime || new Date().toISOString(),
         }
-      : undefined)
+      : undefined
 
   // Safely cast race status with fallback - case insensitive
   const validStatuses: RaceStatus[] = [
@@ -123,26 +102,16 @@ export function RacePageContent() {
         </div>
       )}
 
-      {/* Consolidated Header - Single unified header component with real-time data */}
+      {/* Consolidated Header - Displays current race details */}
       <header className="race-layout-header">
         <RaceDataHeader
           race={currentRace}
           entrants={currentEntrants}
           meeting={currentMeeting}
-          navigationData={realtimeData.navigationData}
-          connectionHealth={realtimeData.getConnectionHealth()}
+          navigationData={navigationData}
           onConfigureAlerts={() => setIsAlertsModalOpen(true)}
-          onToggleConnectionMonitor={() => setShowConnectionMonitor(!showConnectionMonitor)}
-          showConnectionMonitor={showConnectionMonitor}
         />
       </header>
-
-      {/* Connection Monitor - Between Header and Body */}
-      <ConnectionMonitor
-        isOpen={showConnectionMonitor}
-        onToggle={() => setShowConnectionMonitor(!showConnectionMonitor)}
-        className="race-layout-connection-monitor"
-      />
 
       {/* Error Message */}
       {error && (
@@ -175,7 +144,7 @@ export function RacePageContent() {
         </div>
       )}
 
-      {/* Body - Enhanced entrants grid with real-time data */}
+      {/* Body - Enhanced entrants grid with latest fetched data */}
       <main className="race-layout-content" role="main">
         <EnhancedEntrantsGrid
           initialEntrants={currentEntrants}
@@ -185,19 +154,14 @@ export function RacePageContent() {
           enableMoneyFlowTimeline={true}
           enableJockeySilks={true}
           className="h-full"
-          realtimeEntrants={currentEntrants}
-          lastUpdate={
-            realtimeData.lastEntrantsUpdate || realtimeData.lastUpdate
-          }
           poolData={currentPoolData}
-          moneyFlowUpdateTrigger={realtimeData.moneyFlowUpdateTrigger}
           resultsData={currentResultsData?.results}
           raceStatus={currentRace.status}
           resultStatus={currentResultsData?.status || currentRace.resultStatus}
         />
       </main>
 
-      {/* Footer - Enhanced with real-time data */}
+      {/* Footer - Summary panels based on fetched race data */}
       <footer className="race-layout-footer">
         <RaceFooter
           raceStartTime={currentRace.startTime}
@@ -208,9 +172,6 @@ export function RacePageContent() {
           resultsData={currentResultsData || undefined}
           showCountdown={true}
           showResults={true}
-          lastPoolUpdate={realtimeData.lastPoolUpdate}
-          lastResultsUpdate={realtimeData.lastResultsUpdate}
-          connectionHealth={realtimeData.getConnectionHealth()}
           race={currentRace}
         />
       </footer>
@@ -218,10 +179,9 @@ export function RacePageContent() {
       <style jsx global>{`
         .race-page-layout {
           display: grid;
-          grid-template-rows: auto auto 1fr auto;
+          grid-template-rows: auto 1fr auto;
           grid-template-areas:
             'header'
-            'connection-monitor'
             'content'
             'footer';
           height: 100vh;
@@ -237,12 +197,6 @@ export function RacePageContent() {
           min-height: 140px;
           max-height: 160px;
           overflow: visible;
-        }
-
-        .race-layout-connection-monitor {
-          grid-area: connection-monitor;
-          overflow: visible;
-          max-height: 400px;
         }
 
         .race-layout-content {

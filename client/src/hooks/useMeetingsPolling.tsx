@@ -27,46 +27,20 @@ export function useMeetingsPolling({ initialData, onError, onRaceUpdate }: UseMe
   const logger = useLogger('useMeetingsPolling');
   const loggerRef = useRef(logger);
   const [meetings, setMeetings] = useState<Meeting[]>(initialData);
-  const [isConnected, setIsConnected] = useState(true);
+  const [isConnected, setIsConnected] = useState(initialData.length > 0);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
   const [isInitialDataReady, setIsInitialDataReady] = useState(initialData.length > 0);
-  const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const previousMeetingsRef = useRef<Meeting[]>(initialData);
   const onRaceUpdateRef = useRef<((event: RaceUpdateEvent) => void) | undefined>(onRaceUpdate);
   const onErrorRef = useRef<((error: Error) => void) | undefined>(onError);
+  const isFetchingRef = useRef(false);
 
-  // Get intelligent polling interval based on race timing
-  const getPollInterval = (currentMeetings: Meeting[]): number => {
-    if (currentMeetings.length === 0) {
-      return 60000; // 1 minute when no meetings
+  const fetchMeetings = useCallback(async (): Promise<void> => {
+    if (isFetchingRef.current) {
+      return;
     }
 
-    const now = new Date();
-    let shortestTimeToRace = Infinity;
-
-    for (const meeting of currentMeetings) {
-      if (meeting.firstRaceTime) {
-        const raceTime = new Date(meeting.firstRaceTime);
-        const minutesUntilRace = (raceTime.getTime() - now.getTime()) / (1000 * 60);
-
-        if (minutesUntilRace > 0) {
-          shortestTimeToRace = Math.min(shortestTimeToRace, minutesUntilRace);
-        }
-      }
-    }
-
-    // Use intelligent intervals based on proximity to next race
-    if (shortestTimeToRace <= 5) {
-      return 30000; // 30 seconds when race is within 5 minutes
-    } else if (shortestTimeToRace <= 15) {
-      return 60000; // 1 minute when race is within 15 minutes
-    } else {
-      return 120000; // 2 minutes otherwise
-    }
-  };
-
-  // Self-contained polling function
-  const pollMeetings = useCallback(async (): Promise<void> => {
+    isFetchingRef.current = true;
     try {
       const response = await fetch('/api/meetings');
 
@@ -114,32 +88,20 @@ export function useMeetingsPolling({ initialData, onError, onRaceUpdate }: UseMe
       previousMeetingsRef.current = newMeetings;
       setIsConnected(true);
       setConnectionAttempts(0);
+      setIsInitialDataReady(newMeetings.length > 0);
 
       loggerRef.current.debug(`Fetched ${newMeetings.length} meetings from API`);
-
-      // Schedule next poll based on current data
-      const interval = getPollInterval(newMeetings);
-      loggerRef.current.debug(`Scheduling next poll in ${interval}ms`);
-
-      pollTimeoutRef.current = setTimeout(() => {
-        void pollMeetings();
-      }, interval);
 
     } catch (error) {
       loggerRef.current.error('Failed to fetch meetings data', error);
       setIsConnected(false);
       setConnectionAttempts(prev => prev + 1);
       onErrorRef.current?.(error as Error);
-
-      // Retry with backoff on error
-      const retryDelay = Math.min(5000 * Math.pow(2, connectionAttempts), 30000);
-      loggerRef.current.debug(`Retrying poll in ${retryDelay}ms due to error`);
-
-      pollTimeoutRef.current = setTimeout(() => {
-        void pollMeetings();
-      }, retryDelay);
     }
-  }, [connectionAttempts]); // Only depend on connectionAttempts for retry logic
+    finally {
+      isFetchingRef.current = false;
+    }
+  }, []);
 
   // Update refs
   useEffect(() => {
@@ -153,36 +115,21 @@ export function useMeetingsPolling({ initialData, onError, onRaceUpdate }: UseMe
     setIsInitialDataReady(initialData.length > 0);
   }, [initialData.length]);
 
-  // Start polling once initial data is ready
+  // Keep local state in sync with updated initial data from the server
   useEffect(() => {
-    if (!isInitialDataReady) {
-      loggerRef.current.debug('Waiting for initial meetings data to be ready before polling');
-      return;
-    }
+    previousMeetingsRef.current = initialData;
+    setMeetings(initialData);
+  }, [initialData]);
 
-    loggerRef.current.info('Initial meetings data ready, starting polling');
-
-    // Start polling immediately
-    void pollMeetings();
-
-    // Cleanup on unmount or when effect re-runs
-    return () => {
-      if (pollTimeoutRef.current) {
-        clearTimeout(pollTimeoutRef.current);
-        pollTimeoutRef.current = null;
-        loggerRef.current.debug('Polling cleanup: cleared timeout');
-      }
-    };
-  }, [isInitialDataReady, pollMeetings]); // Include pollMeetings dependency
+  // Perform a single fetch for the latest meetings data
+  useEffect(() => {
+    void fetchMeetings();
+  }, [fetchMeetings]);
 
   // Manual retry function
   const retry = useCallback(() => {
-    if (pollTimeoutRef.current) {
-      clearTimeout(pollTimeoutRef.current);
-      pollTimeoutRef.current = null;
-    }
-    void pollMeetings();
-  }, [pollMeetings]);
+    void fetchMeetings();
+  }, [fetchMeetings]);
 
   return {
     meetings,

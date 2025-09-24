@@ -10,10 +10,6 @@ import React, {
 import { Race, Meeting, Entrant, RaceNavigationData } from '@/types/meetings'
 import { cacheInvalidation } from '@/lib/cache'
 import { useMemoryOptimization } from '@/utils/performance'
-import {
-  useSubscriptionCleanup,
-  type CleanupReason,
-} from '@/contexts/SubscriptionCleanupContext'
 
 interface RaceContextData {
   race: Race
@@ -35,9 +31,6 @@ interface RaceContextValue {
   updateRaceData: (data: RaceContextData) => void
   loadRaceData: (raceId: string) => Promise<void>
   invalidateRaceCache: (raceId: string) => void
-  // New cleanup signal for subscription management
-  subscriptionCleanupSignal: number
-  triggerSubscriptionCleanup: (reason?: CleanupReason) => Promise<void>
 }
 
 const RaceContext = createContext<RaceContextValue | undefined>(undefined)
@@ -56,8 +49,6 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
 
   // Memory optimization for RaceContext
   const { triggerCleanup } = useMemoryOptimization()
-  const { signal: subscriptionCleanupSignal, requestCleanup } =
-    useSubscriptionCleanup()
 
   // Internal setter for race data (no debug logging in production)
   const setRaceData = useCallback(
@@ -104,13 +95,6 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
     [triggerCleanup]
   )
 
-  // Trigger subscription cleanup for navigation
-  const triggerSubscriptionCleanup = useCallback(
-    (reason?: CleanupReason) =>
-      requestCleanup({ reason: reason ?? 'race-navigation' }),
-    [requestCleanup]
-  )
-
   const value: RaceContextValue = {
     raceData,
     isLoading,
@@ -118,8 +102,6 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
     updateRaceData,
     loadRaceData,
     invalidateRaceCache,
-    subscriptionCleanupSignal,
-    triggerSubscriptionCleanup,
   }
 
   return <RaceContext.Provider value={value}>{children}</RaceContext.Provider>
