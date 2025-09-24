@@ -1206,7 +1206,12 @@ async function processSingleRaceWithErrorHandling(
     const raceEventData = await apiCircuitBreaker.execute(async () => {
       return await executeApiCallWithTimeout(
         fetchRaceEventData,
-        [nztabBaseUrl, raceId, context],
+        [
+          nztabBaseUrl,
+          raceId,
+          context,
+          { raceStatus: race?.status, timeoutMs: 12000 }
+        ],
         context,
         12000, // 12-second timeout
         1 // 1 retry
@@ -1748,11 +1753,14 @@ async function executeInternalPollingLoop(
     for (const [batchIndex, batch] of batches.entries()) {
       try {
         // Fetch race data for the batch
-        const raceIds = batch.map((r) => r.raceId)
+        const raceRequests = batch.map((r) => ({
+          raceId: r.raceId,
+          raceStatus: r.status
+        }))
         const raceResults = await apiCircuitBreaker.execute(async () => {
           return await batchFetchRaceEventData(
             nztabBaseUrl,
-            raceIds,
+            raceRequests,
             context,
             500
           )
@@ -1937,11 +1945,14 @@ async function executeStandardPolling(
 
     try {
       // Fetch race data for the batch
-      const raceIds = batch.map((r) => r.raceId)
+      const raceRequests = batch.map((r) => ({
+        raceId: r.raceId,
+        raceStatus: r.status
+      }))
       const raceResults = await apiCircuitBreaker.execute(async () => {
         return await batchFetchRaceEventData(
           nztabBaseUrl,
-          raceIds,
+          raceRequests,
           context,
           800
         )

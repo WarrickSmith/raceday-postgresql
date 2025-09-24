@@ -14,23 +14,58 @@ import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
  * @param {number} timeoutMs - Timeout in milliseconds (default: 15000)
  * @returns {Object|null} Race event data or null on failure
  */
-export async function fetchRaceEventData(baseUrl, raceId, context, timeoutMs = 15000) {
+function normalizeRaceStatus(raceStatus) {
+    if (!raceStatus || typeof raceStatus !== 'string') {
+        return null;
+    }
+
+    return raceStatus.trim().toLowerCase();
+}
+
+function buildRaceEventSearchParams(raceStatus) {
+    const normalizedStatus = normalizeRaceStatus(raceStatus);
+    const params = new URLSearchParams({
+        'with_tote_trends_data': 'true',
+        'with_money_tracker': 'true'
+    });
+
+    const includeLiveBetData = !normalizedStatus || ['open', 'interim'].includes(normalizedStatus);
+    const includeWillPays = !normalizedStatus || !['final', 'finalized', 'abandoned'].includes(normalizedStatus);
+
+    if (includeLiveBetData) {
+        params.set('with_big_bets', 'true');
+        params.set('with_live_bets', 'true');
+    }
+
+    if (includeWillPays) {
+        params.set('with_will_pays', 'true');
+    }
+
+    return {
+        params,
+        flags: {
+            includeLiveBetData,
+            includeWillPays,
+            normalizedStatus: normalizedStatus || 'unknown'
+        }
+    };
+}
+
+export async function fetchRaceEventData(baseUrl, raceId, context, options = {}) {
+    const { timeoutMs = 15000, raceStatus } = options;
+
     try {
         // Add comprehensive parameters to get all betting and market data
-        const params = new URLSearchParams({
-            'with_tote_trends_data': 'true',
-            'with_big_bets': 'true',
-            'with_live_bets': 'true',
-            'with_money_tracker': 'true',
-            'with_will_pays': 'true'
-        });
+        const { params, flags } = buildRaceEventSearchParams(raceStatus);
         const apiUrl = `${baseUrl}/affiliates/v1/racing/events/${raceId}?${params.toString()}`;
-        
+
         logDebug(context, 'Fetching race event data from NZTAB API', {
             apiUrl,
             raceId,
             timeoutMs,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            raceStatus: flags.normalizedStatus,
+            parameterFlags: flags
         });
 
         const controller = new AbortController();
@@ -128,55 +163,77 @@ export async function fetchRaceEventData(baseUrl, raceId, context, timeoutMs = 1
 /**
  * Enhanced batch fetch for multiple race events with coordinated rate limiting
  * @param {string} baseUrl - Base URL for NZ TAB API
- * @param {Array} raceIds - Array of race IDs to fetch
+ * @param {Array<string|{raceId: string, raceStatus?: string, status?: string}>} raceIds - Array of race identifiers or descriptors
  * @param {Object} context - Appwrite function context for logging
  * @param {number} delayBetweenCalls - Delay between API calls in milliseconds (default: 1000)
  * @param {number} timeoutPerCall - Timeout per individual call in milliseconds (default: 12000)
  * @returns {Map} Map of raceId -> race data (or null for failures)
  */
 export async function batchFetchRaceEventData(baseUrl, raceIds, context, delayBetweenCalls = 1000, timeoutPerCall = 12000) {
+    const normalizedRequests = Array.isArray(raceIds)
+        ? raceIds.map(request => {
+            if (typeof request === 'string') {
+                return { raceId: request, raceStatus: null };
+            }
+
+            if (request && typeof request === 'object') {
+                return {
+                    raceId: request.raceId,
+                    raceStatus: request.raceStatus ?? request.status ?? null
+                };
+            }
+
+            return { raceId: String(request), raceStatus: null };
+        })
+        : [];
+
     const results = new Map();
     const startTime = Date.now();
 
     logDebug(context, 'Starting batch race data fetch', {
-        raceCount: raceIds.length,
+        raceCount: normalizedRequests.length,
         delayBetweenCalls,
         timeoutPerCall,
-        estimatedDurationMs: raceIds.length * (timeoutPerCall + delayBetweenCalls)
+        estimatedDurationMs: normalizedRequests.length * (timeoutPerCall + delayBetweenCalls)
     });
 
-    for (let i = 0; i < raceIds.length; i++) {
-        const raceId = raceIds[i];
+    for (let i = 0; i < normalizedRequests.length; i++) {
+        const { raceId, raceStatus } = normalizedRequests[i];
         const callStartTime = Date.now();
 
         try {
-            logDebug(context, `Fetching race ${i + 1}/${raceIds.length}: ${raceId}`);
-            
-            const raceData = await fetchRaceEventData(baseUrl, raceId, context, timeoutPerCall);
+            logDebug(context, `Fetching race ${i + 1}/${normalizedRequests.length}: ${raceId}`, {
+                raceStatus: normalizeRaceStatus(raceStatus) || 'unknown'
+            });
+
+            const raceData = await fetchRaceEventData(baseUrl, raceId, context, {
+                timeoutMs: timeoutPerCall,
+                raceStatus
+            });
             results.set(raceId, raceData);
 
             const callDuration = Date.now() - callStartTime;
-            logDebug(context, `Completed race ${i + 1}/${raceIds.length}`, {
+            logDebug(context, `Completed race ${i + 1}/${normalizedRequests.length}`, {
                 raceId,
                 success: !!raceData,
                 callDurationMs: callDuration
             });
 
             // Rate limiting between calls (except for the last call)
-            if (i < raceIds.length - 1) {
+            if (i < normalizedRequests.length - 1) {
                 logDebug(context, `Rate limiting: waiting ${delayBetweenCalls}ms before next call`);
                 await new Promise(resolve => setTimeout(resolve, delayBetweenCalls));
             }
 
         } catch (error) {
-            context.error(`Failed to fetch race ${i + 1}/${raceIds.length}`, {
+            context.error(`Failed to fetch race ${i + 1}/${normalizedRequests.length}`, {
                 raceId,
                 error: error instanceof Error ? error.message : 'Unknown error'
             });
             results.set(raceId, null);
-            
+
             // Continue with rate limiting even on failure
-            if (i < raceIds.length - 1) {
+            if (i < normalizedRequests.length - 1) {
                 await new Promise(resolve => setTimeout(resolve, delayBetweenCalls));
             }
         }
@@ -186,11 +243,13 @@ export async function batchFetchRaceEventData(baseUrl, raceIds, context, delayBe
     const successCount = Array.from(results.values()).filter(data => data !== null).length;
 
     logDebug(context, 'Batch race data fetch completed', {
-        totalRaces: raceIds.length,
+        totalRaces: normalizedRequests.length,
         successfulRaces: successCount,
-        failedRaces: raceIds.length - successCount,
+        failedRaces: normalizedRequests.length - successCount,
         totalDurationMs: totalDuration,
-        averageCallDurationMs: Math.round(totalDuration / raceIds.length)
+        averageCallDurationMs: normalizedRequests.length > 0
+            ? Math.round(totalDuration / normalizedRequests.length)
+            : 0
     });
 
     return results;
