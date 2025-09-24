@@ -4,6 +4,18 @@
 
 import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
 
+function setIfDefined(target, key, value, transform) {
+    if (value === undefined || value === null) {
+        return;
+    }
+    target[key] = transform ? transform(value) : value;
+}
+
+function tryParseInteger(value) {
+    const parsed = typeof value === 'string' ? parseInt(value, 10) : value;
+    return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 /**
  * Filter meetings for AU/NZ Horse/Harness racing only
  * @param {Array} meetings - Array of meeting objects
@@ -93,14 +105,30 @@ export function transformRaceData(race, meetingId) {
         raceNumber: race.race_number,
         startTime: race.start_time,
         status: race.status,
-        meeting: meetingId
+        meeting: meetingId,
+        lastUpdated: new Date().toISOString(),
+        importedAt: new Date().toISOString()
     };
-    
-    // Add optional fields if present
-    if (race.distance !== undefined) raceDoc.distance = race.distance;
-    if (race.track_condition !== undefined) raceDoc.trackCondition = race.track_condition;
-    if (race.weather !== undefined) raceDoc.weather = race.weather;
-    
+
+    setIfDefined(raceDoc, 'actualStart', race.actual_start);
+    setIfDefined(raceDoc, 'toteStartTime', race.tote_start_time);
+    setIfDefined(raceDoc, 'startTimeNz', race.start_time_nz);
+    setIfDefined(raceDoc, 'raceDateNz', race.race_date_nz);
+    setIfDefined(raceDoc, 'distance', race.distance);
+    setIfDefined(raceDoc, 'trackCondition', race.track_condition);
+    setIfDefined(raceDoc, 'trackSurface', race.track_surface);
+    setIfDefined(raceDoc, 'weather', race.weather);
+    setIfDefined(raceDoc, 'type', race.type);
+    setIfDefined(raceDoc, 'totalPrizeMoney', race.prize_monies?.total_value);
+    setIfDefined(raceDoc, 'entrantCount', race.entrant_count);
+    setIfDefined(raceDoc, 'fieldSize', race.field_size);
+    setIfDefined(raceDoc, 'positionsPaid', race.positions_paid);
+    setIfDefined(raceDoc, 'silkUrl', race.silk_url);
+    setIfDefined(raceDoc, 'silkBaseUrl', race.silk_base_url);
+    if (Array.isArray(race.video_channels) && race.video_channels.length > 0) {
+        raceDoc.videoChannels = JSON.stringify(race.video_channels);
+    }
+
     return raceDoc;
 }
 
@@ -111,25 +139,44 @@ export function transformRaceData(race, meetingId) {
  * @returns {Object} Transformed entrant document
  */
 export function transformEntrantData(entrant, raceId) {
+    const timestamp = new Date().toISOString();
     const entrantDoc = {
         entrantId: entrant.entrant_id,
         name: entrant.name,
         runnerNumber: entrant.runner_number,
         isScratched: entrant.is_scratched || false,
-        race: raceId
+        race: raceId,
+        raceId,
+        lastUpdated: timestamp,
+        importedAt: timestamp
     };
 
-    // Add optional fields if present
-    if (entrant.jockey) entrantDoc.jockey = entrant.jockey;
-    if (entrant.trainer_name) entrantDoc.trainerName = entrant.trainer_name;
-    if (entrant.weight) entrantDoc.weight = entrant.weight;
-    if (entrant.silk_url) entrantDoc.silkUrl = entrant.silk_url;
-
-    // Handle odds data if present
-    if (entrant.odds) {
-        if (entrant.odds.fixed_win !== undefined) entrantDoc.winOdds = entrant.odds.fixed_win;
-        if (entrant.odds.fixed_place !== undefined) entrantDoc.placeOdds = entrant.odds.fixed_place;
+    setIfDefined(entrantDoc, 'barrier', entrant.barrier);
+    if (entrant.is_late_scratched !== undefined) {
+        entrantDoc.isLateScratched = entrant.is_late_scratched;
     }
-    
+    const scratchTime = tryParseInteger(entrant.scratch_time);
+    if (scratchTime !== undefined) {
+        entrantDoc.scratchTime = scratchTime;
+    }
+    setIfDefined(entrantDoc, 'runnerChange', entrant.runner_change);
+    if (entrant.favourite !== undefined) entrantDoc.favourite = entrant.favourite;
+    if (entrant.mover !== undefined) entrantDoc.mover = entrant.mover;
+    setIfDefined(entrantDoc, 'jockey', entrant.jockey);
+    setIfDefined(entrantDoc, 'trainerName', entrant.trainer_name);
+
+    if (entrant.odds) {
+        setIfDefined(entrantDoc, 'winOdds', entrant.odds.fixed_win);
+        setIfDefined(entrantDoc, 'placeOdds', entrant.odds.fixed_place);
+        setIfDefined(entrantDoc, 'poolWinOdds', entrant.odds.pool_win);
+        setIfDefined(entrantDoc, 'poolPlaceOdds', entrant.odds.pool_place);
+    }
+
+    if (entrant.silk_colours) {
+        entrantDoc.silkColours = entrant.silk_colours;
+    }
+    setIfDefined(entrantDoc, 'silkUrl64', entrant.silk_url_64x64);
+    setIfDefined(entrantDoc, 'silkUrl128', entrant.silk_url_128x128);
+
     return entrantDoc;
 }

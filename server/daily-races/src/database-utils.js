@@ -5,6 +5,18 @@
 
 import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
 
+function setIfDefined(target, key, value, transform) {
+    if (value === undefined || value === null) {
+        return;
+    }
+    target[key] = transform ? transform(value) : value;
+}
+
+function tryParseInteger(value) {
+    const parsed = typeof value === 'string' ? parseInt(value, 10) : value;
+    return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 /**
  * Safely convert and truncate a field to string with max length
  * @param {any} value - The value to process
@@ -142,12 +154,30 @@ export async function processRaces(databases, databaseId, meetings, context) {
                     name: race.name,
                     raceNumber: race.race_number,
                     startTime: race.start_time,
-                    ...(race.distance !== undefined && { distance: race.distance }),
-                    ...(race.track_condition !== undefined && { trackCondition: race.track_condition }),
-                    ...(race.weather !== undefined && { weather: race.weather }),
                     status: race.status,
-                    meeting: meeting
+                    meeting: meeting,
+                    lastUpdated: new Date().toISOString(),
+                    importedAt: new Date().toISOString()
                 };
+
+                setIfDefined(raceDoc, 'actualStart', race.actual_start);
+                setIfDefined(raceDoc, 'toteStartTime', race.tote_start_time);
+                setIfDefined(raceDoc, 'startTimeNz', race.start_time_nz);
+                setIfDefined(raceDoc, 'raceDateNz', race.race_date_nz);
+                setIfDefined(raceDoc, 'distance', race.distance);
+                setIfDefined(raceDoc, 'trackCondition', race.track_condition);
+                setIfDefined(raceDoc, 'trackSurface', race.track_surface);
+                setIfDefined(raceDoc, 'weather', race.weather);
+                setIfDefined(raceDoc, 'type', race.type);
+                setIfDefined(raceDoc, 'totalPrizeMoney', race.prize_monies?.total_value);
+                setIfDefined(raceDoc, 'entrantCount', race.entrant_count);
+                setIfDefined(raceDoc, 'fieldSize', race.field_size);
+                setIfDefined(raceDoc, 'positionsPaid', race.positions_paid);
+                setIfDefined(raceDoc, 'silkUrl', race.silk_url);
+                setIfDefined(raceDoc, 'silkBaseUrl', race.silk_base_url);
+                if (Array.isArray(race.video_channels) && race.video_channels.length > 0) {
+                    raceDoc.videoChannels = JSON.stringify(race.video_channels);
+                }
                 const success = await performantUpsert(databases, databaseId, 'races', race.id, raceDoc, context);
                 if (success) {
                     logDebug(context, 'Upserted race', { raceId: race.id, name: race.name });
@@ -203,97 +233,52 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
     // Process each entrant (runner) with comprehensive data
     for (const entrant of entrants) {
         try {
+            const timestamp = new Date().toISOString();
             const entrantDoc = {
                 entrantId: entrant.entrant_id,
                 name: entrant.name,
                 runnerNumber: entrant.runner_number,
-                barrier: entrant.barrier,
                 isScratched: entrant.is_scratched || false,
-                isLateScratched: entrant.is_late_scratched || false,
-                isEmergency: entrant.is_emergency || false,
-                race: raceId
+                race: raceId,
+                raceId,
+                lastUpdated: timestamp,
+                importedAt: timestamp
             };
 
-            // Current race day status
-            if (entrant.scratch_time) entrantDoc.scratchTime = entrant.scratch_time;
-            if (entrant.emergency_position) entrantDoc.emergencyPosition = entrant.emergency_position;
-            const runnerChange = safeStringField(entrant.runner_change, 500);
-            if (runnerChange) entrantDoc.runnerChange = runnerChange;
-            if (entrant.first_start_indicator) entrantDoc.firstStartIndicator = entrant.first_start_indicator;
-            
-            // Current race connections
+            setIfDefined(entrantDoc, 'barrier', entrant.barrier);
+            if (entrant.is_late_scratched !== undefined) {
+                entrantDoc.isLateScratched = entrant.is_late_scratched;
+            }
+            const scratchTime = tryParseInteger(entrant.scratch_time);
+            if (scratchTime !== undefined) {
+                entrantDoc.scratchTime = scratchTime;
+            }
+            setIfDefined(entrantDoc, 'runnerChange', safeStringField(entrant.runner_change, 500));
+            if (entrant.favourite !== undefined) entrantDoc.favourite = entrant.favourite;
+            if (entrant.mover !== undefined) entrantDoc.mover = entrant.mover;
             const jockey = safeStringField(entrant.jockey, 255);
             if (jockey) entrantDoc.jockey = jockey;
             const trainerName = safeStringField(entrant.trainer_name, 255);
             if (trainerName) entrantDoc.trainerName = trainerName;
-            const trainerLocation = safeStringField(entrant.trainer_location, 255);
-            if (trainerLocation) entrantDoc.trainerLocation = trainerLocation;
-            if (entrant.apprentice_indicator) entrantDoc.apprenticeIndicator = entrant.apprentice_indicator;
-            const gear = safeStringField(entrant.gear, 200);
-            if (gear) entrantDoc.gear = gear;
-            
-            // Weight information
-            if (entrant.weight?.allocated) entrantDoc.allocatedWeight = entrant.weight.allocated;
-            if (entrant.weight?.total) entrantDoc.totalWeight = entrant.weight.total;
-            if (entrant.allowance_weight) entrantDoc.allowanceWeight = entrant.allowance_weight;
-            
-            // Market information
-            if (entrant.market_name) entrantDoc.marketName = entrant.market_name;
-            if (entrant.primary_market !== undefined) entrantDoc.primaryMarket = entrant.primary_market;
-            if (entrant.favourite !== undefined) entrantDoc.favourite = entrant.favourite;
-            if (entrant.mover !== undefined) entrantDoc.mover = entrant.mover;
-            
-            // Current odds (frequently updated)
+
             if (entrant.odds) {
-                if (entrant.odds.fixed_win !== undefined) entrantDoc.fixedWinOdds = entrant.odds.fixed_win;
-                if (entrant.odds.fixed_place !== undefined) entrantDoc.fixedPlaceOdds = entrant.odds.fixed_place;
-                if (entrant.odds.pool_win !== undefined) entrantDoc.poolWinOdds = entrant.odds.pool_win;
-                if (entrant.odds.pool_place !== undefined) entrantDoc.poolPlaceOdds = entrant.odds.pool_place;
+                setIfDefined(entrantDoc, 'fixedWinOdds', entrant.odds.fixed_win);
+                setIfDefined(entrantDoc, 'fixedPlaceOdds', entrant.odds.fixed_place);
+                setIfDefined(entrantDoc, 'poolWinOdds', entrant.odds.pool_win);
+                setIfDefined(entrantDoc, 'poolPlaceOdds', entrant.odds.pool_place);
             }
-            
-            // Speedmap positioning
-            if (entrant.speedmap?.settling_lengths !== undefined) entrantDoc.settlingLengths = entrant.speedmap.settling_lengths;
-            
-            // Static entrant information (rarely changes)
-            if (entrant.age) entrantDoc.age = entrant.age;
-            if (entrant.sex) entrantDoc.sex = entrant.sex;
-            if (entrant.colour) entrantDoc.colour = entrant.colour;
-            if (entrant.foaling_date) entrantDoc.foalingDate = entrant.foaling_date;
-            if (entrant.sire) entrantDoc.sire = entrant.sire;
-            if (entrant.dam) entrantDoc.dam = entrant.dam;
-            if (entrant.breeding) entrantDoc.breeding = entrant.breeding;
-            const owners = safeStringField(entrant.owners, 255);
-            if (owners) entrantDoc.owners = owners;
-            if (entrant.country) entrantDoc.country = entrant.country;
-            
-            // Performance and form data (summarized for storage)
-            if (entrant.prize_money) entrantDoc.prizeMoney = entrant.prize_money;
-            if (entrant.best_time) entrantDoc.bestTime = entrant.best_time;
-            if (entrant.last_twenty_starts) entrantDoc.lastTwentyStarts = entrant.last_twenty_starts;
-            if (entrant.win_p) entrantDoc.winPercentage = entrant.win_p;
-            if (entrant.place_p) entrantDoc.placePercentage = entrant.place_p;
-            if (entrant.rating) entrantDoc.rating = entrant.rating;
-            if (entrant.handicap_rating) entrantDoc.handicapRating = entrant.handicap_rating;
-            if (entrant.class_level) entrantDoc.classLevel = entrant.class_level;
-            const formComment = safeStringField(entrant.form_comment, 500);
-            if (formComment) entrantDoc.formComment = formComment;
-            
-            // Silk and visual information
-            const silkColours = safeStringField(entrant.silk_colours, 100);
-            if (silkColours) entrantDoc.silkColours = silkColours;
-            if (entrant.silk_url_64x64) entrantDoc.silkUrl64 = entrant.silk_url_64x64;
-            if (entrant.silk_url_128x128) entrantDoc.silkUrl128 = entrant.silk_url_128x128;
-            
-            // Import metadata
-            entrantDoc.lastUpdated = new Date().toISOString();
-            entrantDoc.dataSource = 'NZTAB';
-            entrantDoc.importedAt = new Date().toISOString();
+
+            if (entrant.silk_colours) {
+                entrantDoc.silkColours = safeStringField(entrant.silk_colours, 100);
+            }
+            setIfDefined(entrantDoc, 'silkUrl64', entrant.silk_url_64x64);
+            setIfDefined(entrantDoc, 'silkUrl128', entrant.silk_url_128x128);
 
             const success = await performantUpsert(databases, databaseId, 'entrants', entrant.entrant_id, entrantDoc, context);
             if (success) {
                 entrantsProcessed++;
-                logDebug(context, 'Upserted comprehensive entrant data', { 
-                    entrantId: entrant.entrant_id, 
+                logDebug(context, 'Upserted entrant data', {
+                    entrantId: entrant.entrant_id,
                     name: entrant.name,
                     raceId: raceId,
                     fixedWinOdds: entrantDoc.fixedWinOdds,
@@ -330,74 +315,36 @@ export async function processDetailedRaces(databases, databaseId, detailedRaces,
     for (const { basicRace, detailedData } of detailedRaces) {
         try {
             const enhancedRaceDoc = {
-                // Core identifiers (keep existing)
                 raceId: basicRace.raceId,
                 name: detailedData.description || basicRace.name,
                 raceNumber: basicRace.raceNumber,
-                
-                // Enhanced timing information
                 startTime: basicRace.startTime,
-                ...(detailedData.actual_start && { actualStart: new Date(detailedData.actual_start * 1000).toISOString() }),
-                ...(detailedData.start_time_nz && { startTimeNz: detailedData.start_time_nz }),
-                ...(detailedData.race_date_nz && { raceDateNz: detailedData.race_date_nz }),
-                
-                // Race details (merge basic with detailed)
-                ...(detailedData.distance && { distance: detailedData.distance }),
-                ...(detailedData.track_condition && { trackCondition: detailedData.track_condition }),
-                ...(detailedData.weather && { weather: detailedData.weather }),
                 status: detailedData.status || basicRace.status,
-                
-                // Track information
-                ...(detailedData.track_direction && { trackDirection: detailedData.track_direction }),
-                ...(detailedData.track_surface && { trackSurface: detailedData.track_surface }),
-                ...(detailedData.rail_position && { railPosition: detailedData.rail_position }),
-                ...(detailedData.track_home_straight && { trackHomeStraight: detailedData.track_home_straight }),
-                
-                // Race classification
-                ...(detailedData.type && { type: detailedData.type }),
-                ...(detailedData.start_type && { startType: detailedData.start_type }),
-                ...(detailedData.group && { group: detailedData.group }),
-                ...(detailedData.class && { class: safeStringField(detailedData.class, 20) }),
-                ...(detailedData.gait && { gait: detailedData.gait }),
-                
-                // Prize and field information
-                ...(detailedData.prize_monies?.total_value && { totalPrizeMoney: detailedData.prize_monies.total_value }),
-                ...(detailedData.entrant_count && { entrantCount: detailedData.entrant_count }),
-                ...(detailedData.field_size && { fieldSize: detailedData.field_size }),
-                ...(detailedData.positions_paid && { positionsPaid: detailedData.positions_paid }),
-                
-                // Race conditions
-                ...(detailedData.gender_conditions && { genderConditions: detailedData.gender_conditions }),
-                ...(detailedData.age_conditions && { ageConditions: detailedData.age_conditions }),
-                ...(detailedData.weight_and_handicap_conditions && { weightConditions: detailedData.weight_and_handicap_conditions }),
-                ...(detailedData.allowance_conditions !== undefined && { allowanceConditions: Boolean(detailedData.allowance_conditions) }),
-                ...(detailedData.special_conditions && { specialConditions: detailedData.special_conditions }),
-                ...(detailedData.jockey_conditions && { jockeyConditions: detailedData.jockey_conditions }),
-                
-                // Form and commentary
-                ...(detailedData.form_guide && { formGuide: detailedData.form_guide }),
-                ...(detailedData.comment && { comment: detailedData.comment }),
-                ...(detailedData.description && { description: detailedData.description }),
-                
-                // Visual and media
-                ...(detailedData.silk_url && { silkUrl: detailedData.silk_url }),
-                ...(detailedData.silk_base_url && { silkBaseUrl: detailedData.silk_base_url }),
-                ...(detailedData.video_channels && { videoChannels: JSON.stringify(detailedData.video_channels) }),
-                
-                // Betting options
-                ...(detailedData.ffwin_option_number && { ffwinOptionNumber: detailedData.ffwin_option_number }),
-                ...(detailedData.fftop3_option_number && { fftop3OptionNumber: detailedData.fftop3_option_number }),
-                
-                // Rate information
-                ...(detailedData.mile_rate_400 && { mileRate400: detailedData.mile_rate_400 }),
-                ...(detailedData.mile_rate_800 && { mileRate800: detailedData.mile_rate_800 }),
-                
-                // Import metadata
+                meeting: basicRace.meeting,
                 lastUpdated: new Date().toISOString(),
-                dataSource: 'NZTAB',
-                importedAt: new Date().toISOString(),
-                meeting: basicRace.meeting
+                importedAt: new Date().toISOString()
             };
+
+            if (detailedData.actual_start) {
+                enhancedRaceDoc.actualStart = new Date(detailedData.actual_start * 1000).toISOString();
+            }
+            setIfDefined(enhancedRaceDoc, 'toteStartTime', detailedData.tote_start_time);
+            setIfDefined(enhancedRaceDoc, 'startTimeNz', detailedData.start_time_nz);
+            setIfDefined(enhancedRaceDoc, 'raceDateNz', detailedData.race_date_nz);
+            setIfDefined(enhancedRaceDoc, 'distance', detailedData.distance);
+            setIfDefined(enhancedRaceDoc, 'trackCondition', detailedData.track_condition);
+            setIfDefined(enhancedRaceDoc, 'trackSurface', detailedData.track_surface);
+            setIfDefined(enhancedRaceDoc, 'weather', detailedData.weather);
+            setIfDefined(enhancedRaceDoc, 'type', detailedData.type);
+            setIfDefined(enhancedRaceDoc, 'totalPrizeMoney', detailedData.prize_monies?.total_value);
+            setIfDefined(enhancedRaceDoc, 'entrantCount', detailedData.entrant_count);
+            setIfDefined(enhancedRaceDoc, 'fieldSize', detailedData.field_size);
+            setIfDefined(enhancedRaceDoc, 'positionsPaid', detailedData.positions_paid);
+            setIfDefined(enhancedRaceDoc, 'silkUrl', detailedData.silk_url);
+            setIfDefined(enhancedRaceDoc, 'silkBaseUrl', detailedData.silk_base_url);
+            if (Array.isArray(detailedData.video_channels) && detailedData.video_channels.length > 0) {
+                enhancedRaceDoc.videoChannels = JSON.stringify(detailedData.video_channels);
+            }
 
             const success = await performantUpsert(databases, databaseId, 'races', basicRace.raceId, enhancedRaceDoc, context);
             if (success) {
