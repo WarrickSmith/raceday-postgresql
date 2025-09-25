@@ -124,12 +124,12 @@ export function useMeetingsPolling({ initialData, onError, onRaceUpdate }: UseMe
   // Perform a single fetch for the latest meetings data
   useEffect(() => {
     void fetchMeetings();
-  }, [fetchMeetings]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Manual retry function
   const retry = useCallback(() => {
     void fetchMeetings();
-  }, [fetchMeetings]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     meetings,

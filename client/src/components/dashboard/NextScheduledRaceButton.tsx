@@ -96,7 +96,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
         debounceTimeoutRef.current = null;
       }
     };
-  }, [fetchNextScheduledRace, setupIntelligentPolling]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update polling when race changes
   useEffect(() => {
@@ -109,7 +109,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
         clearTimeout(debounceTimeoutRef.current);
       }
     };
-  }, [setupIntelligentPolling]);
+  }, [nextScheduledRace]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // React to shared update signals from meetings polling system
   useEffect(() => {
@@ -133,7 +133,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
         debounceTimeoutRef.current = null;
       }
     };
-  }, [raceUpdateSignal, fetchNextScheduledRace]);
+  }, [raceUpdateSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset next race when meetings data clears
   useEffect(() => {
@@ -151,7 +151,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
       const now = new Date();
       const raceTime = new Date(nextScheduledRace.startTime);
       const diff = raceTime.getTime() - now.getTime();
-      
+
       // If race has started (passed start time), fetch updated next race ONLY ONCE
       if (diff <= 0 && !hasTriggeredNextFetch) {
         console.log('🏁 Race has started, fetching next scheduled race');
@@ -159,13 +159,13 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
         void fetchNextScheduledRace();
         return;
       }
-      
+
       // Force re-render to update countdown display
       // This is handled by the state update in getTimeUntilRace
     }, 1000); // Update every second for countdown
 
     return () => clearInterval(updateInterval);
-  }, [nextScheduledRace, fetchNextScheduledRace]);
+  }, [nextScheduledRace]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle navigation to next scheduled race
   const handleNavigateToNextRace = useCallback(async () => {
