@@ -1,18 +1,44 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRace } from '@/contexts/RaceContext'
 import { RaceDataHeader } from '@/components/race-view/RaceDataHeader'
 import { EnhancedEntrantsGrid } from '@/components/race-view/EnhancedEntrantsGrid'
 import { RaceFooter } from '@/components/race-view/RaceFooter'
 import AlertsConfigModal from '@/components/alerts/AlertsConfigModal'
-import type { RaceStatus } from '@/types/racePools'
+import type { RaceStatus, RacePoolData } from '@/types/racePools'
 
 export function RacePageContent() {
   const { raceData, isLoading, error } = useRace()
 
   // Alerts Configuration Modal state (moved from EnhancedEntrantsGrid for performance)
   const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false)
+
+  // Pool data state
+  const [poolData, setPoolData] = useState<RacePoolData | null>(null)
+
+  // Fetch pool data when race data is available
+  useEffect(() => {
+    if (!raceData?.race?.raceId) return
+
+    const fetchPoolData = async () => {
+      try {
+        const response = await fetch(`/api/race/${raceData.race.raceId}/pools`)
+        if (response.ok) {
+          const data: RacePoolData = await response.json()
+          setPoolData(data)
+        } else {
+          console.warn('Pool data not available for race:', raceData.race.raceId)
+          setPoolData(null)
+        }
+      } catch (error) {
+        console.error('Error fetching pool data:', error)
+        setPoolData(null)
+      }
+    }
+
+    fetchPoolData()
+  }, [raceData?.race?.raceId])
 
   if (!raceData) {
     return (
@@ -34,7 +60,7 @@ export function RacePageContent() {
   const currentEntrants = raceData.entrants || []
   const currentMeeting = raceData.meeting
   const navigationData = raceData.navigationData
-  const currentPoolData = null
+  const currentPoolData = poolData
 
   // Build results data from persistent race data
   const currentResultsData =
