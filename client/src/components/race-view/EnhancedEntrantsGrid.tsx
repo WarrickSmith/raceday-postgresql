@@ -160,7 +160,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   enableMoneyFlowTimeline = true,
   enableJockeySilks = true,
   realtimeEntrants,
-  lastUpdate,
+  lastUpdate: initialLastUpdate,
   poolData = null,
   moneyFlowUpdateTrigger,
   resultsData,
@@ -227,7 +227,15 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     getPlacePoolData,
     getOddsData,
     refetch: refetchTimeline,
-  } = useMoneyFlowTimeline(currentRaceId, entrantIds, selectedView === 'odds' ? 'win' : selectedView)
+    lastUpdate: timelineLastUpdate,
+  } = useMoneyFlowTimeline(
+    currentRaceId,
+    entrantIds,
+    selectedView === 'odds' ? 'win' : selectedView,
+    raceStatus
+  )
+
+  const lastUpdate = timelineLastUpdate ?? initialLastUpdate ?? null
 
   const [selectedEntrant, setSelectedEntrant] = useState<string | undefined>()
 
@@ -1313,7 +1321,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
             <span className="text-xs text-gray-500">
               Last update:{' '}
-              {lastUpdate ? lastUpdate.toLocaleTimeString() : 'No updates yet'}
+              {lastUpdate
+                ? lastUpdate.toLocaleTimeString('en-US', {
+                    hour12: true,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : 'No updates yet'}
             </span>
 
             {/* Renders and Updates tracking */}
@@ -1790,7 +1804,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
       <div className="sr-only" aria-live="polite" id="grid-status">
         Showing {sortedEntrants.length} runners. Last update:{' '}
-        {lastUpdate ? lastUpdate.toLocaleTimeString() : 'No updates yet'}.
+        {lastUpdate
+          ? lastUpdate.toLocaleTimeString('en-US', {
+              hour12: true,
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : 'No updates yet'}.
       </div>
 
     </div>

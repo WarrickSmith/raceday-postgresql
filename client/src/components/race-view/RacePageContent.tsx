@@ -9,36 +9,57 @@ import AlertsConfigModal from '@/components/alerts/AlertsConfigModal'
 import type { RaceStatus, RacePoolData } from '@/types/racePools'
 
 export function RacePageContent() {
-  const { raceData, isLoading, error } = useRace()
+  const { raceData, isLoading, error, pollingState } = useRace()
 
   // Alerts Configuration Modal state (moved from EnhancedEntrantsGrid for performance)
   const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false)
 
   // Pool data state
   const [poolData, setPoolData] = useState<RacePoolData | null>(null)
+  const [poolLastUpdated, setPoolLastUpdated] = useState<Date | null>(null)
 
   // Fetch pool data when race data is available
   useEffect(() => {
-    if (!raceData?.race?.raceId) return
+    if (!raceData?.race?.raceId) {
+      return
+    }
+
+    const controller = new AbortController()
+    let isActive = true
 
     const fetchPoolData = async () => {
       try {
-        const response = await fetch(`/api/race/${raceData.race.raceId}/pools`)
+        const response = await fetch(`/api/race/${raceData.race.raceId}/pools`, {
+          signal: controller.signal,
+        })
+
+        if (!isActive) {
+          return
+        }
+
         if (response.ok) {
           const data: RacePoolData = await response.json()
           setPoolData(data)
+          setPoolLastUpdated(new Date())
         } else {
           console.warn('Pool data not available for race:', raceData.race.raceId)
           setPoolData(null)
         }
       } catch (error) {
-        console.error('Error fetching pool data:', error)
-        setPoolData(null)
+        if (!controller.signal.aborted) {
+          console.error('Error fetching pool data:', error)
+          setPoolData(null)
+        }
       }
     }
 
-    fetchPoolData()
-  }, [raceData?.race?.raceId])
+    void fetchPoolData()
+
+    return () => {
+      isActive = false
+      controller.abort()
+    }
+  }, [raceData?.race?.raceId, pollingState.lastUpdated])
 
   if (!raceData) {
     return (
@@ -181,6 +202,7 @@ export function RacePageContent() {
           enableJockeySilks={true}
           className="h-full"
           poolData={currentPoolData}
+          moneyFlowUpdateTrigger={pollingState.lastUpdated?.getTime()}
           resultsData={currentResultsData?.results}
           raceStatus={currentRace.status}
           resultStatus={currentResultsData?.status || currentRace.resultStatus}
@@ -199,6 +221,7 @@ export function RacePageContent() {
           showCountdown={true}
           showResults={true}
           race={currentRace}
+          lastPoolUpdate={poolLastUpdated}
         />
       </footer>
 
