@@ -47,6 +47,18 @@ function resolveValue(...candidates) {
     return undefined;
 }
 
+function hasScalarValue(value) {
+    if (value === null || value === undefined) {
+        return false;
+    }
+
+    if (typeof value === 'string') {
+        return value.trim().length > 0;
+    }
+
+    return true;
+}
+
 function normalizeActualStart(actualStart) {
     if (actualStart === undefined || actualStart === null) {
         return undefined;
@@ -199,6 +211,17 @@ function buildEntrantDocument(entrant, raceId, timestamp = new Date().toISOStrin
  * @returns {boolean} Success status
  */
 export async function performantUpsert(databases, databaseId, collectionId, documentId, data, context) {
+    if (collectionId === 'entrants') {
+        if (!hasScalarValue(data?.entrantId) || !hasScalarValue(data?.raceId)) {
+            context.error('Refusing to write entrant without scalar identifiers', {
+                documentId,
+                hasEntrantId: hasScalarValue(data?.entrantId),
+                hasRaceId: hasScalarValue(data?.raceId)
+            });
+            return false;
+        }
+    }
+
     try {
         await databases.updateDocument(databaseId, collectionId, documentId, data);
         return true;
@@ -347,6 +370,16 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
     for (const entrant of entrants) {
         try {
             const entrantDoc = buildEntrantDocument(entrant, raceId);
+
+            if (!hasScalarValue(entrantDoc.entrantId) || !hasScalarValue(entrantDoc.raceId)) {
+                logWarn(context, 'Skipping entrant without scalar identifiers', {
+                    entrantId: entrant.entrant_id,
+                    derivedEntrantId: entrantDoc.entrantId,
+                    derivedRaceId: entrantDoc.raceId,
+                    raceId
+                });
+                continue;
+            }
 
             const success = await performantUpsert(databases, databaseId, 'entrants', entrant.entrant_id, entrantDoc, context);
             if (success) {

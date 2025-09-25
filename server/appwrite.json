@@ -173,6 +173,33 @@
       ]
     },
     {
+      "$id": "scalar-key-maintenance",
+      "name": "Scalar Key Maintenance",
+      "runtime": "node-22",
+      "specification": "s-1vcpu-1gb",
+      "path": "scalar-key-maintenance",
+      "execute": ["any"],
+      "events": [],
+      "schedule": "*/30 * * * *",
+      "timeout": 300,
+      "enabled": true,
+      "logging": false,
+      "entrypoint": "src/main.js",
+      "commands": "npm install",
+      "scopes": [
+        "databases.read",
+        "databases.write",
+        "collections.read",
+        "collections.write",
+        "attributes.read",
+        "attributes.write",
+        "indexes.read",
+        "indexes.write",
+        "documents.read",
+        "documents.write"
+      ]
+    },
+    {
       "$id": "database-setup",
       "name": "Database Setup and Schema Management",
       "runtime": "node-22",

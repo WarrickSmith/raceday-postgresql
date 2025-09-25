@@ -1,0 +1,14 @@
+{
+  "name": "scalar-key-maintenance",
+  "version": "1.0.0",
+  "description": "Backfill and validation function ensuring entrants and money-flow documents expose scalar race and entrant identifiers.",
+  "type": "module",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node src/main.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "node-appwrite": "^17.0.0"
+  }
+}

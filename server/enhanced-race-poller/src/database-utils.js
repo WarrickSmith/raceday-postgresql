@@ -49,6 +49,18 @@ function resolveValue(...candidates) {
   return undefined
 }
 
+function hasScalarValue(value) {
+  if (value === null || value === undefined) {
+    return false
+  }
+
+  if (typeof value === 'string') {
+    return value.trim().length > 0
+  }
+
+  return true
+}
+
 function buildEntrantDocument(entrant, raceId, timestamp = new Date().toISOString()) {
   const entrantDoc = {
     entrantId: resolveValue(entrant.entrant_id, entrant.entrantId, entrant.$id),
@@ -307,6 +319,28 @@ export function validateRacePoolData(raceData, entrantData, context) {
  * @returns {boolean} Success status
  */
 export async function performantUpsert(databases, databaseId, collectionId, documentId, data, context) {
+  if (collectionId === 'entrants') {
+    if (!hasScalarValue(data?.entrantId) || !hasScalarValue(data?.raceId)) {
+      context.error('Refusing to write entrant document without scalar identifiers', {
+        documentId,
+        hasEntrantId: hasScalarValue(data?.entrantId),
+        hasRaceId: hasScalarValue(data?.raceId)
+      })
+      return false
+    }
+  }
+
+  if (collectionId === 'money-flow-history') {
+    if (!hasScalarValue(data?.entrantId) || !hasScalarValue(data?.raceId)) {
+      context.error('Refusing to write money flow document without scalar identifiers', {
+        documentId,
+        hasEntrantId: hasScalarValue(data?.entrantId),
+        hasRaceId: hasScalarValue(data?.raceId)
+      })
+      return false
+    }
+  }
+
   try {
     await databases.updateDocument(databaseId, collectionId, documentId, data)
     return true
@@ -404,6 +438,17 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
   }
 
   try {
+    const scalarEntrantId = typeof entrantId === 'string' ? entrantId.trim() : ''
+    const scalarRaceId = typeof raceId === 'string' ? raceId.trim() : ''
+
+    if (!hasScalarValue(scalarEntrantId) || !hasScalarValue(scalarRaceId)) {
+      logWarn(context, 'Skipping money flow write due to missing scalar identifiers', {
+        entrantId,
+        raceId
+      })
+      return false
+    }
+
     const timestamp = new Date().toISOString()
     let timeToStart = null
     let pollingTimestamp = timestamp
@@ -427,8 +472,9 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
     // Save hold percentage with enhanced metadata
     if (typeof moneyData.hold_percentage !== 'undefined') {
       const holdDoc = {
-        entrant: entrantId,
-        raceId: raceId,
+        entrant: scalarEntrantId,
+        raceId: scalarRaceId,
+        entrantId: scalarEntrantId,
         holdPercentage: moneyData.hold_percentage,
         betPercentage: null,
         type: 'hold_percentage',
@@ -467,8 +513,9 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
     // Save bet percentage with enhanced metadata
     if (typeof moneyData.bet_percentage !== 'undefined') {
       const betDoc = {
-        entrant: entrantId,
-        raceId: raceId,
+        entrant: scalarEntrantId,
+        raceId: scalarRaceId,
+        entrantId: scalarEntrantId,
         holdPercentage: null,
         betPercentage: moneyData.bet_percentage,
         type: 'bet_percentage',
@@ -529,8 +576,15 @@ async function saveMoneyFlowHistory(databases, databaseId, entrantId, moneyData,
  * @returns {number} Number of entrants processed for money flow
  */
 export async function processMoneyTrackerData(databases, databaseId, moneyTrackerData, context, raceId = 'unknown', racePoolData = null, raceStatus = null, validationResults = null, entrantOddsData = null) {
+  if (!hasScalarValue(raceId) || raceId === 'unknown') {
+    logWarn(context, 'Skipping money tracker processing due to missing race identifier', {
+      providedRaceId: raceId
+    })
+    return 0
+  }
+
   if (!moneyTrackerData || !moneyTrackerData.entrants || !Array.isArray(moneyTrackerData.entrants)) {
-    logDebug(context, '❌ No money tracker entrants data available', { 
+    logDebug(context, '❌ No money tracker entrants data available', {
       raceId,
       hasMoneyTrackerData: !!moneyTrackerData,
       hasEntrants: !!moneyTrackerData?.entrants,
@@ -736,11 +790,21 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
   // Process each entrant with enhanced incremental calculations
   for (const [entrantId, moneyData] of Object.entries(entrantMoneyData)) {
     let bucketDocumentId = null
-    
+
     try {
+      if (!hasScalarValue(entrantId)) {
+        logWarn(context, 'Skipping bucketed money flow entry due to missing entrant identifier', {
+          raceId,
+          entrantId
+        })
+        continue
+      }
+
+      const scalarEntrantId = typeof entrantId === 'string' ? entrantId.trim() : ''
+
       logDebug(context, '💰 Processing bucketed money flow for entrant', {
         entrantId: entrantId.slice(0, 8) + '...',
-        raceId, timeInterval, 
+        raceId, timeInterval,
         holdPercentage: moneyData.hold_percentage,
         betPercentage: moneyData.bet_percentage
       })
@@ -823,8 +887,9 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
       bucketDocumentId = ID.unique()
       
       const bucketedDoc = {
-        entrant: entrantId,
+        entrant: scalarEntrantId,
         raceId: raceId,
+        entrantId: scalarEntrantId,
         timeToStart: timeToStart ?? null,
         timeInterval: timeInterval ?? null,
         intervalType: intervalType || 'unknown',
@@ -1004,6 +1069,16 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
   for (const entrant of entrants) {
     try {
       const entrantDoc = buildEntrantDocument(entrant, raceId)
+
+      if (!hasScalarValue(entrantDoc.entrantId) || !hasScalarValue(entrantDoc.raceId)) {
+        logWarn(context, 'Skipping entrant without scalar identifiers', {
+          entrantId: entrant.entrant_id,
+          derivedEntrantId: entrantDoc.entrantId,
+          derivedRaceId: entrantDoc.raceId,
+          raceId
+        })
+        continue
+      }
 
       // Current odds with validation
       if (entrant.odds) {
