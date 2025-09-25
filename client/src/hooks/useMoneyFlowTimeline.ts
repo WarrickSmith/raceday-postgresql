@@ -118,74 +118,97 @@ export function useMoneyFlowTimeline(
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const timelineDataRef = useRef(timelineData)
+  const isFetchingRef = useRef(false)
+  const pendingRequestRef = useRef<Promise<void> | null>(null)
+
+  useEffect(() => {
+    timelineDataRef.current = timelineData
+  }, [timelineData])
 
   // Fetch money flow timeline data for all entrants
   const fetchTimelineData = useCallback(async () => {
-    if (!raceId || entrantIds.length === 0) return
+    if (!raceId || entrantIds.length === 0) {
+      return
+    }
 
     // Check race status to avoid unnecessary polling for completed races
     const isRaceComplete =
       raceStatus &&
       ['Final', 'Finalized', 'Abandoned', 'Cancelled'].includes(raceStatus)
 
-    if (isRaceComplete && timelineData.size > 0) {
+    if (isRaceComplete && timelineDataRef.current.size > 0) {
       // Race is complete and we have timeline data, skip fetch
       return
     }
 
-    setIsLoading(true)
+    if (isFetchingRef.current && pendingRequestRef.current) {
+      return pendingRequestRef.current
+    }
+
     setError(null)
 
-    try {
-      // Use API route to fetch money flow timeline data
-      const response = await fetch(
-        `/api/race/${raceId}/money-flow-timeline?entrants=${entrantKey}`
-      )
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch timeline data: ${response.statusText}`)
+    const fetchPromise = (async () => {
+      if (!isFetchingRef.current) {
+        isFetchingRef.current = true
+        setIsLoading(true)
       }
 
-      const data = (await response.json()) as MoneyFlowTimelineResponse
-      const documents = data.documents ?? []
-
-      if (data.intervalCoverage) {
-        loggerRef.current.debug(
-          'Money flow interval coverage received',
-          data.intervalCoverage
+      try {
+        const response = await fetch(
+          `/api/race/${raceId}/money-flow-timeline?entrants=${entrantKey}`
         )
-      }
 
-      if (data.message) {
-        loggerRef.current.info('Money flow timeline message', {
-          message: data.message,
-        })
-      }
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch timeline data: ${response.statusText}`
+          )
+        }
 
-      // Handle empty data gracefully
-      if (documents.length === 0) {
-        setTimelineData(new Map())
+        const data = (await response.json()) as MoneyFlowTimelineResponse
+        const documents = data.documents ?? []
+
+        if (data.intervalCoverage) {
+          loggerRef.current.debug(
+            'Money flow interval coverage received',
+            data.intervalCoverage
+          )
+        }
+
+        if (data.message) {
+          loggerRef.current.info('Money flow timeline message', {
+            message: data.message,
+          })
+        }
+
+        if (documents.length === 0) {
+          setTimelineData(new Map())
+          setLastUpdate(new Date())
+          return
+        }
+
+        const entrantDataMap = processTimelineData(
+          documents,
+          entrantIds,
+          loggerRef.current
+        )
+        setTimelineData(entrantDataMap)
         setLastUpdate(new Date())
-        return
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to fetch timeline data'
+        setError(errorMessage)
+        loggerRef.current.error('Error fetching money flow timeline', err)
+      } finally {
+        isFetchingRef.current = false
+        pendingRequestRef.current = null
+        setIsLoading(false)
       }
+    })()
 
-      // Use unified processing for both bucketed and legacy data
-      const entrantDataMap = processTimelineData(
-        documents,
-        entrantIds,
-        loggerRef.current
-      )
-      setTimelineData(entrantDataMap)
-      setLastUpdate(new Date())
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to fetch timeline data'
-      setError(errorMessage)
-      loggerRef.current.error('Error fetching money flow timeline', err)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [raceId, entrantIds, entrantKey, raceStatus, timelineData.size])
+    pendingRequestRef.current = fetchPromise
+    return fetchPromise
+  }, [raceId, entrantIds, entrantKey, raceStatus])
 
   // Generate timeline grid data optimized for component display
   const gridData = useMemo(() => {
