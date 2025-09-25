@@ -594,6 +594,20 @@ async function preloadRaceData(raceIds) {
 }
 ```
 
+### Phase 3 API Query Optimisation (Server Routes)
+
+- **Race detail route (`/api/race/[id]`)**
+  - Queries now rely exclusively on the `raceId` index for related collections (entrants, race-results, money flow) instead of relationship filters.
+  - `Query.select` limits payloads to the exact fields consumed by the UI (race core fields, minimal meeting metadata, entrant display fields, money-flow aggregates).
+  - Meeting data is no longer auto-expanded in full; only `meetingId`, `meetingName`, `country`, `raceType`, `category`, `date`, and `weather` are hydrated for navigation/header rendering.
+- **Money flow timeline route (`/api/race/[id]/money-flow-timeline`)**
+  - Uses scalar filters (`raceId`, `entrantId`) across bucketed and legacy timelines and applies the same select list used by the client timeline renderer.
+  - Supports incremental polling via `cursorAfter` (Appwrite document id) and `createdAfter` (ISO string) query parameters. Responses include `nextCursor`, `nextCreatedAt`, and `limit` so clients can resume polling without re-downloading the full history.
+  - Returned documents are sorted server-side by `timeInterval`/`timeToStart` with a `$createdAt` tiebreaker, ensuring consistent ordering for sparkline hydration even when fetched incrementally.
+  - Debug metadata (`intervalCoverage`, scalar filter notes) reflects the optimised query path to help operators verify that bucketed data remains in use.
+
+> **Client guidance:** existing callers can continue without the new parameters, but enabling cursor-based polling is recommended to avoid re-fetching historical data during short polling intervals.
+
 ## Data Flow Summary
 
 1. **Enhanced Backend Polling**: `enhanced-race-poller` function polls NZTAB API with mathematical validation and data quality scoring

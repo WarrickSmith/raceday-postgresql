@@ -80,8 +80,14 @@ export interface MoneyFlowHistory {
   $id: string
   $createdAt: string
   $updatedAt: string
-  entrant: string
-  holdPercentage: number
+  entrant?: string
+  entrantId?: string
+  raceId?: string
+  holdPercentage?: number
+  fixedWinOdds?: number
+  fixedPlaceOdds?: number
+  poolWinOdds?: number
+  poolPlaceOdds?: number
 }
 
 // DEPRECATED: OddsHistory document interface for sparkline data
