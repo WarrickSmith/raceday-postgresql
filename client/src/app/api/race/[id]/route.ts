@@ -92,6 +92,56 @@ const NAVIGATION_SELECT_FIELDS = [
   'meeting.meetingName',
 ]
 
+type AppwriteDatabases = Awaited<ReturnType<typeof createServerClient>>['databases']
+
+type RaceResultsDocument = {
+  resultsAvailable?: boolean
+  resultsData?: string
+  dividendsData?: string
+  fixedOddsData?: string
+  resultStatus?: string
+  photoFinish?: boolean
+  stewardsInquiry?: boolean
+  protestLodged?: boolean
+  resultTime?: string
+  race?: string
+  raceId?: string
+  [key: string]: unknown
+}
+
+async function fetchRaceResultsDocument(
+  databases: AppwriteDatabases,
+  raceId: string,
+  raceDocId: string
+): Promise<RaceResultsDocument | null> {
+  const queryAttempts = [
+    [Query.equal('raceId', raceId)],
+    [Query.equal('race', raceDocId)],
+  ]
+
+  for (const attempt of queryAttempts) {
+    try {
+      const response = await databases.listDocuments(
+        'raceday-db',
+        'race-results',
+        [
+          ...attempt,
+          Query.select(RACE_RESULTS_SELECT_FIELDS),
+          Query.limit(1),
+        ]
+      )
+
+      if (response.documents.length > 0) {
+        return response.documents[0] as RaceResultsDocument
+      }
+    } catch {
+      // Ignore and try the next strategy - race-results data is non-critical
+    }
+  }
+
+  return null
+}
+
 
 /**
  * API route for client-side race data fetching
@@ -182,33 +232,17 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       Query.limit(1),
     ])
 
-    // Fetch race-results data for this race if it exists
-    let raceResultsData = null
-    if (raceQuery.documents.length > 0) {
-      try {
-        const raceResultsQuery = await databases.listDocuments(
-          'raceday-db',
-          'race-results',
-          [
-            Query.equal('raceId', raceId),
-            Query.select(RACE_RESULTS_SELECT_FIELDS),
-            Query.limit(1),
-          ]
-        )
-
-        if (raceResultsQuery.documents.length > 0) {
-          raceResultsData = raceResultsQuery.documents[0]
-        }
-      } catch {
-        // Continue without results data - not critical for race display
-      }
-    }
-
     if (!raceQuery.documents.length) {
       return null
     }
 
     const raceData = raceQuery.documents[0]
+
+    const raceResultsData = await fetchRaceResultsDocument(
+      databases,
+      raceId,
+      raceData.$id
+    )
 
     // Validate that meeting data is populated
     if (!raceData.meeting || !raceData.meeting.meetingId) {
@@ -538,33 +572,17 @@ async function getNavigationRaceData(raceId: string): Promise<{
       Query.limit(1),
     ])
 
-    // Fetch race-results data for this race if it exists
-    let raceResultsData = null
-    if (raceQuery.documents.length > 0) {
-      try {
-        const raceResultsQuery = await databases.listDocuments(
-          'raceday-db',
-          'race-results',
-          [
-            Query.equal('raceId', raceId),
-            Query.select(RACE_RESULTS_SELECT_FIELDS),
-            Query.limit(1),
-          ]
-        )
-
-        if (raceResultsQuery.documents.length > 0) {
-          raceResultsData = raceResultsQuery.documents[0]
-        }
-      } catch {
-        // Continue without results data - not critical for navigation display
-      }
-    }
-
     if (!raceQuery.documents.length) {
       return null
     }
 
     const raceData = raceQuery.documents[0]
+
+    const raceResultsData = await fetchRaceResultsDocument(
+      databases,
+      raceId,
+      raceData.$id
+    )
 
     if (!raceData.meeting || !raceData.meeting.meetingId) {
       return null
