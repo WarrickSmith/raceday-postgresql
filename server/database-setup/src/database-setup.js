@@ -1051,6 +1051,31 @@ async function ensureEntrantsCollection(databases, config, context, progressTrac
             logDebug(context, 'raceId attribute is not available for index creation, skipping idx_race_id index for entrants');
         }
     }
+
+    // Phase 2 – Compound index for active entrants by race
+    if (!entrantsCollection.indexes.some((idx) => idx.key === 'idx_race_active')) {
+        const raceIdAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'raceId', context);
+        const isScratchedAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'isScratched', context);
+        if (raceIdAvailable && isScratchedAvailable) {
+            try {
+                await databases.createIndex(
+                    config.databaseId,
+                    collectionId,
+                    'idx_race_active',
+                    IndexType.Key,
+                    ['raceId', 'isScratched']
+                );
+                logDebug(context, 'idx_race_active compound index created successfully for entrants collection');
+            } catch (error) {
+                context.error(`Failed to create idx_race_active compound index for entrants: ${error}`);
+            }
+        } else {
+            logDebug(
+                context,
+                'raceId or isScratched attribute not available for index creation, skipping idx_race_active'
+            );
+        }
+    }
 }
 
 async function ensureOddsHistoryCollection(databases, config, context, progressTracker = null, rollbackManager = null) {
@@ -1250,6 +1275,32 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context, prog
             catch (error) {
                 context.error(`Failed to create idx_race_id index for money flow history: ${error}`);
             }
+        }
+    }
+
+    // Phase 2 – Compound index for race + entrant + timeInterval
+    if (!moneyFlowCollection.indexes.some((idx) => idx.key === 'idx_race_entrant_time')) {
+        const raceIdAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'raceId', context);
+        const entrantIdAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'entrantId', context);
+        const timeIntervalAvailable = await waitForAttributeAvailable(databases, config.databaseId, collectionId, 'timeInterval', context);
+        if (raceIdAvailable && entrantIdAvailable && timeIntervalAvailable) {
+            try {
+                await databases.createIndex(
+                    config.databaseId,
+                    collectionId,
+                    'idx_race_entrant_time',
+                    IndexType.Key,
+                    ['raceId', 'entrantId', 'timeInterval']
+                );
+                logDebug(context, 'idx_race_entrant_time compound index created successfully for money flow history');
+            } catch (error) {
+                context.error(`Failed to create idx_race_entrant_time compound index for money flow history: ${error}`);
+            }
+        } else {
+            logDebug(
+                context,
+                'One or more attributes (raceId, entrantId, timeInterval) not available; skipping idx_race_entrant_time'
+            );
         }
     }
     
