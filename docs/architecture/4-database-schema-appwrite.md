@@ -22,7 +22,7 @@ odds (float), eventTimestamp (datetime, indexed), type (string),
 entrant (relationship → entrants)
 
 -- money-flow-history: NEW - Time-series money flow data for timeline visualization
-entrant (relationship → entrants), raceId (string, indexed), holdPercentage (float),
+entrant (relationship → entrants), raceId (string, indexed), entrantId (string, indexed), holdPercentage (float),
 betPercentage (float), type (string, indexed), timeToStart (integer), timeInterval (integer),
 intervalType (string), eventTimestamp (datetime, indexed), pollingTimestamp (datetime, indexed),
 winPoolAmount (integer), placePoolAmount (integer), winPoolPercentage (float),
@@ -56,5 +56,15 @@ type (string), read (boolean), raceId (string), entrantId (string)
 - **race-pools:** idx_race_id (unique), idx_last_updated
 - **jockey-silks:** idx_silk_id (unique), idx_jockey_name
 - **user-alert-configs:** idx_user_id, idx_user_entrant (compound)
+
+## 4.3. Scalar Key Enforcement (2025-02)
+
+- **Mandatory identifiers:** `entrants` and `money-flow-history` documents must include both `raceId` and `entrantId` scalar
+  string fields. Ingestion pipelines now refuse to write documents if either value is absent, preventing future index drift.
+- **Automated hygiene:** The `scalar-key-maintenance` Appwrite Function runs every 30 minutes (UTC) to backfill legacy records
+  using relationship pointers. Operators should monitor its warning logs and disable the schedule once it reports zero
+  outstanding documents for three consecutive runs.
+- **Monitoring:** Any document that cannot be repaired is logged with context so data engineers can fix the underlying source
+  record before Phase 2 index provisioning.
 
 ---

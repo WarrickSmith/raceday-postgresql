@@ -1125,6 +1125,7 @@ async function ensureMoneyFlowHistoryCollection(databases, config, context, prog
         
         // CRITICAL MISSING FIELD - Required for proper race filtering
         { key: 'raceId', type: 'string', size: 50, required: false }, // Race identifier for filtering
+        { key: 'entrantId', type: 'string', size: 50, required: false }, // Entrant identifier mirror for scalar queries
         
         // Timeline display fields - Story 4.9 implementation
         { key: 'pollingTimestamp', type: 'datetime', required: false }, // When the polling occurred
