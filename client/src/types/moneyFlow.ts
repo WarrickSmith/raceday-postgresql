@@ -71,19 +71,6 @@ export interface MoneyFlowTimelineData {
   pollingActive: boolean
 }
 
-// Money flow subscription callback interface
-export interface MoneyFlowTimelineSubscriptionResponse {
-  payload?: {
-    entrant?: string
-    pollingTimestamp?: string
-    winPoolAmount?: number
-    placePoolAmount?: number
-    totalPoolAmount?: number
-    poolPercentage?: number
-    incrementalAmount?: number
-  }
-  events?: string[]
-}
 
 // Money flow processing utilities
 export interface MoneyFlowCalculations {

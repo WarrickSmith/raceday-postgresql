@@ -96,11 +96,6 @@ export interface EntrantWithSilk {
   silkRender?: SilkRenderData;
 }
 
-// Silk subscription callback interface
-export interface SilkSubscriptionResponse {
-  payload?: Partial<JockeySilk> & { jockeyName: string };
-  events?: string[];
-}
 
 // Default silk configuration for fallback
 export const DEFAULT_SILK_CONFIG: SilkDisplayConfig = {
