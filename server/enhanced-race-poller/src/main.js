@@ -1541,10 +1541,12 @@ async function saveRaceResults(
 ) {
   try {
     const timestamp = new Date().toISOString()
+    const normalizedRaceId = race?.raceId || race?.$id
+
     const resultsData = {
       race: race.$id,
-      // TASK 5: Add raceId for efficient race-based filtering
-      raceId: race.raceId || race.$id,
+      // Persist scalar raceId alongside relationship for API queries
+      raceId: normalizedRaceId,
       resultTime: timestamp,
     }
 
@@ -1599,17 +1601,39 @@ async function saveRaceResults(
 
     // Try to update existing results document, create if doesn't exist
     try {
-      const existingResults = await databases.listDocuments(
-        databaseId,
-        'race-results',
-        [Query.equal('race', race.$id), Query.limit(1)]
-      )
+      let existingResultDoc = null
 
-      if (existingResults.documents.length > 0) {
+      if (normalizedRaceId) {
+        // Prefer raceId lookups for forward-compatible ingestion
+        const resultsByRaceId = await databases.listDocuments(
+          databaseId,
+          'race-results',
+          [Query.equal('raceId', normalizedRaceId), Query.limit(1)]
+        )
+
+        if (resultsByRaceId.documents.length > 0) {
+          existingResultDoc = resultsByRaceId.documents[0]
+        }
+      }
+
+      if (!existingResultDoc) {
+        // Fallback to legacy relationship-based lookup for historical docs
+        const resultsByRelationship = await databases.listDocuments(
+          databaseId,
+          'race-results',
+          [Query.equal('race', race.$id), Query.limit(1)]
+        )
+
+        if (resultsByRelationship.documents.length > 0) {
+          existingResultDoc = resultsByRelationship.documents[0]
+        }
+      }
+
+      if (existingResultDoc) {
         await databases.updateDocument(
           databaseId,
           'race-results',
-          existingResults.documents[0].$id,
+          existingResultDoc.$id,
           resultsData
         )
       } else {
