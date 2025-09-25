@@ -417,30 +417,35 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         }
       }
 
-      // Priority 4: Fallback to dummy data temporarily to ensure display works
+      // Priority 4: No fallback - return undefined to show '-' instead of dummy data
       if (!poolPercentage) {
-        logger.debug(`No calculable data for ${entrant.name}, using fallback percentage`)
-        // Use a fallback percentage based on entrant position for testing
-        poolPercentage = Math.max(1, 15 - entrant.runnerNumber) // Simple fallback
-        dataSource = 'fallback_for_testing'
+        logger.debug(`No pool data available for ${entrant.name}, will display '-'`)
+        // Don't set poolPercentage - let it remain undefined so UI shows '-'
+        dataSource = 'no_data_available'
       }
 
       // Calculate individual pool contributions based on pool percentage
-      const holdPercentageDecimal = poolPercentage / 100
+      let winPoolContribution = 0
+      let placePoolContribution = 0
+      let totalPoolContribution = 0
 
-      // Use fallback pool totals if no race pool data (for testing)
-      const fallbackWinPool = 5000000 // $50k in cents
-      const fallbackPlacePool = 2000000 // $20k in cents
+      if (poolPercentage && poolPercentage > 0) {
+        const holdPercentageDecimal = poolPercentage / 100
 
-      const winPoolInDollars = Math.round(
-        (racePoolData?.winPoolTotal || fallbackWinPool) / 100
-      )
-      const placePoolInDollars = Math.round(
-        (racePoolData?.placePoolTotal || fallbackPlacePool) / 100
-      )
-      const winPoolContribution = winPoolInDollars * holdPercentageDecimal
-      const placePoolContribution = placePoolInDollars * holdPercentageDecimal
-      const totalPoolContribution = winPoolContribution + placePoolContribution
+        // Use fallback pool totals if no race pool data (for testing)
+        const fallbackWinPool = 5000000 // $50k in cents
+        const fallbackPlacePool = 2000000 // $20k in cents
+
+        const winPoolInDollars = Math.round(
+          (racePoolData?.winPoolTotal || fallbackWinPool) / 100
+        )
+        const placePoolInDollars = Math.round(
+          (racePoolData?.placePoolTotal || fallbackPlacePool) / 100
+        )
+        winPoolContribution = winPoolInDollars * holdPercentageDecimal
+        placePoolContribution = placePoolInDollars * holdPercentageDecimal
+        totalPoolContribution = winPoolContribution + placePoolContribution
+      }
 
       logger.debug(`Real calculation for ${entrant.name}:`, {
         poolPercentage,
@@ -456,12 +461,12 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         // Update odds with latest values from timeline data if available (NEW in Story 4.9)
         winOdds: entrantTimeline?.latestWinOdds ?? entrant.winOdds,
         placeOdds: entrantTimeline?.latestPlaceOdds ?? entrant.placeOdds,
-        poolMoney: {
+        poolMoney: poolPercentage ? {
           win: winPoolContribution,
           place: placePoolContribution,
           total: totalPoolContribution,
           percentage: poolPercentage,
-        },
+        } : undefined, // Return undefined when no pool data to ensure '-' is displayed
       }
 
       // Validate timeline summation for debugging
@@ -1680,7 +1685,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                                 const amount = getPoolAmount(entrant)
                                 return amount !== undefined
                                   ? formatMoney(amount)
-                                  : '...'
+                                  : '—'
                               })()}
                         </span>
                       </div>
@@ -1698,7 +1703,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                                 const percentage = getPoolPercentage(entrant)
                                 return percentage !== undefined
                                   ? formatPercentage(percentage)
-                                  : '...'
+                                  : '0%'
                               })()}
                         </span>
                         {!entrant.isScratched &&
