@@ -73,6 +73,8 @@ export function getStatusConfig(status: string | undefined): RaceStatusConfig {
     finished: 'final', // Map finished to final
     complete: 'final', // Map complete to final
     completed: 'final', // Map completed to final
+    cancelled: 'abandoned', // Normalize cancelled/canceled to abandoned visual
+    canceled: 'abandoned',
     abandoned: 'abandoned',
     postponed: 'postponed',
     started: 'closed', // Map started to closed (race is running)

@@ -3,6 +3,7 @@
 import { memo, useState, useEffect, useMemo } from 'react'
 import { useRace } from '@/contexts/RaceContext'
 import { formatDistance, formatRaceTime } from '@/utils/raceFormatters'
+import { getStatusConfig } from '@/utils/raceStatusConfig'
 import { RaceNavigation } from './RaceNavigation'
 import { getRaceTypeDisplay } from '@/constants/raceTypes'
 import type {
@@ -52,26 +53,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
     return () => clearInterval(timer)
   }, [])
 
-  const statusDisplay = useMemo(() => {
-    const status = race?.status?.toLowerCase() ?? 'unknown'
-
-    switch (status) {
-      case 'open':
-        return { label: 'Open', color: 'green' }
-      case 'closed':
-        return { label: 'Closed', color: 'yellow' }
-      case 'interim':
-        return { label: 'Interim', color: 'blue' }
-      case 'final':
-        return { label: 'Final', color: 'purple' }
-      case 'abandoned':
-        return { label: 'Abandoned', color: 'red' }
-      case 'postponed':
-        return { label: 'Postponed', color: 'orange' }
-      default:
-        return { label: 'Unknown', color: 'gray' }
-    }
-  }, [race?.status])
+  const statusConfig = useMemo(() => getStatusConfig(race?.status), [race?.status])
 
   // Memoized calculations to reduce re-renders (move before early return to avoid hook call errors)
   const formattedTime = useMemo(
@@ -210,13 +192,10 @@ export const RaceDataHeader = memo(function RaceDataHeader({
               STATUS
             </div>
             <div className="flex items-center gap-1">
-              <div
-                className={`w-2 h-2 rounded-full bg-${statusDisplay.color}-500`}
-              ></div>
-              <span
-                className={`text-sm font-semibold text-${statusDisplay.color}-800`}
-              >
-                {statusDisplay.label}
+              {/* Use a text dot with status color to avoid dynamic Tailwind class names */}
+              <span className={`${statusConfig.color} text-base leading-none`}>●</span>
+              <span className={`text-sm font-semibold ${statusConfig.color}`}>
+                {statusConfig.label}
               </span>
             </div>
           </div>
