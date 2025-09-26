@@ -41,6 +41,8 @@ export function useRacesForMeeting({
   const [isConnected, setIsConnected] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const fetchAttemptRef = useRef(0);
+  const pendingRequestRef = useRef<Promise<void> | null>(null);
+  const pendingForMeetingIdRef = useRef<string | null>(null);
 
   // Check cache for existing races
   const getCachedRaces = useCallback((meetingId: string): Race[] | null => {
@@ -58,7 +60,12 @@ export function useRacesForMeeting({
 
   // Fetch races with error handling and caching
   const fetchRaces = useCallback(async (meetingId: string, retryAttempt = 0): Promise<void> => {
-    // Cancel any existing request
+    // If the same meetingId request is already in-flight, reuse it
+    if (pendingRequestRef.current && pendingForMeetingIdRef.current === meetingId) {
+      return pendingRequestRef.current
+    }
+
+    // Cancel any existing request for previous meetingId
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -79,57 +86,68 @@ export function useRacesForMeeting({
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    try {
-      const fetchedRaces = await fetchRacesForMeeting(meetingId);
+    const requestPromise = (async () => {
+      try {
+        const fetchedRaces = await fetchRacesForMeeting(meetingId);
       
-      // Check if request was aborted
-      if (abortController.signal.aborted) {
-        return;
-      }
-
-      // Validate race data
-      const validRaces = fetchedRaces.filter(race => {
-        const isValid = validateRaceData(race);
-        if (!isValid && process.env.NODE_ENV === 'development') {
-          console.warn('Invalid race data:', race);
+        // Check if request was aborted
+        if (abortController.signal.aborted) {
+          return;
         }
-        return isValid;
-      });
 
-      // Sort races by race number
-      const sortedRaces = validRaces.sort((a, b) => a.raceNumber - b.raceNumber);
-
-      setRaces(sortedRaces);
-      setCachedRaces(meetingId, sortedRaces);
-      setIsLoading(false);
-      setError(null);
-      
-    } catch (err) {
-      // Don't update state if request was aborted
-      if (abortController.signal.aborted) {
-        return;
-      }
-
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch races';
-      
-      // Retry logic with exponential backoff
-      if (retryAttempt < 2) {
-        const delay = Math.min(1000 * Math.pow(2, retryAttempt), 5000);
-        setTimeout(() => {
-          if (!abortController.signal.aborted) {
-            void fetchRaces(meetingId, retryAttempt + 1);
+        // Validate race data
+        const validRaces = fetchedRaces.filter(race => {
+          const isValid = validateRaceData(race);
+          if (!isValid && process.env.NODE_ENV === 'development') {
+            console.warn('Invalid race data:', race);
           }
-        }, delay);
-        return;
-      }
+          return isValid;
+        });
 
-      setError(errorMessage);
-      setIsLoading(false);
-      
-      if (onError) {
-        onError(err instanceof Error ? err : new Error(errorMessage));
+        // Sort races by race number
+        const sortedRaces = validRaces.sort((a, b) => a.raceNumber - b.raceNumber);
+
+        setRaces(sortedRaces);
+        setCachedRaces(meetingId, sortedRaces);
+        setIsLoading(false);
+        setError(null);
+      } catch (err) {
+        // Don't update state if request was aborted
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch races';
+        
+        // Retry logic with exponential backoff
+        if (retryAttempt < 2) {
+          const delay = Math.min(1000 * Math.pow(2, retryAttempt), 5000);
+          setTimeout(() => {
+            if (!abortController.signal.aborted) {
+              void fetchRaces(meetingId, retryAttempt + 1);
+            }
+          }, delay);
+          return;
+        }
+
+        setError(errorMessage);
+        setIsLoading(false);
+        
+        if (onError) {
+          onError(err instanceof Error ? err : new Error(errorMessage));
+        }
+      } finally {
+        // Clear pending pointer if it matches this request
+        if (pendingRequestRef.current === requestPromise) {
+          pendingRequestRef.current = null
+          pendingForMeetingIdRef.current = null
+        }
       }
-    }
+    })()
+
+    pendingRequestRef.current = requestPromise
+    pendingForMeetingIdRef.current = meetingId
+    return requestPromise
   }, [getCachedRaces, setCachedRaces, onError]);
 
   // Setup cache event listening for polling-based updates from meetings data
