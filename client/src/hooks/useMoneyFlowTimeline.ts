@@ -38,7 +38,10 @@ interface ServerMoneyFlowPoint {
   $id: string
   $createdAt: string
   $updatedAt: string
-  entrant: EntrantReference
+  // Server may return either a relational `entrant` field or a scalar `entrantId`.
+  // Our API currently selects `entrantId` for performance; include both for compatibility.
+  entrant?: EntrantReference
+  entrantId?: string
   eventTimestamp?: string
   pollingTimestamp?: string
   timeToStart?: number
@@ -462,7 +465,8 @@ function processTimelineData(
   for (const entrantId of entrantIds) {
     // Extract entrant ID consistently across all data formats
     const entrantDocs = documents.filter((doc) => {
-      const docEntrantId = extractEntrantId(doc.entrant)
+      // Prefer scalar `entrantId` when present, fallback to relational `entrant`
+      const docEntrantId = (doc.entrantId && String(doc.entrantId)) || extractEntrantId(doc.entrant as EntrantReference)
       return docEntrantId === entrantId
     })
 
