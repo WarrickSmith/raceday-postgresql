@@ -111,6 +111,8 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
         try {
           const response = await fetch(`/api/race/${normalizedRaceId}`, {
             signal: controller.signal,
+            cache: 'no-store', // ensure fresh status on initial load
+            headers: { 'X-Race-Initial-Load': 'true' },
           })
 
           if (!response.ok) {
