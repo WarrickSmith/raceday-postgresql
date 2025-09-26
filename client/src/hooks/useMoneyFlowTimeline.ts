@@ -75,6 +75,9 @@ interface MoneyFlowTimelineResponse {
   intervalCoverage?: Record<string, unknown>
   message?: string
   queryOptimizations?: string[]
+  // Incremental fetch cursors
+  nextCursor?: string | null
+  nextCreatedAt?: string | null
 }
 
 export interface TimelineGridData {
@@ -124,6 +127,10 @@ export function useMoneyFlowTimeline(
   const timelineDataRef = useRef(timelineData)
   const isFetchingRef = useRef(false)
   const pendingRequestRef = useRef<Promise<void> | null>(null)
+  // Incremental fetch tracking
+  const nextCursorRef = useRef<string | null>(null)
+  const nextCreatedAtRef = useRef<string | null>(null)
+  const lastEntrantKeyRef = useRef<string>('')
 
   useEffect(() => {
     timelineDataRef.current = timelineData
@@ -158,8 +165,22 @@ export function useMoneyFlowTimeline(
       }
 
       try {
+        // Reset cursors when entrant set changes
+        const entrantsChangedThisFetch = lastEntrantKeyRef.current !== entrantKey
+        if (entrantsChangedThisFetch) {
+          nextCursorRef.current = null
+          nextCreatedAtRef.current = null
+          lastEntrantKeyRef.current = entrantKey
+        }
+
+        const params = new URLSearchParams()
+        params.set('entrants', entrantKey)
+        // Use createdAfter for incremental fetches when we have a cursor timestamp
+        if (nextCreatedAtRef.current) {
+          params.set('createdAfter', nextCreatedAtRef.current)
+        }
         const response = await fetch(
-          `/api/race/${raceId}/money-flow-timeline?entrants=${entrantKey}`
+          `/api/race/${raceId}/money-flow-timeline?${params.toString()}`
         )
 
         if (!response.ok) {
@@ -184,18 +205,48 @@ export function useMoneyFlowTimeline(
           })
         }
 
-        if (documents.length === 0) {
-          setTimelineData(new Map())
-          setLastUpdate(new Date())
-          return
+        const incomingMap = processTimelineData(documents, entrantIds, loggerRef.current)
+        const hasIncoming = documents.length > 0 && incomingMap.size > 0
+
+        // Update cursors for next incremental request only when we received new data
+        if (hasIncoming) {
+          nextCursorRef.current = data.nextCursor ?? nextCursorRef.current
+          nextCreatedAtRef.current = data.nextCreatedAt ?? nextCreatedAtRef.current
         }
 
-        const entrantDataMap = processTimelineData(
-          documents,
-          entrantIds,
-          loggerRef.current
-        )
-        setTimelineData(entrantDataMap)
+        if (entrantsChangedThisFetch) {
+          // For entrant set changes, replace with whatever we have (can be empty)
+          setTimelineData(incomingMap)
+        } else if (hasIncoming) {
+          if (!nextCreatedAtRef.current || timelineDataRef.current.size === 0) {
+            // Initial load or no cursor provided -> replace
+            setTimelineData(incomingMap)
+          } else {
+            // Incremental load -> merge into existing map by $id
+            const merged = new Map(timelineDataRef.current)
+            for (const [eid, newData] of incomingMap) {
+              const prev = merged.get(eid)
+              if (!prev) {
+                merged.set(eid, newData)
+                continue
+              }
+              const seen = new Set(prev.dataPoints.map((p) => p.$id))
+              const combined = [...prev.dataPoints]
+              for (const p of newData.dataPoints) {
+                if (p.$id && !seen.has(p.$id)) {
+                  combined.push(p)
+                }
+              }
+              combined.sort((a, b) => {
+                const ai = (a.timeInterval ?? a.timeToStart ?? -Infinity) as number
+                const bi = (b.timeInterval ?? b.timeToStart ?? -Infinity) as number
+                return bi - ai
+              })
+              merged.set(eid, { ...prev, ...newData, dataPoints: combined })
+            }
+            setTimelineData(merged)
+          }
+        } // else: no incoming data and same entrants -> keep existing timeline to avoid flicker
         setLastUpdate(new Date())
       } catch (err) {
         const errorMessage =
