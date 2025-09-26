@@ -15,7 +15,6 @@
     "deploy:enhanced-race-poller": "node scripts/deploy.js enhanced-race-poller",
     "deploy:meeting-status": "node scripts/deploy.js meeting-status-poller",
     "deploy:master-scheduler": "node scripts/deploy.js master-race-scheduler",
-    "deploy:scalar-key-maintenance": "node scripts/deploy.js scalar-key-maintenance",
     "deploy:database-setup": "node scripts/deploy.js database-setup",
     "meetings": "node scripts/run-function.js daily-meetings",
     "races": "node scripts/run-function.js daily-races",
@@ -23,7 +22,6 @@
     "enhanced-race-poller": "node scripts/run-function.js enhanced-race-poller",
     "meeting-status": "node scripts/run-function.js meeting-status-poller",
     "master-scheduler": "node scripts/run-function.js master-race-scheduler",
-    "scalar-key-maintenance": "node scripts/run-function.js scalar-key-maintenance",
     "database-setup": "node scripts/run-function.js database-setup",
     "execute": "node scripts/execute-function.js",
     "get-test-race-ids": "node scripts/get-test-race-ids.js"

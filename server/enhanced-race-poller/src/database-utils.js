@@ -822,7 +822,8 @@ async function saveTimeBucketedMoneyFlowHistory(databases, databaseId, raceId, e
       try {
         // Search for immediate previous bucket
         const previousQuery = await databases.listDocuments(databaseId, 'money-flow-history', [
-          Query.equal('entrant', entrantId),
+          // Use scalar entrantId to leverage idx_race_entrant_time compound index
+          Query.equal('entrantId', scalarEntrantId),
           Query.equal('raceId', raceId),
           Query.equal('type', 'bucketed_aggregation'),
           Query.greaterThan('timeInterval', timeInterval),
