@@ -63,7 +63,8 @@ async function getRacePoolData(raceId: string): Promise<RacePoolData | null> {
       const poolQuery = await databases.listDocuments(
         'raceday-db',
         'race-pools',
-        [Query.equal('raceId', raceDoc.$id), Query.limit(1)]
+        // Match pools by scalar raceId (string), not the race document $id
+        [Query.equal('raceId', raceDoc.raceId), Query.limit(1)]
       );
 
       if (poolQuery.documents.length > 0) {
