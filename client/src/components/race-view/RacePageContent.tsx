@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRace } from '@/contexts/RaceContext'
 import { RaceDataHeader } from '@/components/race-view/RaceDataHeader'
 import { EnhancedEntrantsGrid } from '@/components/race-view/EnhancedEntrantsGrid'
 import { RaceFooter } from '@/components/race-view/RaceFooter'
 import AlertsConfigModal from '@/components/alerts/AlertsConfigModal'
-import type { RaceStatus, RacePoolData } from '@/types/racePools'
+import type { RaceStatus } from '@/types/racePools'
+import { useRacePools } from '@/hooks/useRacePools'
 
 export function RacePageContent() {
   const { raceData, isLoading, error, pollingState } = useRace()
@@ -14,52 +15,11 @@ export function RacePageContent() {
   // Alerts Configuration Modal state (moved from EnhancedEntrantsGrid for performance)
   const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false)
 
-  // Pool data state
-  const [poolData, setPoolData] = useState<RacePoolData | null>(null)
-  const [poolLastUpdated, setPoolLastUpdated] = useState<Date | null>(null)
-
-  // Fetch pool data when race data is available
-  useEffect(() => {
-    if (!raceData?.race?.raceId) {
-      return
-    }
-
-    const controller = new AbortController()
-    let isActive = true
-
-    const fetchPoolData = async () => {
-      try {
-        const response = await fetch(`/api/race/${raceData.race.raceId}/pools`, {
-          signal: controller.signal,
-        })
-
-        if (!isActive) {
-          return
-        }
-
-        if (response.ok) {
-          const data: RacePoolData = await response.json()
-          setPoolData(data)
-          setPoolLastUpdated(new Date())
-        } else {
-          console.warn('Pool data not available for race:', raceData.race.raceId)
-          setPoolData(null)
-        }
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          console.error('Error fetching pool data:', error)
-          setPoolData(null)
-        }
-      }
-    }
-
-    void fetchPoolData()
-
-    return () => {
-      isActive = false
-      controller.abort()
-    }
-  }, [raceData?.race?.raceId, pollingState.lastUpdated])
+  // Pools data with deduped fetch and proper abort/cleanup
+  const {
+    poolData,
+    lastUpdate: poolLastUpdated,
+  } = useRacePools(raceData?.race?.raceId, pollingState.lastUpdated)
 
   if (!raceData) {
     return (
