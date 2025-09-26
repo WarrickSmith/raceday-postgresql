@@ -112,10 +112,20 @@ export function RacePageContent() {
     'abandoned',
     'postponed',
   ]
-  const normalizedStatus = currentRace.status?.toLowerCase() as RaceStatus
-  const raceStatus: RaceStatus = validStatuses.includes(normalizedStatus)
-    ? normalizedStatus
-    : 'open'
+  const normalizedStatusRaw = currentRace.status?.toLowerCase() || 'open'
+  // Map common variants to canonical keys (keep in sync with getStatusConfig)
+  const variantMap: Record<string, RaceStatus> = {
+    finalized: 'final',
+    finished: 'final',
+    complete: 'final',
+    completed: 'final',
+    started: 'closed',
+    running: 'closed',
+    cancelled: 'abandoned',
+    canceled: 'abandoned',
+  }
+  const normalizedStatus = (variantMap[normalizedStatusRaw] || normalizedStatusRaw) as RaceStatus
+  const raceStatus: RaceStatus = validStatuses.includes(normalizedStatus) ? normalizedStatus : 'open'
 
   return (
     <div className="race-page-layout">
