@@ -28,21 +28,35 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
   const [nextScheduledRace, setNextScheduledRace] = useState<NextScheduledRace | null>(null);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingRequestRef = useRef<Promise<void> | null>(null);
 
   // Fetch the next scheduled race from the API
   const fetchNextScheduledRace = useCallback(async () => {
-    try {
-      const response = await fetch('/api/next-scheduled-race');
-      if (response.ok) {
-        const data: NextScheduledRaceApiResponse = await response.json();
-        setNextScheduledRace(data.nextScheduledRace);
-      } else {
-        setNextScheduledRace(null);
-      }
-    } catch (error) {
-      console.error('Failed to fetch next scheduled race:', error);
-      setNextScheduledRace(null);
+    if (pendingRequestRef.current) {
+      return pendingRequestRef.current;
     }
+
+    const promise = (async () => {
+      try {
+        const response = await fetch('/api/next-scheduled-race');
+        if (response.ok) {
+          const data: NextScheduledRaceApiResponse = await response.json();
+          setNextScheduledRace(data.nextScheduledRace);
+        } else {
+          setNextScheduledRace(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch next scheduled race:', error);
+        setNextScheduledRace(null);
+      } finally {
+        if (pendingRequestRef.current === promise) {
+          pendingRequestRef.current = null;
+        }
+      }
+    })();
+
+    pendingRequestRef.current = promise;
+    return promise;
   }, []);
 
   // Setup intelligent polling based on race timing

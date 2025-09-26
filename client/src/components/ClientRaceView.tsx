@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRace } from '@/contexts/RaceContext';
 import { RacePageContent } from '@/components/race-view/RacePageContent';
 import { useLogger } from '@/utils/logging';
@@ -13,6 +13,7 @@ export function ClientRaceView({ raceId }: ClientRaceViewProps) {
   const logger = useLogger('ClientRaceView');
   const { raceData, isLoading: contextLoading, loadRaceData, error: contextError } = useRace();
   const [error, setError] = useState<string | null>(null);
+  const scheduledRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!raceId) return;
@@ -25,14 +26,49 @@ export function ClientRaceView({ raceId }: ClientRaceViewProps) {
     if (!raceData || currentRaceId !== raceId) {
       logger.info('Loading race data for:', { raceId });
       setError(null);
-      loadRaceData(raceId).catch((err) => {
-        logger.error('Failed to load race data in ClientRaceView:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load race data');
-      });
+      // Schedule load on next frame to avoid dev StrictMode double-mount abort churn
+      if (scheduledRef.current !== null) {
+        if (typeof cancelAnimationFrame !== 'undefined') {
+          cancelAnimationFrame(scheduledRef.current);
+        } else {
+          clearTimeout(scheduledRef.current as unknown as number);
+        }
+        scheduledRef.current = null;
+      }
+
+      const run = () => {
+        loadRaceData(raceId).catch((err) => {
+          logger.error('Failed to load race data in ClientRaceView:', err);
+          setError(err instanceof Error ? err.message : 'Failed to load race data');
+        });
+      };
+
+      if (typeof requestAnimationFrame !== 'undefined') {
+        scheduledRef.current = requestAnimationFrame(() => {
+          scheduledRef.current = null;
+          run();
+        });
+      } else {
+        const id = setTimeout(() => {
+          scheduledRef.current = null;
+          run();
+        }, 0) as unknown as number;
+        scheduledRef.current = id;
+      }
     } else if (raceData && currentRaceId === raceId) {
       logger.debug('Race data already matches URL, clearing any errors');
       setError(null);
     }
+    return () => {
+      if (scheduledRef.current !== null) {
+        if (typeof cancelAnimationFrame !== 'undefined') {
+          cancelAnimationFrame(scheduledRef.current);
+        } else {
+          clearTimeout(scheduledRef.current as unknown as number);
+        }
+        scheduledRef.current = null;
+      }
+    };
   }, [raceId, raceData, contextLoading, loadRaceData, logger]);
 
   // Handle errors (prefer context error over local error)
