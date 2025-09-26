@@ -40,22 +40,72 @@ async function getBasicRaceData(raceId: string): Promise<{
   try {
     const { databases } = await createServerClient();
     
-    // Fetch race by raceId field (not $id)
-    const raceQuery = await databases.listDocuments(
-      'raceday-db', 
-      'races',
-      [Query.equal('raceId', raceId), Query.limit(1)]
-    );
+    // Fetch race by raceId field (not $id). Fallback to $id for backward compatibility.
+    let raceData: any | null = null;
+    try {
+      const raceQuery = await databases.listDocuments(
+        'raceday-db', 
+        'races',
+        [Query.equal('raceId', raceId), Query.limit(1)]
+      );
+      if (raceQuery.documents.length > 0) {
+        raceData = raceQuery.documents[0] as any;
+      }
+    } catch {}
 
-    if (!raceQuery.documents.length) {
+    if (!raceData) {
+      try {
+        raceData = (await databases.getDocument('raceday-db', 'races', raceId)) as any;
+      } catch {
+        return null;
+      }
+    }
+    
+    // Resolve meeting info (supports string ID or expanded object)
+    let resolvedMeetingId: string | null = null;
+    let resolvedMeeting: Meeting | null = null;
+
+    if (typeof raceData.meeting === 'string' && raceData.meeting) {
+      resolvedMeetingId = raceData.meeting;
+    } else if (raceData.meeting?.meetingId) {
+      resolvedMeetingId = raceData.meeting.meetingId;
+    } else if (raceData.meeting?.$id) {
+      resolvedMeetingId = raceData.meeting.$id;
+    }
+
+    if (!resolvedMeetingId) {
       return null;
     }
 
-    const raceData = raceQuery.documents[0];
-    
-    // Validate that meeting data is populated
-    if (!raceData.meeting || !raceData.meeting.meetingId) {
-      return null;
+    if (raceData.meeting && typeof raceData.meeting === 'object' && (raceData.meeting.meetingName || raceData.meeting.meetingId)) {
+      resolvedMeeting = {
+        $id: raceData.meeting.$id ?? resolvedMeetingId,
+        $createdAt: raceData.meeting.$createdAt ?? raceData.$createdAt,
+        $updatedAt: raceData.meeting.$updatedAt ?? raceData.$updatedAt,
+        meetingId: raceData.meeting.meetingId ?? resolvedMeetingId,
+        meetingName: raceData.meeting.meetingName ?? 'Unknown Meeting',
+        country: raceData.meeting.country ?? 'Unknown',
+        raceType: raceData.meeting.raceType ?? '',
+        category: raceData.meeting.category ?? '',
+        date: raceData.meeting.date ?? raceData.$createdAt,
+      } as Meeting;
+    } else {
+      try {
+        const meetingDoc = await databases.getDocument('raceday-db', 'meetings', resolvedMeetingId);
+        resolvedMeeting = meetingDoc as unknown as Meeting;
+      } catch {
+        resolvedMeeting = {
+          $id: resolvedMeetingId,
+          $createdAt: raceData.$createdAt,
+          $updatedAt: raceData.$updatedAt,
+          meetingId: resolvedMeetingId,
+          meetingName: 'Unknown Meeting',
+          country: 'Unknown',
+          raceType: '',
+          category: '',
+          date: raceData.$createdAt,
+        } as Meeting;
+      }
     }
 
     // The race already has the meeting data populated as a nested object
@@ -68,23 +118,13 @@ async function getBasicRaceData(raceId: string): Promise<{
       raceNumber: raceData.raceNumber,
       name: raceData.name,
       startTime: raceData.startTime,
-      meeting: raceData.meeting.meetingId, // Extract the meetingId for the Race interface
+      meeting: resolvedMeetingId!, // return meetingId string for the Race interface
       status: raceData.status,
       distance: raceData.distance,
       trackCondition: raceData.trackCondition,
     };
 
-    const meeting: Meeting = {
-      $id: raceData.meeting.$id,
-      $createdAt: raceData.meeting.$createdAt,
-      $updatedAt: raceData.meeting.$updatedAt,
-      meetingId: raceData.meeting.meetingId,
-      meetingName: raceData.meeting.meetingName,
-      country: raceData.meeting.country,
-      raceType: raceData.meeting.raceType,
-      category: raceData.meeting.category,
-      date: raceData.meeting.date,
-    };
+    const meeting: Meeting = resolvedMeeting!;
 
     return { 
       race, 

@@ -22,6 +22,8 @@ const RACE_SELECT_FIELDS = [
   'trackCondition',
   'weather',
   'type',
+  // Include base meeting field to support both string ID and expanded object shapes
+  'meeting',
   'meeting.$id',
   'meeting.$createdAt',
   'meeting.$updatedAt',
@@ -58,8 +60,6 @@ const ENTRANT_SELECT_FIELDS = [
   'runnerNumber',
   'jockey',
   'trainerName',
-  'weight',
-  'silkUrl',
   'silkColours',
   'silkUrl64',
   'silkUrl128',
@@ -89,7 +89,6 @@ const NAVIGATION_SELECT_FIELDS = [
   'name',
   'startTime',
   'status',
-  'meeting.meetingName',
 ]
 
 type AppwriteDatabases = Awaited<ReturnType<typeof createServerClient>>['databases']
@@ -225,18 +224,27 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
   try {
     const { databases } = await createServerClient()
 
-    // Fetch race by raceId field (not $id)
-    const raceQuery = await databases.listDocuments('raceday-db', 'races', [
-      Query.equal('raceId', raceId),
-      Query.select(RACE_SELECT_FIELDS),
-      Query.limit(1),
-    ])
+    // Fetch race by raceId field (not $id). Fallback to $id for backward compatibility.
+    let raceData: any | null = null
+    try {
+      const raceQuery = await databases.listDocuments('raceday-db', 'races', [
+        Query.equal('raceId', raceId),
+        Query.select(RACE_SELECT_FIELDS),
+        Query.limit(1),
+      ])
+      if (raceQuery.documents.length > 0) {
+        raceData = raceQuery.documents[0]
+      }
+    } catch {}
 
-    if (!raceQuery.documents.length) {
-      return null
+    // Fallback: try fetching by document $id directly
+    if (!raceData) {
+      try {
+        raceData = (await databases.getDocument('raceday-db', 'races', raceId)) as any
+      } catch {
+        return null
+      }
     }
-
-    const raceData = raceQuery.documents[0]
 
     const raceResultsData = await fetchRaceResultsDocument(
       databases,
@@ -244,9 +252,56 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       raceData.$id
     )
 
-    // Validate that meeting data is populated
-    if (!raceData.meeting || !raceData.meeting.meetingId) {
+    // Resolve meeting info in a backward-compatible way (supports string ID or expanded object)
+    let resolvedMeetingId: string | null = null
+    let resolvedMeeting: Meeting | null = null
+
+    // Determine meeting ID from various possible shapes
+    if (typeof raceData.meeting === 'string' && raceData.meeting) {
+      resolvedMeetingId = raceData.meeting
+    } else if (raceData.meeting?.meetingId) {
+      resolvedMeetingId = raceData.meeting.meetingId
+    } else if (raceData.meeting?.$id) {
+      resolvedMeetingId = raceData.meeting.$id
+    }
+
+    if (!resolvedMeetingId) {
       return null
+    }
+
+    // If we have an expanded meeting document, use it; otherwise fetch it by ID
+    if (raceData.meeting && typeof raceData.meeting === 'object' && (raceData.meeting.meetingName || raceData.meeting.meetingId)) {
+      resolvedMeeting = {
+        $id: raceData.meeting.$id ?? resolvedMeetingId,
+        $createdAt: raceData.meeting.$createdAt ?? raceData.$createdAt,
+        $updatedAt: raceData.meeting.$updatedAt ?? raceData.$updatedAt,
+        meetingId: raceData.meeting.meetingId ?? resolvedMeetingId,
+        meetingName: raceData.meeting.meetingName ?? 'Unknown Meeting',
+        country: raceData.meeting.country ?? 'Unknown',
+        raceType: raceData.meeting.raceType ?? '',
+        category: raceData.meeting.category ?? '',
+        date: raceData.meeting.date ?? raceData.$createdAt,
+        weather: raceData.meeting.weather ?? undefined,
+        trackCondition: raceData.meeting.trackCondition ?? undefined,
+      }
+    } else {
+      try {
+        const meetingDoc = await databases.getDocument('raceday-db', 'meetings', resolvedMeetingId)
+        resolvedMeeting = meetingDoc as unknown as Meeting
+      } catch {
+        // If meeting fetch fails, still return race data with minimal meeting info
+        resolvedMeeting = {
+          $id: resolvedMeetingId,
+          $createdAt: raceData.$createdAt,
+          $updatedAt: raceData.$updatedAt,
+          meetingId: resolvedMeetingId,
+          meetingName: 'Unknown Meeting',
+          country: 'Unknown',
+          raceType: '',
+          category: '',
+          date: raceData.$createdAt,
+        } as Meeting
+      }
     }
 
     // The race already has the meeting data populated as a nested object
@@ -260,7 +315,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       name: raceData.name,
       startTime: raceData.startTime,
       actualStart: raceData.actualStart, // Include actual start time from database
-      meeting: raceData.meeting.meetingId, // Extract the meetingId for the Race interface
+      meeting: resolvedMeetingId, // Always return meetingId string for the Race interface
       status: raceData.status,
       distance: raceData.distance,
       trackCondition: raceData.trackCondition,
@@ -284,19 +339,7 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       resultTime: raceResultsData?.resultTime,
     }
 
-    const meeting: Meeting = {
-      $id: raceData.meeting.$id,
-      $createdAt: raceData.meeting.$createdAt,
-      $updatedAt: raceData.meeting.$updatedAt,
-      meetingId: raceData.meeting.meetingId,
-      meetingName: raceData.meeting.meetingName,
-      country: raceData.meeting.country,
-      raceType: raceData.meeting.raceType,
-      category: raceData.meeting.category,
-      date: raceData.meeting.date,
-      // Include weather if present in the Appwrite meeting document so client header can use it
-      weather: raceData.meeting.weather ?? undefined,
-    }
+    const meeting: Meeting = resolvedMeeting
 
     // Fetch entrants for this race with batch optimization
     const entrantsQuery = await databases.listDocuments(
@@ -474,8 +517,6 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
         runnerNumber: doc.runnerNumber,
         jockey: doc.jockey,
         trainerName: doc.trainerName,
-        weight: doc.weight,
-        silkUrl: doc.silkUrl,
         silkColours: doc.silkColours,
         silkUrl64: doc.silkUrl64,
         silkUrl128: doc.silkUrl128,
@@ -566,17 +607,25 @@ async function getNavigationRaceData(raceId: string): Promise<{
     const { databases } = await createServerClient()
 
     // Fetch race with meeting data - only essential fields
-    const raceQuery = await databases.listDocuments('raceday-db', 'races', [
-      Query.equal('raceId', raceId),
-      Query.select(RACE_SELECT_FIELDS),
-      Query.limit(1),
-    ])
+    let raceData: any | null = null
+    try {
+      const raceQuery = await databases.listDocuments('raceday-db', 'races', [
+        Query.equal('raceId', raceId),
+        Query.select(RACE_SELECT_FIELDS),
+        Query.limit(1),
+      ])
+      if (raceQuery.documents.length > 0) {
+        raceData = raceQuery.documents[0]
+      }
+    } catch {}
 
-    if (!raceQuery.documents.length) {
-      return null
+    if (!raceData) {
+      try {
+        raceData = (await databases.getDocument('raceday-db', 'races', raceId)) as any
+      } catch {
+        return null
+      }
     }
-
-    const raceData = raceQuery.documents[0]
 
     const raceResultsData = await fetchRaceResultsDocument(
       databases,
@@ -584,8 +633,53 @@ async function getNavigationRaceData(raceId: string): Promise<{
       raceData.$id
     )
 
-    if (!raceData.meeting || !raceData.meeting.meetingId) {
+    // Resolve meeting info (supports string ID or expanded object)
+    let resolvedMeetingId: string | null = null
+    let resolvedMeeting: Meeting | null = null
+
+    if (typeof raceData.meeting === 'string' && raceData.meeting) {
+      resolvedMeetingId = raceData.meeting
+    } else if (raceData.meeting?.meetingId) {
+      resolvedMeetingId = raceData.meeting.meetingId
+    } else if (raceData.meeting?.$id) {
+      resolvedMeetingId = raceData.meeting.$id
+    }
+
+    if (!resolvedMeetingId) {
       return null
+    }
+
+    if (raceData.meeting && typeof raceData.meeting === 'object' && (raceData.meeting.meetingName || raceData.meeting.meetingId)) {
+      resolvedMeeting = {
+        $id: raceData.meeting.$id ?? resolvedMeetingId,
+        $createdAt: raceData.meeting.$createdAt ?? raceData.$createdAt,
+        $updatedAt: raceData.meeting.$updatedAt ?? raceData.$updatedAt,
+        meetingId: raceData.meeting.meetingId ?? resolvedMeetingId,
+        meetingName: raceData.meeting.meetingName ?? 'Unknown Meeting',
+        country: raceData.meeting.country ?? 'Unknown',
+        raceType: raceData.meeting.raceType ?? '',
+        category: raceData.meeting.category ?? '',
+        date: raceData.meeting.date ?? raceData.$createdAt,
+        weather: raceData.meeting.weather ?? undefined,
+        trackCondition: raceData.meeting.trackCondition ?? undefined,
+      }
+    } else {
+      try {
+        const meetingDoc = await databases.getDocument('raceday-db', 'meetings', resolvedMeetingId)
+        resolvedMeeting = meetingDoc as unknown as Meeting
+      } catch {
+        resolvedMeeting = {
+          $id: resolvedMeetingId,
+          $createdAt: raceData.$createdAt,
+          $updatedAt: raceData.$updatedAt,
+          meetingId: resolvedMeetingId,
+          meetingName: 'Unknown Meeting',
+          country: 'Unknown',
+          raceType: '',
+          category: '',
+          date: raceData.$createdAt,
+        } as Meeting
+      }
     }
 
     // Convert to expected format (same as comprehensive version)
@@ -598,7 +692,7 @@ async function getNavigationRaceData(raceId: string): Promise<{
       name: raceData.name,
       startTime: raceData.startTime,
       actualStart: raceData.actualStart, // Include actual start time from database
-      meeting: raceData.meeting.meetingId,
+      meeting: resolvedMeetingId,
       status: raceData.status,
       distance: raceData.distance,
       trackCondition: raceData.trackCondition,
@@ -622,19 +716,7 @@ async function getNavigationRaceData(raceId: string): Promise<{
       resultTime: raceResultsData?.resultTime,
     }
 
-    const meeting: Meeting = {
-      $id: raceData.meeting.$id,
-      $createdAt: raceData.meeting.$createdAt,
-      $updatedAt: raceData.meeting.$updatedAt,
-      meetingId: raceData.meeting.meetingId,
-      meetingName: raceData.meeting.meetingName,
-      country: raceData.meeting.country,
-      raceType: raceData.meeting.raceType,
-      category: raceData.meeting.category,
-      date: raceData.meeting.date,
-      // Ensure weather is populated from the meeting document when available
-      weather: raceData.meeting.weather ?? undefined,
-    }
+    const meeting: Meeting = resolvedMeeting
 
     // Fetch basic entrants data - no history data for speed
     const entrantsQuery = await databases.listDocuments(
@@ -693,8 +775,6 @@ async function getNavigationRaceData(raceId: string): Promise<{
       runnerNumber: doc.runnerNumber,
       jockey: doc.jockey,
       trainerName: doc.trainerName,
-      weight: doc.weight,
-      silkUrl: doc.silkUrl,
       silkColours: doc.silkColours,
       silkUrl64: doc.silkUrl64,
       silkUrl128: doc.silkUrl128,
