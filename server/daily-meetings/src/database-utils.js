@@ -90,14 +90,17 @@ function buildMeetingDocument(meeting, timestamp = new Date().toISOString()) {
     return meetingDoc;
 }
 
-function buildRaceDocument(race, meetingId, timestamp = new Date().toISOString()) {
+function buildRaceDocument(race, meetingData, timestamp = new Date().toISOString()) {
+    // Extract meetingId - races collection uses relationship to meetings, not expanded objects
+    const meetingId = meetingData?.meetingId || meetingData?.meeting || meetingData?.id || meetingData;
+
     const raceDoc = {
         raceId: resolveValue(race.id, race.raceId, race.$id),
         name: resolveValue(race.name, race.description),
         raceNumber: resolveValue(race.race_number, race.raceNumber),
         startTime: resolveValue(race.start_time, race.startTime),
         status: resolveValue(race.status, race.raceStatus),
-        meeting: meetingId,
+        meeting: meetingId, // Store as relationship ID, not expanded object
         lastUpdated: timestamp,
         importedAt: timestamp
     };
@@ -295,7 +298,7 @@ export async function processRaces(databases, databaseId, meetings, context) {
     const allRaces = [];
     meetings.forEach(meeting => {
         meeting.races.forEach(race => {
-            allRaces.push({ meeting: meeting.meeting, race });
+            allRaces.push({ meeting: meeting, race }); // Pass full meeting object instead of just meeting.meeting ID
         });
     });
     
