@@ -2,13 +2,14 @@ import React from 'react'
 import { render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { RaceDataHeader } from '../RaceDataHeader'
+import type { Meeting, Race } from '@/types/meetings'
 
 jest.mock('@/contexts/RaceContext', () => ({
   useRace: jest.fn(() => ({ raceData: null })),
 }))
 
 describe('RaceDataHeader status mapping', () => {
-  const baseMeeting = {
+  const baseMeeting: Meeting = {
     $id: 'meeting-1',
     $createdAt: '2024-01-01T00:00:00.000Z',
     $updatedAt: '2024-01-01T00:00:00.000Z',
@@ -20,7 +21,7 @@ describe('RaceDataHeader status mapping', () => {
     date: '2024-01-01T00:00:00.000Z',
   }
 
-  const buildRace = (status: string) => ({
+  const buildRace = (status: Race['status']): Race => ({
     $id: 'race-1',
     $createdAt: '2024-01-01T00:00:00.000Z',
     $updatedAt: '2024-01-01T00:00:00.000Z',
@@ -39,8 +40,8 @@ describe('RaceDataHeader status mapping', () => {
   it('renders Final for finalized status with purple styles', () => {
     render(
       <RaceDataHeader
-        race={buildRace('Finalized') as any}
-        meeting={baseMeeting as any}
+        race={buildRace('Finalized')}
+        meeting={baseMeeting}
         entrants={[]}
         className=""
       />
@@ -56,8 +57,8 @@ describe('RaceDataHeader status mapping', () => {
   it('renders Abandoned for cancelled status with red styles', () => {
     render(
       <RaceDataHeader
-        race={buildRace('Cancelled') as any}
-        meeting={baseMeeting as any}
+        race={buildRace('Cancelled')}
+        meeting={baseMeeting}
         entrants={[]}
         className=""
       />

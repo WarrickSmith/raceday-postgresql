@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, Query } from '@/lib/appwrite-server';
 import { Race, Meeting } from '@/types/meetings';
+import {
+  normalizeMeetingDocument,
+  type MeetingDocument,
+  type RaceDocument,
+} from '../appwriteTypes';
 
 export async function GET(
   request: NextRequest,
@@ -41,70 +46,76 @@ async function getBasicRaceData(raceId: string): Promise<{
     const { databases } = await createServerClient();
     
     // Fetch race by raceId field (not $id). Fallback to $id for backward compatibility.
-    let raceData: any | null = null;
+    let raceData: RaceDocument | null = null;
     try {
-      const raceQuery = await databases.listDocuments(
-        'raceday-db', 
+      const raceQuery = await databases.listDocuments<RaceDocument>(
+        'raceday-db',
         'races',
         [Query.equal('raceId', raceId), Query.limit(1)]
       );
       if (raceQuery.documents.length > 0) {
-        raceData = raceQuery.documents[0] as any;
+        raceData = raceQuery.documents[0];
       }
     } catch {}
 
     if (!raceData) {
       try {
-        raceData = (await databases.getDocument('raceday-db', 'races', raceId)) as any;
+        raceData = await databases.getDocument<RaceDocument>(
+          'raceday-db',
+          'races',
+          raceId
+        );
       } catch {
         return null;
       }
     }
-    
+
     // Resolve meeting info (supports string ID or expanded object)
     let resolvedMeetingId: string | null = null;
     let resolvedMeeting: Meeting | null = null;
+    let meetingDocument: MeetingDocument | null = null;
 
-    if (typeof raceData.meeting === 'string' && raceData.meeting) {
-      resolvedMeetingId = raceData.meeting;
-    } else if (raceData.meeting?.meetingId) {
-      resolvedMeetingId = raceData.meeting.meetingId;
-    } else if (raceData.meeting?.$id) {
-      resolvedMeetingId = raceData.meeting.$id;
+    const raceMeetingField = raceData.meeting;
+    if (typeof raceMeetingField === 'string' && raceMeetingField) {
+      resolvedMeetingId = raceMeetingField;
+    } else if (
+      raceMeetingField &&
+      typeof raceMeetingField === 'object' &&
+      (raceMeetingField.meetingId || raceMeetingField.$id)
+    ) {
+      const castMeeting = raceMeetingField as MeetingDocument;
+      resolvedMeetingId = castMeeting.meetingId ?? castMeeting.$id ?? null;
+      meetingDocument = castMeeting;
     }
 
     if (!resolvedMeetingId) {
       return null;
     }
 
-    if (raceData.meeting && typeof raceData.meeting === 'object' && (raceData.meeting.meetingName || raceData.meeting.meetingId)) {
-      resolvedMeeting = {
-        $id: raceData.meeting.$id ?? resolvedMeetingId,
-        $createdAt: raceData.meeting.$createdAt ?? raceData.$createdAt,
-        $updatedAt: raceData.meeting.$updatedAt ?? raceData.$updatedAt,
-        meetingId: raceData.meeting.meetingId ?? resolvedMeetingId,
-        meetingName: raceData.meeting.meetingName ?? 'Unknown Meeting',
-        country: raceData.meeting.country ?? 'Unknown',
-        raceType: raceData.meeting.raceType ?? '',
-        category: raceData.meeting.category ?? '',
-        date: raceData.meeting.date ?? raceData.$createdAt,
-      } as Meeting;
+    if (meetingDocument) {
+      resolvedMeeting = normalizeMeetingDocument(meetingDocument, {
+        id: resolvedMeetingId,
+        createdAt: raceData.$createdAt,
+        updatedAt: raceData.$updatedAt,
+      });
     } else {
       try {
-        const meetingDoc = await databases.getDocument('raceday-db', 'meetings', resolvedMeetingId);
-        resolvedMeeting = meetingDoc as unknown as Meeting;
+        const meetingDoc = await databases.getDocument<MeetingDocument>(
+          'raceday-db',
+          'meetings',
+          resolvedMeetingId
+        );
+        resolvedMeeting = normalizeMeetingDocument(meetingDoc, {
+          id: resolvedMeetingId,
+          createdAt: raceData.$createdAt,
+          updatedAt: raceData.$updatedAt,
+        });
       } catch {
-        resolvedMeeting = {
-          $id: resolvedMeetingId,
-          $createdAt: raceData.$createdAt,
-          $updatedAt: raceData.$updatedAt,
-          meetingId: resolvedMeetingId,
-          meetingName: 'Unknown Meeting',
-          country: 'Unknown',
-          raceType: '',
-          category: '',
-          date: raceData.$createdAt,
-        } as Meeting;
+        resolvedMeeting = normalizeMeetingDocument(null, {
+          id: resolvedMeetingId,
+          createdAt: raceData.$createdAt,
+          updatedAt: raceData.$updatedAt,
+        });
       }
     }
 
@@ -114,17 +125,21 @@ async function getBasicRaceData(raceId: string): Promise<{
       $id: raceData.$id,
       $createdAt: raceData.$createdAt,
       $updatedAt: raceData.$updatedAt,
-      raceId: raceData.raceId,
-      raceNumber: raceData.raceNumber,
-      name: raceData.name,
-      startTime: raceData.startTime,
-      meeting: resolvedMeetingId!, // return meetingId string for the Race interface
-      status: raceData.status,
+      raceId: raceData.raceId ?? raceData.$id,
+      raceNumber: raceData.raceNumber ?? 0,
+      name: raceData.name ?? 'Unknown Race',
+      startTime: raceData.startTime ?? raceData.$createdAt,
+      meeting: resolvedMeetingId, // return meetingId string for the Race interface
+      status: raceData.status ?? 'Unknown',
       distance: raceData.distance,
       trackCondition: raceData.trackCondition,
     };
 
-    const meeting: Meeting = resolvedMeeting!;
+    if (!resolvedMeeting) {
+      return null;
+    }
+
+    const meeting: Meeting = resolvedMeeting;
 
     return { 
       race, 

@@ -4,9 +4,18 @@ import {
   Race,
   Meeting,
   Entrant,
-  MoneyFlowHistory,
   RaceNavigationData,
+  type OddsHistoryData,
 } from '@/types/meetings'
+import {
+  normalizeMeetingDocument,
+  type EntrantDocument,
+  type MeetingDocument,
+  type MoneyFlowHistoryDocument,
+  type RaceDocument,
+  type RaceResultsDocument,
+} from './appwriteTypes'
+import type { Models } from 'node-appwrite'
 
 const RACE_SELECT_FIELDS = [
   '$id',
@@ -93,19 +102,31 @@ const NAVIGATION_SELECT_FIELDS = [
 
 type AppwriteDatabases = Awaited<ReturnType<typeof createServerClient>>['databases']
 
-type RaceResultsDocument = {
-  resultsAvailable?: boolean
-  resultsData?: string
-  dividendsData?: string
-  fixedOddsData?: string
-  resultStatus?: string
-  photoFinish?: boolean
-  stewardsInquiry?: boolean
-  protestLodged?: boolean
-  resultTime?: string
-  race?: string
-  raceId?: string
-  [key: string]: unknown
+const createEmptyDocumentList = <T extends Models.Document>(): Models.DocumentList<T> => ({
+  total: 0,
+  documents: [],
+})
+
+const parseJson = <T>(value?: string | null): T | undefined => {
+  if (!value) {
+    return undefined
+  }
+
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    return undefined
+  }
+}
+
+const normalizeResultStatus = (
+  status?: string | null
+): Race['resultStatus'] => {
+  if (status === 'interim' || status === 'final' || status === 'protest') {
+    return status
+  }
+
+  return undefined
 }
 
 async function fetchRaceResultsDocument(
@@ -120,7 +141,7 @@ async function fetchRaceResultsDocument(
 
   for (const attempt of queryAttempts) {
     try {
-      const response = await databases.listDocuments(
+      const response = await databases.listDocuments<RaceResultsDocument>(
         'raceday-db',
         'race-results',
         [
@@ -131,7 +152,7 @@ async function fetchRaceResultsDocument(
       )
 
       if (response.documents.length > 0) {
-        return response.documents[0] as RaceResultsDocument
+        return response.documents[0]
       }
     } catch {
       // Ignore and try the next strategy - race-results data is non-critical
@@ -224,23 +245,19 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
   try {
     const { databases } = await createServerClient()
 
-    // Fetch race by raceId field (not $id). Fallback to $id for backward compatibility.
-    let raceData: any | null = null
+    let raceData: RaceDocument | null = null
     try {
-      const raceQuery = await databases.listDocuments('raceday-db', 'races', [
+      const raceQuery = await databases.listDocuments<RaceDocument>('raceday-db', 'races', [
         Query.equal('raceId', raceId),
         Query.select(RACE_SELECT_FIELDS),
         Query.limit(1),
       ])
-      if (raceQuery.documents.length > 0) {
-        raceData = raceQuery.documents[0]
-      }
+      raceData = raceQuery.documents[0] ?? null
     } catch {}
 
-    // Fallback: try fetching by document $id directly
     if (!raceData) {
       try {
-        raceData = (await databases.getDocument('raceday-db', 'races', raceId)) as any
+        raceData = await databases.getDocument<RaceDocument>('raceday-db', 'races', raceId)
       } catch {
         return null
       }
@@ -252,107 +269,82 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       raceData.$id
     )
 
-    // Resolve meeting info in a backward-compatible way (supports string ID or expanded object)
     let resolvedMeetingId: string | null = null
-    let resolvedMeeting: Meeting | null = null
+    let meetingDocument: MeetingDocument | null = null
 
-    // Determine meeting ID from various possible shapes
-    if (typeof raceData.meeting === 'string' && raceData.meeting) {
-      resolvedMeetingId = raceData.meeting
-    } else if (raceData.meeting?.meetingId) {
-      resolvedMeetingId = raceData.meeting.meetingId
-    } else if (raceData.meeting?.$id) {
-      resolvedMeetingId = raceData.meeting.$id
+    const raceMeetingField = raceData.meeting
+    if (typeof raceMeetingField === 'string' && raceMeetingField) {
+      resolvedMeetingId = raceMeetingField
+    } else if (
+      raceMeetingField &&
+      typeof raceMeetingField === 'object' &&
+      (raceMeetingField.meetingId || raceMeetingField.$id)
+    ) {
+      const castMeeting = raceMeetingField as MeetingDocument
+      resolvedMeetingId = castMeeting.meetingId ?? castMeeting.$id ?? null
+      meetingDocument = castMeeting
     }
 
     if (!resolvedMeetingId) {
       return null
     }
 
-    // If we have an expanded meeting document, use it; otherwise fetch it by ID
-    if (raceData.meeting && typeof raceData.meeting === 'object' && (raceData.meeting.meetingName || raceData.meeting.meetingId)) {
-      resolvedMeeting = {
-        $id: raceData.meeting.$id ?? resolvedMeetingId,
-        $createdAt: raceData.meeting.$createdAt ?? raceData.$createdAt,
-        $updatedAt: raceData.meeting.$updatedAt ?? raceData.$updatedAt,
-        meetingId: raceData.meeting.meetingId ?? resolvedMeetingId,
-        meetingName: raceData.meeting.meetingName ?? 'Unknown Meeting',
-        country: raceData.meeting.country ?? 'Unknown',
-        raceType: raceData.meeting.raceType ?? '',
-        category: raceData.meeting.category ?? '',
-        date: raceData.meeting.date ?? raceData.$createdAt,
-        weather: raceData.meeting.weather ?? undefined,
-        trackCondition: raceData.meeting.trackCondition ?? undefined,
-      }
-    } else {
+    if (!meetingDocument) {
       try {
-        const meetingDoc = await databases.getDocument('raceday-db', 'meetings', resolvedMeetingId)
-        resolvedMeeting = meetingDoc as unknown as Meeting
+        meetingDocument = await databases.getDocument<MeetingDocument>(
+          'raceday-db',
+          'meetings',
+          resolvedMeetingId
+        )
       } catch {
-        // If meeting fetch fails, still return race data with minimal meeting info
-        resolvedMeeting = {
-          $id: resolvedMeetingId,
-          $createdAt: raceData.$createdAt,
-          $updatedAt: raceData.$updatedAt,
-          meetingId: resolvedMeetingId,
-          meetingName: 'Unknown Meeting',
-          country: 'Unknown',
-          raceType: '',
-          category: '',
-          date: raceData.$createdAt,
-        } as Meeting
+        meetingDocument = null
       }
     }
 
-    // The race already has the meeting data populated as a nested object
-    // Convert to our expected format
+    const meeting = normalizeMeetingDocument(meetingDocument, {
+      id: resolvedMeetingId,
+      createdAt: raceData.$createdAt,
+      updatedAt: raceData.$updatedAt,
+    })
+
+    const raceStartTime = raceData.startTime ?? raceData.$createdAt
+
     const race: Race = {
       $id: raceData.$id,
       $createdAt: raceData.$createdAt,
       $updatedAt: raceData.$updatedAt,
-      raceId: raceData.raceId,
-      raceNumber: raceData.raceNumber,
-      name: raceData.name,
-      startTime: raceData.startTime,
-      actualStart: raceData.actualStart, // Include actual start time from database
-      meeting: resolvedMeetingId, // Always return meetingId string for the Race interface
-      status: raceData.status,
+      raceId: raceData.raceId ?? raceData.$id,
+      raceNumber: raceData.raceNumber ?? 0,
+      name: raceData.name ?? 'Unknown Race',
+      startTime: raceStartTime,
+      actualStart: raceData.actualStart ?? undefined,
+      meeting: resolvedMeetingId,
+      status: raceData.status ?? 'Unknown',
       distance: raceData.distance,
       trackCondition: raceData.trackCondition,
       weather: raceData.weather,
-      type: raceData.type, // Race type code (T, H, G) for category display
-      // Results data fields from race-results collection
-      resultsAvailable: raceResultsData?.resultsAvailable || false,
-      resultsData: raceResultsData?.resultsData
-        ? JSON.parse(raceResultsData.resultsData)
-        : undefined,
-      dividendsData: raceResultsData?.dividendsData
-        ? JSON.parse(raceResultsData.dividendsData)
-        : undefined,
-      fixedOddsData: raceResultsData?.fixedOddsData
-        ? JSON.parse(raceResultsData.fixedOddsData)
-        : undefined,
-      resultStatus: raceResultsData?.resultStatus,
-      photoFinish: raceResultsData?.photoFinish || false,
-      stewardsInquiry: raceResultsData?.stewardsInquiry || false,
-      protestLodged: raceResultsData?.protestLodged || false,
+      type: raceData.type,
+      resultsAvailable: raceResultsData?.resultsAvailable ?? false,
+      resultsData: parseJson<Race['resultsData']>(raceResultsData?.resultsData),
+      dividendsData: parseJson<Race['dividendsData']>(raceResultsData?.dividendsData),
+      fixedOddsData: parseJson<Race['fixedOddsData']>(raceResultsData?.fixedOddsData),
+      resultStatus: normalizeResultStatus(raceResultsData?.resultStatus),
+      photoFinish: raceResultsData?.photoFinish ?? false,
+      stewardsInquiry: raceResultsData?.stewardsInquiry ?? false,
+      protestLodged: raceResultsData?.protestLodged ?? false,
       resultTime: raceResultsData?.resultTime,
     }
 
-    const meeting: Meeting = resolvedMeeting
-
-    // Fetch entrants for this race with batch optimization
-    const entrantsQuery = await databases.listDocuments(
+    const entrantsQuery = await databases.listDocuments<EntrantDocument>(
       'raceday-db',
       'entrants',
       [
         Query.equal('raceId', raceId),
         Query.select(ENTRANT_SELECT_FIELDS),
-        Query.orderAsc('runnerNumber'), // Order by runner number for consistent display
+        Query.orderAsc('runnerNumber'),
       ]
     )
 
-    // Calculate data freshness metrics
     const now = new Date()
     const entrantsDataAge =
       entrantsQuery.documents.length > 0
@@ -363,31 +355,25 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
           )
         : 0
 
-    // Fetch money flow data for all entrants efficiently using batch query
     const entrantKeys = entrantsQuery.documents.map(
-      (doc) => doc.entrantId || doc.$id
+      (doc) => doc.entrantId ?? doc.$id
     )
 
-    // Fetch navigation data - previous, next, and next scheduled races
-    // Only exclude abandoned races from Next Scheduled query, not Previous/Next chronological navigation
     const [previousRaceQuery, nextRaceQuery, nextScheduledRaceQuery] =
       await Promise.all([
-        // Previous race query - chronological navigation, includes all races
-        databases.listDocuments('raceday-db', 'races', [
-          Query.lessThan('startTime', raceData.startTime),
+        databases.listDocuments<RaceDocument>('raceday-db', 'races', [
+          Query.lessThan('startTime', raceStartTime),
           Query.orderDesc('startTime'),
           Query.select(NAVIGATION_SELECT_FIELDS),
           Query.limit(1),
         ]),
-        // Next race query - chronological navigation, includes all races
-        databases.listDocuments('raceday-db', 'races', [
-          Query.greaterThan('startTime', raceData.startTime),
+        databases.listDocuments<RaceDocument>('raceday-db', 'races', [
+          Query.greaterThan('startTime', raceStartTime),
           Query.orderAsc('startTime'),
           Query.select(NAVIGATION_SELECT_FIELDS),
           Query.limit(1),
         ]),
-        // Next scheduled race query - FIXED: Query races after current time, not current race
-        databases.listDocuments('raceday-db', 'races', [
+        databases.listDocuments<RaceDocument>('raceday-db', 'races', [
           Query.greaterThan('startTime', now.toISOString()),
           Query.notEqual('status', 'Abandoned'),
           Query.orderAsc('startTime'),
@@ -396,181 +382,172 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
         ]),
       ])
 
-    // Only fetch money flow history data if there are entrants (avoid empty Query.equal calls)
-    const moneyFlowQuery =
-      entrantKeys.length > 0
-        ? await databases.listDocuments('raceday-db', 'money-flow-history', [
-            Query.equal('raceId', raceId),
-            Query.equal('entrantId', entrantKeys),
-            Query.select(MONEY_FLOW_SELECT_FIELDS),
-            Query.orderDesc('$createdAt'),
-            Query.limit(200), // Increased limit for comprehensive data
-          ])
-        : { documents: [] as Array<Record<string, unknown>> }
+    let moneyFlowQuery: Models.DocumentList<MoneyFlowHistoryDocument>
+    if (entrantKeys.length > 0) {
+      moneyFlowQuery = await databases.listDocuments<MoneyFlowHistoryDocument>(
+        'raceday-db',
+        'money-flow-history',
+        [
+          Query.equal('raceId', raceId),
+          Query.equal('entrantId', entrantKeys),
+          Query.select(MONEY_FLOW_SELECT_FIELDS),
+          Query.orderDesc('$createdAt'),
+          Query.limit(200),
+        ]
+      )
+    } else {
+      moneyFlowQuery = createEmptyDocumentList<MoneyFlowHistoryDocument>()
+    }
 
-    // Group results by entrant for processing with enhanced data structure
-    const moneyFlowByEntrant = new Map<string, MoneyFlowHistory[]>()
+    const moneyFlowByEntrant = new Map<string, MoneyFlowHistoryDocument[]>()
     moneyFlowQuery.documents.forEach((doc) => {
-      const moneyFlowDoc = doc as unknown as MoneyFlowHistory & {
-        entrantId?: string
-      }
-      const entrantId = moneyFlowDoc.entrantId || moneyFlowDoc.entrant
-      if (!entrantId) {
+      const entrantKey = doc.entrantId ?? doc.entrant
+      if (!entrantKey) {
         return
       }
-      if (!moneyFlowByEntrant.has(entrantId)) {
-        moneyFlowByEntrant.set(entrantId, [])
+
+      const histories = moneyFlowByEntrant.get(entrantKey)
+      if (histories) {
+        histories.push(doc)
+      } else {
+        moneyFlowByEntrant.set(entrantKey, [doc])
       }
-      moneyFlowByEntrant.get(entrantId)!.push(moneyFlowDoc)
     })
 
-    // Extract odds history from MoneyFlowHistory data for sparklines
-    const oddsHistoryByEntrant = new Map<string, Array<{$id: string, $createdAt: string, $updatedAt: string, entrant: string, winOdds: number, timestamp: string}>>()
+    const oddsHistoryByEntrant = new Map<string, OddsHistoryData[]>()
     moneyFlowQuery.documents.forEach((doc) => {
-      const rawDoc = doc as unknown as {
-        entrant?: string
-        entrantId?: string
-        fixedWinOdds?: number
-        poolWinOdds?: number
-        [key: string]: unknown
-      }
-      const entrantId = rawDoc.entrantId || rawDoc.entrant
-
-      if (!entrantId) {
+      const entrantKey = doc.entrantId ?? doc.entrant
+      if (!entrantKey) {
         return
       }
-      
-      // Use consolidated odds data from MoneyFlowHistory (prefer fixed odds, fallback to pool odds)
-      const winOdds = rawDoc.fixedWinOdds || rawDoc.poolWinOdds
+
+      const winOdds = doc.fixedWinOdds ?? doc.poolWinOdds
       if (!winOdds || winOdds <= 0) {
-        return // Skip if no valid odds data
+        return
       }
 
-      // Create odds history entry from MoneyFlowHistory data
-      const oddsHistoryDoc = {
-        $id: rawDoc.$id as string,
-        $createdAt: rawDoc.$createdAt as string,
-        $updatedAt: rawDoc.$updatedAt as string,
-        entrant: entrantId,
-        winOdds: winOdds,
-        timestamp: (rawDoc.$createdAt) as string,
+      const oddsHistoryEntry: OddsHistoryData = {
+        $id: doc.$id,
+        $createdAt: doc.$createdAt,
+        $updatedAt: doc.$updatedAt,
+        entrant: entrantKey,
+        winOdds,
+        timestamp: doc.$createdAt,
       }
 
-      if (!oddsHistoryByEntrant.has(entrantId)) {
-        oddsHistoryByEntrant.set(entrantId, [])
+      const existing = oddsHistoryByEntrant.get(entrantKey)
+      if (existing) {
+        existing.push(oddsHistoryEntry)
+      } else {
+        oddsHistoryByEntrant.set(entrantKey, [oddsHistoryEntry])
       }
-      oddsHistoryByEntrant.get(entrantId)!.push(oddsHistoryDoc)
     })
 
-    // Process money flow data for trend calculation
-    const moneyFlowResults = entrantKeys.map((entrantKey) => {
-      const histories = moneyFlowByEntrant.get(entrantKey) || []
-      // Sort by creation date descending and take only the 2 most recent
+    const moneyFlowMap = new Map<
+      string,
+      {
+        holdPercentage: number
+        previousHoldPercentage?: number
+        moneyFlowTrend: 'up' | 'down' | 'neutral'
+      }
+    >()
+
+    entrantKeys.forEach((entrantKey) => {
+      const histories = [...(moneyFlowByEntrant.get(entrantKey) ?? [])]
       histories.sort(
         (a, b) =>
           new Date(b.$createdAt).getTime() - new Date(a.$createdAt).getTime()
       )
-      return { documents: histories.slice(0, 2) }
-    })
-    const moneyFlowMap = new Map()
 
-    moneyFlowResults.forEach((result, index) => {
-      const entrantKey = entrantKeys[index]
-      const histories = result.documents
-
-      if (histories.length > 0) {
-        const current = histories[0]
-        const previous = histories[1]
-
-        let trend: 'up' | 'down' | 'neutral' = 'neutral'
-        if (previous && current.holdPercentage !== previous.holdPercentage) {
-          trend =
-            current.holdPercentage > previous.holdPercentage ? 'up' : 'down'
-        }
-
-        moneyFlowMap.set(entrantKey, {
-          holdPercentage: current.holdPercentage,
-          previousHoldPercentage: previous?.holdPercentage,
-          moneyFlowTrend: trend,
-        })
+      const [current, previous] = histories
+      if (!current) {
+        return
       }
+
+      const currentHold = current.holdPercentage ?? 0
+      const previousHold = previous?.holdPercentage
+
+      let trend: 'up' | 'down' | 'neutral' = 'neutral'
+      if (previousHold !== undefined && currentHold !== previousHold) {
+        trend = currentHold > previousHold ? 'up' : 'down'
+      }
+
+      moneyFlowMap.set(entrantKey, {
+        holdPercentage: currentHold,
+        previousHoldPercentage: previousHold,
+        moneyFlowTrend: trend,
+      })
     })
 
     const entrants: Entrant[] = entrantsQuery.documents.map((doc) => {
+      const entrantId = doc.entrantId ?? doc.$id
       const raceReference =
-        (doc as { race?: string }).race || doc.raceId || raceData.$id
+        (typeof doc.race === 'string' && doc.race) || doc.raceId || raceData.$id
 
-      // Get odds history data for this entrant, sorted by creation date ascending for sparkline
-      const entrantKey = doc.entrantId || doc.$id
-      const oddsHistory = oddsHistoryByEntrant.get(entrantKey) || []
+      const oddsHistory = [...(oddsHistoryByEntrant.get(entrantId) ?? [])]
       oddsHistory.sort(
         (a, b) =>
           new Date(a.$createdAt).getTime() - new Date(b.$createdAt).getTime()
       )
 
+      const moneyFlowInfo = moneyFlowMap.get(entrantId)
+
+      const winOdds = doc.fixedWinOdds ?? doc.poolWinOdds
+      const placeOdds = doc.fixedPlaceOdds ?? doc.poolPlaceOdds
+
       return {
         $id: doc.$id,
         $createdAt: doc.$createdAt,
         $updatedAt: doc.$updatedAt,
-        entrantId: doc.entrantId,
-        name: doc.name,
-        runnerNumber: doc.runnerNumber,
+        entrantId,
+        name: doc.name ?? 'Unknown Entrant',
+        runnerNumber: doc.runnerNumber ?? 0,
         jockey: doc.jockey,
         trainerName: doc.trainerName,
         silkColours: doc.silkColours,
         silkUrl64: doc.silkUrl64,
         silkUrl128: doc.silkUrl128,
-        isScratched: doc.isScratched,
+        isScratched: doc.isScratched ?? false,
         race: raceReference,
-        winOdds: doc.fixedWinOdds || doc.poolWinOdds,
-        placeOdds: doc.fixedPlaceOdds || doc.poolPlaceOdds,
-        oddsHistory: oddsHistory, // Add odds history data for sparkline
-        ...(moneyFlowMap.get(entrantKey) ?? {}),
+        winOdds,
+        placeOdds,
+        oddsHistory,
+        ...(moneyFlowInfo ?? {}),
       }
     })
 
-    // Process navigation data with meeting information
-    const navigationData: RaceNavigationData = {
-      previousRace:
-        previousRaceQuery.documents.length > 0
-          ? {
-              raceId: previousRaceQuery.documents[0].raceId,
-              name: previousRaceQuery.documents[0].name,
-              startTime: previousRaceQuery.documents[0].startTime,
-              meetingName:
-                previousRaceQuery.documents[0].meeting?.meetingName ||
-                'Unknown Meeting',
-            }
-          : null,
-      nextRace:
-        nextRaceQuery.documents.length > 0
-          ? {
-              raceId: nextRaceQuery.documents[0].raceId,
-              name: nextRaceQuery.documents[0].name,
-              startTime: nextRaceQuery.documents[0].startTime,
-              meetingName:
-                nextRaceQuery.documents[0].meeting?.meetingName ||
-                'Unknown Meeting',
-            }
-          : null,
-      nextScheduledRace:
-        nextScheduledRaceQuery.documents.length > 0
-          ? {
-              raceId: nextScheduledRaceQuery.documents[0].raceId,
-              name: nextScheduledRaceQuery.documents[0].name,
-              startTime: nextScheduledRaceQuery.documents[0].startTime,
-              meetingName:
-                nextScheduledRaceQuery.documents[0].meeting?.meetingName ||
-                'Unknown Meeting',
-            }
-          : null,
+    const toNavigationEntry = (
+      documents: Models.DocumentList<RaceDocument>['documents']
+    ): RaceNavigationData['previousRace'] => {
+      const [doc] = documents
+      if (!doc) {
+        return null
+      }
+
+      const meetingField = doc.meeting
+      const meetingName =
+        typeof meetingField === 'object' && meetingField?.meetingName
+          ? meetingField.meetingName
+          : 'Unknown Meeting'
+
+      return {
+        raceId: doc.raceId ?? doc.$id,
+        name: doc.name ?? 'Unknown Race',
+        startTime: doc.startTime ?? doc.$createdAt,
+        meetingName,
+      }
     }
 
-    // Calculate comprehensive data freshness metrics
+    const navigationData: RaceNavigationData = {
+      previousRace: toNavigationEntry(previousRaceQuery.documents),
+      nextRace: toNavigationEntry(nextRaceQuery.documents),
+      nextScheduledRace: toNavigationEntry(nextScheduledRaceQuery.documents),
+    }
+
     const dataFreshness = {
       lastUpdated: now.toISOString(),
       entrantsDataAge,
-      oddsHistoryCount: 0, // Deprecated: odds data now comes from MoneyFlowHistory
+      oddsHistoryCount: 0,
       moneyFlowHistoryCount: moneyFlowQuery.documents.length,
     }
 
@@ -582,15 +559,11 @@ async function getComprehensiveRaceData(raceId: string): Promise<{
       dataFreshness,
     }
   } catch (error) {
-    console.error('Error fetching race details:', error)
+    console.error('Error fetching comprehensive race data:', error)
     return null
   }
 }
 
-/**
- * Fast navigation data fetching - optimized for speed
- * Only fetches essential data needed for navigation updates
- */
 async function getNavigationRaceData(raceId: string): Promise<{
   race: Race
   meeting: Meeting
@@ -606,22 +579,19 @@ async function getNavigationRaceData(raceId: string): Promise<{
   try {
     const { databases } = await createServerClient()
 
-    // Fetch race with meeting data - only essential fields
-    let raceData: any | null = null
+    let raceData: RaceDocument | null = null
     try {
-      const raceQuery = await databases.listDocuments('raceday-db', 'races', [
+      const raceQuery = await databases.listDocuments<RaceDocument>('raceday-db', 'races', [
         Query.equal('raceId', raceId),
         Query.select(RACE_SELECT_FIELDS),
         Query.limit(1),
       ])
-      if (raceQuery.documents.length > 0) {
-        raceData = raceQuery.documents[0]
-      }
+      raceData = raceQuery.documents[0] ?? null
     } catch {}
 
     if (!raceData) {
       try {
-        raceData = (await databases.getDocument('raceday-db', 'races', raceId)) as any
+        raceData = await databases.getDocument<RaceDocument>('raceday-db', 'races', raceId)
       } catch {
         return null
       }
@@ -633,93 +603,73 @@ async function getNavigationRaceData(raceId: string): Promise<{
       raceData.$id
     )
 
-    // Resolve meeting info (supports string ID or expanded object)
     let resolvedMeetingId: string | null = null
-    let resolvedMeeting: Meeting | null = null
+    let meetingDocument: MeetingDocument | null = null
 
-    if (typeof raceData.meeting === 'string' && raceData.meeting) {
-      resolvedMeetingId = raceData.meeting
-    } else if (raceData.meeting?.meetingId) {
-      resolvedMeetingId = raceData.meeting.meetingId
-    } else if (raceData.meeting?.$id) {
-      resolvedMeetingId = raceData.meeting.$id
+    const raceMeetingField = raceData.meeting
+    if (typeof raceMeetingField === 'string' && raceMeetingField) {
+      resolvedMeetingId = raceMeetingField
+    } else if (
+      raceMeetingField &&
+      typeof raceMeetingField === 'object' &&
+      (raceMeetingField.meetingId || raceMeetingField.$id)
+    ) {
+      const castMeeting = raceMeetingField as MeetingDocument
+      resolvedMeetingId = castMeeting.meetingId ?? castMeeting.$id ?? null
+      meetingDocument = castMeeting
     }
 
     if (!resolvedMeetingId) {
       return null
     }
 
-    if (raceData.meeting && typeof raceData.meeting === 'object' && (raceData.meeting.meetingName || raceData.meeting.meetingId)) {
-      resolvedMeeting = {
-        $id: raceData.meeting.$id ?? resolvedMeetingId,
-        $createdAt: raceData.meeting.$createdAt ?? raceData.$createdAt,
-        $updatedAt: raceData.meeting.$updatedAt ?? raceData.$updatedAt,
-        meetingId: raceData.meeting.meetingId ?? resolvedMeetingId,
-        meetingName: raceData.meeting.meetingName ?? 'Unknown Meeting',
-        country: raceData.meeting.country ?? 'Unknown',
-        raceType: raceData.meeting.raceType ?? '',
-        category: raceData.meeting.category ?? '',
-        date: raceData.meeting.date ?? raceData.$createdAt,
-        weather: raceData.meeting.weather ?? undefined,
-        trackCondition: raceData.meeting.trackCondition ?? undefined,
-      }
-    } else {
+    if (!meetingDocument) {
       try {
-        const meetingDoc = await databases.getDocument('raceday-db', 'meetings', resolvedMeetingId)
-        resolvedMeeting = meetingDoc as unknown as Meeting
+        meetingDocument = await databases.getDocument<MeetingDocument>(
+          'raceday-db',
+          'meetings',
+          resolvedMeetingId
+        )
       } catch {
-        resolvedMeeting = {
-          $id: resolvedMeetingId,
-          $createdAt: raceData.$createdAt,
-          $updatedAt: raceData.$updatedAt,
-          meetingId: resolvedMeetingId,
-          meetingName: 'Unknown Meeting',
-          country: 'Unknown',
-          raceType: '',
-          category: '',
-          date: raceData.$createdAt,
-        } as Meeting
+        meetingDocument = null
       }
     }
 
-    // Convert to expected format (same as comprehensive version)
+    const meeting = normalizeMeetingDocument(meetingDocument, {
+      id: resolvedMeetingId,
+      createdAt: raceData.$createdAt,
+      updatedAt: raceData.$updatedAt,
+    })
+
+    const raceStartTime = raceData.startTime ?? raceData.$createdAt
+
     const race: Race = {
       $id: raceData.$id,
       $createdAt: raceData.$createdAt,
       $updatedAt: raceData.$updatedAt,
-      raceId: raceData.raceId,
-      raceNumber: raceData.raceNumber,
-      name: raceData.name,
-      startTime: raceData.startTime,
-      actualStart: raceData.actualStart, // Include actual start time from database
+      raceId: raceData.raceId ?? raceData.$id,
+      raceNumber: raceData.raceNumber ?? 0,
+      name: raceData.name ?? 'Unknown Race',
+      startTime: raceStartTime,
+      actualStart: raceData.actualStart ?? undefined,
       meeting: resolvedMeetingId,
-      status: raceData.status,
+      status: raceData.status ?? 'Unknown',
       distance: raceData.distance,
       trackCondition: raceData.trackCondition,
       weather: raceData.weather,
-      type: raceData.type, // Race type code (T, H, G) for category display
-      // Results data fields from race-results collection
-      resultsAvailable: raceResultsData?.resultsAvailable || false,
-      resultsData: raceResultsData?.resultsData
-        ? JSON.parse(raceResultsData.resultsData)
-        : undefined,
-      dividendsData: raceResultsData?.dividendsData
-        ? JSON.parse(raceResultsData.dividendsData)
-        : undefined,
-      fixedOddsData: raceResultsData?.fixedOddsData
-        ? JSON.parse(raceResultsData.fixedOddsData)
-        : undefined,
-      resultStatus: raceResultsData?.resultStatus,
-      photoFinish: raceResultsData?.photoFinish || false,
-      stewardsInquiry: raceResultsData?.stewardsInquiry || false,
-      protestLodged: raceResultsData?.protestLodged || false,
+      type: raceData.type,
+      resultsAvailable: raceResultsData?.resultsAvailable ?? false,
+      resultsData: parseJson<Race['resultsData']>(raceResultsData?.resultsData),
+      dividendsData: parseJson<Race['dividendsData']>(raceResultsData?.dividendsData),
+      fixedOddsData: parseJson<Race['fixedOddsData']>(raceResultsData?.fixedOddsData),
+      resultStatus: normalizeResultStatus(raceResultsData?.resultStatus),
+      photoFinish: raceResultsData?.photoFinish ?? false,
+      stewardsInquiry: raceResultsData?.stewardsInquiry ?? false,
+      protestLodged: raceResultsData?.protestLodged ?? false,
       resultTime: raceResultsData?.resultTime,
     }
 
-    const meeting: Meeting = resolvedMeeting
-
-    // Fetch basic entrants data - no history data for speed
-    const entrantsQuery = await databases.listDocuments(
+    const entrantsQuery = await databases.listDocuments<EntrantDocument>(
       'raceday-db',
       'entrants',
       [
@@ -729,7 +679,6 @@ async function getNavigationRaceData(raceId: string): Promise<{
       ]
     )
 
-    // Calculate basic data freshness
     const now = new Date()
     const entrantsDataAge =
       entrantsQuery.documents.length > 0
@@ -740,96 +689,89 @@ async function getNavigationRaceData(raceId: string): Promise<{
           )
         : 0
 
-    // Only fetch navigation data - skip history data for speed
+    const entrants: Entrant[] = entrantsQuery.documents.map((doc) => {
+      const entrantId = doc.entrantId ?? doc.$id
+      const raceReference =
+        (typeof doc.race === 'string' && doc.race) || doc.raceId || raceData.$id
+
+      return {
+        $id: doc.$id,
+        $createdAt: doc.$createdAt,
+        $updatedAt: doc.$updatedAt,
+        entrantId,
+        name: doc.name ?? 'Unknown Entrant',
+        runnerNumber: doc.runnerNumber ?? 0,
+        jockey: doc.jockey,
+        trainerName: doc.trainerName,
+        silkColours: doc.silkColours,
+        silkUrl64: doc.silkUrl64,
+        silkUrl128: doc.silkUrl128,
+        isScratched: doc.isScratched ?? false,
+        race: raceReference,
+        winOdds: doc.fixedWinOdds ?? doc.poolWinOdds,
+        placeOdds: doc.fixedPlaceOdds ?? doc.poolPlaceOdds,
+        oddsHistory: [],
+        holdPercentage: 0,
+        moneyFlowTrend: 'neutral',
+      }
+    })
+
     const [previousRaceQuery, nextRaceQuery, nextScheduledRaceQuery] =
       await Promise.all([
-        databases.listDocuments('raceday-db', 'races', [
-          Query.lessThan('startTime', raceData.startTime),
+        databases.listDocuments<RaceDocument>('raceday-db', 'races', [
+          Query.lessThan('startTime', raceStartTime),
           Query.orderDesc('startTime'),
           Query.select(NAVIGATION_SELECT_FIELDS),
           Query.limit(1),
         ]),
-        databases.listDocuments('raceday-db', 'races', [
-          Query.greaterThan('startTime', raceData.startTime),
+        databases.listDocuments<RaceDocument>('raceday-db', 'races', [
+          Query.greaterThan('startTime', raceStartTime),
           Query.orderAsc('startTime'),
           Query.select(NAVIGATION_SELECT_FIELDS),
           Query.limit(1),
         ]),
-        // Next scheduled race query - FIXED: Query races after current time, not current race
-        databases.listDocuments('raceday-db', 'races', [
+        databases.listDocuments<RaceDocument>('raceday-db', 'races', [
           Query.greaterThan('startTime', now.toISOString()),
-          Query.notEqual('status', 'Abandoned'), // Exclude abandoned races from Next Scheduled
+          Query.notEqual('status', 'Abandoned'),
           Query.orderAsc('startTime'),
           Query.select(NAVIGATION_SELECT_FIELDS),
           Query.limit(1),
         ]),
       ])
 
-    // Basic entrant mapping without history data for speed
-    const entrants: Entrant[] = entrantsQuery.documents.map((doc) => ({
-      $id: doc.$id,
-      $createdAt: doc.$createdAt,
-      $updatedAt: doc.$updatedAt,
-      entrantId: doc.entrantId,
-      name: doc.name,
-      runnerNumber: doc.runnerNumber,
-      jockey: doc.jockey,
-      trainerName: doc.trainerName,
-      silkColours: doc.silkColours,
-      silkUrl64: doc.silkUrl64,
-      silkUrl128: doc.silkUrl128,
-      isScratched: doc.isScratched,
-      race: (doc as { race?: string }).race || doc.raceId || raceData.$id,
-      winOdds: doc.fixedWinOdds || doc.poolWinOdds,
-      placeOdds: doc.fixedPlaceOdds || doc.poolPlaceOdds,
-      // Set basic defaults for UI - real-time updates will populate these
-      oddsHistory: [],
-      holdPercentage: 0,
-      moneyFlowTrend: 'neutral',
-    }))
+    const toNavigationEntry = (
+      documents: Models.DocumentList<RaceDocument>['documents']
+    ): RaceNavigationData['previousRace'] => {
+      const [doc] = documents
+      if (!doc) {
+        return null
+      }
 
-    // Navigation data processing (same as comprehensive)
+      const meetingField = doc.meeting
+      const meetingName =
+        typeof meetingField === 'object' && meetingField?.meetingName
+          ? meetingField.meetingName
+          : 'Unknown Meeting'
+
+      return {
+        raceId: doc.raceId ?? doc.$id,
+        name: doc.name ?? 'Unknown Race',
+        startTime: doc.startTime ?? doc.$createdAt,
+        meetingName,
+      }
+    }
+
     const navigationData: RaceNavigationData = {
-      previousRace:
-        previousRaceQuery.documents.length > 0
-          ? {
-              raceId: previousRaceQuery.documents[0].raceId,
-              name: previousRaceQuery.documents[0].name,
-              startTime: previousRaceQuery.documents[0].startTime,
-              meetingName:
-                previousRaceQuery.documents[0].meeting?.meetingName ||
-                'Unknown Meeting',
-            }
-          : null,
-      nextRace:
-        nextRaceQuery.documents.length > 0
-          ? {
-              raceId: nextRaceQuery.documents[0].raceId,
-              name: nextRaceQuery.documents[0].name,
-              startTime: nextRaceQuery.documents[0].startTime,
-              meetingName:
-                nextRaceQuery.documents[0].meeting?.meetingName ||
-                'Unknown Meeting',
-            }
-          : null,
-      nextScheduledRace:
-        nextScheduledRaceQuery.documents.length > 0
-          ? {
-              raceId: nextScheduledRaceQuery.documents[0].raceId,
-              name: nextScheduledRaceQuery.documents[0].name,
-              startTime: nextScheduledRaceQuery.documents[0].startTime,
-              meetingName:
-                nextScheduledRaceQuery.documents[0].meeting?.meetingName ||
-                'Unknown Meeting',
-            }
-          : null,
+      previousRace: toNavigationEntry(previousRaceQuery.documents),
+      nextRace: toNavigationEntry(nextRaceQuery.documents),
+      nextScheduledRace: toNavigationEntry(nextScheduledRaceQuery.documents),
     }
 
     const dataFreshness = {
       lastUpdated: now.toISOString(),
       entrantsDataAge,
-      oddsHistoryCount: 0, // No history data in navigation mode
-      moneyFlowHistoryCount: 0, // No history data in navigation mode
+      oddsHistoryCount: 0,
+      moneyFlowHistoryCount: 0,
     }
 
     return {

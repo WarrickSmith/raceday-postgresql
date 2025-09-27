@@ -49,9 +49,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
         console.error('Failed to fetch next scheduled race:', error);
         setNextScheduledRace(null);
       } finally {
-        if (pendingRequestRef.current === promise) {
-          pendingRequestRef.current = null;
-        }
+        pendingRequestRef.current = null;
       }
     })();
 
