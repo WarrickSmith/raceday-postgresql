@@ -9,7 +9,7 @@ import type { AlertsConfig } from '@/types/alerts'
 import { DEFAULT_INDICATORS as DEFAULT_INDICATOR_CONFIGS, DEFAULT_USER_ID } from '@/types/alerts'
 
 // Lightweight in-flight dedup for service calls
-const inFlight = new Map<string, Promise<any>>()
+const inFlight = new Map<string, Promise<unknown>>()
 
 // Service now uses API routes instead of direct database access
 export const initializeAlertConfigService = () => {
@@ -23,7 +23,7 @@ export const initializeAlertConfigService = () => {
 export const loadUserAlertConfig = async (userId: string = DEFAULT_USER_ID): Promise<AlertsConfig> => {
   const key = `load:${userId}`
   const existing = inFlight.get(key)
-  if (existing) return existing
+  if (existing) return existing as Promise<AlertsConfig>
 
   const req = (async (): Promise<AlertsConfig> => {
     try {
@@ -115,7 +115,7 @@ export const saveUserAlertConfig = async (config: AlertsConfig): Promise<void> =
 export const resetToDefaults = async (userId: string = DEFAULT_USER_ID): Promise<AlertsConfig> => {
   const key = `reset:${userId}`
   const existing = inFlight.get(key)
-  if (existing) return existing
+  if (existing) return existing as Promise<AlertsConfig>
 
   const req = (async (): Promise<AlertsConfig> => {
     try {

@@ -43,6 +43,7 @@ export function useRacesForMeeting({
   const fetchAttemptRef = useRef(0);
   const pendingRequestRef = useRef<Promise<void> | null>(null);
   const pendingForMeetingIdRef = useRef<string | null>(null);
+  const pendingRequestMarkerRef = useRef<symbol | null>(null);
 
   // Check cache for existing races
   const getCachedRaces = useCallback((meetingId: string): Race[] | null => {
@@ -85,6 +86,9 @@ export function useRacesForMeeting({
     // Create new abort controller
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
+
+    const requestMarker = Symbol('races-request');
+    pendingRequestMarkerRef.current = requestMarker;
 
     const requestPromise = (async () => {
       try {
@@ -138,9 +142,10 @@ export function useRacesForMeeting({
         }
       } finally {
         // Clear pending pointer if it matches this request
-        if (pendingRequestRef.current === requestPromise) {
-          pendingRequestRef.current = null
-          pendingForMeetingIdRef.current = null
+        if (pendingRequestMarkerRef.current === requestMarker) {
+          pendingRequestRef.current = null;
+          pendingForMeetingIdRef.current = null;
+          pendingRequestMarkerRef.current = null;
         }
       }
     })()
