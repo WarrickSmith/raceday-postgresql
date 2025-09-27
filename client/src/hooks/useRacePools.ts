@@ -141,6 +141,11 @@ export function useRacePools(
   }, [raceId, trigger])
 
   useEffect(() => {
+    // Reset unmounted flag on mount. In React StrictMode the effect cleanup
+    // is invoked immediately after the first mount to surface side-effects,
+    // which was leaving the flag stuck on `true` and preventing state updates.
+    unmountedRef.current = false
+
     return () => {
       unmountedRef.current = true
       clearScheduled()
