@@ -108,6 +108,21 @@ interface UseMoneyFlowTimelineResult {
   getOddsData: (entrantId: string, interval: number, oddsType: 'fixedWin' | 'fixedPlace' | 'poolWin' | 'poolPlace') => string
 }
 
+const normalizeInterval = (
+  value: number | string | null | undefined
+): number | null => {
+  if (value === null || value === undefined) {
+    return null
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null
+  }
+
+  const parsed = Number.parseFloat(String(value))
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 export function useMoneyFlowTimeline(
   raceId: string,
   entrantIds: string[],
@@ -173,45 +188,76 @@ export function useMoneyFlowTimeline(
           lastEntrantKeyRef.current = entrantKey
         }
 
-        const params = new URLSearchParams()
-        params.set('entrants', entrantKey)
-        // Use createdAfter for incremental fetches when we have a cursor timestamp
-        if (nextCreatedAtRef.current) {
-          params.set('createdAfter', nextCreatedAtRef.current)
-        }
-        const response = await fetch(
-          `/api/race/${raceId}/money-flow-timeline?${params.toString()}`
+        const aggregatedDocuments: ServerMoneyFlowPoint[] = []
+        let pageCursor: string | null = null
+        let pageNextCursor: string | null = null
+        let pageNextCreatedAt: string | null = null
+        let page = 0
+        const MAX_PAGES = 10
+
+        do {
+          const params = new URLSearchParams()
+          params.set('entrants', entrantKey)
+          if (pageCursor) {
+            params.set('cursorAfter', pageCursor)
+          } else if (nextCreatedAtRef.current) {
+            params.set('createdAfter', nextCreatedAtRef.current)
+          }
+
+          const response = await fetch(
+            `/api/race/${raceId}/money-flow-timeline?${params.toString()}`
+          )
+
+          if (!response.ok) {
+            throw new Error(
+              `Failed to fetch timeline data: ${response.statusText}`
+            )
+          }
+
+          const pageData = (await response.json()) as MoneyFlowTimelineResponse
+          const pageDocuments = pageData.documents ?? []
+
+          if (page === 0) {
+            if (pageData.intervalCoverage) {
+              loggerRef.current.debug(
+                'Money flow interval coverage received',
+                pageData.intervalCoverage
+              )
+            }
+
+            if (pageData.message) {
+              loggerRef.current.info('Money flow timeline message', {
+                message: pageData.message,
+              })
+            }
+          }
+
+          aggregatedDocuments.push(...pageDocuments)
+
+          pageNextCursor = pageData.nextCursor ?? null
+          pageNextCreatedAt = pageData.nextCreatedAt ?? pageNextCreatedAt
+
+          pageCursor = pageNextCursor
+          page += 1
+        } while (pageCursor && page < MAX_PAGES)
+
+        const incomingMap = processTimelineData(
+          aggregatedDocuments,
+          entrantIds,
+          loggerRef.current
         )
+        const hasIncoming =
+          aggregatedDocuments.length > 0 && incomingMap.size > 0
 
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch timeline data: ${response.statusText}`
-          )
-        }
-
-        const data = (await response.json()) as MoneyFlowTimelineResponse
-        const documents = data.documents ?? []
-
-        if (data.intervalCoverage) {
-          loggerRef.current.debug(
-            'Money flow interval coverage received',
-            data.intervalCoverage
-          )
-        }
-
-        if (data.message) {
-          loggerRef.current.info('Money flow timeline message', {
-            message: data.message,
-          })
-        }
-
-        const incomingMap = processTimelineData(documents, entrantIds, loggerRef.current)
-        const hasIncoming = documents.length > 0 && incomingMap.size > 0
+        const lastAggregatedCreatedAt = aggregatedDocuments.length > 0
+          ? aggregatedDocuments[aggregatedDocuments.length - 1]?.$createdAt ?? null
+          : null
 
         // Update cursors for next incremental request only when we received new data
         if (hasIncoming) {
-          nextCursorRef.current = data.nextCursor ?? nextCursorRef.current
-          nextCreatedAtRef.current = data.nextCreatedAt ?? nextCreatedAtRef.current
+          nextCursorRef.current = pageNextCursor ?? nextCursorRef.current
+          nextCreatedAtRef.current =
+            pageNextCreatedAt ?? lastAggregatedCreatedAt ?? nextCreatedAtRef.current
         }
 
         if (entrantsChangedThisFetch) {
@@ -238,8 +284,14 @@ export function useMoneyFlowTimeline(
                 }
               }
               combined.sort((a, b) => {
-                const ai = (a.timeInterval ?? a.timeToStart ?? -Infinity) as number
-                const bi = (b.timeInterval ?? b.timeToStart ?? -Infinity) as number
+                const ai =
+                  normalizeInterval(a.timeInterval) ??
+                  normalizeInterval(a.timeToStart) ??
+                  Number.NEGATIVE_INFINITY
+                const bi =
+                  normalizeInterval(b.timeInterval) ??
+                  normalizeInterval(b.timeToStart) ??
+                  Number.NEGATIVE_INFINITY
                 return bi - ai
               })
               merged.set(eid, { ...prev, ...newData, dataPoints: combined })
@@ -280,11 +332,6 @@ export function useMoneyFlowTimeline(
       for (let i = 0; i < entrantData.dataPoints.length; i++) {
         const dataPoint = entrantData.dataPoints[i]
 
-        // Skip if no timeToStart data
-        if (typeof dataPoint.timeToStart !== 'number') {
-          continue
-        }
-
         // Use the incremental amount that was already calculated in the first processing loop
         // This ensures we maintain the correct chronological incremental calculations
         const incrementalAmount = dataPoint.incrementalAmount ?? 0
@@ -306,19 +353,20 @@ export function useMoneyFlowTimeline(
 
         // Use timeInterval if available (bucketed data), otherwise timeToStart (legacy)
         // This ensures compatibility with both data structures
-        const interval =
-          dataPoint.timeInterval ?? dataPoint.timeToStart
+        const intervalValue =
+          normalizeInterval(dataPoint.timeInterval) ??
+          normalizeInterval(dataPoint.timeToStart)
 
-        if (interval === undefined) {
+        if (intervalValue === null) {
           continue
         }
 
         // Add grid data for this interval
-        if (!grid[interval]) {
-          grid[interval] = {}
+        if (!grid[intervalValue]) {
+          grid[intervalValue] = {}
         }
 
-        grid[interval][entrantId] = {
+        grid[intervalValue][entrantId] = {
           incrementalAmount,
           poolType,
           timestamp: dataPoint.pollingTimestamp,
@@ -349,7 +397,9 @@ export function useMoneyFlowTimeline(
 
       // Find data point for this specific interval
       const dataPoint = entrantTimeline.dataPoints.find((point) => {
-        const pointInterval = point.timeInterval ?? point.timeToStart ?? -999
+        const pointInterval =
+          normalizeInterval(point.timeInterval) ??
+          normalizeInterval(point.timeToStart)
         return pointInterval === interval
       })
 
@@ -541,8 +591,10 @@ function processTimelineData(
 
     entrantDocs.forEach((doc) => {
       // Use timeInterval if available (bucketed), otherwise timeToStart (legacy)
-      const interval = doc.timeInterval ?? doc.timeToStart ?? -999
-      if (interval === -999) {
+      const interval =
+        normalizeInterval(doc.timeInterval) ?? normalizeInterval(doc.timeToStart)
+
+      if (interval === null) {
         logger?.warn(`Document missing time information for entrant ${entrantId}`)
         return
       }
@@ -568,8 +620,8 @@ function processTimelineData(
         $updatedAt: doc.$updatedAt,
         entrant: entrantId,
         pollingTimestamp: doc.pollingTimestamp || doc.$createdAt,
-        timeToStart: doc.timeToStart || 0,
-        timeInterval: doc.timeInterval ?? interval,
+        timeToStart: normalizeInterval(doc.timeToStart) ?? interval,
+        timeInterval: normalizeInterval(doc.timeInterval) ?? interval,
         intervalType: doc.intervalType || '5m',
         winPoolAmount: doc.winPoolAmount ?? 0,
         placePoolAmount: doc.placePoolAmount ?? 0,
@@ -595,8 +647,14 @@ function processTimelineData(
 
     // Sort by time interval descending (60, 55, 50... 0, -0.5, -1)
     timelinePoints.sort((a, b) => {
-      const aInterval = a.timeInterval ?? a.timeToStart ?? -Infinity
-      const bInterval = b.timeInterval ?? b.timeToStart ?? -Infinity
+      const aInterval =
+        normalizeInterval(a.timeInterval) ??
+        normalizeInterval(a.timeToStart) ??
+        Number.NEGATIVE_INFINITY
+      const bInterval =
+        normalizeInterval(b.timeInterval) ??
+        normalizeInterval(b.timeToStart) ??
+        Number.NEGATIVE_INFINITY
       return bInterval - aInterval
     })
 
