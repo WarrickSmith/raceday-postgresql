@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RaceContextData } from '@/contexts/RaceContext'
 import { useLogger } from '@/utils/logging'
+import { pollingConfig } from '@/config/pollingConfig'
 import { calculateDstAwareMinutesToStart } from '@/utils/timezoneUtils'
 
 interface PollingConfig {
@@ -40,15 +41,10 @@ const RACE_COMPLETE_STATUSES = new Set([
   'abandoned',
   'cancelled',
   'canceled',
+  'official',
 ])
 
-function isDoublePollingEnabled(): boolean {
-  const rawValue =
-    process.env.NEXT_PUBLIC_DOUBLE_POLLING_FREQUENCY ??
-    process.env.DOUBLE_POLLING_FREQUENCY
-
-  return rawValue !== undefined && rawValue.toLowerCase() === 'true'
-}
+const CRITICAL_STATUSES = new Set(['closed', 'running', 'interim'])
 
 export function isRaceComplete(status: string | undefined): boolean {
   if (!status) {
@@ -63,36 +59,36 @@ export function calculatePollingIntervalMs(
   raceStatus: string,
   doubleFrequency: boolean
 ): number {
-  if (!raceStartTime) {
-    return DEFAULT_ACTIVE_INTERVAL * (doubleFrequency ? 0.5 : 1)
-  }
-
   if (isRaceComplete(raceStatus)) {
     return Number.POSITIVE_INFINITY
+  }
+
+  const multiplier = doubleFrequency ? 0.5 : 1
+
+  const applyMultiplier = (intervalMs: number): number => intervalMs * multiplier
+
+  const normalizedStatus = raceStatus?.trim().toLowerCase()
+
+  if (normalizedStatus && CRITICAL_STATUSES.has(normalizedStatus)) {
+    return applyMultiplier(DEFAULT_CRITICAL_INTERVAL)
   }
 
   // Use DST-aware calculation instead of naive Date arithmetic
   const minutesToStart = calculateDstAwareMinutesToStart(raceStartTime, raceStatus)
 
   if (minutesToStart === null || Number.isNaN(minutesToStart)) {
-    return DEFAULT_ACTIVE_INTERVAL * (doubleFrequency ? 0.5 : 1)
+    return applyMultiplier(DEFAULT_BASELINE_INTERVAL)
   }
 
-  const multiplier = doubleFrequency ? 0.5 : 1
-
-  // DST-aware polling intervals that match server-side logic:
-  // > 65 minutes: baseline polling (30 minutes)
-  // 5-65 minutes: active polling (2.5 minutes)
-  // < 5 minutes: critical polling (30 seconds)
-  if (minutesToStart > 65) {
-    return DEFAULT_BASELINE_INTERVAL * multiplier
+  if (minutesToStart <= 5) {
+    return applyMultiplier(DEFAULT_CRITICAL_INTERVAL)
   }
 
-  if (minutesToStart > 5) {
-    return DEFAULT_ACTIVE_INTERVAL * multiplier
+  if (minutesToStart <= 65) {
+    return applyMultiplier(DEFAULT_ACTIVE_INTERVAL)
   }
 
-  return DEFAULT_CRITICAL_INTERVAL * multiplier
+  return applyMultiplier(DEFAULT_BASELINE_INTERVAL)
 }
 
 export function useRacePolling(config: PollingConfig): RacePollingState {
@@ -123,9 +119,11 @@ export function useRacePolling(config: PollingConfig): RacePollingState {
     null
   )
 
+  const { doubleFrequency, enabled: isFeatureEnabled, debugMode, timeoutMs } = pollingConfig
+
   const isDoubleFrequencyEnabled = useMemo(
-    () => isDoublePollingEnabled(),
-    []
+    () => doubleFrequency,
+    [doubleFrequency]
   )
 
   useEffect(() => {
@@ -157,10 +155,6 @@ export function useRacePolling(config: PollingConfig): RacePollingState {
 
   const stop = useCallback(
     (reason: string) => {
-      if (!isPollingRef.current) {
-        return
-      }
-
       logger.info('Stopping race polling', { reason, raceId })
       isPollingRef.current = false
       setIsPolling(false)
@@ -189,6 +183,14 @@ export function useRacePolling(config: PollingConfig): RacePollingState {
       setCurrentIntervalMs(boundedDelay)
       setNextPollTimestamp(targetTimestamp)
 
+      if (debugMode) {
+        logger.debug('Scheduling next poll', {
+          raceId,
+          delayMs: boundedDelay,
+          targetTimestamp,
+        })
+      }
+
       timeoutRef.current = setTimeout(() => {
         const run = executePollRef.current
         if (run) {
@@ -196,7 +198,7 @@ export function useRacePolling(config: PollingConfig): RacePollingState {
         }
       }, boundedDelay)
     },
-    [clearScheduledPoll]
+    [clearScheduledPoll, debugMode, logger, raceId]
   )
 
   const executePoll = useCallback(
@@ -221,10 +223,18 @@ export function useRacePolling(config: PollingConfig): RacePollingState {
         return
       }
 
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+
       try {
         isFetchingRef.current = true
         const controller = new AbortController()
         abortControllerRef.current = controller
+
+        if (timeoutMs > 0) {
+          timeoutHandle = setTimeout(() => {
+            controller.abort()
+          }, timeoutMs)
+        }
 
         const response = await fetch(`/api/race/${raceId}`, {
           signal: controller.signal,
@@ -299,50 +309,85 @@ export function useRacePolling(config: PollingConfig): RacePollingState {
 
         scheduleNextPoll(backoffDelay)
       } finally {
+        if (timeoutMs > 0 && typeof timeoutHandle !== 'undefined') {
+          clearTimeout(timeoutHandle)
+        }
+
         if (abortControllerRef.current) {
           abortControllerRef.current = null
         }
         isFetchingRef.current = false
       }
     },
-    [isDoubleFrequencyEnabled, logger, raceId, scheduleNextPoll, stop]
+    [
+      isDoubleFrequencyEnabled,
+      logger,
+      raceId,
+      scheduleNextPoll,
+      stop,
+      timeoutMs,
+    ]
   )
 
   useEffect(() => {
     executePollRef.current = executePoll
   }, [executePoll])
 
-  const startPolling = useCallback(() => {
-    if (!raceId || !hasInitialData) {
-      return
-    }
+  const startPolling = useCallback(
+    (override?: { status?: string; startTime?: string }) => {
+      if (!isFeatureEnabled) {
+        return
+      }
 
-    if (isRaceComplete(raceStatusRef.current)) {
-      stop('race-complete')
-      return
-    }
+      if (!raceId || !hasInitialData) {
+        return
+      }
 
-    if (isPollingRef.current) {
-      return
-    }
+      if (override?.status) {
+        raceStatusRef.current = override.status
+      }
 
-    isPollingRef.current = true
-    setIsPolling(true)
-    consecutiveFailuresRef.current = 0
+      if (override?.startTime) {
+        raceStartTimeRef.current = override.startTime
+      }
 
-    const initialInterval = calculatePollingIntervalMs(
-      raceStartTimeRef.current,
-      raceStatusRef.current,
-      isDoubleFrequencyEnabled
-    )
+      const currentStatus = override?.status ?? raceStatusRef.current
 
-    if (!Number.isFinite(initialInterval)) {
-      stop('computed-infinite-interval')
-      return
-    }
+      if (isRaceComplete(currentStatus)) {
+        stop('race-complete')
+        return
+      }
 
-    scheduleNextPoll(initialInterval)
-  }, [hasInitialData, isDoubleFrequencyEnabled, raceId, scheduleNextPoll, stop])
+      if (isPollingRef.current) {
+        return
+      }
+
+      isPollingRef.current = true
+      setIsPolling(true)
+      consecutiveFailuresRef.current = 0
+
+      const initialInterval = calculatePollingIntervalMs(
+        raceStartTimeRef.current,
+        currentStatus ?? 'open',
+        isDoubleFrequencyEnabled
+      )
+
+      if (!Number.isFinite(initialInterval)) {
+        stop('computed-infinite-interval')
+        return
+      }
+
+      scheduleNextPoll(initialInterval)
+    },
+    [
+      hasInitialData,
+      isDoubleFrequencyEnabled,
+      isFeatureEnabled,
+      raceId,
+      scheduleNextPoll,
+      stop,
+    ]
+  )
 
   useEffect(() => {
     if (previousRaceIdRef.current && previousRaceIdRef.current !== raceId) {
@@ -356,24 +401,63 @@ export function useRacePolling(config: PollingConfig): RacePollingState {
   }, [raceId, stop])
 
   useEffect(() => {
+    if (!isFeatureEnabled) {
+      if (isPollingRef.current || timeoutRef.current) {
+        stop('polling-disabled')
+      } else {
+        setIsPolling(false)
+        setCurrentIntervalMs(null)
+        setNextPollTimestamp(null)
+
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort()
+          abortControllerRef.current = null
+        }
+      }
+      return
+    }
+
     if (!raceId || !hasInitialData) {
       stop('missing-initial-data')
       return
     }
 
-    if (isRaceComplete(raceStatusRef.current)) {
-      stop('race-complete')
+    const effectiveStatus = raceStatusRef.current ?? raceStatus ?? 'open'
+    const effectiveRaceStartTime = raceStartTime ?? raceStartTimeRef.current
+
+    if (isRaceComplete(effectiveStatus)) {
+      stop('race-status-complete')
       return
     }
 
-    startPolling()
-  }, [hasInitialData, raceId, startPolling, stop])
-
-  useEffect(() => {
-    if (raceStatus && isRaceComplete(raceStatus)) {
-      stop('race-status-complete')
+    if (!isPollingRef.current) {
+      startPolling({ status: effectiveStatus, startTime: effectiveRaceStartTime ?? undefined })
+      return
     }
-  }, [raceStatus, stop])
+
+    const nextInterval = calculatePollingIntervalMs(
+      effectiveRaceStartTime || '',
+      effectiveStatus,
+      isDoubleFrequencyEnabled
+    )
+
+    if (!Number.isFinite(nextInterval)) {
+      stop('computed-infinite-interval')
+      return
+    }
+
+    scheduleNextPoll(nextInterval)
+  }, [
+    hasInitialData,
+    isDoubleFrequencyEnabled,
+    isFeatureEnabled,
+    raceId,
+    raceStartTime,
+    raceStatus,
+    scheduleNextPoll,
+    startPolling,
+    stop,
+  ])
 
   useEffect(() => {
     return () => {
@@ -394,12 +478,12 @@ export function useRacePolling(config: PollingConfig): RacePollingState {
       return
     }
 
-    if (!isPollingRef.current) {
+    if (!isPollingRef.current && isFeatureEnabled) {
       startPolling()
     }
 
     await executePoll({ forced: true, reason: 'manual-refresh' })
-  }, [executePoll, raceId, startPolling])
+  }, [executePoll, isFeatureEnabled, raceId, startPolling])
 
   return {
     isPolling,

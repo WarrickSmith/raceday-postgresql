@@ -60,11 +60,11 @@
 
 **Acceptance Criteria**:
 
-- [x] Dynamic interval adjustments across race phases.
-- [x] `DOUBLE_POLLING_FREQUENCY` toggle supported.
-- [x] Automatic stop on finalised races.
-- [x] Request deduplication and retry logic validated.
-- [x] Full TypeScript coverage, tests, and docs updated. 【F:polling_plan.md†L318-L362】
+- [x] Interval calculator matches documented backend cadence windows (T-65m+, T-5m..T-3m, post-start) with optional half-interval override.
+- [x] Polling hook halts on `Final`/`Abandoned` statuses, resumes when races return to active states, and recalculates intervals after status/start-time changes.
+- [x] DST-aware minute math prevents cadence drift around timezone transitions and edge-case windows.
+- [x] Unit tests cover cadence alignment, overrides, and lifecycle stop/resume scenarios.
+- [x] `.env.example` and docs reflect cadence toggles and operator guidance. 【F:polling_plan.md†L318-L362】
 
 **Testing Requirements**: Playwright validation of cadence changes, ensure no stacked requests, allow for busy server latency. 【F:polling_plan.md†L364-L372】
 
