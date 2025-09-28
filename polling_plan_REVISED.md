@@ -7,23 +7,27 @@
 - **Server Polling Cadence**: Master scheduler (`/server/master-race-scheduler/src/main.js`) orchestrates enhanced race polling with cadence windows: T-65m+ (30 minute intervals), T-5m to T-3m (30 second intervals), through post-start until status is Final. Client can optionally halve intervals via `DOUBLE_POLLING_FREQUENCY`. The master scheduler runs every 1 minute via CRON and coordinates high-frequency polling via enhanced-race-poller.
 
 - **Key API Endpoints**:
+
   - Race data: `/client/src/app/api/race/[id]/route.ts`
   - Money flow timeline: `/client/src/app/api/race/[id]/money-flow-timeline/route.ts`
   - Pools: `/client/src/app/api/race/[id]/pools/route.ts`
   - Entrants: `/client/src/app/api/race/[id]/entrants/route.ts`
 
 - **Performance Context**: Initial analysis revealed 45+ second response times for single race queries due to inefficient relationship queries, missing compound indexes, and payload bloat. Remediation involved scalar key backfills, `Query.select` implementation, and incremental loading patterns. Key optimizations included:
+
   - Database scalar keys: Populated reliable `raceId` and `entrantId` attributes on entrants and money-flow documents
   - Compound indexes: Added `idx_race_entrant_time` on money-flow-history and `idx_race_active` on entrants
   - Query optimization: Refactored APIs to use indexed filters, field selection, and cursor-based pagination
   - Performance improvements: 45s → 2-5s queries (90% improvement), 60-70% payload reduction
 
 - **Indexing Implementation**: Critical database indexes were provisioned to support scalar-key query patterns:
+
   - `money-flow-history`: `idx_race_entrant_time` (raceId, entrantId, timeInterval)
   - `entrants`: `idx_race_active` (raceId, isScratched)
   - Deployment sequencing ensures attributes are available before index creation during low-traffic windows
 
 - **Environment Configuration**:
+
   - `DOUBLE_POLLING_FREQUENCY`: Enable 2x polling frequency (default: false)
   - `NEXT_PUBLIC_POLLING_ENABLED`: Toggle polling functionality
   - `NEXT_PUBLIC_POLLING_DEBUG_MODE`: Enable debug logging
@@ -50,6 +54,7 @@
 2. Ensure `useMeetingsPolling.tsx` cleanup prevents dependency loops.
 3. Surface data for Next Scheduled Race/Next Race buttons on meetings and race pages.
 4. Remove outdated meetings polling code that may interfere with new implementation.
+5. Ensure modern. user friendly 'sorry' message compnent displayed if no meeting data available with a reload/refetch meetings option.
 
 **Acceptance Criteria**:
 
@@ -132,6 +137,7 @@
 4. Document cadence alignment with caching strategy to respect CRON ingestion windows (UTC-aware).
 
 **Caching Strategy**:
+
 - Live races: 15-30 second cache, `stale-while-revalidate`
 - Final races: 5-15 minute cache for stability
 - Coordinate with polling intervals to prevent cache misses
@@ -164,6 +170,7 @@
 4. Retire obsolete real-time tests that no longer apply to polling architecture.
 
 **Test Coverage Areas**:
+
 - Polling interval accuracy (30m/2.5m/30s cadence windows)
 - Status-based polling transitions (open → closed → final)
 - Request deduplication and error handling
@@ -190,6 +197,7 @@
 **Problem Statement**: Update architecture and troubleshooting documentation to describe the polling-only model, environment configuration, and response optimisations while purging real-time references.
 
 **Documentation Context**: The application has transitioned from a hybrid fetch-and-realtime model to a pure polling architecture. Key implementation details include:
+
 - Completed phases: Real-time removal, polling infrastructure, data hygiene, index provisioning, API optimization
 - Performance improvements: 45s → 2-5s queries, 60-70% payload reduction
 - Architecture: Coordinated polling hooks with shared cadence, error handling, progressive loading
@@ -203,6 +211,7 @@
 4. Ensure docs match implemented caching/compression behaviour and query optimizations.
 
 **Documentation Scope**:
+
 - Polling cadence explanation (master scheduler coordination)
 - Environment variables and their effects
 - Troubleshooting guide for common polling issues
@@ -223,6 +232,7 @@
 ## Success Metrics & Risk Watchlist
 
 ### Success Metrics
+
 - **Cadence compliance**: Client polling intervals match backend scheduling windows
 - **No concurrent fetches**: Request deduplication prevents stacked API calls
 - **Error rate <5%**: Robust error handling with exponential backoff
@@ -232,6 +242,7 @@
 - **Performance maintenance**: Sustained 2-5s response times and reduced payload sizes
 
 ### Risk Watchlist
+
 - **Infinite loop regressions**: Meetings polling dependency management
 - **Backend load**: Misconfigured intervals overwhelming server capacity
 - **Stale caches**: Caching strategy conflicts with live data requirements
