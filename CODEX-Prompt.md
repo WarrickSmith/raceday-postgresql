@@ -1,43 +1,48 @@
-# GPT-5-Codex Implementation Prompt
+# CODEC Cloud Prompt: RaceDay Polling Tasks
 
-**Current Phase:** <paste phase title here>
+Use this prompt when executing any remaining task from `polling_plan_REVISED.md` on the RaceDay repository.
 
-## Context
-- Repository: RaceDay (`feat/implement-polling` branch).
-- Implementation blueprint: `query-implementation-plan.md` (section matching the current phase).
-- Supporting reference: `query-optimization-plan.md` for rationale.
-- Backend: Appwrite (indexes & schema via `server/database-setup/src/database-setup.js`).
-- Frontend: Next.js App Router.
+---
 
-## Objectives
-Deliver every task defined for the current phase in `query-implementation-plan.md`, producing production-ready code, tests, and documentation updates that can merge independently.
+## Purpose
+Deliver the selected task to production quality. Keep the scope limited to the specific task while preserving the stability of the existing polling implementation.
 
-## Operating Principles
-1. **Read the plan carefully.** Confirm all prerequisites for the current phase are satisfied or call out blockers.
-2. **Work incrementally.** Maintain a clean commit scope; avoid touching future-phase concerns.
-3. **Stay aligned with Appwrite best practices.** Use indexed fields, avoid relationship over-fetching, and respect rate limits.
-4. **Document decisions.** Update relevant markdown/runbooks when behaviour or ops steps change.
-5. **Validate thoroughly.** Prefer automated tests; include manual verification notes when automation is unavailable.
+## Core References
+- **Primary roadmap:** `polling_plan_REVISED.md` (choose one open task at a time and quote the section while working).
+- **Historical context:** `polling_plan.md` for legacy rationale.
+- **Query foundations:** `query-implementation-plan.md` and `query-optimization-plan.md` for backend/indexing expectations.
+- **Architecture notes:** `CLAUDE.md`, `README.md`, and `.env.example`.
+- **UI reference:** `polling-monitor.png`.
+
+Review the referenced documents before making changes. If the plan references external systems (e.g., Appwrite), document any required operator steps or scripts.
 
 ## Required Workflow
-1. Checkout `feat/implement-polling` and create a phase-specific worktree/branch (e.g., `phase-current-query-impl`).
-2. Re-read the current phase section in `query-implementation-plan.md`; list the tasks you will perform.
-3. Execute tasks sequentially:
-   - Modify code/config as instructed.
-   - Update or add tests/docs.
-   - When relying on Appwrite operations (e.g., index creation), produce scripts or clear operator runbooks.
-4. Run project validation commands (e.g., `npm run lint`, `npm run test`, integration scripts). Capture and summarise outcomes.
-5. Measure or demonstrate the expected improvements when requested by the plan (response time, payload size, etc.).
-6. Prepare a concise implementation report summarising:
-   - Completed tasks & files changed
-   - Test/validation results
-   - Follow-up actions or risks
-7. Stage changes but do not commit (unless instructed otherwise in the workflow). Leave the repository ready for review.
+1. **Identify the task.** Copy the exact task heading and checklist from `polling_plan_REVISED.md`. Confirm no prerequisites remain unfinished.
+2. **Assess impact.** List affected features, integrations, and any risky areas. Flag blockers before coding.
+3. **Plan the change.** Describe the approach, including data model updates, API work, client hooks/components, and configuration changes.
+4. **Implement incrementally.**
+   - Update code, types, and configuration with strong typing (no `any`).
+   - Remove superseded legacy logic when instructed.
+   - Keep commits logically scoped to the task.
+5. **Testing expectations.** Run and record:
+   - `npx tsc --noEmit`
+   - `npm run lint`
+   - `npm test`
+   - Any task-specific checks (e.g., Playwright scenarios, performance benchmarks, cURL header verifications).
+   Document manual validation when automation is unavailable.
+6. **Documentation & Ops.** Update markdown/runbooks, `.env.example`, and comments to reflect new behaviour, toggles, or operational steps.
+7. **Report results.** Prepare a summary covering:
+   - Task name and key deliverables.
+   - Files touched and major changes.
+   - Test results with command outputs.
+   - Follow-up actions, risks, or open questions.
 
-## Output Expectations
-- Adhere to project coding standards and existing file conventions.
-- Keep changes scoped strictly to the current phase deliverables.
-- Provide actionable notes for reviewers or operators (especially when manual Appwrite steps are required).
-- If blockers arise, describe them with suggested resolutions before proceeding.
+## Guardrails
+- Do not modify future tasks unless explicitly required for the current one; note any dependencies you uncover.
+- Maintain consistency with Next.js App Router patterns and Appwrite best practices (indexed queries, incremental loading, request deduplication).
+- Ensure polling respects backend cadence windows and documented environment toggles (`DOUBLE_POLLING_FREQUENCY`, `NEXT_PUBLIC_POLLING_ENABLED`, `NEXT_PUBLIC_POLLING_DEBUG_MODE`, `NEXT_PUBLIC_POLLING_TIMEOUT`).
+- Preserve existing accessibility, UX, and error handling standards; render '-' placeholders for missing data where specified.
+- When introducing caching or compression, verify headers and payload size improvements without breaking clients.
+- Remove deprecated real-time artifacts, tests, and utilities when encountered.
 
-Paste the appropriate phase title at the top of this prompt before execution; the remainder of the instructions automatically apply to any phase.
+Use this prompt verbatim at the start of each CODEC Cloud session to execute the next task in the plan.
