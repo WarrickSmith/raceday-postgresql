@@ -7,6 +7,7 @@
 
 import { ID } from 'node-appwrite';
 import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
+import { shouldTerminateForNzTime as shouldTerminateForNzTimeUtil } from './timezone-utils.js';
 
 const LOCK_DOCUMENT_ID = 'enhanced-race-poller-lock';
 const LOCK_COLLECTION_ID = 'function-locks';
@@ -388,23 +389,15 @@ export function setupHeartbeatInterval(lockManager, progressTracker) {
  */
 export function shouldTerminateForNzTime(context) {
     try {
-        const nzTime = new Date().toLocaleString('en-NZ', {
-            timeZone: 'Pacific/Auckland',
-            hour12: false
-        });
-        const nzTimeObj = new Date(nzTime);
-        const nzHour = nzTimeObj.getHours();
-
-        // Terminate at 1:00 AM NZ time for enhanced race poller (continuous polling function)
-        const shouldTerminate = nzHour >= 1 && nzHour < 6;
+        // Use DST-aware timezone utility for consistent timezone handling
+        const shouldTerminate = shouldTerminateForNzTimeUtil();
 
         if (shouldTerminate) {
-            logDebug(context, 'Enhanced race poller NZ time termination triggered', {
-                nzTime,
-                nzHour,
+            logDebug(context, 'Enhanced race poller NZ time termination triggered (DST-aware)', {
                 terminationReason: 'Past 1:00 AM NZ time - continuous polling termination',
                 timezone: 'Pacific/Auckland',
-                continuousPollingOptimization: true
+                continuousPollingOptimization: true,
+                dstAware: true
             });
         }
 
