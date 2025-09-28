@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RaceContextData } from '@/contexts/RaceContext'
 import { useLogger } from '@/utils/logging'
+import { calculateDstAwareMinutesToStart } from '@/utils/timezoneUtils'
 
 interface PollingConfig {
   raceId: string
@@ -70,16 +71,19 @@ export function calculatePollingIntervalMs(
     return Number.POSITIVE_INFINITY
   }
 
-  const startTimestamp = new Date(raceStartTime).getTime()
-  const now = Date.now()
+  // Use DST-aware calculation instead of naive Date arithmetic
+  const minutesToStart = calculateDstAwareMinutesToStart(raceStartTime, raceStatus)
 
-  if (Number.isNaN(startTimestamp)) {
+  if (minutesToStart === null || Number.isNaN(minutesToStart)) {
     return DEFAULT_ACTIVE_INTERVAL * (doubleFrequency ? 0.5 : 1)
   }
 
-  const minutesToStart = (startTimestamp - now) / MINUTE_IN_MS
   const multiplier = doubleFrequency ? 0.5 : 1
 
+  // DST-aware polling intervals that match server-side logic:
+  // > 65 minutes: baseline polling (30 minutes)
+  // 5-65 minutes: active polling (2.5 minutes)
+  // < 5 minutes: critical polling (30 seconds)
   if (minutesToStart > 65) {
     return DEFAULT_BASELINE_INTERVAL * multiplier
   }
