@@ -54,7 +54,8 @@
 2. Ensure `useMeetingsPolling.tsx` cleanup prevents dependency loops.
 3. Surface data for Next Scheduled Race/Next Race buttons on meetings and race pages.
 4. Remove outdated meetings polling code that may interfere with new implementation.
-5. Ensure modern. user friendly 'sorry' message compnent displayed if no meeting data available with a reload/refetch meetings option.
+5. Implement Databse Connection check on initial page render - Show a modern design, friendly, RacDay data is unavilable message with a re-try connection button to effect a manula re-connect.
+6. When the Databse returns no meetings data, show a modern design, friendly, 'No Meeting Information is currently available' message with a re-check meeting data connection button to effect a manula refresh of meetings data (although the polling should automatically fetch this when available and refresh the page).
 
 **Acceptance Criteria**:
 
