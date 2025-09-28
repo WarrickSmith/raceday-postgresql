@@ -6,6 +6,7 @@
 
 import { ID } from 'node-appwrite';
 import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
+import { shouldTerminateForNzTime as shouldTerminateForNzTimeUtil } from './timezone-utils.js';
 
 const LOCK_DOCUMENT_ID = 'daily-races-lock';
 const LOCK_COLLECTION_ID = 'function-locks';
@@ -303,29 +304,21 @@ export function setupHeartbeatInterval(lockManager, progressTracker) {
  */
 export function shouldTerminateForNzTime(context) {
     try {
-        const nzTime = new Date().toLocaleString('en-NZ', {
-            timeZone: 'Pacific/Auckland',
-            hour12: false
-        });
-        const nzTimeObj = new Date(nzTime);
-        const nzHour = nzTimeObj.getHours();
-
-        // Terminate if between 1:00 AM and 6:00 AM NZ time
-        const shouldTerminate = nzHour >= 1 && nzHour < 6;
+        // Use DST-aware timezone utility for consistent timezone handling
+        const shouldTerminate = shouldTerminateForNzTimeUtil();
 
         if (shouldTerminate) {
-            logDebug(context, 'NZ time termination triggered', {
-                nzTime,
-                nzHour,
+            logDebug(context, 'Daily races NZ time termination triggered (DST-aware)', {
                 terminationReason: 'Past 1:00 AM NZ time',
-                timezone: 'Pacific/Auckland'
+                timezone: 'Pacific/Auckland',
+                dstAware: true
             });
         }
 
         return shouldTerminate;
 
     } catch (error) {
-        context.error('Failed to check NZ termination time', {
+        context.error('Failed to check daily races NZ termination time', {
             error: error.message
         });
         return false; // Don't terminate on error, let Appwrite timeout handle it

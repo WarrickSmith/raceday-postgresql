@@ -4,6 +4,7 @@ import { processDetailedRaces, processEntrants } from './database-utils.js';
 import { validateEnvironmentVariables, executeApiCallWithTimeout, handleError, rateLimit, monitorMemoryUsage, forceGarbageCollection } from './error-handlers.js';
 import { fastLockCheck, updateHeartbeat, releaseLock, setupHeartbeatInterval, shouldTerminateForNzTime } from './lock-manager.js';
 import { logDebug, logInfo, logWarn, logError, logFunctionStart, logFunctionComplete } from './logging-utils.js';
+import { getCurrentNzDateString, getNzStartOfDayUtc, getNzTimeDisplay } from './timezone-utils.js';
 
 export default async function main(context) {
     const functionStartTime = Date.now();
@@ -76,21 +77,19 @@ export default async function main(context) {
         await updateHeartbeat(lockManager, progressTracker);
         
         // PHASE 2: Get today's date for filtering races (using NZ timezone)
-        // Fix: Use proper datetime comparison to avoid timezone boundary issues
+        // Fix: Use DST-aware timezone handling to avoid timezone boundary issues
         // where races early in NZ day (e.g., 11:55 AM) fall in previous UTC day
-        const nzDate = new Date().toLocaleDateString('en-CA', {
-            timeZone: 'Pacific/Auckland',
-        });
+        const nzDate = getCurrentNzDateString();
 
-        // Calculate NZ start of day in UTC for proper database filtering
-        // Since we're running on Sept 19 UTC but it's Sept 20 in NZ,
-        // we need the start of Sept 20 NZ time in UTC format
-        const nzStartOfDayISO = new Date(nzDate + 'T00:00:00+13:00').toISOString();
+        // Calculate NZ start of day in UTC for proper database filtering with DST awareness
+        // Replaces hardcoded +13:00 offset with dynamic DST-aware calculation
+        const nzStartOfDayISO = getNzStartOfDayUtc(nzDate);
 
         // Get basic races from database (that were created by daily-meetings function)
         logDebug(context, 'Fetching basic races from database for detailed enhancement...', {
             nzDate,
             nzStartOfDayISO,
+            nzTimeDisplay: getNzTimeDisplay(),
             filterCriteria: `startTime >= ${nzStartOfDayISO}`
         });
         const racesResult = await databases.listDocuments(databaseId, 'races', [
