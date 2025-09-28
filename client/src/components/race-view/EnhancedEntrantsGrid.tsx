@@ -181,7 +181,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   // Use real-time entrants data from unified subscription if available
   const currentEntrants =
     realtimeEntrants || raceData?.entrants || initialEntrants
-  const currentRaceId = raceData?.race.$id || raceId
+
+  const getEntrantKey = useCallback((entrant: Entrant): string => {
+    return entrant.entrantId || entrant.$id
+  }, [])
+
+  const currentRaceId =
+    raceData?.race.raceId || raceData?.race.$id || raceId
   const currentRaceStartTime = raceData?.race.startTime || raceStartTime
   const currentRace = raceData?.race
 
@@ -199,10 +205,11 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const [updateCount, setUpdateCount] = useState(0)
 
   // Get money flow timeline data for all entrants
-  const entrantIds = useMemo(
-    () => currentEntrants.map((e) => e.$id),
-    [currentEntrants]
-  )
+  const entrantIds = useMemo(() => {
+    return currentEntrants
+      .map((entrant) => getEntrantKey(entrant))
+      .filter((id): id is string => Boolean(id))
+  }, [currentEntrants, getEntrantKey])
 
   // Local selection for Win/Place/Odds selector - MUST be declared before hook calls
   const [selectedView, setSelectedView] = useState<'win' | 'place' | 'odds'>(
@@ -392,7 +399,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       }
 
       // Priority 2: Timeline latest percentage (only if entrant data missing)
-      const entrantTimeline = timelineData?.get(entrant.$id)
+      const entrantTimeline = timelineData?.get(getEntrantKey(entrant))
       if (
         !poolPercentage &&
         entrantTimeline &&
@@ -495,7 +502,14 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
       return entrantWithPoolData
     })
-  }, [entrants, racePoolData, timelineData, validateTimelineSummation, logger])
+  }, [
+    entrants,
+    racePoolData,
+    timelineData,
+    validateTimelineSummation,
+    logger,
+    getEntrantKey,
+  ])
 
   // Debug logging removed - entrants data structure verified
 
@@ -1083,22 +1097,31 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
   // Get data for specific timeline point - shows incremental money amounts or odds based on selected view
   const getTimelineData = useCallback(
-    (entrantId: string, interval: number): string => {
-      const entrant = sortedEntrants.find((e) => e.$id === entrantId)
+    (entrantKey: string, interval: number): string => {
+      const entrant = sortedEntrants.find(
+        (candidate) =>
+          getEntrantKey(candidate) === entrantKey || candidate.$id === entrantKey
+      )
       if (!entrant || entrant.isScratched) return '—'
 
       // Use appropriate function based on selected view
       let result: string
       switch (selectedView) {
         case 'win':
-          result = getWinPoolData ? getWinPoolData(entrantId, interval) : '—'
+          result = getWinPoolData
+            ? getWinPoolData(getEntrantKey(entrant), interval)
+            : '—'
           break
         case 'place':
-          result = getPlacePoolData ? getPlacePoolData(entrantId, interval) : '—'
+          result = getPlacePoolData
+            ? getPlacePoolData(getEntrantKey(entrant), interval)
+            : '—'
           break
         case 'odds':
           // Show Fixed Win odds for odds view
-          result = getOddsData ? getOddsData(entrantId, interval, 'fixedWin') : '—'
+          result = getOddsData
+            ? getOddsData(getEntrantKey(entrant), interval, 'fixedWin')
+            : '—'
           break
         default:
           result = '—'
@@ -1107,12 +1130,12 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       // Debug logging to help troubleshoot data issues
       if (interval === 60 && process.env.NODE_ENV === 'development') {
         logger.debug(`Timeline data for ${entrant.name || entrant.$id} at ${interval}m:`, {
-          entrantId: entrant.$id,
+          entrantId: getEntrantKey(entrant),
           interval,
           selectedView,
           result,
           timelineDataSize: timelineData?.size || 0,
-          hasTimelineData: timelineData?.has(entrant.$id) || false,
+          hasTimelineData: timelineData?.has(getEntrantKey(entrant)) || false,
         })
       }
 
@@ -1126,6 +1149,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       getPlacePoolData,
       getOddsData,
       logger,
+      getEntrantKey,
     ]
   )
 
@@ -1634,7 +1658,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                       {/* Timeline Columns */}
                       {timelineColumns.map((column) => {
                         const indicator = !entrant.isScratched
-                          ? getIndicatorForCell(column.interval, entrant.$id)
+                          ? getIndicatorForCell(
+                              column.interval,
+                              getEntrantKey(entrant)
+                            )
                           : null
                         const indicatorStyle = indicator
                           ? mapIndicatorColorToCellStyle(indicator.color)
@@ -1648,7 +1675,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                           ? indicator.percentageChange.toFixed(2)
                           : undefined
                         const cellValue = getTimelineData(
-                          entrant.$id,
+                          getEntrantKey(entrant),
                           column.interval
                         )
 
