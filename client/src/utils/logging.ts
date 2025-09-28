@@ -289,10 +289,13 @@ export function createComponentLogger(componentName: string) {
 
 /**
  * Hook for React components to get a bound logger
+ * Ensures a stable reference across renders for a given component name.
  */
+import { useMemo } from 'react'
+
 export function useLogger(componentName?: string) {
   const name = componentName || getComponentContext();
-  return createComponentLogger(name);
+  return useMemo(() => createComponentLogger(name), [name]);
 }
 
 export type ComponentLogger = ReturnType<typeof createComponentLogger>;
