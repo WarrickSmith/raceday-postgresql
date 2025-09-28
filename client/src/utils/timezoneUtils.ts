@@ -54,12 +54,13 @@ export function getCurrentNzDateString(): string {
 export function getMinutesUntilRaceStart(raceStartTimeIso: string): number | null {
   if (!raceStartTimeIso) return null
 
-  const now = new Date()
-  const raceStart = new Date(raceStartTimeIso)
+  const raceStartTimestamp = Date.parse(raceStartTimeIso)
+  if (Number.isNaN(raceStartTimestamp)) {
+    return null
+  }
 
-  // Calculate difference in milliseconds, then convert to minutes
-  const diffMs = raceStart.getTime() - now.getTime()
-  return Math.round(diffMs / (1000 * 60))
+  const diffMs = raceStartTimestamp - Date.now()
+  return diffMs / (1000 * 60)
 }
 
 /**
@@ -185,7 +186,10 @@ export function createExtendedRaceWindow(baseHours: number = 1): {
  * @param {string} raceStatus - Current race status
  * @returns {number} Minutes until race start (accurate for DST)
  */
-export function calculateDstAwareMinutesToStart(raceStartTimeIso: string, raceStatus?: string): number | null {
+export function calculateDstAwareMinutesToStart(
+  raceStartTimeIso: string,
+  raceStatus?: string
+): number | null {
   if (!raceStartTimeIso) return null
 
   // Handle completed races

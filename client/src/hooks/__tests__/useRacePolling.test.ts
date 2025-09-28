@@ -6,43 +6,68 @@ import {
 const MINUTE_IN_MS = 60 * 1000
 
 describe('calculatePollingIntervalMs', () => {
-  const originalDateNow = Date.now
+  const baseNow = new Date('2024-05-01T00:00:00Z').getTime()
+  let dateNowSpy: jest.SpyInstance<number, []>
 
   beforeAll(() => {
-    // Freeze time for deterministic interval calculations
-    Date.now = () => new Date('2024-05-01T00:00:00Z').getTime()
+    dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(baseNow)
   })
 
   afterAll(() => {
-    Date.now = originalDateNow
+    dateNowSpy.mockRestore()
+  })
+
+  afterEach(() => {
+    dateNowSpy.mockReturnValue(baseNow)
   })
 
   it('returns baseline interval when race start is more than 65 minutes away', () => {
-    const startTime = new Date('2024-05-01T02:00:00Z').toISOString()
+    const startTime = new Date(baseNow + 120 * MINUTE_IN_MS).toISOString()
     const interval = calculatePollingIntervalMs(startTime, 'Open', false)
     expect(interval).toBe(30 * MINUTE_IN_MS)
   })
 
   it('returns active interval when race start is between 5 and 65 minutes away', () => {
-    const startTime = new Date('2024-05-01T00:30:00Z').toISOString()
+    const startTime = new Date(baseNow + 30 * MINUTE_IN_MS).toISOString()
+    const interval = calculatePollingIntervalMs(startTime, 'Open', false)
+    expect(interval).toBe(2.5 * MINUTE_IN_MS)
+  })
+
+  it('returns active interval for the transition window between 60 and 65 minutes', () => {
+    const startTime = new Date(baseNow + 64.5 * MINUTE_IN_MS).toISOString()
     const interval = calculatePollingIntervalMs(startTime, 'Open', false)
     expect(interval).toBe(2.5 * MINUTE_IN_MS)
   })
 
   it('returns critical interval when race is within five minutes', () => {
-    const startTime = new Date('2024-05-01T00:03:00Z').toISOString()
+    const startTime = new Date(baseNow + 3 * MINUTE_IN_MS).toISOString()
     const interval = calculatePollingIntervalMs(startTime, 'Open', false)
     expect(interval).toBe(30 * 1000)
   })
 
+  it('returns critical interval once the advertised start time has passed but status is still open', () => {
+    const startTime = new Date(baseNow - 2 * MINUTE_IN_MS).toISOString()
+    const interval = calculatePollingIntervalMs(startTime, 'Open', false)
+    expect(interval).toBe(30 * 1000)
+  })
+
+  it('returns critical interval for closed and running statuses regardless of start time', () => {
+    const startTime = new Date(baseNow + 90 * MINUTE_IN_MS).toISOString()
+    const closedInterval = calculatePollingIntervalMs(startTime, 'Closed', false)
+    const runningInterval = calculatePollingIntervalMs(startTime, 'Running', false)
+
+    expect(closedInterval).toBe(30 * 1000)
+    expect(runningInterval).toBe(30 * 1000)
+  })
+
   it('applies double frequency multiplier when enabled', () => {
-    const startTime = new Date('2024-05-01T00:30:00Z').toISOString()
+    const startTime = new Date(baseNow + 30 * MINUTE_IN_MS).toISOString()
     const interval = calculatePollingIntervalMs(startTime, 'Open', true)
     expect(interval).toBe(1.25 * MINUTE_IN_MS)
   })
 
   it('returns infinity when race is complete', () => {
-    const startTime = new Date('2024-05-01T00:30:00Z').toISOString()
+    const startTime = new Date(baseNow + 30 * MINUTE_IN_MS).toISOString()
     const interval = calculatePollingIntervalMs(startTime, 'Final', false)
     expect(interval).toBe(Number.POSITIVE_INFINITY)
   })
