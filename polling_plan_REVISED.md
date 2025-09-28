@@ -58,6 +58,12 @@
 6. When the Databse returns no meetings data, show a modern design, friendly, 'No Meeting Information is currently available' message with a re-check meeting data connection button to effect a manula refresh of meetings data (although the polling should automatically fetch this when available and refresh the page).
 7. Update the Meetings card to reduce card component height by removinng the meetingId value, and combine the racee type (HARNESS/THROUGHBRED), Meeting Status (Upcoming) and Meeting start time, on the same row as the Meeting Name to the right of the meeting name. Keep the Flag Icon right justified in the component.
 
+DEVELOPMENT NOTES:
+
+- Connection health should be established before any data fetching occurs. Fectch requests should check connection status before fetching to prevent failed fetch requests.
+- Connection health and status should be determined on initial render, maybe display a Connection Status indicator with 'Connecting to Data..', Connected' or 'Disconnected'.\*
+- A Disconnected state dhould have an automatic reconnect attempt, say every minute and a manual reconnect button.
+
 **Acceptance Criteria**:
 
 - [ ] Updated Meeting Card displays as expected.
