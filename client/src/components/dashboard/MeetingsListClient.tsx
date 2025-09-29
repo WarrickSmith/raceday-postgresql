@@ -6,6 +6,9 @@ import { MeetingCard } from './MeetingCard';
 import { RacesForMeetingClient } from './RacesForMeetingClient';
 import { MeetingsListSkeleton } from '../skeletons/MeetingCardSkeleton';
 import { NextScheduledRaceButton } from './NextScheduledRaceButton';
+import { ConnectionStatusPanel } from './ConnectionStatusPanel';
+import { ConnectionStatusBadge } from './ConnectionStatusBadge';
+import { NoMeetingsPlaceholder } from './NoMeetingsPlaceholder';
 import { useMeetingsPolling, type RaceUpdateEvent } from '@/hooks/useMeetingsPolling';
 import { Meeting } from '@/types/meetings';
 import { racePrefetchService } from '@/services/racePrefetchService';
@@ -17,7 +20,7 @@ interface MeetingsListClientProps {
 export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(() => initialData[0] ?? null);
   const [raceUpdateSignal, setRaceUpdateSignal] = useState(0);
 
   const handleError = useCallback((error: Error) => {
@@ -46,17 +49,48 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
     }
   }, []);
 
-  const { meetings, isConnected, connectionAttempts, retry } = useMeetingsPolling({
+  const {
+    meetings,
+    isConnected,
+    connectionState,
+    connectionAttempts,
+    isInitialDataReady,
+    retryConnection,
+    refreshMeetings,
+    retryCountdown,
+  } = useMeetingsPolling({
     initialData,
     onError: handleError,
     onRaceUpdate: handleRaceRealtimeUpdate,
   });
 
-  // Auto-select the first meeting on initial load
+  const handleRetryConnection = useCallback(() => {
+    void retryConnection();
+  }, [retryConnection]);
+
+  // Keep the selected meeting in sync with the available meetings
   useEffect(() => {
-    if (meetings.length > 0 && !selectedMeeting) {
-      // Select first meeting by default
+    if (meetings.length === 0) {
+      if (selectedMeeting !== null) {
+        setSelectedMeeting(null);
+      }
+      return;
+    }
+
+    if (!selectedMeeting) {
       setSelectedMeeting(meetings[0]);
+      return;
+    }
+
+    const matchingMeeting = meetings.find((meeting) => meeting.meetingId === selectedMeeting.meetingId);
+
+    if (!matchingMeeting) {
+      setSelectedMeeting(meetings[0]);
+      return;
+    }
+
+    if (matchingMeeting !== selectedMeeting) {
+      setSelectedMeeting(matchingMeeting);
     }
   }, [meetings, selectedMeeting]);
 
@@ -94,9 +128,20 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
     ));
   }, [meetings, selectedMeeting, handleMeetingClick]);
 
-  // Show loading state only if we have no data
-  if (!meetings.length && connectionAttempts === 0) {
+  // Show loading state while establishing a healthy connection
+  if (connectionState === 'connected' && !isInitialDataReady && meetings.length === 0) {
     return <MeetingsListSkeleton />;
+  }
+
+  if (connectionState !== 'connected') {
+    return (
+      <ConnectionStatusPanel
+        state={connectionState}
+        retryCountdown={retryCountdown}
+        onRetry={handleRetryConnection}
+        connectionAttempts={connectionAttempts}
+      />
+    );
   }
 
   return (
@@ -110,19 +155,9 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
             raceUpdateSignal={raceUpdateSignal}
           />
         </div>
-        
+
         {/* Data polling status */}
-        <div className="flex items-center space-x-2">
-          <div
-            className={`w-2 h-2 rounded-full ${
-              isConnected ? 'bg-green-400' : 'bg-red-400'
-            }`}
-            aria-label={isConnected ? 'Data current' : 'Updating data'}
-          />
-          <span className="text-sm text-gray-500">
-            {isConnected ? 'Data current' : 'Updating...'}
-          </span>
-        </div>
+        <ConnectionStatusBadge state={connectionState} />
       </div>
 
       {/* Error banner */}
@@ -141,7 +176,7 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
               </div>
             </div>
             <button
-              onClick={retry}
+              onClick={handleRetryConnection}
               className="text-sm text-yellow-700 hover:text-yellow-600 underline"
             >
               Retry
@@ -163,7 +198,7 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
 
         <div className="flex-1 overflow-y-auto p-4">
           {meetings.length > 0 ? (
-            <div 
+            <div
               className="space-y-3"
               role="list"
               aria-label="Race meetings"
@@ -171,17 +206,7 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
               {meetingsList}
             </div>
           ) : (
-            <div className="text-center py-12">
-              <div className="mx-auto h-12 w-12 text-gray-400">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3a4 4 0 118 0v4m-4 8a4 4 0 11-8 0V7a4 4 0 114 0v4" />
-                </svg>
-              </div>
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No meetings today</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                There are no race meetings scheduled for today.
-              </p>
-            </div>
+            <NoMeetingsPlaceholder onRefresh={refreshMeetings} />
           )}
         </div>
       </div>
