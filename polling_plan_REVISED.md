@@ -44,7 +44,7 @@
 
 ### Task 1: Update Meetings Page Meetings Card Layout
 
-- **Status**: Not Started
+- **Status**: Completed
 - **Priority**: Medium
 - **Estimated Effort**: 4 hours
 
@@ -56,8 +56,8 @@
 
 **Acceptance Criteria**:
 
-- [ ] Updated Meeting Card displays as expected.
-- [ ] TS, lint, tests pass without `any` types.
+- [x] Updated Meeting Card displays as expected.
+- [x] TS, lint, tests pass without `any` types.
 
 **Testing Requirements**: Playwright navigation checks, timers verifying interval accuracy, regression tests on `useMeetingsPolling` to ensure no dependency loops.
 
@@ -81,6 +81,7 @@ DEVELOPMENT NOTES:
 - Connection health should be established before any data fetching occurs. Fectch requests should check connection status before fetching to prevent failed fetch requests.
 - Connection health and status should be determined on initial render, display a Connection Status indicator with 'Connecting to Data..', Connected' or 'Disconnected'.\*
 - A Disconnected state must have an automatic reconnect attempt, say every minute and a manual reconnect button.
+- There should not be any fetches to user configuration configs or any other meetings page fetch if the conection state is 'Disconnected' or specifically not 'Connected'..
 
 **Acceptance Criteria**:
 
