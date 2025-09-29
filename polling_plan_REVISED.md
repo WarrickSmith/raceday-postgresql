@@ -79,7 +79,7 @@
 DEVELOPMENT NOTES:
 
 - Connection health should be established before any data fetching occurs. Fectch requests should check connection status before fetching to prevent failed fetch requests.
-- Connection health and status should be determined on initial render, display a Connection Status indicator with 'Connecting to Data..', Connected' or 'Disconnected'.\*
+- Connection health and status should be determined on initial render, display a Connection Status indicator with 'Connecting to Data..', Connected' or 'Disconnected' and a placeholder component instead of the meetings component showing the user friendly data connection problem message
 - A Disconnected state must have an automatic reconnect attempt, say every minute and a manual reconnect button.
 - There should not be any fetches to user configuration configs or any other meetings page fetch if the conection state is 'Disconnected' or specifically not 'Connected'..
 
