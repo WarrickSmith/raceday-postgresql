@@ -112,33 +112,7 @@ DEVELOPMENT NOTES:
 
 ---
 
-### Task 3: Meetings Page Polling & Navigation Data
-
-- **Status**: Not Started
-- **Priority**: Medium
-- **Estimated Effort**: 4 hours
-
-**Problem Statement**: Deliver 5-minute meetings polling that feeds navigation buttons without regression of the fixed infinite loop. The meetings page requires controlled polling to update navigation elements while preventing the dependency loops that caused runaway API calls.
-
-**Task Details**:
-
-1. Create meetings polling hook with 5-minute cadence while active races exist.
-2. Ensure `useMeetingsPolling.tsx` cleanup prevents dependency loops.
-3. Surface data for Next Scheduled Race/Next Race buttons on meetings and race pages.
-4. Remove outdated meetings polling code that may interfere with new implementation.
-
-**Acceptance Criteria**:
-
-- [ ] Meetings poll at 5-minute intervals when applicable.
-- [ ] Navigation buttons consume fresh data.
-- [ ] No infinite loops or redundant fetches.
-- [ ] TS, lint, tests pass without `any` types.
-
-**Testing Requirements**: Playwright navigation checks, timers verifying interval accuracy, regression tests on `useMeetingsPolling` to ensure no dependency loops.
-
----
-
-### Task 4: Developer Configuration & Polling Monitor
+### Task 3: Developer Configuration & Polling Monitor
 
 - **Status**: Not Started
 - **Priority**: Medium
@@ -164,7 +138,7 @@ DEVELOPMENT NOTES:
 
 ---
 
-### Task 5: Race Page Component Integration & UX Updates
+### Task 4: Race Page Component Integration & UX Updates
 
 - **Status**: Not Started
 - **Priority**: Medium
@@ -190,7 +164,7 @@ DEVELOPMENT NOTES:
 
 ---
 
-### Task 6: Server Response Optimisation (Caching & Compression)
+### Task 5: Server Response Optimisation (Caching & Compression)
 
 - **Status**: Not Started
 - **Priority**: Medium
@@ -225,7 +199,7 @@ DEVELOPMENT NOTES:
 
 ---
 
-### Task 7: End-to-End Testing & Validation
+### Task 6: End-to-End Testing & Validation
 
 - **Status**: Not Started
 - **Priority**: High
@@ -259,7 +233,7 @@ DEVELOPMENT NOTES:
 
 ---
 
-### Task 8: Documentation & Operational Runbooks
+### Task 7: Documentation & Operational Runbooks
 
 - **Status**: Not Started
 - **Priority**: Low
