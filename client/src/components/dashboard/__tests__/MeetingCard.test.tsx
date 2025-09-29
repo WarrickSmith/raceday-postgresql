@@ -36,8 +36,8 @@ describe('MeetingCard', () => {
 
     expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
     expect(screen.getByText('THROUGHBRED')).toBeInTheDocument();
-    expect(screen.getByText('ID: meeting1')).toBeInTheDocument();
-    
+    // meetingId is no longer displayed as per Task 1 requirements
+
     // Wait for async status to load
     await waitFor(() => {
       expect(screen.getByLabelText(/First race at/)).toBeInTheDocument();
