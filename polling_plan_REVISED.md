@@ -168,7 +168,95 @@ DEVELOPMENT NOTES:
 
 ---
 
-### Task 5: Server Response Optimisation (Caching & Compression)
+### Task 5: Global Connection State Management & Ongoing Health Monitoring
+
+- **Status**: Not Started
+- **Priority**: High
+- **Estimated Effort**: 6 hours
+
+**Problem Statement**: The current connection status implementation only performs health checks on initial render. Once the status shows "Connected", no ongoing health checks occur. For the Meetings page, connection failures are only detected when polling API calls fail. For the Race page, polling failures never update the global connection state at all. This results in the connection status indicator showing "Connected" even when the backend is unhealthy or data fetches are failing, leaving users unaware that they may not be receiving live data updates.
+
+**Current Behavior**:
+
+- **Initial connection**: Health check runs once on mount via `/api/health` endpoint
+- **Meetings page**: Connection state updated only when `/api/meetings` fetch fails; no dedicated health checks
+- **Race page**: Polling failures handled with exponential backoff but never update global connection state
+- **Result**: Connection status can remain "Connected" indefinitely even when backend is unhealthy
+
+**Impact & Risks**:
+
+- Users may believe they are viewing live data when polling has been failing silently
+- Connection status indicator becomes misleading after initial connection established
+- Race page users have no visibility into polling failures affecting data freshness
+- No unified approach to detecting and communicating backend health issues across pages
+
+**Implementation Plan**:
+
+1. Implement periodic background health checks (e.g., every 2-3 minutes) to validate ongoing connection health independent of polling requests.
+2. Update `useRacePolling` hook to call `setConnectionState('disconnected')` when race data fetches fail, matching the behavior of `useMeetingsPolling`.
+3. Ensure all API polling mechanisms (meetings, race data, pools, money flow) update the global connection state on fetch failures.
+4. Add health check coordination to prevent redundant health requests when multiple hooks/pages are active simultaneously.
+5. Implement automatic recovery detection when health check succeeds after previous failures.
+
+**Task Details**:
+
+1. **Extend connection state management** ([connectionState.ts](client/src/state/connectionState.ts)):
+   - Add periodic health check mechanism with configurable interval (default: 2-3 minutes)
+   - Implement singleton pattern to prevent multiple health check timers
+   - Add state tracking to avoid concurrent health check requests
+   - Provide `startHealthMonitoring()` and `stopHealthMonitoring()` functions
+
+2. **Update `useRacePolling` hook** ([useRacePolling.ts](client/src/hooks/useRacePolling.ts)):
+   - Import `setConnectionState` from global connection state
+   - Call `setConnectionState('disconnected')` when fetch failures occur
+   - Call `setConnectionState('connected')` when fetch succeeds after previous failures
+   - Coordinate with global health monitoring to avoid conflicting state updates
+
+3. **Update `useMeetingsPolling` hook** ([useMeetingsPolling.tsx](client/src/hooks/useMeetingsPolling.tsx)):
+   - Ensure connection state updates occur consistently on all fetch paths
+   - Coordinate with global health monitoring system
+   - Add recovery detection when fetch succeeds after failures
+
+4. **Integrate health monitoring in page components**:
+   - Start health monitoring when Meetings or Race pages mount
+   - Stop health monitoring when pages unmount (with reference counting for multiple instances)
+   - Ensure health monitoring doesn't interfere with existing polling mechanisms
+
+5. **Add user notifications**:
+   - Toast/banner notifications when connection state transitions from connected → disconnected
+   - Clear notification when connection recovers automatically
+   - Consider rate-limiting notifications to avoid user fatigue
+
+**Configuration**:
+
+- Add `NEXT_PUBLIC_HEALTH_CHECK_INTERVAL_MS` environment variable (default: 180000 = 3 minutes)
+- Add `NEXT_PUBLIC_ENABLE_HEALTH_MONITORING` toggle (default: true)
+- Document configuration in `.env.example`
+
+**Acceptance Criteria**:
+
+- [ ] Periodic health checks run in background after initial connection established
+- [ ] `useRacePolling` updates global connection state on fetch failures and recoveries
+- [ ] `useMeetingsPolling` maintains consistent connection state updates
+- [ ] Connection status indicator accurately reflects backend health across all pages
+- [ ] Health check singleton prevents redundant concurrent requests
+- [ ] No performance degradation or excessive health check requests
+- [ ] Race page and Meetings page both display accurate connection status
+- [ ] Users receive clear indication when data may be stale due to connection issues
+- [ ] TS/lint/tests pass without `any` types
+- [ ] Component and unit tests validate health monitoring behavior
+
+**Testing Requirements**:
+
+- Unit tests for health monitoring state machine and timer management
+- Integration tests simulating backend failures and recovery scenarios
+- Playwright tests validating connection status updates across page transitions
+- Manual testing with network throttling and backend unavailability
+- Verify no race conditions between health checks and polling requests
+
+---
+
+### Task 6: Server Response Optimisation (Caching & Compression)
 
 - **Status**: Not Started
 - **Priority**: Medium
@@ -203,7 +291,7 @@ DEVELOPMENT NOTES:
 
 ---
 
-### Task 6: End-to-End Testing & Validation
+### Task 7: End-to-End Testing & Validation
 
 - **Status**: Not Started
 - **Priority**: High
@@ -237,7 +325,7 @@ DEVELOPMENT NOTES:
 
 ---
 
-### Task 7: Documentation & Operational Runbooks
+### Task 8: Documentation & Operational Runbooks
 
 - **Status**: Not Started
 - **Priority**: Low

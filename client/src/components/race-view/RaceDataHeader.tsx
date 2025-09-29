@@ -6,6 +6,8 @@ import { formatDistance, formatRaceTime } from '@/utils/raceFormatters'
 import { getStatusConfig } from '@/utils/raceStatusConfig'
 import { RaceNavigation } from './RaceNavigation'
 import { getRaceTypeDisplay } from '@/constants/raceTypes'
+import { ConnectionStatusBadge } from '@/components/dashboard/ConnectionStatusBadge'
+import { getConnectionState, subscribeToConnectionState, type ConnectionState } from '@/state/connectionState'
 import type {
   Race,
   Entrant,
@@ -32,6 +34,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
 }: RaceDataHeaderProps) {
   const { raceData } = useRace()
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [connectionState, setConnectionState] = useState<ConnectionState>(() => getConnectionState())
 
   // Use props data if provided (from unified subscription), otherwise fall back to context
   const race = propRace || raceData?.race
@@ -51,6 +54,15 @@ export const RaceDataHeader = memo(function RaceDataHeader({
     }, 1000)
 
     return () => clearInterval(timer)
+  }, [])
+
+  // Subscribe to connection state changes
+  useEffect(() => {
+    const unsubscribe = subscribeToConnectionState((state) => {
+      setConnectionState(state)
+    })
+
+    return unsubscribe
   }, [])
 
   const statusConfig = useMemo(() => getStatusConfig(race?.status), [race?.status])
@@ -259,14 +271,12 @@ export const RaceDataHeader = memo(function RaceDataHeader({
           </div>
         </div>
 
-        {/* Row 3, Col 4: Data Refresh Indicator */}
+        {/* Row 3, Col 4: Connection Status */}
         <div className="flex items-center justify-start gap-2">
           <div className="text-xs text-gray-500 font-bold uppercase">
-            STATUS DETAIL
+            CONNECTION STATUS
           </div>
-          <div className="text-sm font-semibold text-gray-700">
-            {race?.status || '—'}
-          </div>
+          <ConnectionStatusBadge state={connectionState} />
         </div>
       </div>
     </div>
