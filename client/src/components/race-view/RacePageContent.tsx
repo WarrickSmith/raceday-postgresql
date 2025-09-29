@@ -5,15 +5,24 @@ import { useRace } from '@/contexts/RaceContext'
 import { RaceDataHeader } from '@/components/race-view/RaceDataHeader'
 import { EnhancedEntrantsGrid } from '@/components/race-view/EnhancedEntrantsGrid'
 import { RaceFooter } from '@/components/race-view/RaceFooter'
+import { PollingMonitor } from '@/components/race-view/PollingMonitor'
 import AlertsConfigModal from '@/components/alerts/AlertsConfigModal'
 import type { RaceStatus } from '@/types/racePools'
 import { useRacePools } from '@/hooks/useRacePools'
+import { usePollingMetrics } from '@/hooks/usePollingMetrics'
 
 export function RacePageContent() {
   const { raceData, isLoading, error, pollingState } = useRace()
 
   // Alerts Configuration Modal state (moved from EnhancedEntrantsGrid for performance)
   const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false)
+
+  // Polling metrics for monitoring (dev feature)
+  const pollingMetrics = usePollingMetrics(pollingState)
+
+  // Check if polling monitor is enabled via environment variable
+  const isPollingMonitorEnabled =
+    process.env.NEXT_PUBLIC_ENABLE_POLLING_MONITOR === 'true'
 
   // Pools data with deduped fetch and proper abort/cleanup
   const {
@@ -163,6 +172,13 @@ export function RacePageContent() {
 
       {/* Body - Enhanced entrants grid with latest fetched data */}
       <main className="race-layout-content" role="main">
+        {/* Polling Monitor (Development Feature) */}
+        {isPollingMonitorEnabled && (
+          <div className="mb-4">
+            <PollingMonitor metrics={pollingMetrics} />
+          </div>
+        )}
+
         <EnhancedEntrantsGrid
           initialEntrants={currentEntrants}
           raceId={currentRace.$id}
