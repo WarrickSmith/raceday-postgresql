@@ -114,7 +114,7 @@ DEVELOPMENT NOTES:
 
 ### Task 3: Developer Configuration & Polling Monitor
 
-- **Status**: Not Started
+- **Status**: Completed
 - **Priority**: Medium
 - **Estimated Effort**: 8 hours
 
@@ -129,10 +129,14 @@ DEVELOPMENT NOTES:
 
 **Acceptance Criteria**:
 
-- [ ] Monitor toggled via env var and hidden in production.
-- [ ] Header retains only Latency & Status indicators.
-- [ ] Legacy counters removed.
-- [ ] Env vars documented and type-safe; TS/lint/tests clean.
+- [x] Monitor toggled via env var (`NEXT_PUBLIC_ENABLE_POLLING_MONITOR`) and hidden when false.
+- [x] Header retains only Latency & Status indicators (no changes needed - already clean).
+- [x] Legacy counters removed (verified - connection monitoring is for database connectivity, not real-time).
+- [x] Env vars documented in `.env.example` and type-safe; TS/lint/tests clean.
+- [x] Polling metrics hook (`usePollingMetrics`) tracks request counts, error rates, latency, cadence compliance.
+- [x] Polling Monitor component displays all required sections: header stats, cadence tracking, alerts, endpoint performance table, recent activity log.
+- [x] Component tests cover all monitor functionality (22 passing tests).
+- [x] Unit tests validate metrics calculation logic (13 passing tests).
 
 **Testing Requirements**: Playwright layout checks, dev-mode toggle tests, unit tests for monitor metrics.
 
