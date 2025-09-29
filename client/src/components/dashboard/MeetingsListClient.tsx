@@ -22,6 +22,7 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(() => initialData[0] ?? null);
   const [raceUpdateSignal, setRaceUpdateSignal] = useState(0);
+  const [userHasSelectedMeeting, setUserHasSelectedMeeting] = useState(false);
 
   const handleError = useCallback((error: Error) => {
     console.error('Data polling error:', error);
@@ -73,30 +74,42 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
     if (meetings.length === 0) {
       if (selectedMeeting !== null) {
         setSelectedMeeting(null);
+        setUserHasSelectedMeeting(false);
       }
       return;
     }
 
+    // If no meeting is selected, auto-select the first one
     if (!selectedMeeting) {
       setSelectedMeeting(meetings[0]);
       return;
     }
 
+    // Check if the currently selected meeting still exists in the updated meetings list
     const matchingMeeting = meetings.find((meeting) => meeting.meetingId === selectedMeeting.meetingId);
 
     if (!matchingMeeting) {
-      setSelectedMeeting(meetings[0]);
+      // Only reset to first meeting if user hasn't manually selected one
+      // or if there's no other option
+      if (!userHasSelectedMeeting || meetings.length === 1) {
+        setSelectedMeeting(meetings[0]);
+        setUserHasSelectedMeeting(false);
+      }
       return;
     }
 
-    if (matchingMeeting !== selectedMeeting) {
+    // Update the selected meeting with fresh data only if there are actual changes
+    // This prevents unnecessary re-renders that could interrupt race loading
+    if (matchingMeeting.$updatedAt !== selectedMeeting.$updatedAt ||
+        matchingMeeting.firstRaceTime !== selectedMeeting.firstRaceTime) {
       setSelectedMeeting(matchingMeeting);
     }
-  }, [meetings, selectedMeeting]);
+  }, [meetings, selectedMeeting, userHasSelectedMeeting]);
 
   // Handle meeting card click
   const handleMeetingClick = useCallback((meeting: Meeting) => {
     setSelectedMeeting(meeting);
+    setUserHasSelectedMeeting(true);
   }, []);
 
   // Memoize the meetings list to prevent unnecessary re-renders
