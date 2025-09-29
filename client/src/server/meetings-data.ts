@@ -1,3 +1,4 @@
+import { AppwriteException } from 'node-appwrite';
 import { createServerClient, Query } from '@/lib/appwrite-server';
 import { Meeting, Race } from '@/types/meetings';
 import { SUPPORTED_RACE_TYPE_CODES } from '@/constants/raceTypes';
@@ -94,15 +95,19 @@ export async function getMeetingsData(): Promise<Meeting[]> {
 
     return meetingsWithFirstRace;
   } catch (error) {
-    console.error('Error fetching meetings data:', error);
-    
-    // Log additional details for debugging
-    console.error('Environment check:', {
+    const message = error instanceof AppwriteException
+      ? `${error.code ?? 'Appwrite'} ${error.type ?? ''}`.trim() || 'Appwrite request failed'
+      : error instanceof Error
+        ? error.message
+        : 'Unknown error';
+
+    console.warn('Appwrite meetings query failed, returning empty list:', message);
+    console.debug('Appwrite meetings query environment check:', {
       hasEndpoint: !!process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT,
       hasProjectId: !!process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID,
-      hasApiKey: !!process.env.APPWRITE_API_KEY
+      hasApiKey: !!process.env.APPWRITE_API_KEY,
     });
-    
+
     // Return empty array to prevent page crashes
     // The real-time subscription will provide data once the client loads
     return [];

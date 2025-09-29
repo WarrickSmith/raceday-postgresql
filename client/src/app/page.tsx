@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { Metadata } from 'next';
 import { getMeetingsData } from '@/server/meetings-data';
 import { MeetingsListClient } from '@/components/dashboard/MeetingsListClient';
-import { MeetingsListSkeleton } from '@/components/skeletons/MeetingCardSkeleton';
+import { ConnectionStatusPanel } from '@/components/dashboard/ConnectionStatusPanel';
 
 export const metadata: Metadata = {
   title: "Race Day - Today's Meetings",
@@ -33,7 +33,15 @@ export default function Dashboard() {
         </header>
 
         <main className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8 h-[calc(100vh-12rem)] min-h-[600px]">
-          <Suspense fallback={<MeetingsListSkeleton />}>
+          <Suspense
+            fallback={(
+              <ConnectionStatusPanel
+                state="connecting"
+                retryCountdown={null}
+                connectionAttempts={0}
+              />
+            )}
+          >
             <MeetingsServerComponent />
           </Suspense>
         </main>

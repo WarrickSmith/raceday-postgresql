@@ -1,6 +1,7 @@
 'use client'
 
 import { databases, Query } from '@/lib/appwrite-client'
+import { ensureConnection, isConnectionHealthy } from '@/state/connectionState'
 import type { Race } from '@/types/meetings'
 
 const DATABASE_ID = 'raceday-db'
@@ -30,6 +31,13 @@ export async function fetchUpcomingRaces(
   const { windowMinutes, lookbackMinutes, limit } = {
     ...DEFAULT_OPTIONS,
     ...rest,
+  }
+
+  if (!(isConnectionHealthy() || (await ensureConnection()))) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Skipping upcoming races fetch while connection is unavailable')
+    }
+    return []
   }
 
   const now = Date.now()

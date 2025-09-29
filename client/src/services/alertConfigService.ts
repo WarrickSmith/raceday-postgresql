@@ -5,10 +5,28 @@
  * Handles CRUD operations for user alert indicator configurations via API routes
  */
 
+import { ensureConnection, isConnectionHealthy } from '@/state/connectionState'
 import type { AlertsConfig } from '@/types/alerts'
 import { DEFAULT_INDICATORS as DEFAULT_INDICATOR_CONFIGS, DEFAULT_USER_ID } from '@/types/alerts'
 
 // Lightweight in-flight dedup for service calls
+const createDefaultConfig = (userId: string): AlertsConfig => {
+  const defaultIndicators = DEFAULT_INDICATOR_CONFIGS.map((defaultInd, index) => ({
+    ...defaultInd,
+    $id: `default-${index}`,
+    userId,
+    lastUpdated: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+  }))
+
+  return {
+    userId,
+    indicators: defaultIndicators,
+    toggleAll: true,
+    audibleAlertsEnabled: true,
+  }
+}
+
 const inFlight = new Map<string, Promise<unknown>>()
 
 // Service now uses API routes instead of direct database access
@@ -24,6 +42,11 @@ export const loadUserAlertConfig = async (userId: string = DEFAULT_USER_ID): Pro
   const key = `load:${userId}`
   const existing = inFlight.get(key)
   if (existing) return existing as Promise<AlertsConfig>
+
+  if (!(isConnectionHealthy() || (await ensureConnection()))) {
+    console.warn('Skipping alert config load while connection is unavailable')
+    return createDefaultConfig(userId)
+  }
 
   const req = (async (): Promise<AlertsConfig> => {
     try {
@@ -47,20 +70,7 @@ export const loadUserAlertConfig = async (userId: string = DEFAULT_USER_ID): Pro
       console.error('Failed to load user alert config:', error)
 
       // Return defaults on error
-      const defaultIndicators = DEFAULT_INDICATOR_CONFIGS.map((defaultInd, index) => ({
-        ...defaultInd,
-        $id: `default-${index}`,
-        userId,
-        lastUpdated: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-      }))
-
-      return {
-        userId,
-        indicators: defaultIndicators,
-        toggleAll: true,
-        audibleAlertsEnabled: true,
-      }
+      return createDefaultConfig(userId)
     } finally {
       inFlight.delete(key)
     }
@@ -78,6 +88,11 @@ export const saveUserAlertConfig = async (config: AlertsConfig): Promise<void> =
   const key = `save:${config.userId}`
   const existing = inFlight.get(key)
   if (existing) return existing as Promise<void>
+
+  if (!(isConnectionHealthy() || (await ensureConnection()))) {
+    console.warn('Skipping alert config save while connection is unavailable')
+    throw new Error('Cannot save alert configuration while offline. Please reconnect and try again.')
+  }
 
   const req = (async () => {
     try {
@@ -116,6 +131,11 @@ export const resetToDefaults = async (userId: string = DEFAULT_USER_ID): Promise
   const key = `reset:${userId}`
   const existing = inFlight.get(key)
   if (existing) return existing as Promise<AlertsConfig>
+
+  if (!(isConnectionHealthy() || (await ensureConnection()))) {
+    console.warn('Skipping alert config reset while connection is unavailable')
+    throw new Error('Cannot reset alert configuration while offline. Please reconnect and try again.')
+  }
 
   const req = (async (): Promise<AlertsConfig> => {
     try {

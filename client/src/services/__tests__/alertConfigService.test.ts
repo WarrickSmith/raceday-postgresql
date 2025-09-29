@@ -5,6 +5,11 @@
  * Tests for the alert configuration service API integration
  */
 
+jest.mock('@/state/connectionState', () => ({
+  isConnectionHealthy: jest.fn(),
+  ensureConnection: jest.fn(),
+}))
+
 import {
   loadUserAlertConfig,
   saveUserAlertConfig,
@@ -12,15 +17,20 @@ import {
   validateAlertConfig,
 } from '../alertConfigService'
 import { DEFAULT_INDICATORS, DEFAULT_USER_ID } from '@/types/alerts'
+import { ensureConnection, isConnectionHealthy } from '@/state/connectionState'
 
 // Mock fetch
 global.fetch = jest.fn()
 
 const mockFetch = fetch as jest.MockedFunction<typeof fetch>
+const mockIsConnectionHealthy = isConnectionHealthy as jest.MockedFunction<typeof isConnectionHealthy>
+const mockEnsureConnection = ensureConnection as jest.MockedFunction<typeof ensureConnection>
 
 describe('AlertConfigService', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockIsConnectionHealthy.mockReturnValue(true)
+    mockEnsureConnection.mockResolvedValue(true)
   })
 
   describe('loadUserAlertConfig', () => {
@@ -87,6 +97,20 @@ describe('AlertConfigService', () => {
 
       const result = await loadUserAlertConfig('test-user')
 
+      expect(result.userId).toBe('test-user')
+      expect(result.indicators).toHaveLength(6)
+      expect(result.toggleAll).toBe(true)
+      expect(result.audibleAlertsEnabled).toBe(true)
+    })
+
+    it('returns defaults when connection is unavailable', async () => {
+      mockIsConnectionHealthy.mockReturnValue(false)
+      mockEnsureConnection.mockResolvedValue(false)
+
+      const result = await loadUserAlertConfig('test-user')
+
+      expect(mockEnsureConnection).toHaveBeenCalled()
+      expect(mockFetch).not.toHaveBeenCalled()
       expect(result.userId).toBe('test-user')
       expect(result.indicators).toHaveLength(6)
       expect(result.toggleAll).toBe(true)
@@ -162,6 +186,25 @@ describe('AlertConfigService', () => {
         'Failed to save alert configuration. Please try again.'
       )
     })
+
+    it('throws a descriptive error when connection is unavailable', async () => {
+      mockIsConnectionHealthy.mockReturnValue(false)
+      mockEnsureConnection.mockResolvedValue(false)
+
+      const config = {
+        userId: 'test-user',
+        indicators: [],
+        toggleAll: true,
+        audibleAlertsEnabled: true,
+      }
+
+      await expect(saveUserAlertConfig(config)).rejects.toThrow(
+        'Cannot save alert configuration while offline. Please reconnect and try again.'
+      )
+
+      expect(mockEnsureConnection).toHaveBeenCalled()
+      expect(mockFetch).not.toHaveBeenCalled()
+    })
   })
 
   describe('resetToDefaults', () => {
@@ -233,6 +276,18 @@ describe('AlertConfigService', () => {
       await expect(resetToDefaults('test-user')).rejects.toThrow(
         'Failed to reset to default configuration. Please try again.'
       )
+    })
+
+    it('throws a descriptive error when connection is unavailable', async () => {
+      mockIsConnectionHealthy.mockReturnValue(false)
+      mockEnsureConnection.mockResolvedValue(false)
+
+      await expect(resetToDefaults('test-user')).rejects.toThrow(
+        'Cannot reset alert configuration while offline. Please reconnect and try again.'
+      )
+
+      expect(mockEnsureConnection).toHaveBeenCalled()
+      expect(mockFetch).not.toHaveBeenCalled()
     })
   })
 
