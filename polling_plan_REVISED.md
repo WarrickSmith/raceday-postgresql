@@ -54,21 +54,61 @@
 2. Ensure `useMeetingsPolling.tsx` cleanup prevents dependency loops.
 3. Surface data for Next Scheduled Race/Next Race buttons on meetings and race pages.
 4. Remove outdated meetings polling code that may interfere with new implementation.
-5. Implement Databse Connection check on initial page render - Show a modern design, friendly, RacDay data is unavilable message with a re-try connection button to effect a manula re-connect.
-6. When the Databse returns no meetings data, show a modern design, friendly, 'No Meeting Information is currently available' message with a re-check meeting data connection button to effect a manula refresh of meetings data (although the polling should automatically fetch this when available and refresh the page).
-7. Update the Meetings card to reduce card component height by removinng the meetingId value, and combine the Meeting start time, racee type (HARNESS/THROUGHBRED), Meeting Status (Upcoming), and Track condition, on the same row as the Meeting Name to the right of the meeting name. Keep the Flag Icon right justified in the component.
 
-DEVELOPMENT NOTES:
+**Acceptance Criteria**:
 
-- Connection health should be established before any data fetching occurs. Fectch requests should check connection status before fetching to prevent failed fetch requests.
-- Connection health and status should be determined on initial render, maybe display a Connection Status indicator with 'Connecting to Data..', Connected' or 'Disconnected'.\*
-- A Disconnected state dhould have an automatic reconnect attempt, say every minute and a manual reconnect button.
+- [ ] Meetings poll at 5-minute intervals when applicable.
+- [ ] Navigation buttons consume fresh data.
+- [ ] No infinite loops or redundant fetches.
+- [ ] TS, lint, tests pass without `any` types.
+
+**Testing Requirements**: Playwright navigation checks, timers verifying interval accuracy, regression tests on `useMeetingsPolling` to ensure no dependency loops.
+
+---
+
+### Task 1.5: Update Meetings Page Meetings Card Layout
+
+- **Status**: Not Started
+- **Priority**: Medium
+- **Estimated Effort**: 4 hours
+
+**Problem Statement**: Render meetings page meeting cards that have smaller vertical size.
+
+**Task Details**:
+
+1. Update the Meetings card to reduce card component height by removinng the meetingId value, and combine the Meeting start time, racee type (HARNESS/THROUGHBRED), Meeting Status (Upcoming), and Track condition, on the same row as the Meeting Name to the right of the meeting name. Keep the Flag Icon right justified in the component.
 
 **Acceptance Criteria**:
 
 - [ ] Updated Meeting Card displays as expected.
-- [ ] Meetings poll at 5-minute intervals when applicable.
-- [ ] Navigation buttons consume fresh data.
+- [ ] TS, lint, tests pass without `any` types.
+
+**Testing Requirements**: Playwright navigation checks, timers verifying interval accuracy, regression tests on `useMeetingsPolling` to ensure no dependency loops.
+
+---
+
+### Task 1.6: Add Connection Status Indicator and Management
+
+- **Status**: Not Started
+- **Priority**: Medium
+- **Estimated Effort**: 4 hours
+
+**Problem Statement**: The application does not check for Connection Status before attempting any API endpoint fetch requests, resulting in poorly handles fetch request fails when the Appwrite Server and Database is unavailable. Initial fetch requests for meetings that result in no meetings found are not handled in a user friendly way, and just continuously render the Meeting component skeleton.
+
+**Task Details**:
+
+1. Implement Database Connection check on initial page render - Show a modern design, friendly, RacDay data is unavilable message with a re-try connection button to effect a manula re-connect. Prevent any client meeting page fetch request if not connected and ensure the connection status is confirmed before fetch request are allowed. Fetch requests should confirm connection state is valid before attempting a fetch. Render an appropriate 'RaceDay Data Connection Unavailable' component with a manual 'retry connection' button and a countdown time to the automatic retry connect.
+2. When the Database returns no meetings data, show a modern design, friendly, 'No Meeting Information is currently available' message with a re-check meeting data connection button to effect a manula refresh of meetings data (although the polling should automatically fetch this when available and refresh the page).
+
+DEVELOPMENT NOTES:
+
+- Connection health should be established before any data fetching occurs. Fectch requests should check connection status before fetching to prevent failed fetch requests.
+- Connection health and status should be determined on initial render, display a Connection Status indicator with 'Connecting to Data..', Connected' or 'Disconnected'.\*
+- A Disconnected state must have an automatic reconnect attempt, say every minute and a manual reconnect button.
+
+**Acceptance Criteria**:
+
+- [ ] Connection Status and Alternative components are displayed correctly.
 - [ ] No infinite loops or redundant fetches.
 - [ ] TS, lint, tests pass without `any` types.
 
