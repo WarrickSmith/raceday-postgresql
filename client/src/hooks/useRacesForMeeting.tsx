@@ -74,6 +74,9 @@ export function useRacesForMeeting({
     // Check cache first
     const cachedRaces = getCachedRaces(meetingId);
     if (cachedRaces) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 Hook: Using cached races for meetingId:', meetingId, 'count:', cachedRaces.length);
+      }
       setRaces(cachedRaces);
       setIsLoading(false);
       setError(null);
@@ -115,6 +118,10 @@ export function useRacesForMeeting({
         setCachedRaces(meetingId, sortedRaces);
         setIsLoading(false);
         setError(null);
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ Hook: Successfully fetched and set races for meetingId:', meetingId, 'count:', sortedRaces.length);
+        }
       } catch (err) {
         // Don't update state if request was aborted
         if (abortController.signal.aborted) {
@@ -197,17 +204,27 @@ export function useRacesForMeeting({
 
     // Only add debugging in development
     if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 Hook: Starting race fetch for meetingId:', meetingId);
+      console.log('🔍 Hook: Starting race fetch for meetingId:', meetingId, 'attempt:', fetchAttemptRef.current + 1);
     }
-    
+
     fetchAttemptRef.current += 1;
-    
-    void fetchRaces(meetingId).catch(() => {
-      // Error handling is done in fetchRaces
-    });
+    const currentAttempt = fetchAttemptRef.current;
+
+    // Add a small delay to prevent rapid successive calls during initial load
+    const timeoutId = setTimeout(() => {
+      // Only proceed if this is still the latest request
+      if (currentAttempt === fetchAttemptRef.current) {
+        void fetchRaces(meetingId).catch(() => {
+          // Error handling is done in fetchRaces
+        });
+      } else if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 Hook: Skipping race fetch for meetingId:', meetingId, 'due to newer request');
+      }
+    }, 10); // Small delay to allow rapid state changes to settle
 
     // Cleanup function
     return () => {
+      clearTimeout(timeoutId);
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
