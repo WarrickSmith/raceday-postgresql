@@ -25,10 +25,13 @@ if (typeof globalThis.Response === 'undefined') {
     }
 
     async arrayBuffer(): Promise<ArrayBuffer> {
-      return this.body.buffer.slice(
+      const buffer = this.body.buffer.slice(
         this.body.byteOffset,
         this.body.byteOffset + this.body.byteLength
       )
+
+      // Node 20 typings allow SharedArrayBuffer here; cast keeps the signature compatible with Response
+      return buffer as ArrayBuffer
     }
   }
 
