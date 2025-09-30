@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { AppwriteException } from 'node-appwrite';
 import { createServerClient, Query } from '@/lib/appwrite-server';
+import { jsonWithCompression } from '@/lib/http/compression';
 
 interface HealthResponse {
   status: 'healthy' | 'unconfigured' | 'unhealthy';
@@ -9,7 +10,7 @@ interface HealthResponse {
   error?: string;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const timestamp = new Date().toISOString();
 
   try {
@@ -25,7 +26,7 @@ export async function GET() {
         timestamp,
       };
 
-      return NextResponse.json(body, { status: 200 });
+      return jsonWithCompression(request, body, { status: 200 });
     }
 
     const { databases } = await createServerClient();
@@ -38,7 +39,7 @@ export async function GET() {
       uptime: process.uptime(),
     };
 
-    return NextResponse.json(body, { status: 200 });
+    return jsonWithCompression(request, body, { status: 200 });
   } catch (error) {
     let errorMessage = 'Unknown error';
 
@@ -54,6 +55,6 @@ export async function GET() {
       error: errorMessage,
     };
 
-    return NextResponse.json(body, { status: 503 });
+    return jsonWithCompression(request, body, { status: 503 });
   }
 }

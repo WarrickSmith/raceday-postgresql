@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createServerClient, Query } from '@/lib/appwrite-server'
 import {
   Race,
@@ -16,6 +16,7 @@ import {
   type RaceResultsDocument,
 } from './appwriteTypes'
 import type { Models } from 'node-appwrite'
+import { jsonWithCompression } from '@/lib/http/compression'
 
 const RACE_SELECT_FIELDS = [
   '$id',
@@ -175,7 +176,8 @@ export async function GET(
     const { id: raceId } = await params
 
     if (!raceId) {
-      return NextResponse.json(
+      return jsonWithCompression(
+        request,
         { error: 'Race ID is required' },
         { status: 400 }
       )
@@ -190,11 +192,15 @@ export async function GET(
       : await getComprehensiveRaceData(raceId)
 
     if (!raceData) {
-      return NextResponse.json({ error: 'Race not found' }, { status: 404 })
+      return jsonWithCompression(
+        request,
+        { error: 'Race not found' },
+        { status: 404 }
+      )
     }
 
     // Set cache headers based on mode
-    const response = NextResponse.json(raceData)
+    const response = await jsonWithCompression(request, raceData)
 
     if (isNavigation) {
       // Navigation mode: shorter cache for live data but still allow stale-while-revalidate
@@ -219,7 +225,8 @@ export async function GET(
 
     return response
   } catch {
-    return NextResponse.json(
+    return jsonWithCompression(
+      request,
       { error: 'Internal server error' },
       { status: 500 }
     )

@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { createServerClient, Query } from '@/lib/appwrite-server';
+import { jsonWithCompression } from '@/lib/http/compression';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const { databases } = await createServerClient();
     const now = new Date();
@@ -20,9 +21,9 @@ export async function GET() {
     );
 
     if (nextScheduledRaceQuery.documents.length === 0) {
-      return NextResponse.json({ 
+      return jsonWithCompression(request, {
         nextScheduledRace: null,
-        message: 'No upcoming races available' 
+        message: 'No upcoming races available',
       });
     }
 
@@ -37,13 +38,14 @@ export async function GET() {
     };
 
     // Set cache headers for optimal performance
-    const response = NextResponse.json({ nextScheduledRace });
+    const response = await jsonWithCompression(request, { nextScheduledRace });
     response.headers.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
     
     return response;
   } catch (error) {
     console.error('API Error fetching next scheduled race:', error);
-    return NextResponse.json(
+    return jsonWithCompression(
+      request,
       { error: 'Internal server error' },
       { status: 500 }
     );

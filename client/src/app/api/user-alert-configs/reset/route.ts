@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createServerClient, Query } from '@/lib/appwrite-server'
 import type { IndicatorConfig } from '@/types/alerts'
 import { DEFAULT_INDICATORS, DEFAULT_USER_ID } from '@/types/alerts'
+import { jsonWithCompression } from '@/lib/http/compression'
 
 const DATABASE_ID = 'raceday-db'
 const COLLECTION_ID = 'user-alert-configs'
@@ -59,7 +60,7 @@ export async function PUT(request: NextRequest) {
 
     const updatedIndicators = updatedResponse.documents as unknown as IndicatorConfig[]
 
-    return NextResponse.json({
+    return jsonWithCompression(request, {
       userId,
       indicators: updatedIndicators,
       toggleAll: true,
@@ -67,7 +68,8 @@ export async function PUT(request: NextRequest) {
     })
   } catch (error) {
     console.error('Failed to reset to defaults:', error)
-    return NextResponse.json(
+    return jsonWithCompression(
+      request,
       { error: 'Failed to reset configuration' },
       { status: 500 }
     )

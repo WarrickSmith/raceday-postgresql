@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { createServerClient, Query } from '@/lib/appwrite-server';
 import { Race, Meeting } from '@/types/meetings';
 import {
@@ -6,6 +6,7 @@ import {
   type MeetingDocument,
   type RaceDocument,
 } from '../appwriteTypes';
+import { jsonWithCompression } from '@/lib/http/compression';
 
 export async function GET(
   request: NextRequest,
@@ -15,23 +16,32 @@ export async function GET(
     const { id: raceId } = await params;
     
     if (!raceId) {
-      return NextResponse.json({ error: 'Race ID is required' }, { status: 400 });
+      return jsonWithCompression(
+        request,
+        { error: 'Race ID is required' },
+        { status: 400 }
+      );
     }
 
     const raceData = await getBasicRaceData(raceId);
     
     if (!raceData) {
-      return NextResponse.json({ error: 'Race not found' }, { status: 404 });
+      return jsonWithCompression(
+        request,
+        { error: 'Race not found' },
+        { status: 404 }
+      );
     }
 
     // Set cache headers for optimal performance
-    const response = NextResponse.json(raceData);
+    const response = await jsonWithCompression(request, raceData);
     response.headers.set('Cache-Control', 'public, max-age=15, stale-while-revalidate=60');
     
     return response;
   } catch (error) {
     console.error('API Error fetching basic race data:', error);
-    return NextResponse.json(
+    return jsonWithCompression(
+      request,
       { error: 'Internal server error' },
       { status: 500 }
     );

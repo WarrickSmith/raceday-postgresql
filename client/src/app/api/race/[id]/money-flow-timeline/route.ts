@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/appwrite-server'
 import { Query } from 'node-appwrite'
+import { jsonWithCompression } from '@/lib/http/compression'
 
 const TIMELINE_SELECT_FIELDS = [
   '$id',
@@ -56,11 +57,12 @@ export async function GET(
 
     // Validate poolType parameter
     if (!VALID_POOL_TYPES.includes(poolTypeParam as PoolType)) {
-      return NextResponse.json(
-        { 
+      return jsonWithCompression(
+        request,
+        {
           error: 'Invalid poolType parameter',
           message: `poolType must be one of: ${VALID_POOL_TYPES.join(', ')}`,
-          received: poolTypeParam
+          received: poolTypeParam,
         },
         { status: 400 }
       )
@@ -69,14 +71,16 @@ export async function GET(
     const poolType = poolTypeParam as PoolType
 
     if (!raceId) {
-      return NextResponse.json(
+      return jsonWithCompression(
+        request,
         { error: 'Race ID is required' },
         { status: 400 }
       )
     }
 
     if (entrantIds.length === 0) {
-      return NextResponse.json(
+      return jsonWithCompression(
+        request,
         { error: 'Entrant IDs are required' },
         { status: 400 }
       )
@@ -193,7 +197,7 @@ export async function GET(
         response.documents
       )
 
-      return NextResponse.json({
+      return jsonWithCompression(request, {
         success: true,
         documents: sortedDocuments,
         total: response.total,
@@ -227,7 +231,7 @@ export async function GET(
 
     console.log('📊 Timeline interval coverage analysis:', intervalCoverage)
 
-    return NextResponse.json({
+    return jsonWithCompression(request, {
       success: true,
       documents: sortedDocuments,
       total: response.total,
@@ -274,7 +278,7 @@ export async function GET(
       }
     }
 
-    return NextResponse.json(errorResponse, { status: 500 })
+    return jsonWithCompression(request, errorResponse, { status: 500 })
   }
 }
 

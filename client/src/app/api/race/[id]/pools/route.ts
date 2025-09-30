@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { createServerClient, Query } from '@/lib/appwrite-server';
 import { RacePoolData } from '@/types/racePools';
+import { jsonWithCompression } from '@/lib/http/compression';
 
 /**
  * API route for race pool data
@@ -14,24 +15,33 @@ export async function GET(
     const { id: raceId } = await params;
     
     if (!raceId) {
-      return NextResponse.json({ error: 'Race ID is required' }, { status: 400 });
+      return jsonWithCompression(
+        request,
+        { error: 'Race ID is required' },
+        { status: 400 }
+      );
     }
 
     const poolData = await getRacePoolData(raceId);
     
     if (!poolData) {
-      return NextResponse.json({ error: 'Pool data not found' }, { status: 404 });
+      return jsonWithCompression(
+        request,
+        { error: 'Pool data not found' },
+        { status: 404 }
+      );
     }
 
     // Set aggressive cache headers for live pool data
-    const response = NextResponse.json(poolData);
+    const response = await jsonWithCompression(request, poolData);
     response.headers.set('Cache-Control', 'public, max-age=5, stale-while-revalidate=15');
     response.headers.set('X-Pool-Data-Race-ID', raceId);
     
     return response;
   } catch (error) {
     console.error('API Error fetching pool data:', error);
-    return NextResponse.json(
+    return jsonWithCompression(
+      request,
       { error: 'Internal server error' },
       { status: 500 }
     );
