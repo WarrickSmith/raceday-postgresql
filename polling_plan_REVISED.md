@@ -333,7 +333,7 @@ Most of this task was already completed through earlier implementation work. The
 
 ### Task 6: Server Response Optimisation (Compression)
 
-- **Status**: Not Started
+- **Status**: Completed
 - **Priority**: Medium
 - **Estimated Effort**: 8 hours
 
@@ -350,10 +350,16 @@ Most of this task was already completed through earlier implementation work. The
 
 **Acceptance Criteria**:
 
-- [ ] Compression middleware active for relevant API responses without breaking clients.
-- [ ] Payload size reduction validated against baseline metrics.
-- [ ] Polling plan updated to reflect response compression work.
-- [ ] TS/lint/tests pass, no `any` types introduced.
+- [x] Compression middleware active for relevant API responses without breaking clients.
+- [x] Payload size reduction validated against baseline metrics.
+- [x] Polling plan updated to reflect response compression work.
+- [x] TS/lint/tests pass, no `any` types introduced.
+
+**Implementation Notes**:
+
+- Added shared compression utility for Next.js API routes with Brotli/Gzip negotiation and size threshold safeguards.
+- Appwrite HTTP-triggered functions reuse the helper to compress manual polling responses while leaving scheduled executions unaffected.
+- Jest coverage verifies gzip and Brotli outputs round-trip correctly alongside small-payload fallbacks.
 
 **Testing Requirements**: cURL/browser payload size comparisons, compression ratio monitoring, performance metrics before/after, automated tests validating middleware behaviour.
 
