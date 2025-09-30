@@ -1,14 +1,53 @@
+# RaceDay Docker Compose Configuration
+#
+# This file supports two deployment modes:
+#
+# 1. LOCAL DEVELOPMENT:
+#    - Run: docker-compose --env-file ./client/.env.local up --build -d
+#    - Reads variables from ./client/.env.local
+#    - Single source of truth for all environment variables
+#
+# 2. PORTAINER PRODUCTION:
+#    - Deploy stack from GitHub repository
+#    - Define all environment variables in Portainer Stack UI
+#    - Portainer variables override defaults below
+#    - No .env.local file needed (won't exist in GitHub repo)
+
 services:
   raceday:
-    build: ./client
+    build:
+      context: ./client
+      args:
+        - NEXT_PUBLIC_APPWRITE_ENDPOINT=${NEXT_PUBLIC_APPWRITE_ENDPOINT}
+        - NEXT_PUBLIC_APPWRITE_PROJECT_ID=${NEXT_PUBLIC_APPWRITE_PROJECT_ID}
+        - APPWRITE_API_KEY=${APPWRITE_API_KEY}
+        - NEXT_PUBLIC_LOG_LEVEL=${NEXT_PUBLIC_LOG_LEVEL:-ERROR}
+        - NEXT_PUBLIC_DOUBLE_POLLING_FREQUENCY=${NEXT_PUBLIC_DOUBLE_POLLING_FREQUENCY:-false}
+        - DOUBLE_POLLING_FREQUENCY=${DOUBLE_POLLING_FREQUENCY:-false}
+        - NEXT_PUBLIC_POLLING_ENABLED=${NEXT_PUBLIC_POLLING_ENABLED:-true}
+        - NEXT_PUBLIC_POLLING_DEBUG_MODE=${NEXT_PUBLIC_POLLING_DEBUG_MODE:-false}
+        - NEXT_PUBLIC_POLLING_TIMEOUT=${NEXT_PUBLIC_POLLING_TIMEOUT:-5000}
+        - NEXT_PUBLIC_ENABLE_POLLING_MONITOR=${NEXT_PUBLIC_ENABLE_POLLING_MONITOR:-false}
+        - NEXT_PUBLIC_ENABLE_HEALTH_MONITORING=${NEXT_PUBLIC_ENABLE_HEALTH_MONITORING:-true}
+        - NEXT_PUBLIC_HEALTH_CHECK_INTERVAL_MS=${NEXT_PUBLIC_HEALTH_CHECK_INTERVAL_MS:-180000}
     container_name: raceday
     restart: unless-stopped
     ports:
       - '3444:3000'
     environment:
       - NODE_ENV=${NODE_ENV:-production}
-    env_file:
-      - ${ENV_FILE:-./client/.env.local}
+      - NEXT_PUBLIC_APPWRITE_ENDPOINT=${NEXT_PUBLIC_APPWRITE_ENDPOINT}
+      - NEXT_PUBLIC_APPWRITE_PROJECT_ID=${NEXT_PUBLIC_APPWRITE_PROJECT_ID}
+      - APPWRITE_API_KEY=${APPWRITE_API_KEY}
+      - NEXT_PUBLIC_LOG_LEVEL=${NEXT_PUBLIC_LOG_LEVEL:-ERROR}
+      - NEXT_PUBLIC_DOUBLE_POLLING_FREQUENCY=${NEXT_PUBLIC_DOUBLE_POLLING_FREQUENCY:-false}
+      - DOUBLE_POLLING_FREQUENCY=${DOUBLE_POLLING_FREQUENCY:-false}
+      - NEXT_PUBLIC_POLLING_ENABLED=${NEXT_PUBLIC_POLLING_ENABLED:-true}
+      - NEXT_PUBLIC_POLLING_DEBUG_MODE=${NEXT_PUBLIC_POLLING_DEBUG_MODE:-false}
+      - NEXT_PUBLIC_POLLING_TIMEOUT=${NEXT_PUBLIC_POLLING_TIMEOUT:-5000}
+      - NEXT_PUBLIC_ENABLE_POLLING_MONITOR=${NEXT_PUBLIC_ENABLE_POLLING_MONITOR:-false}
+      - NEXT_PUBLIC_ENABLE_HEALTH_MONITORING=${NEXT_PUBLIC_ENABLE_HEALTH_MONITORING:-true}
+      - NEXT_PUBLIC_HEALTH_CHECK_INTERVAL_MS=${NEXT_PUBLIC_HEALTH_CHECK_INTERVAL_MS:-180000}
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/health']
       interval: 30s
