@@ -140,6 +140,31 @@ DEVELOPMENT NOTES:
 
 **Testing Requirements**: Playwright layout checks, dev-mode toggle tests, unit tests for monitor metrics.
 
+**Developer Notes (Post-Implementation)**:
+
+1. **Endpoint Architecture Refinement**: During implementation review, discovered that the race polling architecture uses a single comprehensive endpoint (`/api/race/[id]`) that returns race data, entrants, pools, and money flow in one response. Removed the separate `ENTRANTS` endpoint category from metrics tracking as it was redundant. The monitor now tracks three endpoint categories:
+   - `race`: Primary comprehensive data endpoint (polled by `useRacePolling`)
+   - `pools`: Separate pool data endpoint (fetched by `useRacePools` on each polling trigger)
+   - `money-flow`: Money flow timeline endpoint (fetched by `useMoneyFlowTimeline`)
+
+2. **Latency Measurement**: Added `performance.now()` timing to all data-fetching hooks (`useRacePolling`, `useRacePools`, `useMoneyFlowTimeline`) to capture actual request duration. Latency values are automatically tracked and displayed in the polling monitor.
+
+3. **Request Counting Fix**: Corrected metrics recording to emit both 'start' and 'success'/'error' events. The 'start' event increments the request counter, while outcome events track latency and error status. This ensures accurate request counts and proper latency measurement.
+
+4. **Metrics Integration Pattern**: Created `useEndpointMetrics` helper hook that allows any data-fetching hook to report metrics via custom events. This decoupled approach means:
+   - Each hook tracks its own metrics independently
+   - The polling monitor aggregates all metrics through event listeners
+   - Adding metrics to new endpoints is straightforward (import hook + call `recordRequest`)
+
+5. **Test Updates**: Updated test suites to reflect the simplified three-endpoint architecture (removed `ENTRANTS` endpoint expectations). All tests pass successfully.
+
+6. **Files Modified**:
+   - Created: [useEndpointMetrics.ts](client/src/hooks/useEndpointMetrics.ts) - Reusable metrics tracking helper
+   - Updated: [useRacePolling.ts](client/src/hooks/useRacePolling.ts) - Added latency tracking
+   - Updated: [useRacePools.ts](client/src/hooks/useRacePools.ts) - Integrated metrics tracking
+   - Updated: [useMoneyFlowTimeline.ts](client/src/hooks/useMoneyFlowTimeline.ts) - Integrated metrics tracking
+   - Updated: [usePollingMetrics.ts](client/src/hooks/usePollingMetrics.ts) - Added event listener for custom endpoint metrics
+
 ---
 
 ### Task 4: Race Page Component Integration & UX Updates
