@@ -7,10 +7,13 @@
 
 /**
  * Polling endpoint identifiers
+ *
+ * Note: The race endpoint returns comprehensive data including entrants, pools,
+ * and money flow in a single response. Separate endpoints exist for specialized
+ * queries but are not currently used in the main polling flow.
  */
 export const PollingEndpoint = {
   RACE: 'race',
-  ENTRANTS: 'entrants',
   POOLS: 'pools',
   MONEY_FLOW: 'money-flow',
 } as const

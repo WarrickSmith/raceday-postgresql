@@ -12,6 +12,7 @@ const createMockPollingState = (
   currentIntervalMs: null,
   nextPollTimestamp: null,
   isDoubleFrequencyEnabled: false,
+  lastRequestDurationMs: null,
   retry: jest.fn(),
   stop: jest.fn(),
   ...overrides,
@@ -40,7 +41,6 @@ describe('usePollingMetrics', () => {
     const { result } = renderHook(() => usePollingMetrics(pollingState))
 
     expect(result.current.endpoints).toHaveProperty('race')
-    expect(result.current.endpoints).toHaveProperty('entrants')
     expect(result.current.endpoints).toHaveProperty('pools')
     expect(result.current.endpoints).toHaveProperty('money-flow')
 

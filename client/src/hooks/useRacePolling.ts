@@ -22,6 +22,7 @@ export interface RacePollingState {
   currentIntervalMs: number | null
   nextPollTimestamp: number | null
   isDoubleFrequencyEnabled: boolean
+  lastRequestDurationMs: number | null
   retry: () => Promise<void>
   stop: () => void
 }
@@ -116,6 +117,9 @@ export function useRacePolling(config: PollingConfig): RacePollingState {
     null
   )
   const [nextPollTimestamp, setNextPollTimestamp] = useState<number | null>(
+    null
+  )
+  const [lastRequestDurationMs, setLastRequestDurationMs] = useState<number | null>(
     null
   )
 
@@ -224,6 +228,7 @@ export function useRacePolling(config: PollingConfig): RacePollingState {
       }
 
       let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+      const requestStartTime = performance.now()
 
       try {
         isFetchingRef.current = true
@@ -251,10 +256,12 @@ export function useRacePolling(config: PollingConfig): RacePollingState {
         }
 
         const data = (await response.json()) as RaceContextData
+        const requestDuration = Math.round(performance.now() - requestStartTime)
 
         consecutiveFailuresRef.current = 0
         setError(null)
         setLastUpdated(new Date())
+        setLastRequestDurationMs(requestDuration)
 
         if (data.race?.status) {
           raceStatusRef.current = data.race.status
@@ -492,6 +499,7 @@ export function useRacePolling(config: PollingConfig): RacePollingState {
     currentIntervalMs,
     nextPollTimestamp,
     isDoubleFrequencyEnabled,
+    lastRequestDurationMs,
     retry,
     stop: () => {
       stop('manual-stop')
