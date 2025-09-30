@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useState } from 'react'
+import { memo, useState, useEffect } from 'react'
 import type { PollingMetrics, PollingEndpointKey } from '@/types/pollingMetrics'
 
 interface PollingMonitorProps {
@@ -26,6 +26,19 @@ export const PollingMonitor = memo(function PollingMonitor({
 }: PollingMonitorProps) {
   // Collapsed state (default: collapsed)
   const [isExpanded, setIsExpanded] = useState(false)
+
+  // Real-time countdown state
+  const [currentTime, setCurrentTime] = useState(Date.now())
+
+  // Update countdown every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now())
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [])
+
   // Format percentage with 1 decimal place
   const formatPercent = (value: number): string => `${value.toFixed(1)}%`
 
@@ -58,10 +71,10 @@ export const PollingMonitor = memo(function PollingMonitor({
     })
   }
 
-  // Calculate next poll countdown
+  // Calculate next poll countdown (uses currentTime for real-time updates)
   const getNextPollCountdown = (): string => {
     if (!metrics.cadence.nextPollTimestamp) return '—'
-    const remaining = Math.max(0, metrics.cadence.nextPollTimestamp - Date.now())
+    const remaining = Math.max(0, metrics.cadence.nextPollTimestamp - currentTime)
     if (remaining < 1000) return '<1s'
     if (remaining < 60000) return `${Math.round(remaining / 1000)}s`
     return `${Math.round(remaining / 60000)}m`
