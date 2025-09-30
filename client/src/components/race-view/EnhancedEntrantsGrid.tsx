@@ -133,13 +133,12 @@ interface EnhancedEntrantsGridProps {
   className?: string
   enableMoneyFlowTimeline?: boolean
   enableJockeySilks?: boolean
-  realtimeEntrants?: Entrant[]
   lastUpdate?: Date | null
-  // Real-time pool data from unified subscription
+  // Pool data from polling updates
   poolData?: RacePoolData | null
-  // Trigger for timeline refetch when unified subscription receives money flow updates
+  // Trigger for timeline refetch when polling receives money flow updates
   moneyFlowUpdateTrigger?: number
-  // Results data for position highlighting (merged from real-time and persistent sources)
+  // Results data for position highlighting (merged from polling and persistent sources)
   resultsData?: RaceResult[]
   // Race status for determining when to show results highlighting
   raceStatus?: string
@@ -159,7 +158,6 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   className = '',
   enableMoneyFlowTimeline = true,
   enableJockeySilks = true,
-  realtimeEntrants,
   lastUpdate: initialLastUpdate,
   poolData = null,
   moneyFlowUpdateTrigger,
@@ -178,9 +176,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     primeAudioWithUserGesture,
   } = useAudibleAlerts()
 
-  // Use real-time entrants data from unified subscription if available
-  const currentEntrants =
-    realtimeEntrants || raceData?.entrants || initialEntrants
+  // Use entrants data from polling context if available
+  const currentEntrants = raceData?.entrants || initialEntrants
 
   const getEntrantKey = useCallback((entrant: Entrant): string => {
     return entrant.entrantId || entrant.$id
@@ -191,8 +188,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const currentRaceStartTime = raceData?.race.startTime || raceStartTime
   const currentRace = raceData?.race
 
-  // Get actual race pool data
-  // Use real-time pool data from unified subscription with fallback for persistence
+  // Get actual race pool data from polling updates
   const racePoolData = poolData
 
   // Pool view state - fixed to win pool since toggle is removed
@@ -259,7 +255,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   }, [audioAlertsEnabled, primeAudioWithUserGesture, toggleAudioAlerts])
 
 
-  // Trigger timeline refetch when unified subscription receives money flow updates
+  // Trigger timeline refetch when polling receives money flow updates
   useEffect(() => {
     if (moneyFlowUpdateTrigger && refetchTimeline) {
       refetchTimeline()
@@ -297,9 +293,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     setUpdateCount((prev) => prev + 1)
   }, [currentEntrants])
 
-  // Use entrants data directly (real-time updates come from unified subscription)
+  // Use entrants data directly (updates come from polling)
   const entrants = useMemo(() => {
-    // Use current entrants which includes real-time updates from unified subscription
+    // Use current entrants which includes updates from polling
     const finalEntrants =
       currentEntrants && currentEntrants.length > 0
         ? currentEntrants
@@ -309,13 +305,12 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     if (process.env.NODE_ENV === 'development') {
       logger.debug('EnhancedEntrantsGrid entrants:', {
         entrantsCount: finalEntrants.length,
-        hasRealtimeData: !!realtimeEntrants,
         lastUpdateTime: lastUpdate?.toISOString(),
       })
     }
 
     return finalEntrants
-  }, [currentEntrants, initialEntrants, realtimeEntrants, lastUpdate, logger])
+  }, [currentEntrants, initialEntrants, lastUpdate, logger])
 
   // Validation function to check if timeline amounts sum to total pool
   const validateTimelineSummation = useCallback((entrant: Entrant) => {

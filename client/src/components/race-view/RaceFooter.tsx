@@ -32,7 +32,7 @@ interface RaceFooterProps {
   showResults?: boolean
   lastPoolUpdate?: Date | null
   lastResultsUpdate?: Date | null
-  // Real-time race data from unified subscription
+  // Race data from polling updates
   race?: Race | null
 }
 
@@ -48,7 +48,7 @@ export const RaceFooter = memo(function RaceFooter({
   lastResultsUpdate,
   race = null,
 }: RaceFooterProps) {
-  // Use real-time data from props (from unified subscription) with context fallbacks
+  // Use data from props (from polling updates) with fallbacks
   const currentRaceStartTime = race?.startTime || raceStartTime
   const currentRaceStatus =
     (race?.status?.toLowerCase() as RaceStatus) || raceStatus
