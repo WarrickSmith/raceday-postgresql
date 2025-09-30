@@ -357,8 +357,8 @@ Most of this task was already completed through earlier implementation work. The
 
 **Implementation Notes**:
 
-- Added shared compression utility for Next.js API routes with Brotli/Gzip negotiation and size threshold safeguards.
-- Appwrite HTTP-triggered functions reuse the helper to compress manual polling responses while leaving scheduled executions unaffected.
+- Implemented a dedicated compression helper for Next.js API routes with Brotli/Gzip negotiation and size threshold safeguards.
+- Appwrite HTTP-triggered functions now inline identical compression helpers per function, keeping deployments self-contained while compressing manual responses.
 - Jest coverage verifies gzip and Brotli outputs round-trip correctly alongside small-payload fallbacks.
 
 **Testing Requirements**: cURL/browser payload size comparisons, compression ratio monitoring, performance metrics before/after, automated tests validating middleware behaviour.
