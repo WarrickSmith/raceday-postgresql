@@ -5,10 +5,29 @@
  * Handles CRUD operations for user alert indicator configurations via API routes
  */
 
-import type {
-  AlertsConfig,
-} from '@/types/alerts'
+import { ensureConnection, isConnectionHealthy } from '@/state/connectionState'
+import type { AlertsConfig } from '@/types/alerts'
 import { DEFAULT_INDICATORS as DEFAULT_INDICATOR_CONFIGS, DEFAULT_USER_ID } from '@/types/alerts'
+
+// Lightweight in-flight dedup for service calls
+const createDefaultConfig = (userId: string): AlertsConfig => {
+  const defaultIndicators = DEFAULT_INDICATOR_CONFIGS.map((defaultInd, index) => ({
+    ...defaultInd,
+    $id: `default-${index}`,
+    userId,
+    lastUpdated: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+  }))
+
+  return {
+    userId,
+    indicators: defaultIndicators,
+    toggleAll: true,
+    audibleAlertsEnabled: true,
+  }
+}
+
+const inFlight = new Map<string, Promise<unknown>>()
 
 // Service now uses API routes instead of direct database access
 export const initializeAlertConfigService = () => {
@@ -20,42 +39,45 @@ export const initializeAlertConfigService = () => {
  * Returns 6 indicator configurations for the specified user
  */
 export const loadUserAlertConfig = async (userId: string = DEFAULT_USER_ID): Promise<AlertsConfig> => {
-  try {
-    const response = await fetch(`/api/user-alert-configs?userId=${encodeURIComponent(userId)}`)
+  const key = `load:${userId}`
+  const existing = inFlight.get(key)
+  if (existing) return existing as Promise<AlertsConfig>
 
-    if (!response.ok) {
-      throw new Error(`Failed to load alert config: ${response.statusText}`)
-    }
-
-    const config = await response.json()
-    const audibleAlertsEnabled =
-      config.audibleAlertsEnabled ??
-      config.indicators?.[0]?.audibleAlertsEnabled ??
-      true
-
-    return {
-      ...config,
-      audibleAlertsEnabled,
-    }
-  } catch (error) {
-    console.error('Failed to load user alert config:', error)
-
-    // Return defaults on error
-    const defaultIndicators = DEFAULT_INDICATOR_CONFIGS.map((defaultInd, index) => ({
-      ...defaultInd,
-      $id: `default-${index}`,
-      userId,
-      lastUpdated: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-    }))
-
-    return {
-      userId,
-      indicators: defaultIndicators,
-      toggleAll: true,
-      audibleAlertsEnabled: true,
-    }
+  if (!(isConnectionHealthy() || (await ensureConnection()))) {
+    console.warn('Skipping alert config load while connection is unavailable')
+    return createDefaultConfig(userId)
   }
+
+  const req = (async (): Promise<AlertsConfig> => {
+    try {
+      const response = await fetch(`/api/user-alert-configs?userId=${encodeURIComponent(userId)}`)
+
+      if (!response.ok) {
+        throw new Error(`Failed to load alert config: ${response.statusText}`)
+      }
+
+      const config = await response.json()
+      const audibleAlertsEnabled =
+        config.audibleAlertsEnabled ??
+        config.indicators?.[0]?.audibleAlertsEnabled ??
+        true
+
+      return {
+        ...config,
+        audibleAlertsEnabled,
+      }
+    } catch (error) {
+      console.error('Failed to load user alert config:', error)
+
+      // Return defaults on error
+      return createDefaultConfig(userId)
+    } finally {
+      inFlight.delete(key)
+    }
+  })()
+
+  inFlight.set(key, req)
+  return req
 }
 
 /**
@@ -63,26 +85,42 @@ export const loadUserAlertConfig = async (userId: string = DEFAULT_USER_ID): Pro
  * Updates all 6 indicator configurations for the user
  */
 export const saveUserAlertConfig = async (config: AlertsConfig): Promise<void> => {
-  try {
-    const response = await fetch('/api/user-alert-configs', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId: config.userId,
-        indicators: config.indicators,
-        audibleAlertsEnabled: config.audibleAlertsEnabled,
-      }),
-    })
+  const key = `save:${config.userId}`
+  const existing = inFlight.get(key)
+  if (existing) return existing as Promise<void>
 
-    if (!response.ok) {
-      throw new Error(`Failed to save alert config: ${response.statusText}`)
-    }
-  } catch (error) {
-    console.error('Failed to save user alert config:', error)
-    throw new Error('Failed to save alert configuration. Please try again.')
+  if (!(isConnectionHealthy() || (await ensureConnection()))) {
+    console.warn('Skipping alert config save while connection is unavailable')
+    throw new Error('Cannot save alert configuration while offline. Please reconnect and try again.')
   }
+
+  const req = (async () => {
+    try {
+      const response = await fetch('/api/user-alert-configs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: config.userId,
+          indicators: config.indicators,
+          audibleAlertsEnabled: config.audibleAlertsEnabled,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to save alert config: ${response.statusText}`)
+      }
+    } catch (error) {
+      console.error('Failed to save user alert config:', error)
+      throw new Error('Failed to save alert configuration. Please try again.')
+    } finally {
+      inFlight.delete(key)
+    }
+  })()
+
+  inFlight.set(key, req)
+  return req
 }
 
 /**
@@ -90,32 +128,48 @@ export const saveUserAlertConfig = async (config: AlertsConfig): Promise<void> =
  * Resets colors and enables all indicators
  */
 export const resetToDefaults = async (userId: string = DEFAULT_USER_ID): Promise<AlertsConfig> => {
-  try {
-    const response = await fetch('/api/user-alert-configs/reset', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ userId }),
-    })
+  const key = `reset:${userId}`
+  const existing = inFlight.get(key)
+  if (existing) return existing as Promise<AlertsConfig>
 
-    if (!response.ok) {
-      throw new Error(`Failed to reset alert config: ${response.statusText}`)
-    }
-
-    const resetConfig = await response.json()
-    const audibleAlertsEnabled =
-      resetConfig.audibleAlertsEnabled ??
-      resetConfig.indicators?.[0]?.audibleAlertsEnabled ??
-      true
-    return {
-      ...resetConfig,
-      audibleAlertsEnabled,
-    }
-  } catch (error) {
-    console.error('Failed to reset to defaults:', error)
-    throw new Error('Failed to reset to default configuration. Please try again.')
+  if (!(isConnectionHealthy() || (await ensureConnection()))) {
+    console.warn('Skipping alert config reset while connection is unavailable')
+    throw new Error('Cannot reset alert configuration while offline. Please reconnect and try again.')
   }
+
+  const req = (async (): Promise<AlertsConfig> => {
+    try {
+      const response = await fetch('/api/user-alert-configs/reset', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to reset alert config: ${response.statusText}`)
+      }
+
+      const resetConfig = await response.json()
+      const audibleAlertsEnabled =
+        resetConfig.audibleAlertsEnabled ??
+        resetConfig.indicators?.[0]?.audibleAlertsEnabled ??
+        true
+      return {
+        ...resetConfig,
+        audibleAlertsEnabled,
+      }
+    } catch (error) {
+      console.error('Failed to reset to defaults:', error)
+      throw new Error('Failed to reset to default configuration. Please try again.')
+    } finally {
+      inFlight.delete(key)
+    }
+  })()
+
+  inFlight.set(key, req)
+  return req
 }
 
 // Validation helper

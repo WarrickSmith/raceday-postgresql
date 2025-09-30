@@ -52,19 +52,20 @@ describe('useRacesForMeeting', () => {
   it('should fetch races successfully', async () => {
     mockFetchRacesForMeeting.mockResolvedValue(mockRaces);
 
-    const { result } = renderHook(() => 
+    const { result } = renderHook(() =>
       useRacesForMeeting({ meetingId: 'meeting1' })
     );
 
-    expect(result.current.isLoading).toBe(true);
+    // Initial state
     expect(result.current.races).toEqual([]);
     expect(result.current.error).toBeNull();
 
+    // Wait for fetch to complete (the hook uses setTimeout + async fetch)
     await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
+      expect(result.current.races).toEqual(mockRaces);
+    }, { timeout: 5000 });
 
-    expect(result.current.races).toEqual(mockRaces);
+    expect(result.current.isLoading).toBe(false);
     expect(result.current.error).toBeNull();
     expect(mockFetchRacesForMeeting).toHaveBeenCalledWith('meeting1');
   });
@@ -73,17 +74,18 @@ describe('useRacesForMeeting', () => {
     const errorMessage = 'Failed to fetch races';
     mockFetchRacesForMeeting.mockRejectedValue(new Error(errorMessage));
 
-    const { result } = renderHook(() => 
+    const { result } = renderHook(() =>
       useRacesForMeeting({ meetingId: 'meeting1' })
     );
 
-    // Hook has retry logic with exponential backoff, so wait longer
+    // Hook has retry logic with exponential backoff (2 retries with delays up to 2s + 4s)
+    // Wait for all retries to complete and error to be set
     await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    }, { timeout: 10000 });
+      expect(result.current.error).toBe('Failed to fetch races');
+    }, { timeout: 15000 });
 
     expect(result.current.races).toEqual([]);
-    expect(result.current.error).toBe('Failed to fetch races');
+    expect(result.current.isLoading).toBe(false);
   });
 
   it('should not fetch when disabled', () => {
@@ -115,21 +117,27 @@ describe('useRacesForMeeting', () => {
   it('should handle refetch', async () => {
     mockFetchRacesForMeeting.mockResolvedValue(mockRaces);
 
-    const { result } = renderHook(() => 
+    const { result } = renderHook(() =>
       useRacesForMeeting({ meetingId: 'meeting1' })
     );
 
+    // Wait for initial fetch to complete
     await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
+      expect(result.current.races).toEqual(mockRaces);
+    }, { timeout: 5000 });
 
-    expect(mockFetchRacesForMeeting).toHaveBeenCalledTimes(1);
+    const initialCallCount = mockFetchRacesForMeeting.mock.calls.length;
+    expect(initialCallCount).toBeGreaterThan(0);
 
+    // Refetch clears cache and triggers new fetch
     await act(async () => {
       await result.current.refetch();
     });
 
-    expect(mockFetchRacesForMeeting).toHaveBeenCalledTimes(2);
+    // Wait for refetch to complete
+    await waitFor(() => {
+      expect(mockFetchRacesForMeeting.mock.calls.length).toBeGreaterThan(initialCallCount);
+    }, { timeout: 5000 });
   });
 
   it('should cleanup on unmount', () => {

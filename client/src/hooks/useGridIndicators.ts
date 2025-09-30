@@ -46,6 +46,8 @@ const findDataPoint = (
   })
 }
 
+const getEntrantKey = (entrant: Entrant): string => entrant.entrantId || entrant.$id
+
 const buildMoneyFrame = (
   entrants: Entrant[],
   timelineData: Map<string, EntrantMoneyFlowTimeline>,
@@ -53,7 +55,8 @@ const buildMoneyFrame = (
   view: Exclude<GridView, 'odds'>
 ) =>
   entrants.map((entrant) => {
-    const timeline = timelineData.get(entrant.$id)
+    const entrantKey = getEntrantKey(entrant)
+    const timeline = timelineData.get(entrantKey)
     const dataPoint = findDataPoint(timeline, interval)
 
     const rawAmount = (() => {
@@ -65,10 +68,10 @@ const buildMoneyFrame = (
     })()
 
     const basePoint: MoneyFlowDataPoint = {
-      $id: `${entrant.$id}-${interval}-${view}`,
+      $id: `${entrantKey}-${interval}-${view}`,
       $createdAt: dataPoint?.$createdAt ?? '1970-01-01T00:00:00.000Z',
       $updatedAt: dataPoint?.$updatedAt ?? '1970-01-01T00:00:00.000Z',
-      entrant: entrant.$id,
+      entrant: entrantKey,
       pollingTimestamp: dataPoint?.pollingTimestamp ?? '1970-01-01T00:00:00.000Z',
       timeToStart: interval,
       timeInterval: interval,
@@ -119,10 +122,11 @@ const computeMoneyIndicators = (
         return
       }
 
+      const entrantKey = getEntrantKey(entrant)
       const percentageResult = calculateMoneyChangePercentage({
         currentTimeframe: currentFrame,
         previousTimeframe: previousFrame,
-        entrantId: entrant.$id,
+        entrantId: entrantKey,
       })
 
       if (!percentageResult.hasChange) {
@@ -143,11 +147,11 @@ const computeMoneyIndicators = (
         return
       }
 
-      indicator.entrantId = entrant.$id
+      indicator.entrantId = entrantKey
       indicator.percentageChange = percentageResult.percentageChange
 
       const existingIntervalMap = matrix.get(currentInterval) ?? new Map()
-      existingIntervalMap.set(entrant.$id, indicator)
+      existingIntervalMap.set(entrantKey, indicator)
       matrix.set(currentInterval, existingIntervalMap)
     })
   }
@@ -169,7 +173,8 @@ const computeOddsIndicators = (
         return
       }
 
-      const timeline = timelineData.get(entrant.$id)
+      const entrantKey = getEntrantKey(entrant)
+      const timeline = timelineData.get(entrantKey)
       const currentPoint = findDataPoint(timeline, currentInterval)
       const previousPoint = findDataPoint(timeline, previousInterval)
 
@@ -210,11 +215,11 @@ const computeOddsIndicators = (
         return
       }
 
-      indicator.entrantId = entrant.$id
+      indicator.entrantId = entrantKey
       indicator.percentageChange = oddsResult.percentageChange
 
       const intervalMap = matrix.get(currentInterval) ?? new Map()
-      intervalMap.set(entrant.$id, indicator)
+      intervalMap.set(entrantKey, indicator)
       matrix.set(currentInterval, intervalMap)
     })
   }

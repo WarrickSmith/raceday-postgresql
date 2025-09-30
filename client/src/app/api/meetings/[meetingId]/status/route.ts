@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { createServerClient, Query } from '@/lib/appwrite-server';
+import { jsonWithCompression } from '@/lib/http/compression';
 
 export async function GET(
   request: NextRequest,
@@ -21,7 +22,7 @@ export async function GET(
     );
 
     if (racesQuery.documents.length === 0) {
-      return NextResponse.json({ isCompleted: false });
+      return jsonWithCompression(request, { isCompleted: false });
     }
 
     // Check if all races are finalized
@@ -30,17 +31,21 @@ export async function GET(
       return raceData.status === 'Final' || raceData.status === 'Abandoned';
     });
 
-    return NextResponse.json({ 
+    return jsonWithCompression(request, {
       isCompleted: allRacesFinalized,
       totalRaces: racesQuery.documents.length,
       finalizedRaces: racesQuery.documents.filter((race) => {
         const raceData = race as unknown as { status: string };
         return raceData.status === 'Final' || raceData.status === 'Abandoned';
-      }).length
+      }).length,
     });
     
   } catch (error) {
     console.error('Error checking meeting status:', error);
-    return NextResponse.json({ isCompleted: false }, { status: 500 });
+    return jsonWithCompression(
+      request,
+      { isCompleted: false },
+      { status: 500 }
+    );
   }
 }

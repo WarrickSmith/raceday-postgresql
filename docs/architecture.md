@@ -58,12 +58,14 @@ The daily data import is now handled by three sequential functions with 10-minut
   - Mathematical validation of pool sums and percentages
   - Dual-phase polling: early morning baseline capture + high-frequency critical periods
   - Server-heavy processing with pre-calculated incremental amounts
-- **Dynamic Intervals:**
-  - T-65m+: 5-minute intervals (baseline capture)
-  - T-30m to T-5m: 1-minute intervals
-  - T-5m to T-3m: 30-second intervals
-  - T-3m to Start: 15-second intervals
-  - Post-start: 15-second intervals until Final
+- **Dynamic Intervals (v4.8 aligned):**
+  - T-65m+: 30-minute baseline cadence (15 minutes with double-frequency override)
+  - T-60m to T-5m: 2.5-minute active cadence (75 seconds with double-frequency override)
+  - T-5m to Final: 30-second critical cadence (15 seconds with double-frequency override)
+  - Post-final statuses: Polling halts entirely to conserve capacity
+- **Cadence Controls:**
+  - Client/UI mirrors these windows via `calculatePollingIntervalMs`
+  - Environment toggles: `NEXT_PUBLIC_DOUBLE_POLLING_FREQUENCY`, `DOUBLE_POLLING_FREQUENCY`, `NEXT_PUBLIC_POLLING_ENABLED`, `NEXT_PUBLIC_POLLING_DEBUG_MODE`, `NEXT_PUBLIC_POLLING_TIMEOUT`
 
 #### master-race-scheduler (Scheduled, Autonomous Coordination)
 - **Specification:** s-1vcpu-512mb
@@ -77,12 +79,9 @@ The daily data import is now handled by three sequential functions with 10-minut
 - **Schedule:** Every minute during race hours
 - **Purpose:** Real-time updates for active races (legacy function)
 - **Status:** Maintained for backward compatibility, enhanced-race-poller recommended
-- **Dynamic Intervals:**
-  - T-60m to T-20m: 5-minute intervals
-  - T-20m to T-10m: 2-minute intervals  
-  - T-10m to T-5m: 1-minute intervals
-  - T-5m to Start: 15-second intervals
-  - Post-start: 5-minute intervals until Final
+- **Dynamic Intervals (Legacy - replaced by enhanced-race-poller):**
+  - See enhanced-race-poller for current intervals
+  - Legacy intervals no longer in use
 
 #### single-race-poller (HTTP-triggered, Legacy)
 - **Specification:** s-1vcpu-1gb

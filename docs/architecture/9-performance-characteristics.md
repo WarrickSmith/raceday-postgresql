@@ -35,3 +35,10 @@
 - **Change Indicators:** < 16ms animation frame updates for ⚡ indicators
 
 ---
+
+## 9.3. Response Compression Strategy (v4.8)
+
+- **Next.js API Routes** now negotiate `br` or `gzip` encoding based on the caller's `Accept-Encoding` header, defaulting to identity responses when headers are absent or payloads are below 1 KB.
+- **Appwrite HTTP Functions** share the same compression utility to ensure batch/single race polling responses are compressed when triggered manually without impacting scheduled executions.
+- **Client Compatibility** is preserved by appending the `Vary: Accept-Encoding` header and setting explicit `Content-Length` values for both compressed and uncompressed payloads.
+- **Validation** is covered by Jest tests that decompress both Brotli and gzip responses to guarantee fidelity before rollout.

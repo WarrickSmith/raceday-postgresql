@@ -1,6 +1,35 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createServerClient } from '@/lib/appwrite-server'
 import { Query } from 'node-appwrite'
+import { jsonWithCompression } from '@/lib/http/compression'
+
+const TIMELINE_SELECT_FIELDS = [
+  '$id',
+  '$createdAt',
+  '$updatedAt',
+  'raceId',
+  'entrantId',
+  'type',
+  'timeInterval',
+  'timeToStart',
+  'intervalType',
+  'holdPercentage',
+  'incrementalWinAmount',
+  'incrementalPlaceAmount',
+  'winPoolAmount',
+  'placePoolAmount',
+  'winPoolPercentage',
+  'placePoolPercentage',
+  'fixedWinOdds',
+  'fixedPlaceOdds',
+  'poolWinOdds',
+  'poolPlaceOdds',
+  'eventTimestamp',
+  'pollingTimestamp',
+]
+
+const DEFAULT_TIMELINE_LIMIT = 200
+const MAX_TIMELINE_LIMIT = 2000
 
 // Valid pool types for API filtering
 const VALID_POOL_TYPES = ['win', 'place', 'odds'] as const
@@ -10,6 +39,7 @@ type EntrantValue = string | { entrantId?: string; $id?: string; id?: string | n
 
 interface MoneyFlowDocument {
   entrant?: EntrantValue
+  entrantId?: string
   timeInterval?: number
   timeToStart?: number
 }
@@ -27,11 +57,12 @@ export async function GET(
 
     // Validate poolType parameter
     if (!VALID_POOL_TYPES.includes(poolTypeParam as PoolType)) {
-      return NextResponse.json(
-        { 
+      return jsonWithCompression(
+        request,
+        {
           error: 'Invalid poolType parameter',
           message: `poolType must be one of: ${VALID_POOL_TYPES.join(', ')}`,
-          received: poolTypeParam
+          received: poolTypeParam,
         },
         { status: 400 }
       )
@@ -40,14 +71,16 @@ export async function GET(
     const poolType = poolTypeParam as PoolType
 
     if (!raceId) {
-      return NextResponse.json(
+      return jsonWithCompression(
+        request,
         { error: 'Race ID is required' },
         { status: 400 }
       )
     }
 
     if (entrantIds.length === 0) {
-      return NextResponse.json(
+      return jsonWithCompression(
+        request,
         { error: 'Entrant IDs are required' },
         { status: 400 }
       )
@@ -56,6 +89,34 @@ export async function GET(
     const { databases } = await createServerClient()
     const databaseId = 'raceday-db'
 
+    const cursorAfter = searchParams.get('cursorAfter') || undefined
+    const createdAfterParam = searchParams.get('createdAfter') || undefined
+    const limitParam = searchParams.get('limit')
+    const parsedLimit = limitParam ? Number(limitParam) : DEFAULT_TIMELINE_LIMIT
+    const limit = Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(Math.floor(parsedLimit), 1), MAX_TIMELINE_LIMIT)
+      : DEFAULT_TIMELINE_LIMIT
+
+    const buildBaseQueries = () => {
+      const queries = [
+        Query.equal('raceId', raceId),
+        Query.equal('entrantId', entrantIds),
+        Query.select(TIMELINE_SELECT_FIELDS),
+        Query.orderAsc('$createdAt'),
+        Query.limit(limit),
+      ]
+
+      if (cursorAfter) {
+        queries.push(Query.cursorAfter(cursorAfter))
+      }
+
+      if (createdAfterParam) {
+        queries.push(Query.greaterThan('$createdAt', createdAfterParam))
+      }
+
+      return queries
+    }
+
     // Try bucketed data first (with timeInterval field)
     let response
     try {
@@ -63,14 +124,11 @@ export async function GET(
         databaseId,
         'money-flow-history',
         [
-          Query.equal('entrant', entrantIds),
-          Query.equal('raceId', raceId), // CRITICAL FIX: Enable raceId filter now that field exists
-          Query.equal('type', 'bucketed_aggregation'), // Only bucketed aggregation records with pre-calculated increments
-          Query.isNotNull('timeInterval'), // Only records with timeInterval (bucketed data)
-          Query.greaterThan('timeInterval', -65), // Extended range to capture more pre/post race data
-          Query.lessThan('timeInterval', 66), // Include 65m baseline data (using lessThan with 66)
-          Query.orderAsc('timeInterval'), // Order by time interval
-          Query.limit(2000), // Enough for high-frequency data
+          ...buildBaseQueries(),
+          Query.equal('type', 'bucketed_aggregation'),
+          Query.isNotNull('timeInterval'),
+          Query.greaterThan('timeInterval', -65),
+          Query.lessThan('timeInterval', 66),
         ]
       )
     } catch (error) {
@@ -87,14 +145,14 @@ export async function GET(
         '📊 No bucketed data found, falling back to legacy timeToStart data'
       )
 
-      // Try a broader query first to see if any data exists at all
       try {
         const broadResponse = await databases.listDocuments(
           databaseId,
           'money-flow-history',
           [
-            Query.equal('entrant', entrantIds),
-            Query.limit(10), // Just get a few records to see what exists
+            Query.equal('raceId', raceId),
+            Query.equal('entrantId', entrantIds),
+            Query.limit(10),
           ]
         )
 
@@ -118,13 +176,10 @@ export async function GET(
           databaseId,
           'money-flow-history',
           [
-            Query.equal('entrant', entrantIds),
-            Query.equal('raceId', raceId), // CRITICAL FIX: Enable raceId filter now that field exists
-            Query.isNotNull('timeToStart'), // Only records with timeToStart
-            Query.greaterThan('timeToStart', -65), // Extended range to capture more pre/post race data
-            Query.lessThan('timeToStart', 66), // Include 65m baseline data (using lessThan with 66)
-            Query.orderAsc('timeToStart'), // Order by time to start
-            Query.limit(2000), // Enough for high-frequency data
+            ...buildBaseQueries(),
+            Query.isNotNull('timeToStart'),
+            Query.greaterThan('timeToStart', -65),
+            Query.lessThan('timeToStart', 66),
           ]
         )
       } catch (legacyError) {
@@ -135,14 +190,25 @@ export async function GET(
         response = { documents: [], total: 0 }
       }
 
-      return NextResponse.json({
+      const sortedDocuments = sortTimelineDocuments(
+        response.documents as MoneyFlowDocument[]
+      )
+      const { nextCursor, nextCreatedAt } = getNextCursorMetadata(
+        response.documents
+      )
+
+      return jsonWithCompression(request, {
         success: true,
-        documents: response.documents,
+        documents: sortedDocuments,
         total: response.total,
         raceId,
         entrantIds,
         poolType, // Include requested pool type in response
         bucketedData: false, // Indicate this is legacy data
+        nextCursor,
+        nextCreatedAt,
+        limit,
+        createdAfter: createdAfterParam ?? null,
         message:
           response.documents.length === 0
             ? 'No timeline data available yet - collection may be empty after reinitialization'
@@ -152,22 +218,32 @@ export async function GET(
     }
 
     // Add interval coverage analysis for debugging
+    const sortedDocuments = sortTimelineDocuments(
+      response.documents as MoneyFlowDocument[]
+    )
     const intervalCoverage = analyzeIntervalCoverage(
-      response.documents as MoneyFlowDocument[],
+      sortedDocuments,
       entrantIds
+    )
+    const { nextCursor, nextCreatedAt } = getNextCursorMetadata(
+      response.documents
     )
 
     console.log('📊 Timeline interval coverage analysis:', intervalCoverage)
 
-    return NextResponse.json({
+    return jsonWithCompression(request, {
       success: true,
-      documents: response.documents,
+      documents: sortedDocuments,
       total: response.total,
       raceId,
       entrantIds,
       poolType, // Include requested pool type in response
       bucketedData: true,
       intervalCoverage,
+      nextCursor,
+      nextCreatedAt,
+      limit,
+      createdAfter: createdAfterParam ?? null,
       message:
         response.documents.length === 0
           ? 'No timeline data available yet - collection may be empty after reinitialization'
@@ -202,7 +278,7 @@ export async function GET(
       }
     }
 
-    return NextResponse.json(errorResponse, { status: 500 })
+    return jsonWithCompression(request, errorResponse, { status: 500 })
   }
 }
 
@@ -214,9 +290,11 @@ function getPoolTypeOptimizations(
   bucketedData: boolean
 ): string[] {
   const baseOptimizations = [
+    'Scalar filters on raceId and entrantId',
     'Time interval filtering',
     bucketedData ? 'Bucketed storage' : 'Legacy timeToStart data',
     bucketedData ? 'Pre-calculated incrementals' : 'Raw data fallback',
+    'Cursor-based incremental retrieval ($createdAt + cursorAfter)',
     'Extended range (-65 to +66)',
   ]
 
@@ -246,6 +324,47 @@ function getPoolTypeOptimizations(
 /**
  * Analyze interval coverage to identify gaps in timeline data
  */
+function sortTimelineDocuments(documents: MoneyFlowDocument[]) {
+  const getIntervalValue = (doc: MoneyFlowDocument) => {
+    if (typeof doc.timeInterval === 'number') {
+      return doc.timeInterval
+    }
+
+    if (typeof doc.timeToStart === 'number') {
+      return doc.timeToStart
+    }
+
+    return Number.MAX_SAFE_INTEGER
+  }
+
+  const getCreatedAt = (doc: MoneyFlowDocument) => {
+    const raw = (doc as { $createdAt?: string }).$createdAt
+    const parsed = raw ? Date.parse(raw) : NaN
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+
+  return [...documents].sort((a, b) => {
+    const intervalDelta = getIntervalValue(a) - getIntervalValue(b)
+    if (intervalDelta !== 0) {
+      return intervalDelta
+    }
+
+    return getCreatedAt(a) - getCreatedAt(b)
+  })
+}
+
+function getNextCursorMetadata(
+  documents: Array<{ $id?: string; $createdAt?: string }>
+) {
+  const lastDocument =
+    documents.length > 0 ? documents[documents.length - 1] : undefined
+
+  return {
+    nextCursor: lastDocument?.$id ?? null,
+    nextCreatedAt: lastDocument?.$createdAt ?? null,
+  }
+}
+
 function analyzeIntervalCoverage(
   documents: MoneyFlowDocument[],
   entrantIds: string[]
@@ -280,7 +399,7 @@ function analyzeIntervalCoverage(
 
   entrantIds.forEach((entrantId: string) => {
     const entrantDocs = documents.filter((doc) => {
-      const docEntrantId = resolveEntrantId(doc.entrant)
+      const docEntrantId = doc.entrantId || resolveEntrantId(doc.entrant)
       return docEntrantId === entrantId
     })
 

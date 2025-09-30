@@ -1,8 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import type { ConnectionState } from '@/state/connectionState';
+import { setConnectionState as setGlobalConnectionState } from '@/state/connectionState';
 import { Meeting } from '@/types/meetings';
 import { useLogger } from '@/utils/logging';
+
+const AUTO_RETRY_INTERVAL_MS = 60_000;
 
 export interface RaceUpdateEvent {
   meetingId: string;
@@ -23,50 +27,68 @@ interface MeetingsApiResponse {
   timestamp: string;
 }
 
+export type { ConnectionState } from '@/state/connectionState';
+
 export function useMeetingsPolling({ initialData, onError, onRaceUpdate }: UseMeetingsPollingOptions) {
   const logger = useLogger('useMeetingsPolling');
   const loggerRef = useRef(logger);
   const [meetings, setMeetings] = useState<Meeting[]>(initialData);
-  const [isConnected, setIsConnected] = useState(true);
+  const initialConnectionState: ConnectionState = initialData.length > 0 ? 'connected' : 'connecting';
+  const [connectionState, setLocalConnectionState] = useState<ConnectionState>(() => {
+    setGlobalConnectionState(initialConnectionState);
+    return initialConnectionState;
+  });
   const [connectionAttempts, setConnectionAttempts] = useState(0);
   const [isInitialDataReady, setIsInitialDataReady] = useState(initialData.length > 0);
-  const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
   const previousMeetingsRef = useRef<Meeting[]>(initialData);
   const onRaceUpdateRef = useRef<((event: RaceUpdateEvent) => void) | undefined>(onRaceUpdate);
   const onErrorRef = useRef<((error: Error) => void) | undefined>(onError);
+  const isFetchingRef = useRef(false);
+  const connectionStateRef = useRef<ConnectionState>(initialConnectionState);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autoRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Get intelligent polling interval based on race timing
-  const getPollInterval = (currentMeetings: Meeting[]): number => {
-    if (currentMeetings.length === 0) {
-      return 60000; // 1 minute when no meetings
+  const updateConnectionState = useCallback((state: ConnectionState) => {
+    connectionStateRef.current = state;
+    setLocalConnectionState(state);
+    setGlobalConnectionState(state);
+  }, []);
+
+  const clearRetryTimers = useCallback(() => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
     }
 
-    const now = new Date();
-    let shortestTimeToRace = Infinity;
+    if (autoRetryTimeoutRef.current) {
+      clearTimeout(autoRetryTimeoutRef.current);
+      autoRetryTimeoutRef.current = null;
+    }
+  }, []);
 
-    for (const meeting of currentMeetings) {
-      if (meeting.firstRaceTime) {
-        const raceTime = new Date(meeting.firstRaceTime);
-        const minutesUntilRace = (raceTime.getTime() - now.getTime()) / (1000 * 60);
+  const handleConnectionSuccess = useCallback(() => {
+    updateConnectionState('connected');
+    setConnectionAttempts(0);
+    setRetryCountdown(null);
+  }, [updateConnectionState]);
 
-        if (minutesUntilRace > 0) {
-          shortestTimeToRace = Math.min(shortestTimeToRace, minutesUntilRace);
-        }
-      }
+  const handleConnectionFailure = useCallback(() => {
+    updateConnectionState('disconnected');
+    setConnectionAttempts(prev => prev + 1);
+  }, [updateConnectionState]);
+
+  const fetchMeetings = useCallback(async (): Promise<void> => {
+    if (isFetchingRef.current) {
+      return;
     }
 
-    // Use intelligent intervals based on proximity to next race
-    if (shortestTimeToRace <= 5) {
-      return 30000; // 30 seconds when race is within 5 minutes
-    } else if (shortestTimeToRace <= 15) {
-      return 60000; // 1 minute when race is within 15 minutes
-    } else {
-      return 120000; // 2 minutes otherwise
+    if (connectionStateRef.current !== 'connected') {
+      loggerRef.current.info('Skipping meetings fetch while connection is not established');
+      return;
     }
-  };
 
-  // Self-contained polling function
-  const pollMeetings = useCallback(async (): Promise<void> => {
+    isFetchingRef.current = true;
     try {
       const response = await fetch('/api/meetings');
 
@@ -112,34 +134,71 @@ export function useMeetingsPolling({ initialData, onError, onRaceUpdate }: UseMe
 
       setMeetings(newMeetings);
       previousMeetingsRef.current = newMeetings;
-      setIsConnected(true);
-      setConnectionAttempts(0);
+      handleConnectionSuccess(); // This calls setGlobalConnectionState('connected')
+      setIsInitialDataReady(true);
 
       loggerRef.current.debug(`Fetched ${newMeetings.length} meetings from API`);
 
-      // Schedule next poll based on current data
-      const interval = getPollInterval(newMeetings);
-      loggerRef.current.debug(`Scheduling next poll in ${interval}ms`);
-
-      pollTimeoutRef.current = setTimeout(() => {
-        void pollMeetings();
-      }, interval);
-
     } catch (error) {
       loggerRef.current.error('Failed to fetch meetings data', error);
-      setIsConnected(false);
-      setConnectionAttempts(prev => prev + 1);
+      handleConnectionFailure();
       onErrorRef.current?.(error as Error);
-
-      // Retry with backoff on error
-      const retryDelay = Math.min(5000 * Math.pow(2, connectionAttempts), 30000);
-      loggerRef.current.debug(`Retrying poll in ${retryDelay}ms due to error`);
-
-      pollTimeoutRef.current = setTimeout(() => {
-        void pollMeetings();
-      }, retryDelay);
+    } finally {
+      isFetchingRef.current = false;
     }
-  }, [connectionAttempts]); // Only depend on connectionAttempts for retry logic
+  }, [handleConnectionFailure, handleConnectionSuccess]);
+
+  const checkConnectionHealth = useCallback(async (): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/health', { cache: 'no-store' });
+
+      if (!response.ok) {
+        throw new Error(`Health check failed with status ${response.status}`);
+      }
+
+      const body: { status: 'healthy' | 'unconfigured' | 'unhealthy' } = await response.json();
+
+      if (body.status === 'healthy') {
+        handleConnectionSuccess();
+        return true;
+      }
+
+      loggerRef.current.debug('Health check returned non-healthy status', body);
+      handleConnectionFailure();
+      return false;
+    } catch (error) {
+      // Use debug level for expected connection failures (not an error condition)
+      loggerRef.current.debug('Connection health check failed', error);
+      handleConnectionFailure();
+      return false;
+    }
+  }, [handleConnectionFailure, handleConnectionSuccess]);
+
+  const attemptReconnect = useCallback(async (): Promise<boolean> => {
+    updateConnectionState('connecting');
+
+    const isHealthy = await checkConnectionHealth();
+
+    if (isHealthy) {
+      await fetchMeetings();
+      return true;
+    }
+
+    return false;
+  }, [checkConnectionHealth, fetchMeetings, updateConnectionState]);
+
+  const refreshMeetings = useCallback(async (): Promise<void> => {
+    if (connectionStateRef.current !== 'connected') {
+      await attemptReconnect();
+      return;
+    }
+
+    await fetchMeetings();
+  }, [attemptReconnect, fetchMeetings]);
+
+  const retry = useCallback(() => {
+    void attemptReconnect();
+  }, [attemptReconnect]);
 
   // Update refs
   useEffect(() => {
@@ -150,46 +209,74 @@ export function useMeetingsPolling({ initialData, onError, onRaceUpdate }: UseMe
 
   // Mark initial data as ready
   useEffect(() => {
-    setIsInitialDataReady(initialData.length > 0);
+    if (initialData.length > 0) {
+      setIsInitialDataReady(true);
+    }
   }, [initialData.length]);
 
-  // Start polling once initial data is ready
+  // Keep local state in sync with updated initial data from the server
   useEffect(() => {
-    if (!isInitialDataReady) {
-      loggerRef.current.debug('Waiting for initial meetings data to be ready before polling');
-      return;
+    previousMeetingsRef.current = initialData;
+    setMeetings(initialData);
+  }, [initialData]);
+
+  useEffect(() => {
+    void attemptReconnect();
+  }, [attemptReconnect]);
+
+  useEffect(() => {
+    if (connectionState !== 'disconnected') {
+      setRetryCountdown(null);
+      clearRetryTimers();
+      return () => {
+        clearRetryTimers();
+      };
     }
 
-    loggerRef.current.info('Initial meetings data ready, starting polling');
+    setRetryCountdown(Math.ceil(AUTO_RETRY_INTERVAL_MS / 1000));
 
-    // Start polling immediately
-    void pollMeetings();
+    countdownIntervalRef.current = setInterval(() => {
+      setRetryCountdown(prev => {
+        if (prev === null) {
+          return prev;
+        }
 
-    // Cleanup on unmount or when effect re-runs
+        if (prev <= 1) {
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+          }
+          return 0;
+        }
+
+        return prev - 1;
+      });
+    }, 1000);
+
+    autoRetryTimeoutRef.current = setTimeout(() => {
+      void attemptReconnect();
+    }, AUTO_RETRY_INTERVAL_MS);
+
     return () => {
-      if (pollTimeoutRef.current) {
-        clearTimeout(pollTimeoutRef.current);
-        pollTimeoutRef.current = null;
-        loggerRef.current.debug('Polling cleanup: cleared timeout');
-      }
+      clearRetryTimers();
     };
-  }, [isInitialDataReady, pollMeetings]); // Include pollMeetings dependency
+  }, [attemptReconnect, clearRetryTimers, connectionState]);
 
-  // Manual retry function
-  const retry = useCallback(() => {
-    if (pollTimeoutRef.current) {
-      clearTimeout(pollTimeoutRef.current);
-      pollTimeoutRef.current = null;
-    }
-    void pollMeetings();
-  }, [pollMeetings]);
+  useEffect(() => {
+    return () => {
+      clearRetryTimers();
+    };
+  }, [clearRetryTimers]);
 
   return {
     meetings,
-    isConnected,
-    connectionState: isConnected ? 'connected' : 'disconnected',
+    isConnected: connectionState === 'connected',
+    connectionState,
     connectionAttempts,
     isInitialDataReady,
-    retry
+    retry,
+    retryConnection: attemptReconnect,
+    refreshMeetings,
+    retryCountdown,
   };
 }

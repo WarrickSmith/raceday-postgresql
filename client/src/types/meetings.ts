@@ -74,28 +74,20 @@ export interface MeetingWithExpandState extends Meeting {
   races?: Race[]
 }
 
-// Appwrite real-time subscription response type for entrants
-export interface EntrantSubscriptionResponse {
-  payload?: Partial<Entrant> & { $id: string }
-  events?: string[]
-}
-
-// Money flow subscription callback interface for type safety
-export interface MoneyFlowSubscriptionResponse {
-  payload?: {
-    entrant?: string
-    holdPercentage?: number
-  }
-  events?: string[]
-}
 
 // MoneyFlowHistory document interface
 export interface MoneyFlowHistory {
   $id: string
   $createdAt: string
   $updatedAt: string
-  entrant: string
-  holdPercentage: number
+  entrant?: string
+  entrantId?: string
+  raceId?: string
+  holdPercentage?: number
+  fixedWinOdds?: number
+  fixedPlaceOdds?: number
+  poolWinOdds?: number
+  poolPlaceOdds?: number
 }
 
 // DEPRECATED: OddsHistory document interface for sparkline data
@@ -109,12 +101,6 @@ export interface OddsHistoryData {
   timestamp: string
 }
 
-// DEPRECATED: Odds history subscription callback interface
-// Real-time odds updates now come via MoneyFlowHistory subscriptions
-export interface OddsHistorySubscriptionResponse {
-  payload?: Partial<OddsHistoryData> & { $id: string }
-  events?: string[]
-}
 
 // Navigation event handler types
 export type NavigationHandler = (direction: 'previous' | 'next') => void

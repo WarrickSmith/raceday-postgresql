@@ -3,11 +3,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Meeting } from '@/types/meetings';
-import { useSubscriptionCleanup } from '@/contexts/SubscriptionCleanupContext';
 
 interface NextScheduledRaceButtonProps {
   meetings: Meeting[];
-  isRealtimeConnected: boolean; // Note: Now represents polling connection status
+  isRealtimeConnected: boolean; // Represents latest meetings fetch status
   raceUpdateSignal: number;
 }
 
@@ -29,22 +28,33 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
   const [nextScheduledRace, setNextScheduledRace] = useState<NextScheduledRace | null>(null);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { requestCleanup } = useSubscriptionCleanup();
+  const pendingRequestRef = useRef<Promise<void> | null>(null);
 
   // Fetch the next scheduled race from the API
   const fetchNextScheduledRace = useCallback(async () => {
-    try {
-      const response = await fetch('/api/next-scheduled-race');
-      if (response.ok) {
-        const data: NextScheduledRaceApiResponse = await response.json();
-        setNextScheduledRace(data.nextScheduledRace);
-      } else {
-        setNextScheduledRace(null);
-      }
-    } catch (error) {
-      console.error('Failed to fetch next scheduled race:', error);
-      setNextScheduledRace(null);
+    if (pendingRequestRef.current) {
+      return pendingRequestRef.current;
     }
+
+    const promise = (async () => {
+      try {
+        const response = await fetch('/api/next-scheduled-race');
+        if (response.ok) {
+          const data: NextScheduledRaceApiResponse = await response.json();
+          setNextScheduledRace(data.nextScheduledRace);
+        } else {
+          setNextScheduledRace(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch next scheduled race:', error);
+        setNextScheduledRace(null);
+      } finally {
+        pendingRequestRef.current = null;
+      }
+    })();
+
+    pendingRequestRef.current = promise;
+    return promise;
   }, []);
 
   // Setup intelligent polling based on race timing
@@ -98,7 +108,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
         debounceTimeoutRef.current = null;
       }
     };
-  }, [fetchNextScheduledRace, setupIntelligentPolling]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update polling when race changes
   useEffect(() => {
@@ -111,7 +121,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
         clearTimeout(debounceTimeoutRef.current);
       }
     };
-  }, [setupIntelligentPolling]);
+  }, [nextScheduledRace]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // React to shared update signals from meetings polling system
   useEffect(() => {
@@ -135,7 +145,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
         debounceTimeoutRef.current = null;
       }
     };
-  }, [raceUpdateSignal, fetchNextScheduledRace]);
+  }, [raceUpdateSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset next race when meetings data clears
   useEffect(() => {
@@ -153,7 +163,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
       const now = new Date();
       const raceTime = new Date(nextScheduledRace.startTime);
       const diff = raceTime.getTime() - now.getTime();
-      
+
       // If race has started (passed start time), fetch updated next race ONLY ONCE
       if (diff <= 0 && !hasTriggeredNextFetch) {
         console.log('🏁 Race has started, fetching next scheduled race');
@@ -161,13 +171,13 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
         void fetchNextScheduledRace();
         return;
       }
-      
+
       // Force re-render to update countdown display
       // This is handled by the state update in getTimeUntilRace
     }, 1000); // Update every second for countdown
 
     return () => clearInterval(updateInterval);
-  }, [nextScheduledRace, fetchNextScheduledRace]);
+  }, [nextScheduledRace]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle navigation to next scheduled race
   const handleNavigateToNextRace = useCallback(async () => {
@@ -177,14 +187,13 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
     
     try {
       console.log('🎯 Navigating to next scheduled race:', nextScheduledRace.raceId);
-      await requestCleanup({ reason: 'next-scheduled-button' });
       router.push(`/race/${nextScheduledRace.raceId}`);
     } catch (error) {
       console.error('❌ Failed to navigate to next scheduled race:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [nextScheduledRace, isLoading, router, requestCleanup]);
+  }, [nextScheduledRace, isLoading, router]);
 
   // Show button always, but disable when no next race is available
   const isDisabled = !nextScheduledRace || isLoading;

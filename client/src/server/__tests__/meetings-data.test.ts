@@ -109,15 +109,26 @@ describe('meetings-data', () => {
     });
 
     it('should handle database errors gracefully', async () => {
-      // Mock console.error to suppress expected error output
-      console.error = jest.fn();
-      
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
+
       mockDatabases.listDocuments.mockRejectedValueOnce(new Error('Database error'));
 
       const result = await getMeetingsData();
 
       expect(result).toEqual([]);
-      expect(console.error).toHaveBeenCalledWith('Error fetching meetings data:', expect.any(Error));
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Appwrite meetings query failed, returning empty list:',
+        expect.any(String)
+      );
+      expect(debugSpy).toHaveBeenCalledWith('Appwrite meetings query environment check:', {
+        hasEndpoint: expect.any(Boolean),
+        hasProjectId: expect.any(Boolean),
+        hasApiKey: expect.any(Boolean),
+      });
+
+      warnSpy.mockRestore();
+      debugSpy.mockRestore();
     });
 
     it('should handle race fetching errors for individual meetings', async () => {

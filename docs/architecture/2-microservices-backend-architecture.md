@@ -25,7 +25,9 @@ The daily data import is now handled by three sequential functions with 10-minut
 - **Output:** Entrant records with initial odds data
 - **Duration:** ~300 seconds (5 minutes max)
 
-## 2.2. Real-time Functions
+## 2.2. Live Data Polling Functions
+
+**Note**: These functions poll external APIs and update Appwrite database. Client applications poll Appwrite via Next.js API routes with coordinated cadence.
 
 ### enhanced-race-poller (HTTP-triggered, Master Coordination)
 - **Specification:** s-2vcpu-2gb
@@ -37,11 +39,11 @@ The daily data import is now handled by three sequential functions with 10-minut
   - Dual-phase polling: early morning baseline capture + high-frequency critical periods
   - Server-heavy processing with pre-calculated incremental amounts
 - **Dynamic Intervals:**
-  - T-65m+: 5-minute intervals (baseline capture)
-  - T-30m to T-5m: 1-minute intervals
-  - T-5m to T-3m: 30-second intervals
-  - T-3m to Start: 15-second intervals
-  - Post-start: 15-second intervals until Final
+  - T-65m+: 30-minute intervals (early morning baseline)
+  - T-60m to T-5m: 2.5-minute intervals (active period)
+  - T-5m to T-3m: 30-second intervals (critical approach)
+  - T-3m to Start: 30-second intervals (ultra-critical)
+  - Post-start: 30-second intervals until Final
 
 ### master-race-scheduler (Scheduled, Autonomous Coordination)
 - **Specification:** s-1vcpu-512mb
@@ -55,12 +57,7 @@ The daily data import is now handled by three sequential functions with 10-minut
 - **Schedule:** Every minute during race hours
 - **Purpose:** Real-time updates for active races (legacy function)
 - **Status:** Maintained for backward compatibility, enhanced-race-poller recommended
-- **Dynamic Intervals:**
-  - T-60m to T-20m: 5-minute intervals
-  - T-20m to T-10m: 2-minute intervals  
-  - T-10m to T-5m: 1-minute intervals
-  - T-5m to Start: 15-second intervals
-  - Post-start: 5-minute intervals until Final
+- **Dynamic Intervals (Legacy):** See enhanced-race-poller for current production intervals
 
 ### single-race-poller (HTTP-triggered, Legacy)
 - **Specification:** s-1vcpu-1gb

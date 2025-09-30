@@ -1,12 +1,16 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MeetingsListClient } from '../MeetingsListClient';
-import { useMeetingsPolling } from '@/hooks/useMeetingsPolling';
+import { RacesForMeetingClient } from '../RacesForMeetingClient';
+import { useMeetingsPolling, type ConnectionState } from '@/hooks/useMeetingsPolling';
 import { Meeting } from '@/types/meetings';
 import { RACE_TYPE_CODES } from '@/constants/raceTypes';
-import { SubscriptionCleanupProvider } from '@/contexts/SubscriptionCleanupContext';
 
 // Mock the polling hook and Next.js navigation
 jest.mock('@/hooks/useMeetingsPolling');
+
+jest.mock('../RacesForMeetingClient', () => ({
+  RacesForMeetingClient: jest.fn(() => <div data-testid="races-for-meeting-client" />),
+}));
 
 const mockPush = jest.fn();
 jest.mock('next/navigation', () => ({
@@ -27,20 +31,16 @@ jest.mock('next/router', () => ({
 }));
 
 const mockUseMeetingsPolling = useMeetingsPolling as jest.MockedFunction<typeof useMeetingsPolling>;
+const mockRacesForMeetingClient = RacesForMeetingClient as jest.MockedFunction<typeof RacesForMeetingClient>;
 
-const renderWithProvider = (ui: React.ReactElement) =>
-  render(ui, {
-    wrapper: ({ children }) => (
-      <SubscriptionCleanupProvider>{children}</SubscriptionCleanupProvider>
-    ),
-  });
+const renderWithProvider = (ui: React.ReactElement) => render(ui);
 
 describe('MeetingsListClient', () => {
   const mockMeetings: Meeting[] = [
     {
       $id: '1',
       $createdAt: '2024-01-01T08:00:00Z',
-      $updatedAt: '2024-01-01T08:00:00Z',  
+      $updatedAt: '2024-01-01T08:00:00Z',
       meetingId: 'meeting1',
       meetingName: 'Flemington Race Meeting',
       country: 'AUS',
@@ -53,7 +53,7 @@ describe('MeetingsListClient', () => {
       $id: '2',
       $createdAt: '2024-01-01T07:00:00Z',
       $updatedAt: '2024-01-01T07:00:00Z',
-      meetingId: 'meeting2', 
+      meetingId: 'meeting2',
       meetingName: 'Addington Harness',
       country: 'NZ',
       raceType: 'Harness Horse Racing',
@@ -63,103 +63,159 @@ describe('MeetingsListClient', () => {
     },
   ];
 
+  type MockPollingResult = {
+    meetings: Meeting[];
+    isConnected: boolean;
+    connectionState: ConnectionState;
+    connectionAttempts: number;
+    isInitialDataReady: boolean;
+    retry: jest.Mock<void, []>;
+    retryConnection: jest.Mock<Promise<boolean>, []>;
+    refreshMeetings: jest.Mock<Promise<void>, []>;
+    retryCountdown: number | null;
+  };
+
+  const createMockReturn = (overrides: Partial<MockPollingResult> = {}): MockPollingResult => ({
+    meetings: mockMeetings,
+    isConnected: true,
+    connectionState: 'connected',
+    connectionAttempts: 0,
+    isInitialDataReady: true,
+    retry: jest.fn<void, []>(),
+    retryConnection: jest.fn<Promise<boolean>, []>(() => Promise.resolve(true)),
+    refreshMeetings: jest.fn<Promise<void>, []>(() => Promise.resolve()),
+    retryCountdown: null,
+    ...overrides,
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockPush.mockClear();
-    mockUseMeetingsPolling.mockReturnValue({
-      meetings: mockMeetings,
-      isConnected: true,
-      connectionState: 'connected' as const,
-      connectionAttempts: 0,
-      isInitialDataReady: true,
-      retry: jest.fn(),
-    });
+    mockUseMeetingsPolling.mockReturnValue(createMockReturn());
+    mockRacesForMeetingClient.mockClear();
   });
 
-  it('should render meetings list with connection status', () => {
+  it('should render meetings list with connection status badge', () => {
     renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
 
     expect(screen.getByText("Today's Meetings")).toBeInTheDocument();
-    expect(screen.getByLabelText('Data current')).toBeInTheDocument();
-    // Meetings appear in both meeting cards and race cards, so expect multiple instances
+    expect(screen.getByText('Connected')).toBeInTheDocument();
     expect(screen.getAllByText('Flemington Race Meeting').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Addington Harness').length).toBeGreaterThan(0);
   });
 
-  it('should show disconnected status when not connected', () => {
-    mockUseMeetingsPolling.mockReturnValue({
-      meetings: mockMeetings,
-      isConnected: false,
-      connectionState: 'disconnected' as const,
-      connectionAttempts: 1,
-      isInitialDataReady: false,
-      retry: jest.fn(),
-    });
-
-    renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
-
-    expect(screen.getByText('Updating...')).toBeInTheDocument();
-  });
-
-  it('should display error banner when error occurs', async () => {
-    // Mock console.error to suppress expected error output
-    const originalConsoleError = console.error;
-    console.error = jest.fn();
-    
-    const mockRetry = jest.fn();
-    mockUseMeetingsPolling.mockReturnValue({
-      meetings: mockMeetings,
-      isConnected: false,
-      connectionState: 'disconnected' as const,
-      connectionAttempts: 2,
-      isInitialDataReady: false,
-      retry: mockRetry,
-    });
-
-    // Simulate error by calling the hook with an error handler
-    mockUseMeetingsPolling.mockImplementation(({ onError: errorHandler }) => {
-      // Simulate error after some time
-      setTimeout(() => errorHandler?.(new Error('Data fetch failed')), 100);
-      return {
-        meetings: mockMeetings,
+  it('should show connection panel when disconnected', () => {
+    const retryConnection = jest.fn<Promise<boolean>, []>(() => Promise.resolve(false));
+    mockUseMeetingsPolling.mockReturnValue(
+      createMockReturn({
         isConnected: false,
-        connectionState: 'disconnected' as const,
+        connectionState: 'disconnected',
         connectionAttempts: 2,
         isInitialDataReady: false,
-        retry: mockRetry,
-      };
+        retryConnection,
+        retryCountdown: 45,
+      }),
+    );
+
+    renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
+
+    expect(screen.getByText('RaceDay data connection unavailable')).toBeInTheDocument();
+    const retryButton = screen.getByRole('button', { name: /Retry connection/i });
+    fireEvent.click(retryButton);
+    expect(retryConnection).toHaveBeenCalled();
+  });
+
+  it('should display connecting state when health check is running', () => {
+    mockUseMeetingsPolling.mockReturnValue(
+      createMockReturn({
+        isConnected: false,
+        connectionState: 'connecting',
+        connectionAttempts: 0,
+        isInitialDataReady: false,
+        retryCountdown: null,
+      }),
+    );
+
+    renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
+
+    expect(screen.getByText('Connecting to RaceDay data…')).toBeInTheDocument();
+  });
+
+  it('should preselect the first meeting when data is available', () => {
+    renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
+
+    expect(mockRacesForMeetingClient).toHaveBeenCalled();
+    const firstCallProps = mockRacesForMeetingClient.mock.calls[0]?.[0];
+    expect(firstCallProps?.selectedMeeting).toEqual(mockMeetings[0]);
+  });
+
+  it('resynchronizes the selected meeting when polling returns new meeting references', () => {
+    const updatedMeetings: Meeting[] = [
+      {
+        ...mockMeetings[0],
+        meetingName: 'Flemington Race Meeting',
+      },
+      mockMeetings[1],
+    ];
+
+    let pollingState = createMockReturn();
+    mockUseMeetingsPolling.mockImplementation(() => pollingState);
+
+    const { rerender } = renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
+
+    expect(mockRacesForMeetingClient).toHaveBeenCalled();
+    const initialCallIndex = mockRacesForMeetingClient.mock.calls.length - 1;
+    const initialSelected = mockRacesForMeetingClient.mock.calls[initialCallIndex]?.[0]?.selectedMeeting;
+    expect(initialSelected).toEqual(mockMeetings[0]);
+
+    pollingState = createMockReturn({ meetings: updatedMeetings });
+    rerender(<MeetingsListClient initialData={mockMeetings} />);
+
+    const updatedCallIndex = mockRacesForMeetingClient.mock.calls.length - 1;
+    const updatedSelected = mockRacesForMeetingClient.mock.calls[updatedCallIndex]?.[0]?.selectedMeeting;
+    expect(updatedSelected).toEqual(updatedMeetings[0]);
+  });
+
+  it('should display error banner when error occurs and allow manual retry', async () => {
+    const originalConsoleError = console.error;
+    console.error = jest.fn();
+
+    const retryConnection = jest.fn<Promise<boolean>, []>(() => Promise.resolve(false));
+
+    mockUseMeetingsPolling.mockImplementation(({ onError }) => {
+      setTimeout(() => onError?.(new Error('Data fetch failed')), 50);
+      return createMockReturn({
+        retryConnection,
+      });
     });
 
     renderWithProvider(<MeetingsListClient initialData={mockMeetings} />);
 
-    // Wait for error to be set
     await waitFor(() => {
       expect(screen.getByText(/Data update issue/)).toBeInTheDocument();
     });
 
-    // Test retry button
-    const retryButton = screen.getByText('Retry');
-    fireEvent.click(retryButton);
-    expect(mockRetry).toHaveBeenCalled();
-    
-    // Restore console.error
+    fireEvent.click(screen.getByText('Retry'));
+    expect(retryConnection).toHaveBeenCalled();
+
     console.error = originalConsoleError;
   });
 
-  it('should show empty state when no meetings', () => {
-    mockUseMeetingsPolling.mockReturnValue({
-      meetings: [],
-      isConnected: true,
-      connectionState: 'connected' as const,
-      connectionAttempts: 1, // Set to > 0 to avoid loading skeleton
-      isInitialDataReady: true,
-      retry: jest.fn(),
-    });
+  it('should show friendly empty state when no meetings', () => {
+    const refreshMeetings = jest.fn<Promise<void>, []>(() => Promise.resolve());
+    mockUseMeetingsPolling.mockReturnValue(
+      createMockReturn({
+        meetings: [],
+        refreshMeetings,
+      }),
+    );
 
     renderWithProvider(<MeetingsListClient initialData={[]} />);
 
-    expect(screen.getByText('No meetings today')).toBeInTheDocument();
-    expect(screen.getByText('There are no race meetings scheduled for today.')).toBeInTheDocument();
+    expect(screen.getByText('No Meeting Information is currently available')).toBeInTheDocument();
+    const refreshButton = screen.getByRole('button', { name: /Re-check meetings data/i });
+    fireEvent.click(refreshButton);
+    expect(refreshMeetings).toHaveBeenCalled();
   });
 
   it('should display correct meeting count', () => {
@@ -171,14 +227,11 @@ describe('MeetingsListClient', () => {
 
   it('should display singular meeting count correctly', () => {
     const singleMeeting = [mockMeetings[0]];
-    mockUseMeetingsPolling.mockReturnValue({
-      meetings: singleMeeting,
-      isConnected: true,
-      connectionState: 'connected' as const,
-      connectionAttempts: 0,
-      isInitialDataReady: true,
-      retry: jest.fn(),
-    });
+    mockUseMeetingsPolling.mockReturnValue(
+      createMockReturn({
+        meetings: singleMeeting,
+      }),
+    );
 
     renderWithProvider(<MeetingsListClient initialData={singleMeeting} />);
 
@@ -217,14 +270,11 @@ describe('MeetingsListClient', () => {
       <MeetingsListClient initialData={mockMeetings} />
     );
 
-    mockUseMeetingsPolling.mockReturnValue({
-      meetings: updatedMeetings,
-      isConnected: true,
-      connectionState: 'connected' as const,
-      connectionAttempts: 0,
-      isInitialDataReady: true,
-      retry: jest.fn(),
-    });
+    mockUseMeetingsPolling.mockReturnValue(
+      createMockReturn({
+        meetings: updatedMeetings,
+      }),
+    );
 
     rerender(<MeetingsListClient initialData={mockMeetings} />);
 

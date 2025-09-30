@@ -2,26 +2,29 @@
 
 ## 3.1. Data Fetching Strategy
 
-**Primary Pattern: SWR + Real-time Invalidation**
+**Primary Pattern: Coordinated Client-Side Polling**
 
 ```typescript
-// Smart caching with real-time updates
-const { meetings, isLoading } = useMeetings(filters);
+// Race data polling with dynamic cadence
+const { race, entrants, isPolling, error, lastUpdate } = useRacePolling(raceId);
 
-// Real-time cache invalidation
-useRealtime(
-  'databases.raceday-db.collections.meetings.documents',
-  (update) => {
-    mutate(); // Invalidate SWR cache on backend updates
-  }
-);
+// Meeting list polling with connection health checks
+const { meetings, isLoading, connectionState } = useMeetingsPolling();
+
+// Pool data fetching coordinated with race polling
+const { pools, isLoading: poolsLoading } = useRacePools(raceId);
+
+// Money flow history with incremental loading
+const { timeline, isLoading: timelineLoading } = useMoneyFlowTimeline(raceId);
 ```
 
 **Benefits:**
-- Initial data loads from cache (< 500ms)
-- Real-time updates without polling overhead
-- Automatic cache invalidation when backend functions update data
-- Graceful degradation on connection issues
+- Dynamic polling intervals based on race timing (T-65m+: 30min, T-60m to T-5m: 2.5min, T-5m to T-3m: 30s, T-3m to Start: 30s, Post-start: 30s)
+- Health monitoring prevents requests when backend unavailable
+- Request deduplication avoids stacked API calls
+- Response compression reduces payload sizes 60-70%
+- Graceful degradation with error handling and retry logic
+- Staleness indicators show data freshness
 
 ## 3.2. Enhanced Component Architecture (v4.7)
 
@@ -45,12 +48,16 @@ src/
 │       ├── DataTable.tsx          # High-performance data grid
 │       ├── MoneyFlowIndicator.tsx # Change visualization
 │       └── StatusIndicator.tsx    # Race status with timing
-├── hooks/                # Enhanced real-time hooks
-│   ├── useRealtime.ts             # Base real-time subscription
-│   ├── useMoneyFlowData.ts        # Money flow history queries
+├── hooks/                # Polling and data management hooks
+│   ├── useRacePolling.ts          # Coordinated race data polling with dynamic cadence
+│   ├── useMeetingsPolling.tsx     # Meeting list polling with connection health checks
+│   ├── useRacePools.ts            # Pool data fetching synchronized with race polling
+│   ├── useMoneyFlowTimeline.ts    # Money flow history with incremental loading
+│   ├── usePollingMetrics.ts       # Polling observability and metrics tracking
+│   ├── useEndpointMetrics.ts      # Request-level metrics for monitoring
 │   ├── useRaceNavigation.ts       # Race switching logic
-│   ├── useGridSorting.ts          # Column sorting state
-│   └── usePoolToggle.ts           # Pool view switching
+│   ├── useValueFlash.ts           # Value change animations
+│   └── useGridIndicators.ts       # Grid visual indicators
 ├── services/             # API service layer
 │   ├── moneyFlowService.ts        # Money flow data queries
 │   ├── racePoolsService.ts        # Pool totals service
@@ -61,7 +68,7 @@ src/
     └── jockeySilks.ts             # Silk data types
 ```
 
-## 3.3. Enhanced Race Interface Implementation (v4.7)
+## 3.3. Enhanced Race Interface Implementation
 
 ### Data Fetching Strategy
 
@@ -69,59 +76,88 @@ src/
 ```typescript
 // /race/[id]/page.tsx
 export default async function RacePage({ params }: { params: { id: string } }) {
-  const supabase = createServerClient();
-  
-  // Parallel data fetching for first paint
-  const [raceData, entrants, moneyFlowHistory, racePools] = await Promise.all([
-    supabase.from('races').select('*').eq('raceId', params.id).single(),
-    supabase.from('entrants').select('*, jockey_silks(*)').eq('race', params.id),
-    supabase.from('money-flow-history')
-      .select('*')
-      .eq('entrant.race', params.id)
-      .gte('pollingTimestamp', /* T-60m */)
-      .order('pollingTimestamp', { ascending: true }),
-    supabase.from('race-pools').select('*').eq('race', params.id).single()
-  ]);
+  // Initial SSR data fetch (optional - could also use client-side only)
+  // Most data is fetched client-side via polling for consistency
 
-  return <EnhancedRaceView initialData={{ raceData, entrants, moneyFlowHistory, racePools }} />;
+  return <ClientRaceView raceId={params.id} />;
 }
 ```
 
-**Client-Side Real-Time Updates:**
+**Client-Side Polling Updates:**
 ```typescript
-// Enhanced real-time subscription with money flow tracking
-function useEnhancedRaceData(raceId: string, initialData: InitialRaceData) {
-  const [data, setData] = useState(initialData);
-  
+// Coordinated polling with RaceContext
+function ClientRaceView({ raceId }: { raceId: string }) {
+  // Main race polling hook with dynamic cadence
+  const {
+    race,
+    entrants,
+    isPolling,
+    error,
+    lastUpdate,
+    nextPollIn
+  } = useRacePolling(raceId);
+
+  // Pool data fetching (triggered by race polling)
+  const { pools, isLoading: poolsLoading } = useRacePools(raceId);
+
+  // Money flow timeline (incremental loading)
+  const { timeline, isLoading: timelineLoading } = useMoneyFlowTimeline(raceId);
+
+  // Polling metrics for observability (dev only)
+  const metrics = usePollingMetrics();
+
+  return (
+    <RaceContext.Provider value={{ race, entrants, pools, timeline }}>
+      {showPollingMonitor && <PollingMonitor metrics={metrics} />}
+      <EnhancedEntrantsGrid entrants={entrants} timeline={timeline} />
+      <RaceFooter pools={pools} lastUpdate={lastUpdate} />
+    </RaceContext.Provider>
+  );
+}
+
+// useRacePolling implementation pattern
+function useRacePolling(raceId: string) {
+  const [data, setData] = useState(null);
+  const [isPolling, setIsPolling] = useState(false);
+  const connectionState = useConnectionState();
+
   useEffect(() => {
-    const subscriptions = [
-      // Real-time entrant updates
-      supabase.channel(`race:${raceId}:entrants`)
-        .on('postgres_changes', 
-          { event: '*', schema: 'public', table: 'entrants', filter: `race=eq.${raceId}` },
-          handleEntrantUpdate
-        ),
-      
-      // Money flow history updates  
-      supabase.channel(`race:${raceId}:money-flow`)
-        .on('postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'money-flow-history' },
-          handleMoneyFlowUpdate
-        ),
-        
-      // Race pools updates
-      supabase.channel(`race:${raceId}:pools`)
-        .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'race-pools', filter: `race=eq.${raceId}` },
-          handlePoolsUpdate
-        )
-    ];
-    
-    subscriptions.forEach(sub => sub.subscribe());
-    return () => subscriptions.forEach(sub => sub.unsubscribe());
-  }, [raceId]);
-  
-  return data;
+    // Guard: don't poll if disconnected
+    if (connectionState !== 'connected') {
+      return;
+    }
+
+    // Determine polling interval based on race timing
+    const interval = calculatePollingInterval(data?.race);
+
+    const pollData = async () => {
+      setIsPolling(true);
+      try {
+        const response = await fetch(`/api/race/${raceId}`, {
+          signal: AbortSignal.timeout(5000)
+        });
+        if (response.ok) {
+          const result = await response.json();
+          setData(result);
+        }
+      } catch (error) {
+        // Handle error, update connection state if needed
+        setConnectionState('disconnected');
+      } finally {
+        setIsPolling(false);
+      }
+    };
+
+    // Initial poll
+    void pollData();
+
+    // Set up interval for subsequent polls
+    const timerId = setInterval(pollData, interval);
+
+    return () => clearInterval(timerId);
+  }, [raceId, connectionState, data?.race]);
+
+  return { race: data?.race, entrants: data?.entrants, isPolling, ... };
 }
 ```
 

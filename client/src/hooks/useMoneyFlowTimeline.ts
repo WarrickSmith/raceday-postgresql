@@ -12,6 +12,9 @@ import type {
 } from '@/types/moneyFlow'
 import { useLogger } from '@/utils/logging'
 import type { ComponentLogger } from '@/utils/logging'
+import { useEndpointMetrics } from './useEndpointMetrics'
+import { PollingEndpoint } from '@/types/pollingMetrics'
+import { getConnectionState } from '@/state/connectionState'
 
 // Server response interface for raw database data
 interface ServerEntrant {
@@ -38,7 +41,10 @@ interface ServerMoneyFlowPoint {
   $id: string
   $createdAt: string
   $updatedAt: string
-  entrant: EntrantReference
+  // Server may return either a relational `entrant` field or a scalar `entrantId`.
+  // Our API currently selects `entrantId` for performance; include both for compatibility.
+  entrant?: EntrantReference
+  entrantId?: string
   eventTimestamp?: string
   pollingTimestamp?: string
   timeToStart?: number
@@ -72,6 +78,9 @@ interface MoneyFlowTimelineResponse {
   intervalCoverage?: Record<string, unknown>
   message?: string
   queryOptimizations?: string[]
+  // Incremental fetch cursors
+  nextCursor?: string | null
+  nextCreatedAt?: string | null
 }
 
 export interface TimelineGridData {
@@ -102,6 +111,21 @@ interface UseMoneyFlowTimelineResult {
   getOddsData: (entrantId: string, interval: number, oddsType: 'fixedWin' | 'fixedPlace' | 'poolWin' | 'poolPlace') => string
 }
 
+const normalizeInterval = (
+  value: number | string | null | undefined
+): number | null => {
+  if (value === null || value === undefined) {
+    return null
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null
+  }
+
+  const parsed = Number.parseFloat(String(value))
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 export function useMoneyFlowTimeline(
   raceId: string,
   entrantIds: string[],
@@ -112,80 +136,215 @@ export function useMoneyFlowTimeline(
   const loggerRef = useRef(logger)
   loggerRef.current = logger
   const entrantKey = useMemo(() => entrantIds.join(','), [entrantIds])
+
+  // Metrics tracking
+  const { recordRequest } = useEndpointMetrics(PollingEndpoint.MONEY_FLOW)
   const [timelineData, setTimelineData] = useState<
     Map<string, EntrantMoneyFlowTimeline>
   >(new Map())
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const timelineDataRef = useRef(timelineData)
+  const isFetchingRef = useRef(false)
+  const pendingRequestRef = useRef<Promise<void> | null>(null)
+  // Incremental fetch tracking
+  const nextCursorRef = useRef<string | null>(null)
+  const nextCreatedAtRef = useRef<string | null>(null)
+  const lastEntrantKeyRef = useRef<string>('')
+
+  useEffect(() => {
+    timelineDataRef.current = timelineData
+  }, [timelineData])
 
   // Fetch money flow timeline data for all entrants
   const fetchTimelineData = useCallback(async () => {
-    if (!raceId || entrantIds.length === 0) return
+    if (!raceId || entrantIds.length === 0) {
+      return
+    }
+
+    // Check connection state before attempting fetch
+    const connectionState = getConnectionState()
+    if (connectionState !== 'connected') {
+      // Don't attempt fetch if not connected
+      setError('Connection unavailable')
+      return
+    }
 
     // Check race status to avoid unnecessary polling for completed races
     const isRaceComplete =
       raceStatus &&
       ['Final', 'Finalized', 'Abandoned', 'Cancelled'].includes(raceStatus)
 
-    if (isRaceComplete && timelineData.size > 0) {
+    if (isRaceComplete && timelineDataRef.current.size > 0) {
       // Race is complete and we have timeline data, skip fetch
       return
     }
 
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      // Use API route to fetch money flow timeline data
-      const response = await fetch(
-        `/api/race/${raceId}/money-flow-timeline?entrants=${entrantKey}`
-      )
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch timeline data: ${response.statusText}`)
-      }
-
-      const data = (await response.json()) as MoneyFlowTimelineResponse
-      const documents = data.documents ?? []
-
-      if (data.intervalCoverage) {
-        loggerRef.current.debug(
-          'Money flow interval coverage received',
-          data.intervalCoverage
-        )
-      }
-
-      if (data.message) {
-        loggerRef.current.info('Money flow timeline message', {
-          message: data.message,
-        })
-      }
-
-      // Handle empty data gracefully
-      if (documents.length === 0) {
-        setTimelineData(new Map())
-        setLastUpdate(new Date())
-        return
-      }
-
-      // Use unified processing for both bucketed and legacy data
-      const entrantDataMap = processTimelineData(
-        documents,
-        entrantIds,
-        loggerRef.current
-      )
-      setTimelineData(entrantDataMap)
-      setLastUpdate(new Date())
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to fetch timeline data'
-      setError(errorMessage)
-      loggerRef.current.error('Error fetching money flow timeline', err)
-    } finally {
-      setIsLoading(false)
+    if (isFetchingRef.current && pendingRequestRef.current) {
+      return pendingRequestRef.current
     }
-  }, [raceId, entrantIds, entrantKey, raceStatus, timelineData.size])
+
+    setError(null)
+    const overallStartTime = performance.now()
+
+    const fetchPromise = (async () => {
+      if (!isFetchingRef.current) {
+        isFetchingRef.current = true
+        setIsLoading(true)
+      }
+
+      try {
+        // Reset cursors when entrant set changes
+        const entrantsChangedThisFetch = lastEntrantKeyRef.current !== entrantKey
+        if (entrantsChangedThisFetch) {
+          nextCursorRef.current = null
+          nextCreatedAtRef.current = null
+          lastEntrantKeyRef.current = entrantKey
+        }
+
+        const aggregatedDocuments: ServerMoneyFlowPoint[] = []
+        let pageCursor: string | null = null
+        let pageNextCursor: string | null = null
+        let pageNextCreatedAt: string | null = null
+        let page = 0
+        const MAX_PAGES = 10
+
+        do {
+          const params = new URLSearchParams()
+          params.set('entrants', entrantKey)
+          if (pageCursor) {
+            params.set('cursorAfter', pageCursor)
+          } else if (nextCreatedAtRef.current) {
+            params.set('createdAfter', nextCreatedAtRef.current)
+          }
+
+          const response = await fetch(
+            `/api/race/${raceId}/money-flow-timeline?${params.toString()}`
+          )
+
+          if (!response.ok) {
+            throw new Error(
+              `Failed to fetch timeline data: ${response.statusText}`
+            )
+          }
+
+          const pageData = (await response.json()) as MoneyFlowTimelineResponse
+          const pageDocuments = pageData.documents ?? []
+
+          if (page === 0) {
+            if (pageData.intervalCoverage) {
+              loggerRef.current.debug(
+                'Money flow interval coverage received',
+                pageData.intervalCoverage
+              )
+            }
+
+            if (pageData.message) {
+              loggerRef.current.info('Money flow timeline message', {
+                message: pageData.message,
+              })
+            }
+          }
+
+          aggregatedDocuments.push(...pageDocuments)
+
+          pageNextCursor = pageData.nextCursor ?? null
+          pageNextCreatedAt = pageData.nextCreatedAt ?? pageNextCreatedAt
+
+          pageCursor = pageNextCursor
+          page += 1
+        } while (pageCursor && page < MAX_PAGES)
+
+        const incomingMap = processTimelineData(
+          aggregatedDocuments,
+          entrantIds,
+          loggerRef.current
+        )
+        const hasIncoming =
+          aggregatedDocuments.length > 0 && incomingMap.size > 0
+
+        const lastAggregatedCreatedAt = aggregatedDocuments.length > 0
+          ? aggregatedDocuments[aggregatedDocuments.length - 1]?.$createdAt ?? null
+          : null
+
+        // Update cursors for next incremental request only when we received new data
+        if (hasIncoming) {
+          nextCursorRef.current = pageNextCursor ?? nextCursorRef.current
+          nextCreatedAtRef.current =
+            pageNextCreatedAt ?? lastAggregatedCreatedAt ?? nextCreatedAtRef.current
+        }
+
+        if (entrantsChangedThisFetch) {
+          // For entrant set changes, replace with whatever we have (can be empty)
+          setTimelineData(incomingMap)
+        } else if (hasIncoming) {
+          if (!nextCreatedAtRef.current || timelineDataRef.current.size === 0) {
+            // Initial load or no cursor provided -> replace
+            setTimelineData(incomingMap)
+          } else {
+            // Incremental load -> merge into existing map by $id
+            const merged = new Map(timelineDataRef.current)
+            for (const [eid, newData] of incomingMap) {
+              const prev = merged.get(eid)
+              if (!prev) {
+                merged.set(eid, newData)
+                continue
+              }
+              const seen = new Set(prev.dataPoints.map((p) => p.$id))
+              const combined = [...prev.dataPoints]
+              for (const p of newData.dataPoints) {
+                if (p.$id && !seen.has(p.$id)) {
+                  combined.push(p)
+                }
+              }
+              combined.sort((a, b) => {
+                const ai =
+                  normalizeInterval(a.timeInterval) ??
+                  normalizeInterval(a.timeToStart) ??
+                  Number.NEGATIVE_INFINITY
+                const bi =
+                  normalizeInterval(b.timeInterval) ??
+                  normalizeInterval(b.timeToStart) ??
+                  Number.NEGATIVE_INFINITY
+                return bi - ai
+              })
+              merged.set(eid, { ...prev, ...newData, dataPoints: combined })
+            }
+            setTimelineData(merged)
+          }
+        } // else: no incoming data and same entrants -> keep existing timeline to avoid flicker
+        setLastUpdate(new Date())
+
+        // Record successful request
+        const requestDuration = Math.round(performance.now() - overallStartTime)
+        recordRequest({
+          success: true,
+          durationMs: requestDuration,
+        })
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to fetch timeline data'
+        setError(errorMessage)
+        loggerRef.current.error('Error fetching money flow timeline', err)
+
+        // Record failed request
+        const requestDuration = Math.round(performance.now() - overallStartTime)
+        recordRequest({
+          success: false,
+          durationMs: requestDuration,
+          error: errorMessage,
+        })
+      } finally {
+        isFetchingRef.current = false
+        pendingRequestRef.current = null
+        setIsLoading(false)
+      }
+    })()
+
+    pendingRequestRef.current = fetchPromise
+    return fetchPromise
+  }, [raceId, entrantIds, entrantKey, raceStatus, recordRequest])
 
   // Generate timeline grid data optimized for component display
   const gridData = useMemo(() => {
@@ -202,11 +361,6 @@ export function useMoneyFlowTimeline(
       // The data points are already sorted chronologically and have incremental amounts calculated
       for (let i = 0; i < entrantData.dataPoints.length; i++) {
         const dataPoint = entrantData.dataPoints[i]
-
-        // Skip if no timeToStart data
-        if (typeof dataPoint.timeToStart !== 'number') {
-          continue
-        }
 
         // Use the incremental amount that was already calculated in the first processing loop
         // This ensures we maintain the correct chronological incremental calculations
@@ -229,19 +383,20 @@ export function useMoneyFlowTimeline(
 
         // Use timeInterval if available (bucketed data), otherwise timeToStart (legacy)
         // This ensures compatibility with both data structures
-        const interval =
-          dataPoint.timeInterval ?? dataPoint.timeToStart
+        const intervalValue =
+          normalizeInterval(dataPoint.timeInterval) ??
+          normalizeInterval(dataPoint.timeToStart)
 
-        if (interval === undefined) {
+        if (intervalValue === null) {
           continue
         }
 
         // Add grid data for this interval
-        if (!grid[interval]) {
-          grid[interval] = {}
+        if (!grid[intervalValue]) {
+          grid[intervalValue] = {}
         }
 
-        grid[interval][entrantId] = {
+        grid[intervalValue][entrantId] = {
           incrementalAmount,
           poolType,
           timestamp: dataPoint.pollingTimestamp,
@@ -272,7 +427,9 @@ export function useMoneyFlowTimeline(
 
       // Find data point for this specific interval
       const dataPoint = entrantTimeline.dataPoints.find((point) => {
-        const pointInterval = point.timeInterval ?? point.timeToStart ?? -999
+        const pointInterval =
+          normalizeInterval(point.timeInterval) ??
+          normalizeInterval(point.timeToStart)
         return pointInterval === interval
       })
 
@@ -439,7 +596,8 @@ function processTimelineData(
   for (const entrantId of entrantIds) {
     // Extract entrant ID consistently across all data formats
     const entrantDocs = documents.filter((doc) => {
-      const docEntrantId = extractEntrantId(doc.entrant)
+      // Prefer scalar `entrantId` when present, fallback to relational `entrant`
+      const docEntrantId = (doc.entrantId && String(doc.entrantId)) || extractEntrantId(doc.entrant as EntrantReference)
       return docEntrantId === entrantId
     })
 
@@ -463,8 +621,10 @@ function processTimelineData(
 
     entrantDocs.forEach((doc) => {
       // Use timeInterval if available (bucketed), otherwise timeToStart (legacy)
-      const interval = doc.timeInterval ?? doc.timeToStart ?? -999
-      if (interval === -999) {
+      const interval =
+        normalizeInterval(doc.timeInterval) ?? normalizeInterval(doc.timeToStart)
+
+      if (interval === null) {
         logger?.warn(`Document missing time information for entrant ${entrantId}`)
         return
       }
@@ -490,8 +650,8 @@ function processTimelineData(
         $updatedAt: doc.$updatedAt,
         entrant: entrantId,
         pollingTimestamp: doc.pollingTimestamp || doc.$createdAt,
-        timeToStart: doc.timeToStart || 0,
-        timeInterval: doc.timeInterval ?? interval,
+        timeToStart: normalizeInterval(doc.timeToStart) ?? interval,
+        timeInterval: normalizeInterval(doc.timeInterval) ?? interval,
         intervalType: doc.intervalType || '5m',
         winPoolAmount: doc.winPoolAmount ?? 0,
         placePoolAmount: doc.placePoolAmount ?? 0,
@@ -517,8 +677,14 @@ function processTimelineData(
 
     // Sort by time interval descending (60, 55, 50... 0, -0.5, -1)
     timelinePoints.sort((a, b) => {
-      const aInterval = a.timeInterval ?? a.timeToStart ?? -Infinity
-      const bInterval = b.timeInterval ?? b.timeToStart ?? -Infinity
+      const aInterval =
+        normalizeInterval(a.timeInterval) ??
+        normalizeInterval(a.timeToStart) ??
+        Number.NEGATIVE_INFINITY
+      const bInterval =
+        normalizeInterval(b.timeInterval) ??
+        normalizeInterval(b.timeToStart) ??
+        Number.NEGATIVE_INFINITY
       return bInterval - aInterval
     })
 

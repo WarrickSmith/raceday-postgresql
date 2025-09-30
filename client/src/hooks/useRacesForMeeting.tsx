@@ -41,6 +41,9 @@ export function useRacesForMeeting({
   const [isConnected, setIsConnected] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const fetchAttemptRef = useRef(0);
+  const pendingRequestRef = useRef<Promise<void> | null>(null);
+  const pendingForMeetingIdRef = useRef<string | null>(null);
+  const pendingRequestMarkerRef = useRef<symbol | null>(null);
 
   // Check cache for existing races
   const getCachedRaces = useCallback((meetingId: string): Race[] | null => {
@@ -58,7 +61,12 @@ export function useRacesForMeeting({
 
   // Fetch races with error handling and caching
   const fetchRaces = useCallback(async (meetingId: string, retryAttempt = 0): Promise<void> => {
-    // Cancel any existing request
+    // If the same meetingId request is already in-flight, reuse it
+    if (pendingRequestRef.current && pendingForMeetingIdRef.current === meetingId) {
+      return pendingRequestRef.current
+    }
+
+    // Cancel any existing request for previous meetingId
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -66,6 +74,9 @@ export function useRacesForMeeting({
     // Check cache first
     const cachedRaces = getCachedRaces(meetingId);
     if (cachedRaces) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 Hook: Using cached races for meetingId:', meetingId, 'count:', cachedRaces.length);
+      }
       setRaces(cachedRaces);
       setIsLoading(false);
       setError(null);
@@ -79,57 +90,76 @@ export function useRacesForMeeting({
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    try {
-      const fetchedRaces = await fetchRacesForMeeting(meetingId);
-      
-      // Check if request was aborted
-      if (abortController.signal.aborted) {
-        return;
-      }
+    const requestMarker = Symbol('races-request');
+    pendingRequestMarkerRef.current = requestMarker;
 
-      // Validate race data
-      const validRaces = fetchedRaces.filter(race => {
-        const isValid = validateRaceData(race);
-        if (!isValid && process.env.NODE_ENV === 'development') {
-          console.warn('Invalid race data:', race);
+    const requestPromise = (async () => {
+      try {
+        const fetchedRaces = await fetchRacesForMeeting(meetingId);
+      
+        // Check if request was aborted
+        if (abortController.signal.aborted) {
+          return;
         }
-        return isValid;
-      });
 
-      // Sort races by race number
-      const sortedRaces = validRaces.sort((a, b) => a.raceNumber - b.raceNumber);
-
-      setRaces(sortedRaces);
-      setCachedRaces(meetingId, sortedRaces);
-      setIsLoading(false);
-      setError(null);
-      
-    } catch (err) {
-      // Don't update state if request was aborted
-      if (abortController.signal.aborted) {
-        return;
-      }
-
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch races';
-      
-      // Retry logic with exponential backoff
-      if (retryAttempt < 2) {
-        const delay = Math.min(1000 * Math.pow(2, retryAttempt), 5000);
-        setTimeout(() => {
-          if (!abortController.signal.aborted) {
-            void fetchRaces(meetingId, retryAttempt + 1);
+        // Validate race data
+        const validRaces = fetchedRaces.filter(race => {
+          const isValid = validateRaceData(race);
+          if (!isValid && process.env.NODE_ENV === 'development') {
+            console.warn('Invalid race data:', race);
           }
-        }, delay);
-        return;
-      }
+          return isValid;
+        });
 
-      setError(errorMessage);
-      setIsLoading(false);
-      
-      if (onError) {
-        onError(err instanceof Error ? err : new Error(errorMessage));
+        // Sort races by race number
+        const sortedRaces = validRaces.sort((a, b) => a.raceNumber - b.raceNumber);
+
+        setRaces(sortedRaces);
+        setCachedRaces(meetingId, sortedRaces);
+        setIsLoading(false);
+        setError(null);
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ Hook: Successfully fetched and set races for meetingId:', meetingId, 'count:', sortedRaces.length);
+        }
+      } catch (err) {
+        // Don't update state if request was aborted
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch races';
+        
+        // Retry logic with exponential backoff
+        if (retryAttempt < 2) {
+          const delay = Math.min(1000 * Math.pow(2, retryAttempt), 5000);
+          setTimeout(() => {
+            if (!abortController.signal.aborted) {
+              void fetchRaces(meetingId, retryAttempt + 1);
+            }
+          }, delay);
+          return;
+        }
+
+        setError(errorMessage);
+        setIsLoading(false);
+        
+        if (onError) {
+          onError(err instanceof Error ? err : new Error(errorMessage));
+        }
+      } finally {
+        // Clear pending pointer if it matches this request
+        if (pendingRequestMarkerRef.current === requestMarker) {
+          pendingRequestRef.current = null;
+          pendingForMeetingIdRef.current = null;
+          pendingRequestMarkerRef.current = null;
+        }
       }
-    }
+    })()
+
+    pendingRequestRef.current = requestPromise
+    pendingForMeetingIdRef.current = meetingId
+    return requestPromise
   }, [getCachedRaces, setCachedRaces, onError]);
 
   // Setup cache event listening for polling-based updates from meetings data
@@ -174,17 +204,27 @@ export function useRacesForMeeting({
 
     // Only add debugging in development
     if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 Hook: Starting race fetch for meetingId:', meetingId);
+      console.log('🔍 Hook: Starting race fetch for meetingId:', meetingId, 'attempt:', fetchAttemptRef.current + 1);
     }
-    
+
     fetchAttemptRef.current += 1;
-    
-    void fetchRaces(meetingId).catch(() => {
-      // Error handling is done in fetchRaces
-    });
+    const currentAttempt = fetchAttemptRef.current;
+
+    // Add a small delay to prevent rapid successive calls during initial load
+    const timeoutId = setTimeout(() => {
+      // Only proceed if this is still the latest request
+      if (currentAttempt === fetchAttemptRef.current) {
+        void fetchRaces(meetingId).catch(() => {
+          // Error handling is done in fetchRaces
+        });
+      } else if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 Hook: Skipping race fetch for meetingId:', meetingId, 'due to newer request');
+      }
+    }, 10); // Small delay to allow rapid state changes to settle
 
     // Cleanup function
     return () => {
+      clearTimeout(timeoutId);
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }

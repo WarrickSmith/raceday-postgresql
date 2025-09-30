@@ -120,14 +120,3 @@ export interface RaceStatusDisplay {
   color: 'green' | 'yellow' | 'red' | 'blue' | 'gray';
 }
 
-// Pool subscription callback interface
-export interface PoolSubscriptionResponse {
-  payload?: Partial<RacePoolData> & { raceId: string };
-  events?: string[];
-}
-
-// Results subscription callback interface
-export interface ResultsSubscriptionResponse {
-  payload?: Partial<RaceResultsData> & { raceId: string };
-  events?: string[];
-}

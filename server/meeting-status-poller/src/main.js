@@ -2,6 +2,7 @@ import { Client, Databases, Query } from 'node-appwrite';
 import { fastLockCheck, updateHeartbeat, releaseLock, setupHeartbeatInterval, shouldTerminateForNzTime } from './lock-manager.js';
 import { validateEnvironmentVariables, executeApiCallWithTimeout, monitorMemoryUsage, forceGarbageCollection, nzTabApiCircuitBreaker, handleError } from './error-handlers.js';
 import { logDebug, logInfo, logWarn, logError, logFunctionStart, logFunctionComplete } from './logging-utils.js';
+import { getCurrentNzDateString, getNzTimeDisplay } from './timezone-utils.js';
 
 /**
  * Meeting Status Poller - Enhanced with fast-fail lock pattern and robustness improvements
@@ -98,13 +99,11 @@ export default async function main(context) {
         await updateHeartbeat(lockManager, progressTracker);
 
         // PHASE 2: Get today's date and fetch existing meetings from database
-        const now = new Date();
-        const nzDate = now.toLocaleDateString('en-CA', {
-            timeZone: 'Pacific/Auckland',
-        });
+        const nzDate = getCurrentNzDateString();
 
         logDebug(context,'Fetching existing meetings from database...', {
             nzDate,
+            nzTimeDisplay: getNzTimeDisplay(),
             timezone: 'Pacific/Auckland'
         });
 

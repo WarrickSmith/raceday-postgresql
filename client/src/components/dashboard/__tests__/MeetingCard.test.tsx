@@ -36,8 +36,8 @@ describe('MeetingCard', () => {
 
     expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
     expect(screen.getByText('THROUGHBRED')).toBeInTheDocument();
-    expect(screen.getByText('ID: meeting1')).toBeInTheDocument();
-    
+    // meetingId is no longer displayed as per Task 1 requirements
+
     // Wait for async status to load
     await waitFor(() => {
       expect(screen.getByLabelText(/First race at/)).toBeInTheDocument();
@@ -268,7 +268,7 @@ describe('MeetingCard', () => {
       expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
     });
     
-    // Re-render with updated meeting data (simulating real-time update)
+    // Re-render with updated meeting data (simulating polling refresh)
     const updatedMeeting = { ...mockMeeting, $updatedAt: '2024-01-01T09:00:00Z' };
     rerender(<MeetingCard meeting={updatedMeeting} />);
     

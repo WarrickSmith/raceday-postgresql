@@ -133,13 +133,12 @@ interface EnhancedEntrantsGridProps {
   className?: string
   enableMoneyFlowTimeline?: boolean
   enableJockeySilks?: boolean
-  realtimeEntrants?: Entrant[]
   lastUpdate?: Date | null
-  // Real-time pool data from unified subscription
+  // Pool data from polling updates
   poolData?: RacePoolData | null
-  // Trigger for timeline refetch when unified subscription receives money flow updates
+  // Trigger for timeline refetch when polling receives money flow updates
   moneyFlowUpdateTrigger?: number
-  // Results data for position highlighting (merged from real-time and persistent sources)
+  // Results data for position highlighting (merged from polling and persistent sources)
   resultsData?: RaceResult[]
   // Race status for determining when to show results highlighting
   raceStatus?: string
@@ -159,8 +158,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   className = '',
   enableMoneyFlowTimeline = true,
   enableJockeySilks = true,
-  realtimeEntrants,
-  lastUpdate,
+  lastUpdate: initialLastUpdate,
   poolData = null,
   moneyFlowUpdateTrigger,
   resultsData,
@@ -178,15 +176,19 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     primeAudioWithUserGesture,
   } = useAudibleAlerts()
 
-  // Use real-time entrants data from unified subscription if available
-  const currentEntrants =
-    realtimeEntrants || raceData?.entrants || initialEntrants
-  const currentRaceId = raceData?.race.$id || raceId
+  // Use entrants data from polling context if available
+  const currentEntrants = raceData?.entrants || initialEntrants
+
+  const getEntrantKey = useCallback((entrant: Entrant): string => {
+    return entrant.entrantId || entrant.$id
+  }, [])
+
+  const currentRaceId =
+    raceData?.race.raceId || raceData?.race.$id || raceId
   const currentRaceStartTime = raceData?.race.startTime || raceStartTime
   const currentRace = raceData?.race
 
-  // Get actual race pool data
-  // Use real-time pool data from unified subscription with fallback for persistence
+  // Get actual race pool data from polling updates
   const racePoolData = poolData
 
   // Pool view state - fixed to win pool since toggle is removed
@@ -199,10 +201,11 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const [updateCount, setUpdateCount] = useState(0)
 
   // Get money flow timeline data for all entrants
-  const entrantIds = useMemo(
-    () => currentEntrants.map((e) => e.$id),
-    [currentEntrants]
-  )
+  const entrantIds = useMemo(() => {
+    return currentEntrants
+      .map((entrant) => getEntrantKey(entrant))
+      .filter((id): id is string => Boolean(id))
+  }, [currentEntrants, getEntrantKey])
 
   // Local selection for Win/Place/Odds selector - MUST be declared before hook calls
   const [selectedView, setSelectedView] = useState<'win' | 'place' | 'odds'>(
@@ -227,7 +230,15 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     getPlacePoolData,
     getOddsData,
     refetch: refetchTimeline,
-  } = useMoneyFlowTimeline(currentRaceId, entrantIds, selectedView === 'odds' ? 'win' : selectedView)
+    lastUpdate: timelineLastUpdate,
+  } = useMoneyFlowTimeline(
+    currentRaceId,
+    entrantIds,
+    selectedView === 'odds' ? 'win' : selectedView,
+    raceStatus
+  )
+
+  const lastUpdate = timelineLastUpdate ?? initialLastUpdate ?? null
 
   const [selectedEntrant, setSelectedEntrant] = useState<string | undefined>()
 
@@ -244,7 +255,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   }, [audioAlertsEnabled, primeAudioWithUserGesture, toggleAudioAlerts])
 
 
-  // Trigger timeline refetch when unified subscription receives money flow updates
+  // Trigger timeline refetch when polling receives money flow updates
   useEffect(() => {
     if (moneyFlowUpdateTrigger && refetchTimeline) {
       refetchTimeline()
@@ -282,9 +293,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     setUpdateCount((prev) => prev + 1)
   }, [currentEntrants])
 
-  // Use entrants data directly (real-time updates come from unified subscription)
+  // Use entrants data directly (updates come from polling)
   const entrants = useMemo(() => {
-    // Use current entrants which includes real-time updates from unified subscription
+    // Use current entrants which includes updates from polling
     const finalEntrants =
       currentEntrants && currentEntrants.length > 0
         ? currentEntrants
@@ -294,13 +305,12 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     if (process.env.NODE_ENV === 'development') {
       logger.debug('EnhancedEntrantsGrid entrants:', {
         entrantsCount: finalEntrants.length,
-        hasRealtimeData: !!realtimeEntrants,
         lastUpdateTime: lastUpdate?.toISOString(),
       })
     }
 
     return finalEntrants
-  }, [currentEntrants, initialEntrants, realtimeEntrants, lastUpdate, logger])
+  }, [currentEntrants, initialEntrants, lastUpdate, logger])
 
   // Validation function to check if timeline amounts sum to total pool
   const validateTimelineSummation = useCallback((entrant: Entrant) => {
@@ -384,7 +394,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       }
 
       // Priority 2: Timeline latest percentage (only if entrant data missing)
-      const entrantTimeline = timelineData?.get(entrant.$id)
+      const entrantTimeline = timelineData?.get(getEntrantKey(entrant))
       if (
         !poolPercentage &&
         entrantTimeline &&
@@ -417,30 +427,35 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         }
       }
 
-      // Priority 4: Fallback to dummy data temporarily to ensure display works
+      // Priority 4: No fallback - return undefined to show '-' instead of dummy data
       if (!poolPercentage) {
-        logger.debug(`No calculable data for ${entrant.name}, using fallback percentage`)
-        // Use a fallback percentage based on entrant position for testing
-        poolPercentage = Math.max(1, 15 - entrant.runnerNumber) // Simple fallback
-        dataSource = 'fallback_for_testing'
+        logger.debug(`No pool data available for ${entrant.name}, will display '-'`)
+        // Don't set poolPercentage - let it remain undefined so UI shows '-'
+        dataSource = 'no_data_available'
       }
 
       // Calculate individual pool contributions based on pool percentage
-      const holdPercentageDecimal = poolPercentage / 100
+      let winPoolContribution = 0
+      let placePoolContribution = 0
+      let totalPoolContribution = 0
 
-      // Use fallback pool totals if no race pool data (for testing)
-      const fallbackWinPool = 5000000 // $50k in cents
-      const fallbackPlacePool = 2000000 // $20k in cents
+      if (poolPercentage && poolPercentage > 0) {
+        const holdPercentageDecimal = poolPercentage / 100
 
-      const winPoolInDollars = Math.round(
-        (racePoolData?.winPoolTotal || fallbackWinPool) / 100
-      )
-      const placePoolInDollars = Math.round(
-        (racePoolData?.placePoolTotal || fallbackPlacePool) / 100
-      )
-      const winPoolContribution = winPoolInDollars * holdPercentageDecimal
-      const placePoolContribution = placePoolInDollars * holdPercentageDecimal
-      const totalPoolContribution = winPoolContribution + placePoolContribution
+        // Use fallback pool totals if no race pool data (for testing)
+        const fallbackWinPool = 5000000 // $50k in cents
+        const fallbackPlacePool = 2000000 // $20k in cents
+
+        const winPoolInDollars = Math.round(
+          (racePoolData?.winPoolTotal || fallbackWinPool) / 100
+        )
+        const placePoolInDollars = Math.round(
+          (racePoolData?.placePoolTotal || fallbackPlacePool) / 100
+        )
+        winPoolContribution = winPoolInDollars * holdPercentageDecimal
+        placePoolContribution = placePoolInDollars * holdPercentageDecimal
+        totalPoolContribution = winPoolContribution + placePoolContribution
+      }
 
       logger.debug(`Real calculation for ${entrant.name}:`, {
         poolPercentage,
@@ -456,12 +471,12 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         // Update odds with latest values from timeline data if available (NEW in Story 4.9)
         winOdds: entrantTimeline?.latestWinOdds ?? entrant.winOdds,
         placeOdds: entrantTimeline?.latestPlaceOdds ?? entrant.placeOdds,
-        poolMoney: {
+        poolMoney: poolPercentage ? {
           win: winPoolContribution,
           place: placePoolContribution,
           total: totalPoolContribution,
           percentage: poolPercentage,
-        },
+        } : undefined, // Return undefined when no pool data to ensure '-' is displayed
       }
 
       // Validate timeline summation for debugging
@@ -482,7 +497,14 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
       return entrantWithPoolData
     })
-  }, [entrants, racePoolData, timelineData, validateTimelineSummation, logger])
+  }, [
+    entrants,
+    racePoolData,
+    timelineData,
+    validateTimelineSummation,
+    logger,
+    getEntrantKey,
+  ])
 
   // Debug logging removed - entrants data structure verified
 
@@ -1070,22 +1092,31 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
   // Get data for specific timeline point - shows incremental money amounts or odds based on selected view
   const getTimelineData = useCallback(
-    (entrantId: string, interval: number): string => {
-      const entrant = sortedEntrants.find((e) => e.$id === entrantId)
+    (entrantKey: string, interval: number): string => {
+      const entrant = sortedEntrants.find(
+        (candidate) =>
+          getEntrantKey(candidate) === entrantKey || candidate.$id === entrantKey
+      )
       if (!entrant || entrant.isScratched) return '—'
 
       // Use appropriate function based on selected view
       let result: string
       switch (selectedView) {
         case 'win':
-          result = getWinPoolData ? getWinPoolData(entrantId, interval) : '—'
+          result = getWinPoolData
+            ? getWinPoolData(getEntrantKey(entrant), interval)
+            : '—'
           break
         case 'place':
-          result = getPlacePoolData ? getPlacePoolData(entrantId, interval) : '—'
+          result = getPlacePoolData
+            ? getPlacePoolData(getEntrantKey(entrant), interval)
+            : '—'
           break
         case 'odds':
           // Show Fixed Win odds for odds view
-          result = getOddsData ? getOddsData(entrantId, interval, 'fixedWin') : '—'
+          result = getOddsData
+            ? getOddsData(getEntrantKey(entrant), interval, 'fixedWin')
+            : '—'
           break
         default:
           result = '—'
@@ -1094,12 +1125,12 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       // Debug logging to help troubleshoot data issues
       if (interval === 60 && process.env.NODE_ENV === 'development') {
         logger.debug(`Timeline data for ${entrant.name || entrant.$id} at ${interval}m:`, {
-          entrantId: entrant.$id,
+          entrantId: getEntrantKey(entrant),
           interval,
           selectedView,
           result,
           timelineDataSize: timelineData?.size || 0,
-          hasTimelineData: timelineData?.has(entrant.$id) || false,
+          hasTimelineData: timelineData?.has(getEntrantKey(entrant)) || false,
         })
       }
 
@@ -1113,6 +1144,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       getPlacePoolData,
       getOddsData,
       logger,
+      getEntrantKey,
     ]
   )
 
@@ -1308,7 +1340,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
             <span className="text-xs text-gray-500">
               Last update:{' '}
-              {lastUpdate ? lastUpdate.toLocaleTimeString() : 'No updates yet'}
+              {lastUpdate
+                ? lastUpdate.toLocaleTimeString('en-US', {
+                    hour12: true,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : 'No updates yet'}
             </span>
 
             {/* Renders and Updates tracking */}
@@ -1615,7 +1653,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                       {/* Timeline Columns */}
                       {timelineColumns.map((column) => {
                         const indicator = !entrant.isScratched
-                          ? getIndicatorForCell(column.interval, entrant.$id)
+                          ? getIndicatorForCell(
+                              column.interval,
+                              getEntrantKey(entrant)
+                            )
                           : null
                         const indicatorStyle = indicator
                           ? mapIndicatorColorToCellStyle(indicator.color)
@@ -1629,7 +1670,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                           ? indicator.percentageChange.toFixed(2)
                           : undefined
                         const cellValue = getTimelineData(
-                          entrant.$id,
+                          getEntrantKey(entrant),
                           column.interval
                         )
 
@@ -1680,7 +1721,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                                 const amount = getPoolAmount(entrant)
                                 return amount !== undefined
                                   ? formatMoney(amount)
-                                  : '...'
+                                  : '—'
                               })()}
                         </span>
                       </div>
@@ -1698,7 +1739,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                                 const percentage = getPoolPercentage(entrant)
                                 return percentage !== undefined
                                   ? formatPercentage(percentage)
-                                  : '...'
+                                  : '0%'
                               })()}
                         </span>
                         {!entrant.isScratched &&
@@ -1785,7 +1826,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
       <div className="sr-only" aria-live="polite" id="grid-status">
         Showing {sortedEntrants.length} runners. Last update:{' '}
-        {lastUpdate ? lastUpdate.toLocaleTimeString() : 'No updates yet'}.
+        {lastUpdate
+          ? lastUpdate.toLocaleTimeString('en-US', {
+              hour12: true,
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : 'No updates yet'}.
       </div>
 
     </div>

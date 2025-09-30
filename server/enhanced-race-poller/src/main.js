@@ -27,6 +27,11 @@
  * - Lock-based concurrent execution prevention with resource optimization
  */
 
+import { promisify } from 'node:util'
+import {
+  brotliCompress as brotliCompressCallback,
+  gzip as gzipCallback,
+} from 'node:zlib'
 import { Client, Databases, Query } from 'node-appwrite'
 import { fetchRaceEventData, batchFetchRaceEventData } from './api-client.js'
 import {
@@ -47,6 +52,163 @@ import {
 } from './error-handlers.js'
 import { fastLockCheck, updateHeartbeat, releaseLock, setupHeartbeatInterval, shouldTerminateForNzTime } from './lock-manager.js'
 import { logDebug, logInfo, logWarn, logError, logPerformance as logPerfOptimized, logFunctionStart, logFunctionComplete } from './logging-utils.js'
+import {
+  createExtendedRaceWindow,
+  getMinutesUntilRaceStart,
+  getCurrentNzDateString,
+  getNzTimeDisplay
+} from './timezone-utils.js'
+
+const brotliCompress = promisify(brotliCompressCallback)
+const gzipCompress = promisify(gzipCallback)
+const MIN_COMPRESSION_BYTES = 1024
+const SUPPORTED_ENCODINGS = ['br', 'gzip']
+
+function parseEncodingPreferences(header) {
+  if (!header || typeof header !== 'string') {
+    return []
+  }
+
+  return header
+    .split(',')
+    .map((value) => {
+      const [name, ...params] = value.trim().split(';')
+      if (!name) {
+        return null
+      }
+
+      let quality = 1
+      for (const param of params) {
+        const [key, raw] = param.trim().split('=')
+        if (key === 'q' && raw !== undefined) {
+          const parsed = Number.parseFloat(raw)
+          if (!Number.isNaN(parsed)) {
+            quality = parsed
+          }
+        }
+      }
+
+      return {
+        name: name.trim().toLowerCase(),
+        q: quality,
+      }
+    })
+    .filter((value) => Boolean(value && value.name && value.q > 0))
+}
+
+function negotiateEncoding(header) {
+  const preferences = parseEncodingPreferences(header)
+  if (preferences.length === 0) {
+    return null
+  }
+
+  let bestEncoding = null
+  let bestQuality = -1
+
+  for (const preference of preferences) {
+    if (preference.name === '*') {
+      if (preference.q > bestQuality) {
+        bestEncoding = 'gzip'
+        bestQuality = preference.q
+      }
+      continue
+    }
+
+    if (!SUPPORTED_ENCODINGS.includes(preference.name)) {
+      continue
+    }
+
+    if (preference.q > bestQuality) {
+      bestEncoding = preference.name
+      bestQuality = preference.q
+      continue
+    }
+
+    if (preference.q === bestQuality && bestEncoding) {
+      const currentIndex = SUPPORTED_ENCODINGS.indexOf(bestEncoding)
+      const candidateIndex = SUPPORTED_ENCODINGS.indexOf(preference.name)
+      if (candidateIndex !== -1 && candidateIndex < currentIndex) {
+        bestEncoding = preference.name
+      }
+    }
+  }
+
+  return bestEncoding
+}
+
+function ensureHeadersObject(res) {
+  if (!res.headers || typeof res.headers !== 'object') {
+    res.headers = {}
+  }
+
+  return res.headers
+}
+
+function appendVaryHeader(headers, value) {
+  const existing = headers.Vary || headers.vary
+  if (!existing) {
+    headers.Vary = value
+    return
+  }
+
+  const normalized = existing
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+
+  if (!normalized.includes(value.toLowerCase())) {
+    headers.Vary = `${existing}, ${value}`
+  }
+}
+
+async function sendCompressedJson(context, payload, status = 200) {
+  const res = context?.res
+  if (!res) {
+    return payload
+  }
+
+  if (typeof res.send !== 'function') {
+    if (typeof res.json === 'function') {
+      return res.json(payload, status)
+    }
+    return payload
+  }
+
+  const headers = ensureHeadersObject(res)
+  headers['Content-Type'] = 'application/json; charset=utf-8'
+  appendVaryHeader(headers, 'Accept-Encoding')
+
+  const serialisedPayload = JSON.stringify(payload ?? null)
+  const uncompressedBuffer = Buffer.from(serialisedPayload)
+
+  const acceptEncodingHeader =
+    context?.req?.headers?.['accept-encoding'] ?? context?.req?.headers?.accept ?? null
+
+  const shouldCompress = uncompressedBuffer.byteLength >= MIN_COMPRESSION_BYTES
+
+  if (!shouldCompress) {
+    delete headers['Content-Encoding']
+    headers['Content-Length'] = String(uncompressedBuffer.byteLength)
+    return res.send(uncompressedBuffer, status)
+  }
+
+  const encoding = negotiateEncoding(acceptEncodingHeader)
+
+  if (!encoding) {
+    delete headers['Content-Encoding']
+    headers['Content-Length'] = String(uncompressedBuffer.byteLength)
+    return res.send(uncompressedBuffer, status)
+  }
+
+  const compressedBuffer =
+    encoding === 'br'
+      ? await brotliCompress(uncompressedBuffer)
+      : await gzipCompress(uncompressedBuffer)
+
+  headers['Content-Encoding'] = encoding
+  headers['Content-Length'] = String(compressedBuffer.length)
+
+  return res.send(compressedBuffer, status)
+}
 
 // Initialize circuit breaker for critical operations
 const apiCircuitBreaker = new CircuitBreaker('nztab-api', {
@@ -392,17 +554,24 @@ async function executeScheduledPolling(
       }
     }
 
-    const now = new Date()
-    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000) // 1 hour ago
-    const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000) // 1 hour from now
+    // Use DST-aware extended time window for race detection (fixes DST transition issues)
+    const timeWindow = createExtendedRaceWindow(1) // 1 hour base window, extended during DST transitions
 
     // Enhanced intelligent race filtering - get races within extended window but prioritize critical ones
     progressTracker.currentOperation = 'querying-race-database'
     await updateHeartbeat(lockManager, progressTracker)
 
+    logDebug(context, 'Using DST-aware time window for race detection', {
+      startTime: timeWindow.startTime,
+      endTime: timeWindow.endTime,
+      nzStartTime: timeWindow.nzStartTime,
+      nzEndTime: timeWindow.nzEndTime,
+      currentNzTime: timeWindow.currentNzTime
+    })
+
     const racesQuery = await databases.listDocuments(databaseId, 'races', [
-      Query.greaterThanEqual('startTime', oneHourAgo.toISOString()),
-      Query.lessThanEqual('startTime', oneHourFromNow.toISOString()),
+      Query.greaterThanEqual('startTime', timeWindow.startTime),
+      Query.lessThanEqual('startTime', timeWindow.endTime),
       Query.notEqual('status', 'Final'),
       Query.orderAsc('startTime'),
       Query.limit(50), // Reasonable limit for scheduled polling
@@ -430,7 +599,7 @@ async function executeScheduledPolling(
     progressTracker.currentOperation = 'prioritizing-races'
     await updateHeartbeat(lockManager, progressTracker)
 
-    const racesByPriority = categorizeRacesByUrgency(allRaces, now, context)
+    const racesByPriority = categorizeRacesByUrgency(allRaces, context)
 
     // Update progress with prioritization results
     progressTracker.ultraCriticalRaces = racesByPriority.ultra_critical.length
@@ -594,7 +763,7 @@ async function executeHttpSinglePolling(
         )
       })
 
-      return context.res.json(immediateResponse, 202) // 202 Accepted
+      return sendCompressedJson(context, immediateResponse, 202) // 202 Accepted
     } else {
       // Direct execution (for testing or scheduled calls)
       const result = await processSingleRaceWithErrorHandling(
@@ -621,7 +790,7 @@ async function executeHttpSinglePolling(
     if (error.code === 404) {
       const response = { success: false, error: `Race not found: ${raceId}` }
       if (context.res && context.res.json) {
-        return context.res.json(response, 404)
+        return sendCompressedJson(context, response, 404)
       }
       return response
     }
@@ -643,7 +812,7 @@ async function executeHttpSinglePolling(
     }
 
     if (context.res && context.res.json) {
-      return context.res.json(response, 500)
+      return sendCompressedJson(context, response, 500)
     }
     return response
   }
@@ -683,7 +852,7 @@ async function executeHttpBatchPolling(
       }
 
       if (context.res && context.res.json) {
-        return context.res.json(response, 400)
+        return sendCompressedJson(context, response, 400)
       }
       return response
     }
@@ -723,7 +892,7 @@ async function executeHttpBatchPolling(
       }
 
       if (context.res && context.res.json) {
-        return context.res.json(response, 200)
+        return sendCompressedJson(context, response, 200)
       }
       return response
     }
@@ -757,7 +926,7 @@ async function executeHttpBatchPolling(
         )
       })
 
-      return context.res.json(immediateResponse, 202) // 202 Accepted
+      return sendCompressedJson(context, immediateResponse, 202) // 202 Accepted
     } else {
       // Direct execution (for testing)
       const raceData = validRaces.map((item) => ({
@@ -801,7 +970,7 @@ async function executeHttpBatchPolling(
     }
 
     if (context.res && context.res.json) {
-      return context.res.json(response, 500)
+      return sendCompressedJson(context, response, 500)
     }
     return response
   }
@@ -810,11 +979,10 @@ async function executeHttpBatchPolling(
 /**
  * Categorize races by urgency for intelligent polling prioritization
  * @param {Array} races - Array of race documents
- * @param {Date} now - Current time
  * @param {Object} context - Appwrite function context
  * @returns {Object} Categorized races by priority
  */
-function categorizeRacesByUrgency(races, now, context) {
+function categorizeRacesByUrgency(races, context) {
   const categories = {
     ultra_critical: [], // -3m to Final (30-second polling) - highest priority
     critical: [], // -5m to -3m (30-second polling)
@@ -825,15 +993,16 @@ function categorizeRacesByUrgency(races, now, context) {
   for (const race of races) {
     if (!race.startTime) continue
 
-    const raceStart = new Date(race.startTime)
-    const timeToStartMinutes =
-      (raceStart.getTime() - now.getTime()) / (1000 * 60)
+    // Use DST-aware time calculation
+    const timeToStartMinutes = getMinutesUntilRaceStart(race.startTime)
 
     // Enhanced prioritization based on race status and timing for internal polling loops
+    // Note: timeToStartMinutes is POSITIVE for future races, NEGATIVE for past races
     if (
-      timeToStartMinutes <= 3 ||
+      timeToStartMinutes <= 3 && timeToStartMinutes >= -5 ||
       ['Closed', 'Running', 'Interim'].includes(race.status)
     ) {
+      // Ultra-critical: 3 minutes before to 5 minutes after start, or critical status
       categories.ultra_critical.push({
         raceId: race.$id,
         race,
@@ -842,6 +1011,7 @@ function categorizeRacesByUrgency(races, now, context) {
         pollingInterval: 30, // 30 seconds
       })
     } else if (timeToStartMinutes <= 5 && timeToStartMinutes > 3) {
+      // Critical: 5 minutes before to 3 minutes before start
       categories.critical.push({
         raceId: race.$id,
         race,
@@ -849,7 +1019,8 @@ function categorizeRacesByUrgency(races, now, context) {
         priority: 'critical',
         pollingInterval: 30, // 30 seconds
       })
-    } else if (timeToStartMinutes >= -20 && timeToStartMinutes < -5) {
+    } else if (timeToStartMinutes <= 20 && timeToStartMinutes > 5) {
+      // Urgent: 20 minutes before to 5 minutes before start
       categories.urgent.push({
         raceId: race.$id,
         race,
@@ -857,7 +1028,8 @@ function categorizeRacesByUrgency(races, now, context) {
         priority: 'urgent',
         pollingInterval: 150, // 2.5 minutes
       })
-    } else if (timeToStartMinutes >= -60 && timeToStartMinutes < -20) {
+    } else if (timeToStartMinutes <= 60 && timeToStartMinutes > 20) {
+      // Normal: 60 minutes before to 20 minutes before start
       categories.normal.push({
         raceId: race.$id,
         race,
@@ -1027,7 +1199,8 @@ function selectRacesForPolling(categorizedRaces, context) {
         critical: redundancyPrevention.skippedCritical,
         urgent: redundancyPrevention.skippedUrgent,
         normal: redundancyPrevention.skippedNormal
-      }
+      },
+      reasonBreakdown: redundancyPrevention.reasonBreakdown
     },
     selectedByCriticality: {
       ultra_critical: selectedRaces.filter(
@@ -1037,7 +1210,21 @@ function selectRacesForPolling(categorizedRaces, context) {
       urgent: selectedRaces.filter((r) => r.priority === 'urgent').length,
       normal: selectedRaces.filter((r) => r.priority === 'normal').length,
     },
-    intelligentPollingEfficiency: `Prevented ${totalSkipped} redundant API calls`
+    intelligentPollingEfficiency: `Prevented ${totalSkipped} redundant API calls`,
+    debugInfo: {
+      categorizedRacesCounts: {
+        ultra_critical: categorizedRaces.ultra_critical.length,
+        critical: categorizedRaces.critical.length,
+        urgent: categorizedRaces.urgent.length,
+        normal: categorizedRaces.normal.length
+      },
+      sampleRaceTimings: categorizedRaces.normal.slice(0, 2).map(r => ({
+        raceId: r.raceId,
+        timeToStart: r.timeToStart,
+        lastPollTime: r.race.last_poll_time,
+        status: r.race.status
+      }))
+    }
   })
 
   return selectedRaces
@@ -1541,10 +1728,12 @@ async function saveRaceResults(
 ) {
   try {
     const timestamp = new Date().toISOString()
+    const normalizedRaceId = race?.raceId || race?.$id
+
     const resultsData = {
       race: race.$id,
-      // TASK 5: Add raceId for efficient race-based filtering
-      raceId: race.raceId || race.$id,
+      // Persist scalar raceId alongside relationship for API queries
+      raceId: normalizedRaceId,
       resultTime: timestamp,
     }
 
@@ -1599,17 +1788,39 @@ async function saveRaceResults(
 
     // Try to update existing results document, create if doesn't exist
     try {
-      const existingResults = await databases.listDocuments(
-        databaseId,
-        'race-results',
-        [Query.equal('race', race.$id), Query.limit(1)]
-      )
+      let existingResultDoc = null
 
-      if (existingResults.documents.length > 0) {
+      if (normalizedRaceId) {
+        // Prefer raceId lookups for forward-compatible ingestion
+        const resultsByRaceId = await databases.listDocuments(
+          databaseId,
+          'race-results',
+          [Query.equal('raceId', normalizedRaceId), Query.limit(1)]
+        )
+
+        if (resultsByRaceId.documents.length > 0) {
+          existingResultDoc = resultsByRaceId.documents[0]
+        }
+      }
+
+      if (!existingResultDoc) {
+        // Fallback to legacy relationship-based lookup for historical docs
+        const resultsByRelationship = await databases.listDocuments(
+          databaseId,
+          'race-results',
+          [Query.equal('race', race.$id), Query.limit(1)]
+        )
+
+        if (resultsByRelationship.documents.length > 0) {
+          existingResultDoc = resultsByRelationship.documents[0]
+        }
+      }
+
+      if (existingResultDoc) {
         await databases.updateDocument(
           databaseId,
           'race-results',
-          existingResults.documents[0].$id,
+          existingResultDoc.$id,
           resultsData
         )
       } else {

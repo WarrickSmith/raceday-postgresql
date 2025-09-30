@@ -10,7 +10,7 @@ import { logDebug, logInfo, logWarn, logError } from './logging-utils.js';
 /**
  * Schema version tracking and migration management
  */
-export const SCHEMA_VERSION = '4.0.0'; // Update when schema changes
+export const SCHEMA_VERSION = '4.1.0'; // Update when schema changes
 export const SCHEMA_VERSION_COLLECTION = 'schema-version';
 
 /**
@@ -49,7 +49,7 @@ export const EXPECTED_COLLECTIONS = {
     },
     'money-flow-history': {
         name: 'MoneyFlowHistory',
-        requiredAttributes: ['eventTimestamp', 'type', 'raceId'],
+        requiredAttributes: ['eventTimestamp', 'type', 'raceId', 'entrantId'],
         requiredIndexes: ['idx_timestamp', 'idx_race_id', 'idx_time_interval'],
         relationships: ['entrant']
     },

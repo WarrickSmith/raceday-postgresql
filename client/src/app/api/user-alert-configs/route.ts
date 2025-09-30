@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createServerClient, Query } from '@/lib/appwrite-server'
 import { ID } from 'node-appwrite'
 import type { Databases, Models } from 'node-appwrite'
 import type { IndicatorConfig } from '@/types/alerts'
 import { DEFAULT_INDICATORS, DEFAULT_USER_ID } from '@/types/alerts'
+import { jsonWithCompression } from '@/lib/http/compression'
 
 const DATABASE_ID = 'raceday-db'
 const COLLECTION_ID = 'user-alert-configs'
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
     // If no indicators found, create defaults
     if (indicators.length === 0) {
       const defaultIndicators = await createDefaultIndicators(databases, userId)
-      return NextResponse.json({
+      return jsonWithCompression(request, {
         userId,
         indicators: defaultIndicators,
         toggleAll: true,
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
     const audibleAlertsEnabled =
       indicators[0]?.audibleAlertsEnabled ?? true
 
-    return NextResponse.json({
+    return jsonWithCompression(request, {
       userId,
       indicators,
       toggleAll,
@@ -68,7 +69,8 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Failed to load user alert config:', error)
-    return NextResponse.json(
+    return jsonWithCompression(
+      request,
       { error: 'Failed to load alert configuration' },
       { status: 500 }
     )
@@ -89,7 +91,8 @@ export async function POST(request: NextRequest) {
     } = body
 
     if (!indicators || !Array.isArray(indicators)) {
-      return NextResponse.json(
+      return jsonWithCompression(
+        request,
         { error: 'Invalid indicators data' },
         { status: 400 }
       )
@@ -128,10 +131,11 @@ export async function POST(request: NextRequest) {
 
     await Promise.all(updatePromises)
 
-    return NextResponse.json({ success: true })
+    return jsonWithCompression(request, { success: true })
   } catch (error) {
     console.error('Failed to save user alert config:', error)
-    return NextResponse.json(
+    return jsonWithCompression(
+      request,
       { error: 'Failed to save alert configuration' },
       { status: 500 }
     )

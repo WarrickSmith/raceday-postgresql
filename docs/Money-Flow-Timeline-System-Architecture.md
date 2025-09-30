@@ -150,12 +150,11 @@ import { ID, Query } from 'node-appwrite'
 
 **Updated Strategy**:
 ```javascript
-// Pre-race polling intervals
-if (timeToStart > 65) intervalType = '5m'    // 5-minute intervals (early baseline)
-else if (timeToStart > 30) intervalType = '5m' // 5-minute intervals  
-else if (timeToStart > 5) intervalType = '1m'  // 1-minute intervals
-else if (timeToStart > 3) intervalType = '30s' // 30-second intervals (-5m to -3m)
-else if (timeToStart > 0) intervalType = '30s' // 30-second intervals (-3m to start)
+// Pre-race polling intervals (aligned with master-race-scheduler)
+if (timeToStart > 65) intervalType = '30m'    // 30-minute intervals (early morning baseline)
+else if (timeToStart > 5) intervalType = '2.5m' // 2.5-minute intervals (T-60m to T-5m active period)
+else if (timeToStart > 3) intervalType = '30s' // 30-second intervals (T-5m to T-3m critical approach)
+else if (timeToStart > 0) intervalType = '30s' // 30-second intervals (T-3m to start ultra-critical)
 else intervalType = '30s' // Live updates (post-start until Final)
 
 // Post-race polling

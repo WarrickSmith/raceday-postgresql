@@ -38,12 +38,12 @@ describe('Home Page', () => {
     expect(screen.getByRole('main')).toBeInTheDocument()
   })
 
-  it('shows loading skeleton initially', async () => {
+  it('shows the connection panel while the dashboard mounts', async () => {
     render(<Home />)
-    
-    // Should show loading skeleton while data is being fetched
+
+    // Should surface the connection panel immediately while the server loads data
     await waitFor(() => {
-      expect(screen.getByTestId('meetings-skeleton')).toBeInTheDocument()
+      expect(screen.getByText('Connecting to RaceDay data…')).toBeInTheDocument()
     }, { timeout: 500 })
   })
 })

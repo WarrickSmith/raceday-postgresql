@@ -120,7 +120,7 @@ describe('MeetingCard Integration Tests', () => {
 
     const initialFetchCallCount = fetchMock.mock.calls.length;
 
-    // Re-render with updated meeting (simulating real-time update)
+    // Re-render with updated meeting (simulating polling refresh)
     const updatedMeeting = { ...mockMeeting, $updatedAt: '2024-01-01T09:00:00Z' };
     rerender(<MeetingCard meeting={updatedMeeting} />);
 
@@ -162,7 +162,7 @@ describe('MeetingCard Integration Tests', () => {
     });
   });
 
-  it('should integrate with real-time status determination', async () => {
+  it('should integrate with polling status determination', async () => {
     // Test with past race time (should be live)
     const pastMeeting = {
       ...mockMeeting,

@@ -47,6 +47,18 @@ function resolveValue(...candidates) {
     return undefined;
 }
 
+function hasScalarValue(value) {
+    if (value === null || value === undefined) {
+        return false;
+    }
+
+    if (typeof value === 'string') {
+        return value.trim().length > 0;
+    }
+
+    return true;
+}
+
 function normalizeActualStart(actualStart) {
     if (actualStart === undefined || actualStart === null) {
         return undefined;
@@ -78,14 +90,17 @@ function buildMeetingDocument(meeting, timestamp = new Date().toISOString()) {
     return meetingDoc;
 }
 
-function buildRaceDocument(race, meetingId, timestamp = new Date().toISOString()) {
+function buildRaceDocument(race, meetingData, timestamp = new Date().toISOString()) {
+    // Extract meetingId - races collection uses relationship to meetings, not expanded objects
+    const meetingId = meetingData?.meetingId || meetingData?.meeting || meetingData?.id || meetingData;
+
     const raceDoc = {
         raceId: resolveValue(race.id, race.raceId, race.$id),
         name: resolveValue(race.name, race.description),
         raceNumber: resolveValue(race.race_number, race.raceNumber),
         startTime: resolveValue(race.start_time, race.startTime),
         status: resolveValue(race.status, race.raceStatus),
-        meeting: meetingId,
+        meeting: meetingId, // Store as relationship ID, not expanded object
         lastUpdated: timestamp,
         importedAt: timestamp
     };
@@ -199,6 +214,17 @@ function buildEntrantDocument(entrant, raceId, timestamp = new Date().toISOStrin
  * @returns {boolean} Success status
  */
 export async function performantUpsert(databases, databaseId, collectionId, documentId, data, context) {
+    if (collectionId === 'entrants') {
+        if (!hasScalarValue(data?.entrantId) || !hasScalarValue(data?.raceId)) {
+            context.error('Refusing to write entrant without scalar identifiers', {
+                documentId,
+                hasEntrantId: hasScalarValue(data?.entrantId),
+                hasRaceId: hasScalarValue(data?.raceId)
+            });
+            return false;
+        }
+    }
+
     try {
         await databases.updateDocument(databaseId, collectionId, documentId, data);
         return true;
@@ -272,7 +298,7 @@ export async function processRaces(databases, databaseId, meetings, context) {
     const allRaces = [];
     meetings.forEach(meeting => {
         meeting.races.forEach(race => {
-            allRaces.push({ meeting: meeting.meeting, race });
+            allRaces.push({ meeting: meeting, race }); // Pass full meeting object instead of just meeting.meeting ID
         });
     });
     
@@ -337,6 +363,16 @@ export async function processEntrants(databases, databaseId, raceId, entrants, c
         try {
             // Daily entrants document (frequently updated data)
             const dailyEntrantDoc = buildEntrantDocument(entrant, raceId);
+
+            if (!hasScalarValue(dailyEntrantDoc.entrantId) || !hasScalarValue(dailyEntrantDoc.raceId)) {
+                logWarn(context, 'Skipping entrant without scalar identifiers', {
+                    entrantId: entrant.entrant_id,
+                    derivedEntrantId: dailyEntrantDoc.entrantId,
+                    derivedRaceId: dailyEntrantDoc.raceId,
+                    raceId
+                });
+                continue;
+            }
 
             const dailySuccess = await performantUpsert(databases, databaseId, 'entrants', entrant.entrant_id, dailyEntrantDoc, context);
 

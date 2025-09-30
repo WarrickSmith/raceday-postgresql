@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-RaceDay is a real-time horse racing dashboard built with Next.js 15+ and Appwrite Cloud. The application provides live race data through automated polling of the New Zealand TAB API and real-time updates via Appwrite subscriptions.
+RaceDay is a live horse racing dashboard built with Next.js 15+ and Appwrite Cloud. The application provides live race data through automated server-side polling of the New Zealand TAB API and coordinated client-side polling for real-time updates.
 
 ## Key Commands
 
@@ -49,7 +49,7 @@ RaceDay is a real-time horse racing dashboard built with Next.js 15+ and Appwrit
 - **Key Directories**:
   - `app/` - Next.js App Router pages and layouts
   - `components/` - Reusable React components
-  - `hooks/` - Custom React hooks for real-time data and race management
+  - `hooks/` - Custom React hooks for polling, data management, and race coordination
   - `services/` - Backend service integrations and API calls
   - `types/` - TypeScript type definitions
   - `lib/` - Utility libraries and Appwrite client configuration
@@ -69,55 +69,65 @@ RaceDay is a real-time horse racing dashboard built with Next.js 15+ and Appwrit
   - `meeting-status-poller` - Monitor meeting status changes
   - `master-race-scheduler` - Coordinate race polling schedules
 
-### Real-Time Data Flow
-1. **Data Import**: Scheduled functions import race data from NZ TAB API
-2. **Live Updates**: Polling functions update race data in real-time
-3. **Client Subscriptions**: React hooks subscribe to Appwrite real-time events
-4. **UI Updates**: Components automatically re-render with live data
+### Polling Architecture Data Flow
+1. **Data Import**: Scheduled functions import race data from NZ TAB API (daily-meetings, daily-races)
+2. **Live Updates**: Server polling functions (master-race-scheduler, enhanced-race-poller) update race data at coordinated intervals
+3. **Client Polling**: React hooks fetch data from Next.js API routes at dynamic intervals based on race timing
+4. **UI Updates**: Components re-render based on polling updates with staleness indicators and loading states
 
-## Critical Real-Time Integration
+## Critical Polling Integration
 
 ### Appwrite Client Configuration
 - Client configuration in `lib/appwrite-client.ts` and `lib/appwrite-server.ts`
-- Real-time subscriptions handled through custom hooks in `hooks/`
 - Environment variables required: `NEXT_PUBLIC_APPWRITE_ENDPOINT`, `NEXT_PUBLIC_APPWRITE_PROJECT_ID`
 - **Documentation Research**: Use MCP Context7 server for up-to-date Appwrite integration documentation and examples
 
-### Key Hooks for Real-Time Data
-- `useAppwriteRealtime.ts` - Core real-time subscription management
-- `useMoneyFlowTimeline.ts` - Money flow and betting pool data
-- `useRealtimeRace.ts` - Individual race data updates
-- `useRealtimeMeetings.tsx` - Meeting-level data
-- `useRealtimeEntrants.ts` - Entrant-specific updates
+### Key Hooks for Polling Data
+- `useRacePolling.ts` - Coordinated race data polling with dynamic cadence and health checks
+- `useMeetingsPolling.tsx` - Meeting list polling with connection state management
+- `useRacePools.ts` - Pool data fetching synchronized with race polling
+- `useMoneyFlowTimeline.ts` - Money flow history with incremental loading
+- `usePollingMetrics.ts` - Polling observability and metrics tracking
+- `useEndpointMetrics.ts` - Request-level metrics for monitoring
 
-### Data Synchronization Patterns
-- Real-time hooks must maintain connection to Appwrite database
-- Pool calculations require live API data, not fallback dummy values
-- Timeline data needs proper interval matching for historical vs live races
-- Update timestamps should reflect actual data refresh times
+### Polling Synchronization Patterns
+- Polling hooks coordinate request timing to prevent overlapping fetches
+- Health checks guard polling to prevent requests when backend unavailable
+- Pool calculations use live polled data with staleness indicators
+- Polling cadence dynamically adjusts based on race timing (T-65m+: 30min, T-60m to T-5m: 2.5min, T-5m to T-3m: 30s, T-3m to Start: 30s, Post-start: 30s)
+- Request deduplication prevents stacked API calls
+- Update timestamps reflect actual polling data refresh times
 
 ## Development Workflow
 
 ### MCP Server Integration
 - **Web Search & Documentation**: Use MCP WebSearch and Context7 servers for researching Appwrite integration patterns and troubleshooting
 - **Browser Testing**: Use MCP Playwright or Puppeteer servers for comprehensive client-side testing and validation
-- **Real-time Debugging**: Leverage browser automation tools to test live data connections and UI responsiveness
+- **Polling Debugging**: Leverage browser automation tools to test polling coordination, health checks, and UI responsiveness
 
 ### Environment Setup
 1. Set up Appwrite Cloud project with required environment variables
 2. Run `npm install` in both `client/` and `server/` directories
 3. Use `npm run setup:appwrite` from client directory to initialize database schema
 4. Create required user role labels in Appwrite console: "user" and "admin"
-5. Ensure real-time subscriptions are properly configured for live data flow
-6. **Connection Monitoring**: Set `NEXT_PUBLIC_ENABLE_CONNECTION_MONITOR=true` in `.env.local` to enable connection monitoring panel
+5. Configure polling behavior via environment variables (see `.env.example`)
+6. **Health Monitoring**: Enabled by default via `NEXT_PUBLIC_ENABLE_HEALTH_MONITORING=true` (periodic backend health checks every 3 minutes)
+7. **Polling Monitor**: Set `NEXT_PUBLIC_ENABLE_POLLING_MONITOR=true` in `.env.local` to enable development polling metrics panel
 
-### Connection Monitoring (Development Feature)
-- **Enable**: Set `NEXT_PUBLIC_ENABLE_CONNECTION_MONITOR=true` in `.env.local`
-- **Disable**: Set `NEXT_PUBLIC_ENABLE_CONNECTION_MONITOR=false` or omit the variable entirely
-- **Access**: Click the 🔧 button in the race header status area (when enabled)
-- **Features**: Real-time connection count, channel count, latency metrics, active subscription details
-- **Warning System**: Visual alerts when connection limits exceeded (>10 connections)
-- **Emergency Fallback**: Automatic real-time disable if connection limits reached
+### Health Monitoring & Connection Management
+- **Health Monitoring**: Periodic backend health checks enabled by default (every 3 minutes, configurable via `NEXT_PUBLIC_HEALTH_CHECK_INTERVAL_MS`)
+- **Connection State Management**: Global connection state guards polling requests when backend unavailable
+- **Automatic Recovery**: When backend returns to health, polling automatically resumes
+- **Reference Counting**: Health monitoring uses reference counting for multi-page scenarios (continues while at least one page is active)
+- **Manual Retry**: Users can manually trigger connection retry via UI when disconnected
+- **Connection Guards**: Polling hooks check connection state before making requests to prevent failed fetches
+
+### Polling Monitor (Development Feature)
+- **Enable**: Set `NEXT_PUBLIC_ENABLE_POLLING_MONITOR=true` in `.env.local`
+- **Disable**: Set `NEXT_PUBLIC_ENABLE_POLLING_MONITOR=false` or omit the variable entirely (default: disabled)
+- **Access**: Collapsible panel above Enhanced Entrants Grid on race pages (when enabled)
+- **Features**: Request counts, error rates, latency metrics, cadence compliance tracking, endpoint performance table, recent activity log
+- **Warning System**: Visual alerts when cadence drift detected or error rates exceed thresholds
 - **Performance Impact**: Zero overhead when disabled
 
 ### Prerequisites
@@ -127,45 +137,52 @@ RaceDay is a real-time horse racing dashboard built with Next.js 15+ and Appwrit
 
 ### Testing Strategy
 - Unit tests configured with Jest and React Testing Library
-- Test real-time data connections with live race data
+- Test polling coordination and request deduplication with multiple simultaneous polls
+- Validate health check guards prevent requests when backend disconnected
 - Validate pool calculations match race totals (mathematical verification)
-- Monitor "No updates yet" vs actual timestamp displays for real-time status
+- Monitor polling cadence compliance with backend scheduling windows
+- Verify staleness indicators and update timestamps reflect actual polling data
 - **Browser Testing**: Use MCP Playwright or Puppeteer servers to validate client application issues and fixes in real browser environments
 
 ### Code Patterns
-- React components use custom hooks for data fetching and real-time updates
+- React components use custom hooks for data fetching and polling coordination
+- Polling hooks check connection state before making requests
 - Appwrite functions follow microservice architecture with individual responsibilities
 - TypeScript types are shared between client and server through `types/` directory
-- Error handling includes fallback states but should not mask real-time connection issues
+- Error handling includes fallback states with retry mechanisms and user-friendly messaging
+- Response compression (Brotli/Gzip) enabled for all API routes and Appwrite functions
 
-## Known Issues & Current Work
+## Current Architecture Status
 
-### Story 4.9 Implementation (Money Flow Timeline)
-- **Status**: Partial implementation with critical real-time data connection issues
-- **Problem**: API returns real data but UI shows dummy fallback values
-- **Priority**: Fix real-time subscription broken connection preventing live data from reaching UI
-- **Files**: `EnhancedEntrantsGrid.tsx`, real-time hooks, pool calculation logic
+### Polling Implementation (Completed)
+- **Client Polling**: Coordinated polling hooks with dynamic cadence based on race timing
+- **Health Monitoring**: Periodic backend health checks with connection state management
+- **Response Compression**: Brotli/Gzip compression for 60-70% payload reduction
+- **Polling Observability**: Development monitoring UI for metrics tracking
+- **Status**: Polling architecture fully implemented and tested (290/290 tests passing)
 
 ### Testing with Live Data
-- Use race ID `279dc587-bb6e-4a56-b7e5-70d78b942ddd` for "CHRISTCHURCH CASINO 30TH SI AWARDS"
-- Verify real percentages (e.g., 28%) instead of dummy values (14.29%)
-- Ensure pool amounts sum correctly to footer totals
-- Check that timeline columns show real incremental data (e.g., "+$344")
+- Use active race IDs from meetings page for current day testing
+- Verify polling updates occur at expected intervals based on race timing
+- Check connection status indicator shows "Connected" when backend healthy
+- Monitor polling metrics (if enabled) for cadence compliance and error rates
+- Validate pool amounts and percentages update based on polling data
 
 ## Database Architecture
 
 ### Appwrite Collections
 - **Meetings** - Race meeting information
-- **Races** - Individual race details  
+- **Races** - Individual race details
 - **Entrants** - Horse/jockey entries per race
 - **Race Pools** - Betting pool data and money flow
-- Real-time subscriptions automatically sync data changes to connected clients
+- **Money Flow History** - Time-series data for money flow timeline visualization
 
 ### Data Flow Validation
-- Server functions populate collections via NZ TAB API
-- Client components subscribe to collection changes via Appwrite real-time
-- Money flow calculations use live pool data, not estimated fallback values
+- Server functions populate collections via NZ TAB API polling
+- Client components fetch data via Next.js API routes using coordinated polling
+- Money flow calculations use live polled data with staleness indicators
 - Pool percentages and amounts must be mathematically consistent
+- Polling cadence adjusts dynamically based on race timing (T-65m through post-start)
 
 ## Important Instructions and Reminders
 

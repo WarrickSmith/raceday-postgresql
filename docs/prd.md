@@ -174,12 +174,12 @@ All development work must reference the latest official documentation for our ke
 
 - Create `race-data-poller` function using nested Appwrite CLI structure with every-minute base schedule.
 - Leverage existing shared utilities and common code through nested structure for API calls and data processing.
-- Implement dynamic polling intervals based on time-to-start:
-  - T-60m to T-20m: 5-minute intervals
-  - T-20m to T-10m: 2-minute intervals  
-  - T-10m to T-5m: 1-minute intervals
-  - T-5m to Start: 15-second intervals
-  - Post-start: 5-minute intervals until Final
+- Implement dynamic polling intervals based on time-to-start (NOTE: Legacy intervals - current implementation uses enhanced-race-poller with T-65m+: 30min, T-60m to T-5m: 2.5min, T-5m to T-3m: 30s, T-3m to Start: 30s, Post-start: 30s):
+  - T-60m to T-20m: 5-minute intervals (legacy)
+  - T-20m to T-10m: 2-minute intervals (legacy)
+  - T-10m to T-5m: 1-minute intervals (legacy)
+  - T-5m to Start: 15-second intervals (legacy)
+  - Post-start: 5-minute intervals until Final (legacy)
 - Fetch latest entrant data with odds and money flow updates using shared API utilities.
 - Store updates in database with proper timestamp indexing.
 - Implement timeout protection and error handling for API calls.

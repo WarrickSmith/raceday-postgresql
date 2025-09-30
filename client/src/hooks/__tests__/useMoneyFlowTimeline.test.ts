@@ -217,4 +217,125 @@ describe('useMoneyFlowTimeline', () => {
       expect(result.current.isLoading).toBe(false)
     })
   })
+
+  describe('Incremental merge and retention', () => {
+    it('should not clear existing timeline data when an incremental poll returns no documents', async () => {
+      const initialResponse = {
+        success: true,
+        documents: [
+          {
+            $id: 'doc-A',
+            $createdAt: '2023-01-01T00:05:00.000Z',
+            $updatedAt: '2023-01-01T00:05:00.000Z',
+            entrant: 'entrant-1',
+            pollingTimestamp: '2023-01-01T00:05:00.000Z',
+            timeInterval: 5,
+            timeToStart: 5,
+            winPoolAmount: 1000,
+            placePoolAmount: 400,
+            holdPercentage: 12,
+          },
+        ],
+        nextCreatedAt: '2023-01-01T00:05:00.000Z',
+      }
+
+      const emptyIncremental = {
+        success: true,
+        documents: [],
+        nextCreatedAt: null,
+      }
+
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse(initialResponse))
+        .mockResolvedValueOnce(createMockResponse(emptyIncremental))
+
+      const { result } = renderHook(() =>
+        useMoneyFlowTimeline('race-1', ['entrant-1'])
+      )
+
+      await waitFor(() => expect(result.current.timelineData.size).toBe(1))
+
+      // Trigger incremental refetch (no new docs)
+      await result.current.refetch()
+
+      // Expect previous data retained
+      expect(result.current.timelineData.size).toBe(1)
+      const entrantData = result.current.timelineData.get('entrant-1')
+      expect(entrantData?.dataPoints.length).toBe(1)
+      expect(entrantData?.dataPoints[0].$id).toBe('doc-A')
+    })
+
+    it('should merge new documents without duplicating existing points', async () => {
+      const initialResponse = {
+        success: true,
+        documents: [
+          {
+            $id: 'doc-A',
+            $createdAt: '2023-01-01T00:00:00.000Z',
+            $updatedAt: '2023-01-01T00:00:00.000Z',
+            entrant: 'entrant-1',
+            pollingTimestamp: '2023-01-01T00:00:00.000Z',
+            timeInterval: 10,
+            timeToStart: 10,
+            winPoolAmount: 800,
+            placePoolAmount: 300,
+            holdPercentage: 10,
+          },
+        ],
+        nextCreatedAt: '2023-01-01T00:00:00.000Z',
+      }
+
+      const incrementalResponse = {
+        success: true,
+        documents: [
+          // Duplicate of doc-A (should not be added again)
+          {
+            $id: 'doc-A',
+            $createdAt: '2023-01-01T00:00:00.000Z',
+            $updatedAt: '2023-01-01T00:00:00.000Z',
+            entrant: 'entrant-1',
+            pollingTimestamp: '2023-01-01T00:00:00.000Z',
+            timeInterval: 10,
+            timeToStart: 10,
+            winPoolAmount: 800,
+            placePoolAmount: 300,
+            holdPercentage: 10,
+          },
+          // New point
+          {
+            $id: 'doc-B',
+            $createdAt: '2023-01-01T00:03:00.000Z',
+            $updatedAt: '2023-01-01T00:03:00.000Z',
+            entrant: 'entrant-1',
+            pollingTimestamp: '2023-01-01T00:03:00.000Z',
+            timeInterval: 7,
+            timeToStart: 7,
+            winPoolAmount: 900,
+            placePoolAmount: 340,
+            holdPercentage: 11,
+          },
+        ],
+        nextCreatedAt: '2023-01-01T00:03:00.000Z',
+      }
+
+      mockFetch
+        .mockResolvedValueOnce(createMockResponse(initialResponse))
+        .mockResolvedValueOnce(createMockResponse(incrementalResponse))
+
+      const { result } = renderHook(() =>
+        useMoneyFlowTimeline('race-1', ['entrant-1'])
+      )
+
+      await waitFor(() => expect(result.current.timelineData.size).toBe(1))
+
+      // Merge second batch
+      await result.current.refetch()
+
+      const entrantData = result.current.timelineData.get('entrant-1')
+      expect(entrantData).toBeDefined()
+      expect(entrantData?.dataPoints.length).toBe(2)
+      const ids = entrantData!.dataPoints.map((p) => p.$id).sort()
+      expect(ids).toEqual(['doc-A', 'doc-B'])
+    })
+  })
 })

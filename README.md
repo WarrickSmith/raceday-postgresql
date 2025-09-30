@@ -1,11 +1,15 @@
-# RaceDay - Real-time Horse Racing Dashboard
+# RaceDay - Live Horse Racing Dashboard
 
-A real-time horse racing dashboard built with Next.js 15+ and Appwrite Cloud. The application automatically polls New Zealand TAB API for race data and provides live updates through Appwrite's realtime subscriptions.
+A live horse racing dashboard built with Next.js 15+ and Appwrite Cloud. The application automatically polls New Zealand TAB API for race data through server-side functions and provides live updates through coordinated client-side polling.
 
 ## Features
 
 - **Automated Data Import**: Daily race data import from NZ TAB API (6:00 AM NZ time)
-- **Real-time Updates**: Live race data through Appwrite Realtime subscriptions  
+- **Live Polling Updates**: Coordinated client-side polling with dynamic cadence based on race timing
+- **Dynamic Polling Cadence**: Automatic interval adjustment (30min → 2.5min → 30s) based on time to start
+- **Health Monitoring**: Periodic backend health checks with automatic connection recovery
+- **Response Compression**: Brotli/Gzip compression for 60-70% payload reduction
+- **Polling Observability**: Development monitoring UI for request metrics and cadence tracking
 - **Selective Racing Data**: AU/NZ Horse and Harness racing (excludes Greyhounds)
 - **Modern Stack**: Next.js 15+, React 19, TypeScript, Tailwind CSS
 
@@ -166,11 +170,11 @@ See `server/daily-race-importer/README.md` and `server/daily-race-importer/DEPLO
 
 - **Frontend**: Next.js 15+, React 19, TypeScript, Tailwind CSS
 - **Backend**: Appwrite Cloud Functions (Node.js 22)
-- **Database**: Appwrite Database with automatic indexing
-- **Real-time**: Appwrite Realtime Subscriptions  
+- **Database**: Appwrite Database with compound indexing for optimal query performance
+- **Data Updates**: Client-side polling with health monitoring and compression
 - **Data Source**: New Zealand TAB API
 - **Deployment**: Automated deployment scripts with environment management
-- **Testing**: Jest with comprehensive test coverage
+- **Testing**: Jest with comprehensive test coverage (290/290 tests passing)
 
 ## Learn More
 
