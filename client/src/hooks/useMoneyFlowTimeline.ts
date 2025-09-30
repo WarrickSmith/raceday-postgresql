@@ -14,6 +14,7 @@ import { useLogger } from '@/utils/logging'
 import type { ComponentLogger } from '@/utils/logging'
 import { useEndpointMetrics } from './useEndpointMetrics'
 import { PollingEndpoint } from '@/types/pollingMetrics'
+import { getConnectionState } from '@/state/connectionState'
 
 // Server response interface for raw database data
 interface ServerEntrant {
@@ -159,6 +160,14 @@ export function useMoneyFlowTimeline(
   // Fetch money flow timeline data for all entrants
   const fetchTimelineData = useCallback(async () => {
     if (!raceId || entrantIds.length === 0) {
+      return
+    }
+
+    // Check connection state before attempting fetch
+    const connectionState = getConnectionState()
+    if (connectionState !== 'connected') {
+      // Don't attempt fetch if not connected
+      setError('Connection unavailable')
       return
     }
 

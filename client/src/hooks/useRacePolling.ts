@@ -5,6 +5,7 @@ import type { RaceContextData } from '@/contexts/RaceContext'
 import { useLogger } from '@/utils/logging'
 import { pollingConfig } from '@/config/pollingConfig'
 import { calculateDstAwareMinutesToStart } from '@/utils/timezoneUtils'
+import { setConnectionState, getConnectionState } from '@/state/connectionState'
 
 interface PollingConfig {
   raceId: string
@@ -217,6 +218,19 @@ export function useRacePolling(config: PollingConfig): RacePollingState {
         return
       }
 
+      // Check connection state before attempting fetch
+      // Skip polling if disconnected (unless forced retry)
+      const connectionState = getConnectionState()
+      if (connectionState === 'disconnected' && !forced) {
+        logger.debug('Polling skipped: connection is disconnected')
+        return
+      }
+
+      if (connectionState === 'connecting' && !forced) {
+        logger.debug('Polling skipped: connection is still being established')
+        return
+      }
+
       if (isFetchingRef.current) {
         logger.debug('Polling skipped: request already in progress')
         return
@@ -262,6 +276,9 @@ export function useRacePolling(config: PollingConfig): RacePollingState {
         setError(null)
         setLastUpdated(new Date())
         setLastRequestDurationMs(requestDuration)
+
+        // Update global connection state on successful fetch (recovery detection)
+        setConnectionState('connected')
 
         if (data.race?.status) {
           raceStatusRef.current = data.race.status
@@ -313,6 +330,9 @@ export function useRacePolling(config: PollingConfig): RacePollingState {
           error: errorInstance.message,
           attempt: consecutiveFailuresRef.current,
         })
+
+        // Update global connection state on fetch failure
+        setConnectionState('disconnected')
 
         scheduleNextPoll(backoffDelay)
       } finally {

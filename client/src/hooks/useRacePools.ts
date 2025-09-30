@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RacePoolData } from '@/types/racePools'
 import { useEndpointMetrics } from './useEndpointMetrics'
 import { PollingEndpoint } from '@/types/pollingMetrics'
+import { getConnectionState } from '@/state/connectionState'
 
 interface UseRacePoolsResult {
   poolData: RacePoolData | null
@@ -49,6 +50,14 @@ export function useRacePools(
 
   const startFetch = useCallback(async () => {
     if (!raceId) return
+
+    // Check connection state before attempting fetch
+    const connectionState = getConnectionState()
+    if (connectionState !== 'connected') {
+      // Don't attempt fetch if not connected
+      setError('Connection unavailable')
+      return
+    }
 
     // If a request is already in-flight, reuse it
     if (pendingRequestRef.current) {
