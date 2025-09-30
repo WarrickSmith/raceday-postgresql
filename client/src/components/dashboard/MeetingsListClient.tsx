@@ -12,6 +12,7 @@ import { NoMeetingsPlaceholder } from './NoMeetingsPlaceholder';
 import { useMeetingsPolling, type RaceUpdateEvent } from '@/hooks/useMeetingsPolling';
 import { Meeting } from '@/types/meetings';
 import { racePrefetchService } from '@/services/racePrefetchService';
+import { startHealthMonitoring, stopHealthMonitoring } from '@/state/connectionState';
 
 interface MeetingsListClientProps {
   initialData: Meeting[];
@@ -68,6 +69,15 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
   const handleRetryConnection = useCallback(() => {
     void retryConnection();
   }, [retryConnection]);
+
+  // Start health monitoring when component mounts
+  useEffect(() => {
+    startHealthMonitoring();
+
+    return () => {
+      stopHealthMonitoring();
+    };
+  }, []);
 
   // Keep the selected meeting in sync with the available meetings
   useEffect(() => {
@@ -146,14 +156,36 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
     return <MeetingsListSkeleton />;
   }
 
+  // Show connection status panel when not connected (with header above)
   if (connectionState !== 'connected') {
     return (
-      <ConnectionStatusPanel
-        state={connectionState}
-        retryCountdown={retryCountdown}
-        onRetry={handleRetryConnection}
-        connectionAttempts={connectionAttempts}
-      />
+      <>
+        {/* Header with connection status and next race button */}
+        <div className="col-span-1 lg:col-span-2 flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <NextScheduledRaceButton
+              meetings={meetings}
+              isRealtimeConnected={isConnected}
+              raceUpdateSignal={raceUpdateSignal}
+            />
+          </div>
+
+          {/* Data polling status */}
+          <ConnectionStatusBadge state={connectionState} />
+        </div>
+
+        {/* Centered ConnectionStatusPanel spanning full width */}
+        <div className="col-span-1 lg:col-span-2 flex items-center justify-center">
+          <div className="w-full max-w-4xl">
+            <ConnectionStatusPanel
+              state={connectionState}
+              retryCountdown={retryCountdown}
+              onRetry={handleRetryConnection}
+              connectionAttempts={connectionAttempts}
+            />
+          </div>
+        </div>
+      </>
     );
   }
 
@@ -162,7 +194,7 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
       {/* Header with connection status and next race button */}
       <div className="col-span-1 lg:col-span-2 flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <NextScheduledRaceButton 
+          <NextScheduledRaceButton
             meetings={meetings}
             isRealtimeConnected={isConnected}
             raceUpdateSignal={raceUpdateSignal}

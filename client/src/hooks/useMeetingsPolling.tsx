@@ -134,7 +134,7 @@ export function useMeetingsPolling({ initialData, onError, onRaceUpdate }: UseMe
 
       setMeetings(newMeetings);
       previousMeetingsRef.current = newMeetings;
-      handleConnectionSuccess();
+      handleConnectionSuccess(); // This calls setGlobalConnectionState('connected')
       setIsInitialDataReady(true);
 
       loggerRef.current.debug(`Fetched ${newMeetings.length} meetings from API`);
@@ -163,11 +163,12 @@ export function useMeetingsPolling({ initialData, onError, onRaceUpdate }: UseMe
         return true;
       }
 
-      loggerRef.current.warn('Health check returned non-healthy status', body);
+      loggerRef.current.debug('Health check returned non-healthy status', body);
       handleConnectionFailure();
       return false;
     } catch (error) {
-      loggerRef.current.error('Connection health check failed', error);
+      // Use debug level for expected connection failures (not an error condition)
+      loggerRef.current.debug('Connection health check failed', error);
       handleConnectionFailure();
       return false;
     }
