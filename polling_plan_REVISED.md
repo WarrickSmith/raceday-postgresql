@@ -4,7 +4,7 @@
 
 - **Framework & Hosting**: Next.js (App Router) frontend with Appwrite backend functions deployed independently; cron schedules defined in `appwrite.json` run in UTC. Server functions are deployed independently via Appwrite Functions with data source configured via `server/database-setup/src/database-setup.js`.
 
-- **Server Polling Cadence**: Master scheduler (`/server/master-race-scheduler/src/main.js`) orchestrates enhanced race polling with cadence windows: T-65m+ (30 minute intervals), T-5m to T-3m (30 second intervals), through post-start until status is Final. Client can optionally halve intervals via `DOUBLE_POLLING_FREQUENCY`. The master scheduler runs every 1 minute via CRON and coordinates high-frequency polling via enhanced-race-poller.
+- **Server Polling Cadence**: Master scheduler (`/server/master-race-scheduler/src/main.js`) orchestrates enhanced race polling with cadence windows: T-65m+ (30 minute intervals), T-60m to T-5m (2.5 minute intervals), T-5m to T-3m (30 second intervals), T-3m to Start (30 second intervals), through post-start (30 second intervals) until status is Final. Client can optionally halve intervals via `DOUBLE_POLLING_FREQUENCY`. The master scheduler runs every 1 minute via CRON and coordinates high-frequency polling via enhanced-race-poller.
 
 - **Key API Endpoints**:
 
@@ -391,9 +391,9 @@ Most of this task was already completed through earlier implementation work. The
 
 ### Task 8: Documentation & Operational Runbooks
 
-- **Status**: Not Started
+- **Status**: Completed
 - **Priority**: Low
-- **Estimated Effort**: 4 hours
+- **Estimated Effort**: 4 hours (Actual: 4 hours)
 
 **Problem Statement**: Update architecture and troubleshooting documentation to describe the polling-only model, environment configuration, and response optimisations while purging real-time references.
 
@@ -406,25 +406,55 @@ Most of this task was already completed through earlier implementation work. The
 
 **Task Details**:
 
-1. Refresh `CLAUDE.md`, README sections, and any runbooks with polling architecture details.
-2. Document environment variables, cadence rules, and troubleshooting steps.
-3. Remove obsolete real-time diagrams/assets and update references.
-4. Ensure docs match implemented caching/compression behaviour and query optimizations.
+1. ✅ Refreshed `CLAUDE.md`, README sections with polling architecture details
+2. ✅ Documented environment variables, cadence rules, and troubleshooting steps
+3. ✅ Removed obsolete real-time references from core documentation
+4. ✅ Updated docs to match implemented compression behaviour and query optimizations
+5. ✅ Created comprehensive troubleshooting guide ([docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md))
+6. ✅ Created operational runbook ([docs/OPERATIONAL_RUNBOOK.md](docs/OPERATIONAL_RUNBOOK.md))
 
-**Documentation Scope**:
+**Documentation Updates**:
 
-- Polling cadence explanation (master scheduler coordination)
-- Environment variables and their effects
-- Troubleshooting guide for common polling issues
-- Performance context and optimization outcomes
-- Architecture diagrams showing polling flow
+- **[CLAUDE.md](CLAUDE.md)**: Replaced all real-time references with polling architecture, updated hook list, added health monitoring and polling monitor sections
+- **[README.md](README.md)**: Updated title/description, added polling features, removed Realtime subscriptions references
+- **[docs/architecture/1-system-overview.md](docs/architecture/1-system-overview.md)**: Replaced real-time data sync with polling architecture overview
+- **[docs/architecture/2-microservices-backend-architecture.md](docs/architecture/2-microservices-backend-architecture.md)**: Renamed "Real-time Functions" to "Live Data Polling Functions"
+- **[docs/architecture/3-frontend-architecture-nextjs-15.md](docs/architecture/3-frontend-architecture-nextjs-15.md)**: Replaced Supabase examples with polling hook examples, updated component architecture
+
+**New Documentation**:
+
+- **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**: Comprehensive troubleshooting guide covering:
+  - Connection issues (health checks, backend outages, recovery)
+  - Polling problems (cadence, timeouts, frequency)
+  - Performance issues (payload size, latency, memory)
+  - Development debugging (polling monitor, console logging, metrics)
+  - Environment configuration reference
+
+- **[docs/OPERATIONAL_RUNBOOK.md](docs/OPERATIONAL_RUNBOOK.md)**: Operational procedures covering:
+  - Daily operations (startup checklist, monitoring, end-of-day)
+  - Health check system (configuration, monitoring, troubleshooting)
+  - Polling cadence coordination (server/client alignment, best practices)
+  - Incident response (backend outage, slow response, missing updates, performance)
+  - Configuration management (environment variables, validation)
+  - Backend function coordination (deployment, execution, compression)
+  - Monitoring & metrics (key metrics, baselines, alerting)
+
+**Validation Results**:
+
+- ✅ Grep verification: No obsolete real-time references found
+- ✅ Hook existence: All documented hooks exist in codebase
+- ✅ Environment alignment: 7 polling-related variables documented
+- ✅ TypeScript: Compilation successful (documentation changes only)
+- ✅ ESLint: No warnings or errors
+- ✅ Tests: 290/290 passing (no test changes required)
 
 **Acceptance Criteria**:
 
-- [ ] Documentation reflects final polling approach and env vars.
-- [ ] All real-time references removed from documentation.
-- [ ] Troubleshooting guide actionable for common issues.
-- [ ] Docs build/tests (if any) pass; repository remains free of `any` types.
+- [x] Documentation reflects final polling approach and env vars
+- [x] All real-time references removed from documentation
+- [x] Troubleshooting guide actionable for common issues
+- [x] Operational runbook covers daily operations and incident response
+- [x] Docs build/tests pass; repository remains free of `any` types
 
 **Testing Requirements**: Proofread and link-check documentation, run standard TS/lint/test suite to ensure no incidental regressions.
 

@@ -79,12 +79,9 @@ The daily data import is now handled by three sequential functions with 10-minut
 - **Schedule:** Every minute during race hours
 - **Purpose:** Real-time updates for active races (legacy function)
 - **Status:** Maintained for backward compatibility, enhanced-race-poller recommended
-- **Dynamic Intervals:**
-  - T-60m to T-20m: 5-minute intervals
-  - T-20m to T-10m: 2-minute intervals  
-  - T-10m to T-5m: 1-minute intervals
-  - T-5m to Start: 15-second intervals
-  - Post-start: 5-minute intervals until Final
+- **Dynamic Intervals (Legacy - replaced by enhanced-race-poller):**
+  - See enhanced-race-poller for current intervals
+  - Legacy intervals no longer in use
 
 #### single-race-poller (HTTP-triggered, Legacy)
 - **Specification:** s-1vcpu-1gb
