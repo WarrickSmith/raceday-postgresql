@@ -13,6 +13,7 @@ import { Race, Meeting, Entrant, RaceNavigationData } from '@/types/meetings'
 import { cacheInvalidation } from '@/lib/cache'
 import { useMemoryOptimization } from '@/utils/performance'
 import { useRacePolling, type RacePollingState } from '@/hooks/useRacePolling'
+import { getConnectionState } from '@/state/connectionState'
 
 export interface RaceContextData {
   race: Race
@@ -87,6 +88,14 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
 
       if (!normalizedRaceId) {
         setError('Race ID is required')
+        return Promise.resolve()
+      }
+
+      // Check connection state before attempting fetch
+      const connectionState = getConnectionState()
+      if (connectionState !== 'connected') {
+        setError('Connection unavailable - please check your connection')
+        setIsLoading(false)
         return Promise.resolve()
       }
 
