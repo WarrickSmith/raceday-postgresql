@@ -331,38 +331,31 @@ Most of this task was already completed through earlier implementation work. The
 
 ---
 
-### Task 6: Server Response Optimisation (Caching & Compression)
+### Task 6: Server Response Optimisation (Compression)
 
 - **Status**: Not Started
 - **Priority**: Medium
 - **Estimated Effort**: 8 hours
 
-**Problem Statement**: Optimise server-side responses with caching headers, optional shared cache helper, and compression to reduce payload size and align with polling cadence. This builds on the query optimizations already implemented.
+**Problem Statement**: Implement compression middleware for server-side responses to further reduce payload size and ensure efficient delivery during polling cadence windows.
 
-**Technical Context**: Previous phases implemented Query.select for 60-70% payload reduction, scalar key queries for 90% performance improvement, and cursor-based incremental loading. This task adds response-level optimizations.
+**Technical Context**: Previous phases implemented Query.select for 60-70% payload reduction, scalar key queries for 90% performance improvement, and cursor-based incremental loading. This task focuses on response compression to complement those gains.
 
 **Task Details**:
 
-1. Apply race-status-aware `Cache-Control` headers and Next.js `revalidate` settings.
-2. Evaluate short-lived cache helper (Redis/in-memory) for hot races.
-3. Enable compression middleware for large API payloads.
-4. Document cadence alignment with caching strategy to respect CRON ingestion windows (UTC-aware).
-
-**Caching Strategy**:
-
-- Live races: 15-30 second cache, `stale-while-revalidate`
-- Final races: 5-15 minute cache for stability
-- Coordinate with polling intervals to prevent cache misses
+1. Select and configure compression middleware compatible with Next.js API routes and Appwrite functions.
+2. Ensure middleware targets large JSON payloads while excluding already-compressed assets.
+3. Verify polling cadence compatibility and confirm no negative impact on latency or streaming responses.
+4. Update operational documentation to cover compression behaviour and rollout sequencing.
 
 **Acceptance Criteria**:
 
-- [ ] API responses include appropriate cache headers.
-- [ ] Optional cache helper safely reduces repeated fetch cost.
-- [ ] Compression active without breaking clients.
-- [ ] Polling plan updated to reflect response optimisations.
+- [ ] Compression middleware active for relevant API responses without breaking clients.
+- [ ] Payload size reduction validated against baseline metrics.
+- [ ] Polling plan updated to reflect response compression work.
 - [ ] TS/lint/tests pass, no `any` types introduced.
 
-**Testing Requirements**: cURL/browser header checks, payload size comparisons, performance metrics before/after, automated tests validating middleware.
+**Testing Requirements**: cURL/browser payload size comparisons, compression ratio monitoring, performance metrics before/after, automated tests validating middleware behaviour.
 
 ---
 
