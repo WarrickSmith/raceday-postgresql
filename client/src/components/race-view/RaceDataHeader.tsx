@@ -7,7 +7,11 @@ import { getStatusConfig } from '@/utils/raceStatusConfig'
 import { RaceNavigation } from './RaceNavigation'
 import { getRaceTypeDisplay } from '@/constants/raceTypes'
 import { ConnectionStatusBadge } from '@/components/dashboard/ConnectionStatusBadge'
-import { getConnectionState, subscribeToConnectionState, type ConnectionState } from '@/state/connectionState'
+import {
+  getConnectionState,
+  subscribeToConnectionState,
+  type ConnectionState,
+} from '@/state/connectionState'
 import type {
   Race,
   Entrant,
@@ -34,7 +38,9 @@ export const RaceDataHeader = memo(function RaceDataHeader({
 }: RaceDataHeaderProps) {
   const { raceData } = useRace()
   const [currentTime, setCurrentTime] = useState(new Date())
-  const [connectionState, setConnectionState] = useState<ConnectionState>(() => getConnectionState())
+  const [connectionState, setConnectionState] = useState<ConnectionState>(() =>
+    getConnectionState()
+  )
 
   // Use props data if provided (from unified subscription), otherwise fall back to context
   const race = propRace || raceData?.race
@@ -65,7 +71,10 @@ export const RaceDataHeader = memo(function RaceDataHeader({
     return unsubscribe
   }, [])
 
-  const statusConfig = useMemo(() => getStatusConfig(race?.status), [race?.status])
+  const statusConfig = useMemo(
+    () => getStatusConfig(race?.status),
+    [race?.status]
+  )
 
   // Memoized calculations to reduce re-renders (move before early return to avoid hook call errors)
   const formattedTime = useMemo(
@@ -201,11 +210,13 @@ export const RaceDataHeader = memo(function RaceDataHeader({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <div className="text-xs text-gray-500 font-bold uppercase">
-              STATUS
+              RACE STATUS
             </div>
             <div className="flex items-center gap-1">
               {/* Use a text dot with status color to avoid dynamic Tailwind class names */}
-              <span className={`${statusConfig.color} text-base leading-none`}>●</span>
+              <span className={`${statusConfig.color} text-base leading-none`}>
+                ●
+              </span>
               <span className={`text-sm font-semibold ${statusConfig.color}`}>
                 {statusConfig.label}
               </span>
@@ -217,7 +228,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
             {onConfigureAlerts && (
               <button
                 onClick={onConfigureAlerts}
-                className="text-xs px-2 py-1 rounded transition-colors bg-gray-200 text-gray-600 hover:bg-gray-300 hover:text-gray-700"
+                className="text-xs px-2 py-1 rounded transition-colors bg-gray-400 text-gray-800 hover:bg-gray-300 hover:text-gray-700"
                 title="Configure indicators"
                 aria-label="Open indicators configuration"
               >
