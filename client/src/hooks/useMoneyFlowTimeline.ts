@@ -12,6 +12,8 @@ import type {
 } from '@/types/moneyFlow'
 import { useLogger } from '@/utils/logging'
 import type { ComponentLogger } from '@/utils/logging'
+import { useEndpointMetrics } from './useEndpointMetrics'
+import { PollingEndpoint } from '@/types/pollingMetrics'
 
 // Server response interface for raw database data
 interface ServerEntrant {
@@ -133,6 +135,9 @@ export function useMoneyFlowTimeline(
   const loggerRef = useRef(logger)
   loggerRef.current = logger
   const entrantKey = useMemo(() => entrantIds.join(','), [entrantIds])
+
+  // Metrics tracking
+  const { recordRequest } = useEndpointMetrics(PollingEndpoint.MONEY_FLOW)
   const [timelineData, setTimelineData] = useState<
     Map<string, EntrantMoneyFlowTimeline>
   >(new Map())
@@ -172,6 +177,7 @@ export function useMoneyFlowTimeline(
     }
 
     setError(null)
+    const overallStartTime = performance.now()
 
     const fetchPromise = (async () => {
       if (!isFetchingRef.current) {
@@ -300,11 +306,26 @@ export function useMoneyFlowTimeline(
           }
         } // else: no incoming data and same entrants -> keep existing timeline to avoid flicker
         setLastUpdate(new Date())
+
+        // Record successful request
+        const requestDuration = Math.round(performance.now() - overallStartTime)
+        recordRequest({
+          success: true,
+          durationMs: requestDuration,
+        })
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Failed to fetch timeline data'
         setError(errorMessage)
         loggerRef.current.error('Error fetching money flow timeline', err)
+
+        // Record failed request
+        const requestDuration = Math.round(performance.now() - overallStartTime)
+        recordRequest({
+          success: false,
+          durationMs: requestDuration,
+          error: errorMessage,
+        })
       } finally {
         isFetchingRef.current = false
         pendingRequestRef.current = null
@@ -314,7 +335,7 @@ export function useMoneyFlowTimeline(
 
     pendingRequestRef.current = fetchPromise
     return fetchPromise
-  }, [raceId, entrantIds, entrantKey, raceStatus])
+  }, [raceId, entrantIds, entrantKey, raceStatus, recordRequest])
 
   // Generate timeline grid data optimized for component display
   const gridData = useMemo(() => {

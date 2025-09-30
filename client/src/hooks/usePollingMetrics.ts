@@ -60,7 +60,6 @@ export function usePollingMetrics(
       avgLatency: 0,
       endpoints: {
         [PollingEndpoint.RACE]: { ...emptyEndpointMetrics },
-        [PollingEndpoint.ENTRANTS]: { ...emptyEndpointMetrics },
         [PollingEndpoint.POOLS]: { ...emptyEndpointMetrics },
         [PollingEndpoint.MONEY_FLOW]: { ...emptyEndpointMetrics },
       },
@@ -107,16 +106,6 @@ export function usePollingMetrics(
     // Initialize endpoint metrics
     const endpointMetrics: Record<PollingEndpointKey, EndpointMetrics> = {
       [PollingEndpoint.RACE]: {
-        requests: 0,
-        errors: 0,
-        latency: 0,
-        lastSuccess: null,
-        status: 'OK',
-        fallbacks: 0,
-        recoveries: 0,
-        lastError: null,
-      },
-      [PollingEndpoint.ENTRANTS]: {
         requests: 0,
         errors: 0,
         latency: 0,
@@ -327,10 +316,19 @@ export function usePollingMetrics(
   useEffect(() => {
     // Record polling activity from pollingState
     if (pollingState.isPolling && pollingState.lastUpdated) {
+      // Record start event first (for request counting)
       recordEvent({
         timestamp: pollingState.lastUpdated,
-        endpoint: PollingEndpoint.RACE, // Primary endpoint
+        endpoint: PollingEndpoint.RACE,
+        type: 'start',
+      })
+
+      // Then record outcome with latency
+      recordEvent({
+        timestamp: pollingState.lastUpdated,
+        endpoint: PollingEndpoint.RACE,
         type: pollingState.error ? 'error' : 'success',
+        durationMs: pollingState.lastRequestDurationMs ?? undefined,
         error: pollingState.error?.message,
       })
     }
@@ -342,9 +340,52 @@ export function usePollingMetrics(
     pollingState.isPolling,
     pollingState.error,
     pollingState.lastUpdated,
+    pollingState.lastRequestDurationMs,
     recordEvent,
     calculateMetrics,
   ])
+
+  /**
+   * Listen for custom endpoint metrics events from other hooks
+   */
+  useEffect(() => {
+    const handleEndpointMetrics = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        endpoint: PollingEndpointKey
+        timestamp: Date
+        success: boolean
+        durationMs?: number
+        error?: string
+      }>
+
+      const { endpoint, timestamp, success, durationMs, error } = customEvent.detail
+
+      // Record start event
+      recordEvent({
+        timestamp,
+        endpoint,
+        type: 'start',
+      })
+
+      // Record outcome
+      recordEvent({
+        timestamp,
+        endpoint,
+        type: success ? 'success' : 'error',
+        durationMs,
+        error,
+      })
+
+      // Recalculate metrics
+      const newMetrics = calculateMetrics()
+      setMetrics(newMetrics)
+    }
+
+    window.addEventListener('endpoint-metrics', handleEndpointMetrics)
+    return () => {
+      window.removeEventListener('endpoint-metrics', handleEndpointMetrics)
+    }
+  }, [recordEvent, calculateMetrics])
 
   return metrics
 }

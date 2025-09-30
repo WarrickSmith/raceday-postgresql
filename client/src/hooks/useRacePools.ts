@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RacePoolData } from '@/types/racePools'
+import { useEndpointMetrics } from './useEndpointMetrics'
+import { PollingEndpoint } from '@/types/pollingMetrics'
 
 interface UseRacePoolsResult {
   poolData: RacePoolData | null
@@ -31,6 +33,9 @@ export function useRacePools(
   const scheduledRef = useRef<number | null>(null) // rAF or setTimeout id
   const unmountedRef = useRef(false)
 
+  // Metrics tracking
+  const { recordRequest } = useEndpointMetrics(PollingEndpoint.POOLS)
+
   const clearScheduled = () => {
     if (scheduledRef.current !== null) {
       if (typeof cancelAnimationFrame !== 'undefined') {
@@ -55,6 +60,7 @@ export function useRacePools(
 
     const controller = new AbortController()
     abortControllerRef.current = controller
+    const requestStartTime = performance.now()
 
     const promise = (async () => {
       try {
@@ -71,20 +77,38 @@ export function useRacePools(
         }
 
         const data: RacePoolData = await response.json()
+        const requestDuration = Math.round(performance.now() - requestStartTime)
+
         if (!unmountedRef.current && !controller.signal.aborted) {
           setPoolData(data)
           setLastUpdate(new Date())
           setError(null)
+
+          // Record successful request
+          recordRequest({
+            success: true,
+            durationMs: requestDuration,
+          })
         }
       } catch (err) {
         // Ignore intentional aborts
         if ((err as Error)?.name === 'AbortError' || controller.signal.aborted) {
           return
         }
+
+        const requestDuration = Math.round(performance.now() - requestStartTime)
+        const message = (err as Error)?.message || 'Unknown pools fetch error'
+
         if (!unmountedRef.current) {
-          const message = (err as Error)?.message || 'Unknown pools fetch error'
           setError(message)
           setPoolData(null)
+
+          // Record failed request
+          recordRequest({
+            success: false,
+            durationMs: requestDuration,
+            error: message,
+          })
         }
       } finally {
         if (!unmountedRef.current) {
@@ -96,7 +120,7 @@ export function useRacePools(
 
     pendingRequestRef.current = promise
     return promise
-  }, [raceId])
+  }, [raceId, recordRequest])
 
   const scheduleFetch = useCallback(() => {
     clearScheduled()
