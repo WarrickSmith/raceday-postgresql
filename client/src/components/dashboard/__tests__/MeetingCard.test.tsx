@@ -268,7 +268,7 @@ describe('MeetingCard', () => {
       expect(screen.getByLabelText(/Status:/)).toBeInTheDocument();
     });
     
-    // Re-render with updated meeting data (simulating real-time update)
+    // Re-render with updated meeting data (simulating polling refresh)
     const updatedMeeting = { ...mockMeeting, $updatedAt: '2024-01-01T09:00:00Z' };
     rerender(<MeetingCard meeting={updatedMeeting} />);
     

@@ -248,10 +248,10 @@ describe('RaceCard', () => {
       expect(screen.getByText(RACE_STATUS.OPEN)).toBeInTheDocument();
     });
 
-    it('should maintain status display during real-time updates', async () => {
+    it('should maintain status display during polling updates', async () => {
       const { rerender } = render(<RaceCard race={{ ...mockRace, status: RACE_STATUS.OPEN }} />);
       
-      // Simulate real-time update
+      // Simulate polling-driven update
       const updatedRace = {
         ...mockRace,
         status: RACE_STATUS.RUNNING,
