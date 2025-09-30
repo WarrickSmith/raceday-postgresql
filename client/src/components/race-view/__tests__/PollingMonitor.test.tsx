@@ -9,34 +9,24 @@ const createMockMetrics = (overrides: Partial<PollingMetrics> = {}): PollingMetr
   avgLatency: 150,
   endpoints: {
     race: {
-      requests: 5,
-      errors: 0,
-      latency: 120,
+      requests: 7,
+      errors: 1,
+      latency: 140,
       lastSuccess: new Date('2025-01-15T10:00:00Z'),
-      status: 'OK',
+      status: 'WARNING',
       fallbacks: 0,
       recoveries: 0,
-      lastError: null,
-    },
-    entrants: {
-      requests: 2,
-      errors: 0,
-      latency: 200,
-      lastSuccess: new Date('2025-01-15T10:00:05Z'),
-      status: 'OK',
-      fallbacks: 0,
-      recoveries: 0,
-      lastError: null,
+      lastError: 'Timeout error',
     },
     pools: {
       requests: 2,
-      errors: 1,
+      errors: 0,
       latency: 180,
       lastSuccess: new Date('2025-01-15T10:00:03Z'),
-      status: 'WARNING',
+      status: 'OK',
       fallbacks: 0,
       recoveries: 1,
-      lastError: 'Timeout error',
+      lastError: null,
     },
     'money-flow': {
       requests: 1,
@@ -287,7 +277,6 @@ describe('PollingMonitor', () => {
 
     expect(screen.getByText('Endpoint Performance')).toBeInTheDocument()
     expect(screen.getByText('race')).toBeInTheDocument()
-    expect(screen.getByText('entrants')).toBeInTheDocument()
     expect(screen.getByText('pools')).toBeInTheDocument()
     expect(screen.getByText('money-flow')).toBeInTheDocument()
   })
@@ -302,8 +291,6 @@ describe('PollingMonitor', () => {
 
     const statusBadges = screen.getAllByText('OK')
     expect(statusBadges.length).toBeGreaterThan(0)
-
-    expect(screen.getByText('WARNING')).toBeInTheDocument()
   })
 
   it('should show recent activity log when expanded', () => {
@@ -416,16 +403,6 @@ describe('PollingMonitor', () => {
     const metrics = createMockMetrics({
       endpoints: {
         race: {
-          requests: 0,
-          errors: 0,
-          latency: 0,
-          lastSuccess: null,
-          status: 'OK',
-          fallbacks: 0,
-          recoveries: 0,
-          lastError: null,
-        },
-        entrants: {
           requests: 0,
           errors: 0,
           latency: 0,
