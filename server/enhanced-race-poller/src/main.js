@@ -28,6 +28,7 @@
  */
 
 import { Client, Databases, Query } from 'node-appwrite'
+import { sendCompressedJson } from '../../shared/http/compression.js'
 import { fetchRaceEventData, batchFetchRaceEventData } from './api-client.js'
 import {
   processEntrants,
@@ -607,7 +608,7 @@ async function executeHttpSinglePolling(
         )
       })
 
-      return context.res.json(immediateResponse, 202) // 202 Accepted
+      return sendCompressedJson(context, immediateResponse, 202) // 202 Accepted
     } else {
       // Direct execution (for testing or scheduled calls)
       const result = await processSingleRaceWithErrorHandling(
@@ -634,7 +635,7 @@ async function executeHttpSinglePolling(
     if (error.code === 404) {
       const response = { success: false, error: `Race not found: ${raceId}` }
       if (context.res && context.res.json) {
-        return context.res.json(response, 404)
+        return sendCompressedJson(context, response, 404)
       }
       return response
     }
@@ -656,7 +657,7 @@ async function executeHttpSinglePolling(
     }
 
     if (context.res && context.res.json) {
-      return context.res.json(response, 500)
+      return sendCompressedJson(context, response, 500)
     }
     return response
   }
@@ -696,7 +697,7 @@ async function executeHttpBatchPolling(
       }
 
       if (context.res && context.res.json) {
-        return context.res.json(response, 400)
+        return sendCompressedJson(context, response, 400)
       }
       return response
     }
@@ -736,7 +737,7 @@ async function executeHttpBatchPolling(
       }
 
       if (context.res && context.res.json) {
-        return context.res.json(response, 200)
+        return sendCompressedJson(context, response, 200)
       }
       return response
     }
@@ -770,7 +771,7 @@ async function executeHttpBatchPolling(
         )
       })
 
-      return context.res.json(immediateResponse, 202) // 202 Accepted
+      return sendCompressedJson(context, immediateResponse, 202) // 202 Accepted
     } else {
       // Direct execution (for testing)
       const raceData = validRaces.map((item) => ({
@@ -814,7 +815,7 @@ async function executeHttpBatchPolling(
     }
 
     if (context.res && context.res.json) {
-      return context.res.json(response, 500)
+      return sendCompressedJson(context, response, 500)
     }
     return response
   }

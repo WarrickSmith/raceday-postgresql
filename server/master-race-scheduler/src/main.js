@@ -2,6 +2,7 @@ import { Client, Databases, Functions, Query } from 'node-appwrite';
 import { validateEnvironmentVariables, executeWithTimeout, monitorMemoryUsage, forceGarbageCollection, categorizeError, logPerformanceMetrics } from './error-handlers.js';
 import { fastLockCheck, updateHeartbeat, releaseLock, setupHeartbeatInterval, shouldTerminateForNzTime } from './lock-manager.js';
 import { logDebug, logInfo, logWarn, logError, logFunctionStart, logFunctionComplete } from './logging-utils.js';
+import { sendCompressedJson } from '../../shared/http/compression.js';
 
 /**
  * Master Race Scheduler - Autonomous polling coordination for horse race data
@@ -141,7 +142,7 @@ export default async function main(context) {
     if (heartbeatInterval) clearInterval(heartbeatInterval);
     await releaseLock(lockManager, result.statistics || progressTracker, 'completed');
 
-    return context.res.json({
+    return sendCompressedJson(context, {
       success: result.success,
       message: result.message || 'Enhanced scheduler completed single cycle',
       ...result,
