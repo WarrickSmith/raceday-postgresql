@@ -365,37 +365,27 @@ Most of this task was already completed through earlier implementation work. The
 
 ---
 
-### Task 7: End-to-End Testing & Validation
+### Task 7: Retire Obsolete Real-Time Tests
 
 - **Status**: Not Started
 - **Priority**: High
-- **Estimated Effort**: 8 hours
+- **Estimated Effort**: 2 hours
 
-**Problem Statement**: Validate polling reliability, cadence compliance, and resilience across browsers/devices with comprehensive automated coverage. Ensure the polling system works correctly under various network conditions and device constraints.
+**Problem Statement**: Retire obsolete real-time tests that no longer apply to the polling-only architecture so the suite reflects current behaviour.
 
 **Task Details**:
 
-1. Expand integration tests covering cadence, status transitions, request dedup, and fallback rendering.
-2. Author Playwright scenarios for network interruptions, background tabs, and mobile breakpoints.
-3. Validate environment toggles and monitor instrumentation.
-4. Retire obsolete real-time tests that no longer apply to polling architecture.
-
-**Test Coverage Areas**:
-
-- Polling interval accuracy (30m/2.5m/30s cadence windows)
-- Status-based polling transitions (open → closed → final)
-- Request deduplication and error handling
-- Environment variable toggles (DOUBLE_POLLING_FREQUENCY, debug modes)
-- Progressive loading and incremental data fetching
+1. Inventory legacy real-time integration, end-to-end, and unit tests tied to deprecated sockets or subscriptions.
+2. Remove or rewrite those tests to align with the polling implementation and current feature set.
+3. Update test configuration and documentation to ensure obsolete suites no longer execute in CI.
 
 **Acceptance Criteria**:
 
-- [ ] Integration & Playwright suites cover polling workflows.
-- [ ] Normal and double-frequency modes verified.
-- [ ] No request stacking or data regressions detected.
-- [ ] TS/lint/tests succeed with zero `any` types.
+- [ ] No remaining tests reference deprecated real-time behaviour.
+- [ ] CI configuration excludes removed real-time suites without errors.
+- [ ] TS/lint/test pipelines pass without `any` types.
 
-**Testing Requirements**: Full automated test suite runs (`npm test`, `npm run lint`, `npx tsc --noEmit`), Playwright MCP runs with sufficient wait windows for polling behavior validation.
+**Testing Requirements**: Run `npm test`, `npm run lint`, and `npx tsc --noEmit` to verify the adjusted suite passes after removals.
 
 ---
 
