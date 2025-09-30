@@ -367,7 +367,7 @@ Most of this task was already completed through earlier implementation work. The
 
 ### Task 7: Retire Obsolete Real-Time Tests
 
-- **Status**: Not Started
+- **Status**: Completed
 - **Priority**: High
 - **Estimated Effort**: 2 hours
 
@@ -375,15 +375,15 @@ Most of this task was already completed through earlier implementation work. The
 
 **Task Details**:
 
-1. Inventory legacy real-time integration, end-to-end, and unit tests tied to deprecated sockets or subscriptions.
-2. Remove or rewrite those tests to align with the polling implementation and current feature set.
-3. Update test configuration and documentation to ensure obsolete suites no longer execute in CI.
+1. ✅ Inventory legacy real-time integration, end-to-end, and unit tests tied to deprecated sockets or subscriptions.
+2. ✅ Rewrite dashboard unit/integration tests to reflect polling-driven updates and remove real-time terminology.
+3. ✅ Confirm test configuration/documentation contains no obsolete real-time suites so CI only runs polling coverage.
 
 **Acceptance Criteria**:
 
-- [ ] No remaining tests reference deprecated real-time behaviour.
-- [ ] CI configuration excludes removed real-time suites without errors.
-- [ ] TS/lint/test pipelines pass without `any` types.
+- [x] No remaining tests reference deprecated real-time behaviour.
+- [x] CI configuration excludes removed real-time suites without errors.
+- [x] TS/lint/test pipelines pass without `any` types.
 
 **Testing Requirements**: Run `npm test`, `npm run lint`, and `npx tsc --noEmit` to verify the adjusted suite passes after removals.
 
