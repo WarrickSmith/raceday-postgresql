@@ -1,11 +1,7 @@
 'use client'
 
-import { databases, Query } from '@/lib/appwrite-client'
 import { ensureConnection, isConnectionHealthy } from '@/state/connectionState'
 import type { Race } from '@/types/meetings'
-
-const DATABASE_ID = 'raceday-db'
-const RACES_COLLECTION_ID = 'races'
 
 export interface FetchUpcomingRacesOptions {
   /** Number of minutes ahead to search for upcoming races (default 120) */
@@ -40,28 +36,24 @@ export async function fetchUpcomingRaces(
     return []
   }
 
-  const now = Date.now()
-  const lowerBound = new Date(now - lookbackMinutes * 60_000).toISOString()
-  const upperBound = new Date(now + windowMinutes * 60_000).toISOString()
-
   try {
-    const query = [
-      Query.greaterThan('startTime', lowerBound),
-      Query.lessThanEqual('startTime', upperBound),
-      Query.notEqual('status', 'Abandoned'),
-      Query.notEqual('status', 'Final'),
-      Query.notEqual('status', 'Finalized'),
-      Query.orderAsc('startTime'),
-      Query.limit(limit),
-    ]
+    // Call Next.js API route instead of Appwrite directly
+    const params = new URLSearchParams({
+      windowMinutes: windowMinutes.toString(),
+      lookbackMinutes: lookbackMinutes.toString(),
+      limit: limit.toString(),
+    })
 
-    const response = await databases.listDocuments(
-      DATABASE_ID,
-      RACES_COLLECTION_ID,
-      query
-    )
+    const response = await fetch(`/api/races/upcoming?${params.toString()}`, {
+      cache: 'no-store',
+    })
 
-    const races = response.documents as unknown as Race[]
+    if (!response.ok) {
+      throw new Error(`Failed to fetch upcoming races: ${response.statusText}`)
+    }
+
+    const data = await response.json() as { races: Race[]; total: number; timestamp: string }
+    const races = data.races
 
     if (typeof filter === 'function') {
       return races.filter(filter)
