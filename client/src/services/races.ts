@@ -1,5 +1,3 @@
-import { Query } from 'appwrite';
-import { databases } from '@/lib/appwrite-client';
 import { Race } from '@/types/meetings';
 
 // Type declaration for debug function on window
@@ -9,10 +7,8 @@ declare global {
   }
 }
 
-// Test database connection on module load (only in development)
-if (process.env.NODE_ENV === 'development') {
-  console.log('🔌 Database client loaded:', !!databases);
-}
+// Service migrated to use Next.js API routes instead of direct Appwrite calls
+// This eliminates CORS issues and keeps API keys server-side
 
 /**
  * Race data service functions for client-side operations
@@ -51,69 +47,23 @@ export async function fetchRacesForMeeting(meetingId: string): Promise<Race[]> {
     if (process.env.NODE_ENV === 'development') {
       console.log('🏁 Fetching races for meetingId:', meetingId);
     }
-    
-    // First try: Query by meeting field directly (if it's a relationship ID)
-    let response;
-    try {
-      response = await databases.listDocuments('raceday-db', 'races', [
-        Query.equal('meeting', meetingId),
-        Query.orderAsc('raceNumber'),
-        Query.limit(20),
-      ]);
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🏁 Direct meeting query result:', response.documents.length, 'races found');
-      }
-    } catch (directError) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🚨 Direct meeting query failed:', directError);
-      }
-      
-      // Fallback: Get all races and filter client-side (not ideal but works)
-      try {
-        const allRacesResponse = await databases.listDocuments('raceday-db', 'races', [
-          Query.limit(100)
-        ]);
-        
-        // Filter races by meetingId on the client side
-        const filteredRaces = allRacesResponse.documents.filter((race: Record<string, unknown>) => {
-          // Check if meeting is a string ID
-          if (typeof race.meeting === 'string') {
-            return race.meeting === meetingId;
-          }
-          
-          // Check if meeting is an object with meetingId property
-          if (typeof race.meeting === 'object' && race.meeting && 'meetingId' in race.meeting) {
-            return (race.meeting as Record<string, unknown>).meetingId === meetingId;
-          }
-          
-          // Check if meeting is an object with $id property
-          if (typeof race.meeting === 'object' && race.meeting && '$id' in race.meeting) {
-            return (race.meeting as Record<string, unknown>).$id === meetingId;
-          }
-          
-          return false;
-        });
-        
-        // Sort by race number
-        filteredRaces.sort((a: Record<string, unknown>, b: Record<string, unknown>) =>
-          (a.raceNumber as number) - (b.raceNumber as number)
-        );
-        
-        response = { documents: filteredRaces };
-        
-        if (process.env.NODE_ENV === 'development') {
-          console.log('🏁 Client-side filtered result:', response.documents.length, 'races found');
-        }
-      } catch (fallbackError) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('🚨 Fallback query also failed:', fallbackError);
-        }
-        throw fallbackError;
-      }
+
+    // Call Next.js API route instead of Appwrite directly
+    const response = await fetch(`/api/meetings/${meetingId}/races`, {
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch races: ${response.statusText}`);
     }
-    
-    return response.documents as unknown as Race[];
+
+    const data = await response.json() as { races: Race[]; total: number; timestamp: string };
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🏁 API response:', data.races.length, 'races found');
+    }
+
+    return data.races;
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
       console.error('🚨 Error fetching races:', error);

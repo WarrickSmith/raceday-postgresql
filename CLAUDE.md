@@ -75,11 +75,28 @@ RaceDay is a live horse racing dashboard built with Next.js 15+ and Appwrite Clo
 3. **Client Polling**: React hooks fetch data from Next.js API routes at dynamic intervals based on race timing
 4. **UI Updates**: Components re-render based on polling updates with staleness indicators and loading states
 
+### API Routes Architecture
+- **All Appwrite calls are server-side**: Client never directly accesses Appwrite database
+- **Key API Routes**:
+  - `/api/meetings` - Fetch all meetings
+  - `/api/meetings/[meetingId]/races` - Fetch races for a meeting
+  - `/api/meetings/[meetingId]/status` - Get meeting status
+  - `/api/races/upcoming` - Fetch upcoming races with time window filters
+  - `/api/race/[id]` - Fetch complete race data
+  - `/api/race/[id]/pools` - Fetch race pool data
+  - `/api/race/[id]/money-flow-timeline` - Fetch money flow history
+  - `/api/race/[id]/basic` - Fetch basic race information
+  - `/api/health` - Backend health check endpoint
+- **Benefits**: No CORS issues, API keys stay server-side, works on any domain without configuration
+
 ## Critical Polling Integration
 
-### Appwrite Client Configuration
-- Client configuration in `lib/appwrite-client.ts` and `lib/appwrite-server.ts`
-- Environment variables required: `NEXT_PUBLIC_APPWRITE_ENDPOINT`, `NEXT_PUBLIC_APPWRITE_PROJECT_ID`
+### Appwrite Configuration
+- **Server-side only**: All Appwrite database calls are made through Next.js API routes (no direct client calls)
+- Server configuration in `lib/appwrite-server.ts`
+- Client configuration in `lib/appwrite-client.ts` (not used for database calls)
+- Environment variables required: `NEXT_PUBLIC_APPWRITE_ENDPOINT`, `NEXT_PUBLIC_APPWRITE_PROJECT_ID`, `APPWRITE_API_KEY`
+- **No CORS configuration needed**: API routes eliminate CORS issues entirely
 - **Documentation Research**: Use MCP Context7 server for up-to-date Appwrite integration documentation and examples
 
 ### Key Hooks for Polling Data
