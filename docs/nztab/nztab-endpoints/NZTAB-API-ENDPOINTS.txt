@@ -1,7 +1,0 @@
-List-of-meetings			{{baseUrl}}/affiliates/v1/racing/meetings
-Specified-Meeting-ByID			{{baseUrl}}/affiliates/v1/racing/meetings/:id?enc=json
-List-Of-Races				{{baseUrl}}/affiliates/v1/racing/list?date_from=today
-List-Of-Futures				{{baseUrl}}/affiliates/v1/racing/futures?enc=json
-List-Of-Meetings-With-Extras		{{baseUrl}}/affiliates/v1/racing/extras?date_from=today
-Extras-For-A-Specified-Meeting		{{baseUrl}}/affiliates/v1/racing/extras/:id?enc=json
-Events-For-A-Specified-Race		{{baseUrl}}/affiliates/v1/racing/events/:id
