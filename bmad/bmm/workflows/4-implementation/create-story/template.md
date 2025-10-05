@@ -12,6 +12,18 @@ so that {{benefit}}.
 
 1. [Add acceptance criteria from epics/PRD]
 
+## Quality Requirements (Definition of Done)
+
+**MANDATORY for Story Completion:**
+- [ ] TypeScript compilation: Zero errors (`npm run build`)
+- [ ] ESLint validation: Zero errors, zero warnings (`npm run lint`)
+- [ ] No `any` types: Strict type enforcement (manual review)
+- [ ] All tests pass: Unit + Integration + E2E (`npm test -- --run`)
+- [ ] Code formatted: Prettier applied (`npm run format`)
+- [ ] Security scan: No high/critical vulnerabilities (`npm audit`)
+
+**Reference:** [Definition of Done](../../../docs/DEFINITION-OF-DONE.md)
+
 ## Tasks / Subtasks
 
 - [ ] Task 1 (AC: #)
