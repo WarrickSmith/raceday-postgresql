@@ -1,5 +1,8 @@
 # RaceDay Docker Compose Configuration
 #
+# NOTE: This configuration is currently client-only (Appwrite-based).
+# Story 1.5 will add PostgreSQL and Node.js server services.
+#
 # This file supports two deployment modes:
 #
 # 1. LOCAL DEVELOPMENT:
