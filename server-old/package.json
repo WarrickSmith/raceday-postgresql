@@ -1,0 +1,36 @@
+{
+  "name": "raceday-appwrite-functions",
+  "version": "2.0.0",
+  "description": "Nested Appwrite functions for RaceDay microservices architecture",
+  "type": "module",
+  "scripts": {
+    "install-cli": "npm install -g appwrite-cli",
+    "login": "node scripts/login.js",
+    "logout": "appwrite logout",
+    "status": "appwrite functions list",
+    "deploy": "appwrite push functions",
+    "deploy:meetings": "node scripts/deploy.js daily-meetings",
+    "deploy:races": "node scripts/deploy.js daily-races",
+    "deploy:initial-data": "node scripts/deploy.js daily-initial-data",
+    "deploy:enhanced-race-poller": "node scripts/deploy.js enhanced-race-poller",
+    "deploy:meeting-status": "node scripts/deploy.js meeting-status-poller",
+    "deploy:master-scheduler": "node scripts/deploy.js master-race-scheduler",
+    "deploy:database-setup": "node scripts/deploy.js database-setup",
+    "meetings": "node scripts/run-function.js daily-meetings",
+    "races": "node scripts/run-function.js daily-races",
+    "initial-data": "node scripts/run-function.js daily-initial-data",
+    "enhanced-race-poller": "node scripts/run-function.js enhanced-race-poller",
+    "meeting-status": "node scripts/run-function.js meeting-status-poller",
+    "master-scheduler": "node scripts/run-function.js master-race-scheduler",
+    "database-setup": "node scripts/run-function.js database-setup",
+    "execute": "node scripts/execute-function.js",
+    "get-test-race-ids": "node scripts/get-test-race-ids.js"
+  },
+  "dependencies": {
+    "node-appwrite": "^17.0.0",
+    "dotenv": "^16.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

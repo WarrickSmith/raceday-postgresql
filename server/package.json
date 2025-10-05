@@ -1,36 +1,42 @@
 {
-  "name": "raceday-appwrite-functions",
-  "version": "2.0.0",
-  "description": "Nested Appwrite functions for RaceDay microservices architecture",
+  "name": "raceday-server",
+  "version": "1.0.0",
+  "description": "Raceday PostgreSQL backend server",
+  "main": "dist/index.js",
   "type": "module",
-  "scripts": {
-    "install-cli": "npm install -g appwrite-cli",
-    "login": "node scripts/login.js",
-    "logout": "appwrite logout",
-    "status": "appwrite functions list",
-    "deploy": "appwrite push functions",
-    "deploy:meetings": "node scripts/deploy.js daily-meetings",
-    "deploy:races": "node scripts/deploy.js daily-races",
-    "deploy:initial-data": "node scripts/deploy.js daily-initial-data",
-    "deploy:enhanced-race-poller": "node scripts/deploy.js enhanced-race-poller",
-    "deploy:meeting-status": "node scripts/deploy.js meeting-status-poller",
-    "deploy:master-scheduler": "node scripts/deploy.js master-race-scheduler",
-    "deploy:database-setup": "node scripts/deploy.js database-setup",
-    "meetings": "node scripts/run-function.js daily-meetings",
-    "races": "node scripts/run-function.js daily-races",
-    "initial-data": "node scripts/run-function.js daily-initial-data",
-    "enhanced-race-poller": "node scripts/run-function.js enhanced-race-poller",
-    "meeting-status": "node scripts/run-function.js meeting-status-poller",
-    "master-scheduler": "node scripts/run-function.js master-race-scheduler",
-    "database-setup": "node scripts/run-function.js database-setup",
-    "execute": "node scripts/execute-function.js",
-    "get-test-race-ids": "node scripts/get-test-race-ids.js"
-  },
-  "dependencies": {
-    "node-appwrite": "^17.0.0",
-    "dotenv": "^16.0.0"
-  },
   "engines": {
     "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src tests --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\""
+  },
+  "keywords": [
+    "raceday",
+    "postgresql",
+    "backend"
+  ],
+  "author": "warrick",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.10",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@vitest/coverage-v8": "^2.1.9",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "pg": "^8.16.3"
   }
 }
