@@ -23,7 +23,11 @@ validation-rules:
 - [ ] Integration tests added/updated when component interactions are affected
 - [ ] End-to-end tests created for critical user flows, if applicable
 - [ ] All tests pass locally (no regressions introduced)
-- [ ] Linting and static checks (if configured) pass
+- [ ] **MANDATORY:** TypeScript compilation succeeds with zero errors (`npm run build` or `tsc --noEmit`)
+- [ ] **MANDATORY:** ESLint validation passes with zero errors and zero warnings (`npm run lint`)
+- [ ] **MANDATORY:** No `any` types used anywhere in the code (strict type enforcement)
+- [ ] Code formatted with Prettier (`npm run format`)
+- [ ] Security scan reviewed (`npm audit`) - no high/critical vulnerabilities
 
 ## Story File Updates
 
