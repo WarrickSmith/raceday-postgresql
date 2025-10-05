@@ -84,6 +84,75 @@ The application detects insider betting patterns by analyzing money flow changes
 - ESLint with strict rules
 - Zero lint errors policy
 
+### Coding Standards
+
+**Modern ES6+ Standards:**
+- **ES Modules (ESM):** All code uses `import`/`export` (not `require`/`module.exports`)
+- **Arrow Functions:** Use arrow functions for functional programming patterns
+- **Async/Await:** Prefer async/await over callbacks or raw Promises
+- **Const/Let:** Use `const` by default, `let` when reassignment needed (never `var`)
+- **Destructuring:** Use object/array destructuring for cleaner code
+- **Template Literals:** Use template literals for string interpolation
+- **Spread/Rest Operators:** Leverage spread syntax for immutability
+- **Optional Chaining:** Use `?.` for safe property access
+- **Nullish Coalescing:** Use `??` for default values (not `||`)
+
+**Functional Programming Principles:**
+- **Pure Functions:** Functions should be side-effect free when possible
+- **Immutability:** Avoid mutating objects/arrays; create new instances
+- **Array Methods:** Use `.map()`, `.filter()`, `.reduce()`, `.find()` over loops
+- **Function Composition:** Build complex logic from simple, composable functions
+- **No Classes for Business Logic:** Prefer functional composition over OOP patterns
+
+**TypeScript Best Practices:**
+- **Type Inference:** Let TypeScript infer types when obvious
+- **Interface over Type:** Use `interface` for object shapes, `type` for unions/intersections
+- **Strict Typing:** No `any`, use `unknown` when type truly unknown
+- **Runtime Validation:** Use Zod for API boundaries and external data
+- **Named Exports:** Prefer named exports over default exports for better refactoring
+
+**Code Quality Standards:**
+- **TypeScript:** Zero compilation errors (`npm run build` must succeed)
+- **ESLint:** Zero errors and zero warnings (`npm run lint` must pass)
+- **No `any` Types:** Strict type enforcement (use `unknown` when type is genuinely unknown)
+- **Prettier:** Automatic formatting enforced (2 spaces, single quotes, no semicolons)
+- **Maximum Function Length:** 50 lines (refactor if longer)
+- **Maximum File Length:** 300 lines (split if longer)
+- **Meaningful Names:** Use descriptive variable/function names (no abbreviations)
+- **Comments:** Explain "why" not "what"; code should be self-documenting
+
+**Validation Commands:**
+```bash
+npm run build    # TypeScript compilation (0 errors required)
+npm run lint     # ESLint validation (0 errors, 0 warnings required)
+npm run format   # Prettier formatting
+npm test -- --run  # Full test suite
+npm audit        # Security vulnerability scan
+```
+
+**Definition of Done:** All stories must satisfy quality gates defined in [DEFINITION-OF-DONE.md](./DEFINITION-OF-DONE.md)
+
+**Module System Configuration:**
+```json
+// package.json
+{
+  "type": "module"  // Enable ES modules
+}
+```
+
+```json
+// tsconfig.json
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "target": "ES2022",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
+  }
+}
+```
+
 ### Dependencies
 
 **Production Dependencies (Node.js 22 LTS Compatible):**
