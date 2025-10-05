@@ -15,9 +15,9 @@ Activate agents in CLI:
 
 ### CORE Module
 
-#### 🧙 BMad Master Task Executor (`@bmad-master`)
+#### 🧙 BMad Master Executor, Knowledge Custodian, and Workflow Orchestrator (`@bmad-master`)
 
-**When to use:** Use for BMad Master Task Executor tasks
+**When to use:** Use for BMad Master Executor, Knowledge Custodian, and Workflow Orchestrator tasks
 
 **Activation:** Type `@bmad-master` to activate this agent.
 
@@ -26,6 +26,14 @@ Activate agents in CLI:
 **When to use:** Use for BMad Web Orchestrator tasks
 
 **Activation:** Type `@bmad-web-orchestrator` to activate this agent.
+
+### BMB Module
+
+#### 🧙 BMad Builder (`@bmad-builder`)
+
+**When to use:** Use for BMad Builder tasks
+
+**Activation:** Type `@bmad-builder` to activate this agent.
 
 ### BMM Module
 
@@ -94,6 +102,44 @@ Activate agents in CLI:
 **When to use:** Use for UX Expert tasks
 
 **Activation:** Type `@ux-expert` to activate this agent.
+
+### CIS Module
+
+#### 🤖 README (`@README`)
+
+**When to use:** Use for README tasks
+
+**Activation:** Type `@README` to activate this agent.
+
+#### 🧠 Elite Brainstorming Specialist (`@brainstorming-coach`)
+
+**When to use:** Use for Elite Brainstorming Specialist tasks
+
+**Activation:** Type `@brainstorming-coach` to activate this agent.
+
+#### 🔬 Master Problem Solver (`@creative-problem-solver`)
+
+**When to use:** Use for Master Problem Solver tasks
+
+**Activation:** Type `@creative-problem-solver` to activate this agent.
+
+#### 🎨 Design Thinking Maestro (`@design-thinking-coach`)
+
+**When to use:** Use for Design Thinking Maestro tasks
+
+**Activation:** Type `@design-thinking-coach` to activate this agent.
+
+#### ⚡ Disruptive Innovation Oracle (`@innovation-strategist`)
+
+**When to use:** Use for Disruptive Innovation Oracle tasks
+
+**Activation:** Type `@innovation-strategist` to activate this agent.
+
+#### 📖 Master Storyteller (`@storyteller`)
+
+**When to use:** Use for Master Storyteller tasks
+
+**Activation:** Type `@storyteller` to activate this agent.
 
 ---
 
