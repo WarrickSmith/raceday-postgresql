@@ -2,9 +2,13 @@
 
 **Project:** Appwrite to Node.js/PostgreSQL Migration
 **Version:** 1.0
-**Date:** 2025-10-05
+**Date:** 2025-10-05 (Updated: 2025-10-07)
 **Architect:** Winston (BMAD System Architect)
 **Stakeholder:** Warrick
+
+**API Reference:**
+- [NZ TAB API OpenAPI Specification](./api/nztab-openapi.json)
+- [API Research Findings](./research-findings-nztab-api.md)
 
 ---
 

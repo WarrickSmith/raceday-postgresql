@@ -2,9 +2,13 @@
 
 **Epic:** Epic 1 - Core Infrastructure Setup
 **Project:** raceday-postgresql
-**Date:** 2025-10-05
+**Date:** 2025-10-05 (Updated: 2025-10-07)
 **Author:** warrick
 **Status:** Ready for Development
+
+**Related Documentation:**
+- [NZ TAB API OpenAPI Specification](./api/nztab-openapi.json)
+- [API Research Findings](./research-findings-nztab-api.md)
 
 ---
 

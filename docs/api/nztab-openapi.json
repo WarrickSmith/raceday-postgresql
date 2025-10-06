@@ -1,0 +1,3906 @@
+{
+  "components": {
+    "schemas": {
+      "BarrierStartSummaries": {
+        "description": "BarrierStartSummaries details.",
+        "nullable": true,
+        "properties": {
+          "barrier": {
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          }
+        },
+        "required": [
+          "barrier"
+        ],
+        "type": "object"
+      },
+      "Deduction": {
+        "description": "Deduction details.",
+        "nullable": true,
+        "properties": {
+          "place": {
+            "type": "number"
+          },
+          "win": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "win",
+          "place"
+        ],
+        "type": "object"
+      },
+      "EntrantLiability": {
+        "description": "EntrantLiability details.",
+        "nullable": true,
+        "properties": {
+          "bet_percentage": {
+            "description": "The percent of total bets that have been placed on the race",
+            "type": "number"
+          },
+          "entrant_id": {
+            "description": "Unique ID for an entrant of a race",
+            "type": "string"
+          },
+          "hold_percentage": {
+            "description": "The percent of total hold that’s being held on this entrant",
+            "type": "number"
+          }
+        },
+        "required": [
+          "entrant_id",
+          "hold_percentage",
+          "bet_percentage"
+        ],
+        "type": "object"
+      },
+      "EventBet": {
+        "description": "EventBet details.",
+        "nullable": true,
+        "properties": {
+          "description": {
+            "description": "The entrant name and barrier number the Bet has been placed on",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "legs": {
+            "description": "Specific information about the Bet",
+            "items": {
+              "$ref": "#/components/schemas/EventBetLeg"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "place_odds": {
+            "description": "The odds that were selected when the Bet was placed",
+            "type": "number"
+          },
+          "place_time": {
+            "description": "The datetime that the bet was placed",
+            "format": "date-time",
+            "type": "string"
+          },
+          "stake": {
+            "description": "The stake of the bet in dollars",
+            "type": "number"
+          },
+          "title": {
+            "description": "The product type that the Bet has been placed on",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "description",
+          "stake",
+          "legs",
+          "place_time",
+          "place_odds"
+        ],
+        "type": "object"
+      },
+      "EventBetLeg": {
+        "description": "EventBetLeg details.",
+        "nullable": true,
+        "properties": {
+          "race": {
+            "$ref": "#/components/schemas/EventBetLegRace"
+          },
+          "selections": {
+            "description": "Selections are optional for BetLeg.Type of BetLegType_BET_LEG_TYPE_EXOTIC or BetLegType_BET_LEG_TYPE_COMPOUND.\nIs the selections the bet leg grouped and ordered by position.",
+            "items": {
+              "$ref": "#/components/schemas/EventBetLegSelection"
+            },
+            "nullable": true,
+            "type": "array"
+          }
+        },
+        "required": [
+          "selections"
+        ],
+        "type": "object"
+      },
+      "EventBetLegRace": {
+        "description": "EventBetLegRace details.",
+        "nullable": true,
+        "properties": {
+          "barrier_number": {
+            "description": "BarrierNumber for the EntrantID if set.",
+            "type": "integer"
+          },
+          "entrant_id": {
+            "description": "EntrantID is optional. Only populated when bet is of a type with only one selection allowed, like Win or Place.\nIs the entrant id of the selection.",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "entrant_name": {
+            "description": "EntrantName for the EntrantID if set.",
+            "type": "string"
+          },
+          "entrant_number": {
+            "description": "EntrantNumber for the EntrantID if set.",
+            "type": "integer"
+          },
+          "meeting_name": {
+            "description": "MeetingName for the MeetingID if set.",
+            "type": "string"
+          },
+          "product_type_name": {
+            "description": "ProductTypeName for the ProductTypeID.",
+            "type": "string"
+          },
+          "race_name": {
+            "description": "RaceName for the RaceID if set.",
+            "type": "string"
+          },
+          "race_number": {
+            "description": "RaceNumber for the RaceID if set.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "meeting_name",
+          "race_name",
+          "race_number",
+          "product_type_name"
+        ],
+        "type": "object"
+      },
+      "EventBetLegSelection": {
+        "description": "EventBetLegSelection details.",
+        "nullable": true,
+        "properties": {
+          "entrants": {
+            "description": "Entrants for the selections of the same Position ordered ascending.",
+            "items": {
+              "$ref": "#/components/schemas/EventBetLegSelectionEntrant"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "position": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "position",
+          "entrants"
+        ],
+        "type": "object"
+      },
+      "EventBetLegSelectionEntrant": {
+        "description": "EventBetLegSelectionEntrant details.",
+        "nullable": true,
+        "properties": {
+          "entrant_barrier": {
+            "description": "EntrantBarrier for the entrant.",
+            "type": "integer"
+          },
+          "entrant_id": {
+            "description": "EntrantID is one of the entrant ids for a selection.",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "entrant_name": {
+            "description": "EntrantName for the entrant.",
+            "type": "string"
+          },
+          "entrant_number": {
+            "description": "EntrantNumber for the entrant.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entrant_id",
+          "entrant_name",
+          "entrant_number",
+          "entrant_barrier"
+        ],
+        "type": "object"
+      },
+      "EventDividend": {
+        "description": "EventDividend details.",
+        "nullable": true,
+        "properties": {
+          "description": {
+            "description": "The description of the results for the pool",
+            "type": "string"
+          },
+          "dividend": {
+            "description": "The declared dividend of the pool in dollars",
+            "type": "number"
+          },
+          "id": {
+            "description": "The unique ID in relation to the Pool",
+            "type": "string"
+          },
+          "jackpot_size": {
+            "description": "The size of the pool's jackpot in dollars if applicable",
+            "type": "number"
+          },
+          "pool_size": {
+            "description": "The size of the pool in dollars",
+            "type": "number"
+          },
+          "positions": {
+            "description": "The result of the pool",
+            "items": {
+              "$ref": "#/components/schemas/EventDividendPosition"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "product_name": {
+            "description": "The name of the pool",
+            "type": "string"
+          },
+          "status": {
+            "description": "The status of the pool",
+            "type": "string"
+          },
+          "tote": {
+            "description": "The tote that the Pool has paid on (only NZ for TAB)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tote",
+          "product_name",
+          "status",
+          "dividend",
+          "pool_size",
+          "jackpot_size",
+          "positions",
+          "description"
+        ],
+        "type": "object"
+      },
+      "EventDividendPosition": {
+        "description": "EventDividendPosition details.",
+        "nullable": true,
+        "properties": {
+          "position": {
+            "type": "integer"
+          },
+          "runner_number": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "runner_number",
+          "position"
+        ],
+        "type": "object"
+      },
+      "EventEntrant": {
+        "description": "EventEntrant details.",
+        "properties": {
+          "age": {
+            "description": "The age of the entrant in years",
+            "type": "integer"
+          },
+          "all_box_history": {
+            "description": "Available only to registered partners and featured countries.\nA summary of a greyhounds performance in all boxes",
+            "items": {
+              "$ref": "#/components/schemas/BarrierStartSummaries"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "all_weather": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "all_weather_slushy": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "allowance_weight": {
+            "description": "The weight an apprentice jockey can claim",
+            "type": "string"
+          },
+          "alt_silk_url_64x64": {
+            "description": "The URL of the entrants' 64x64 silk image",
+            "type": "string"
+          },
+          "alt_silk_url_128x128": {
+            "description": "The URL of the entrants' 128x128 silk image",
+            "type": "string"
+          },
+          "apprentice_indicator": {
+            "description": "Indicates if a jockey is an apprentice",
+            "type": "string"
+          },
+          "barrier": {
+            "description": "The barrier the entrant is in",
+            "type": "integer"
+          },
+          "barrier_position": {
+            "description": "The barrier position for an entrant (Harness Racing only)",
+            "nullable": true,
+            "type": "string"
+          },
+          "best_mile_rate": {
+            "description": "Available only to registered partners and featured countries.\nBest mile rate for the runner",
+            "type": "string"
+          },
+          "best_time": {
+            "description": "A greyhounds best time",
+            "nullable": true,
+            "type": "string"
+          },
+          "box_history": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "breeding": {
+            "description": "Breeding for the entrant",
+            "type": "string"
+          },
+          "class_level": {
+            "description": "The class level of the entrant",
+            "type": "string"
+          },
+          "colour": {
+            "description": "The colour of the entrant",
+            "type": "string"
+          },
+          "country": {
+            "description": "The country the entrant is registered in",
+            "type": "string"
+          },
+          "dam": {
+            "description": "The entrant's dam",
+            "type": "string"
+          },
+          "dam_dam": {
+            "description": "The name of the dam's dam",
+            "type": "string"
+          },
+          "dam_sire": {
+            "description": "The name of the dam's sire",
+            "type": "string"
+          },
+          "deductions": {
+            "$ref": "#/components/schemas/Deduction"
+          },
+          "distance": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "emergency_position": {
+            "description": "Available only to registered partners and featured countries.\nIndicates if it is an emergency position for the entrant",
+            "nullable": true,
+            "type": "string"
+          },
+          "entrant_id": {
+            "description": "Unique ID for an entrant of a race",
+            "type": "string"
+          },
+          "fast": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "favourite": {
+            "description": "Indicates whether the entrant is the favourite",
+            "type": "boolean"
+          },
+          "firm": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "first_start_indicator": {
+            "description": "Available only to registered partners and featured countries.\nIndicates if it is a first start for the entrant",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "first_up": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "foaling_date": {
+            "description": "Available only to registered partners and featured countries.\nThe date of birth of an entrant",
+            "nullable": true,
+            "type": "string"
+          },
+          "form_comment": {
+            "description": "Available only to registered partners.\nThe form comment of an entrant in a race",
+            "nullable": true,
+            "type": "string"
+          },
+          "form_comment_short": {
+            "description": "Available only to registered partners.\nShort comment on the runner's form",
+            "nullable": true,
+            "type": "string"
+          },
+          "form_indicators": {
+            "description": "Specific indicators about an entrant's form",
+            "items": {
+              "$ref": "#/components/schemas/FormIndicator"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "fourth_up": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "fresh_30": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "fresh_90": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "gear": {
+            "description": "The gear an entrant is wearing in a race",
+            "type": "string"
+          },
+          "good": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "grass": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "grass_wet": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "handicap": {
+            "description": "Handicap is the handicap of the entrant.",
+            "type": "number"
+          },
+          "handicap_rating": {
+            "description": "Attribute is no longer available",
+            "nullable": true,
+            "type": "string"
+          },
+          "heavy": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "horse_id": {
+            "description": "The unique identifier of the horse",
+            "type": "integer"
+          },
+          "hurdle": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "is_emergency": {
+            "description": "Available only to registered partners and featured countries.\nIndicates whether an entrant is an emergency",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "is_late_scratched": {
+            "description": "Available only to registered partner and featured countries.\nIndicates whether an entrant was late scratched",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "is_scratched": {
+            "description": "Indicates whether the entrant is scratched",
+            "type": "boolean"
+          },
+          "jockey": {
+            "description": "The jockey riding the entrant in the race",
+            "type": "string"
+          },
+          "jockey_past_performances": {
+            "$ref": "#/components/schemas/EventJockeyPastPerformances"
+          },
+          "last_12_months": {
+            "$ref": "#/components/schemas/Last12MonthsSummary"
+          },
+          "last_12_months_prize_money": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "The runner's last 12 months estimated winnings",
+            "nullable": true,
+            "type": "object"
+          },
+          "last_12_p": {
+            "description": "Available only to registered partners and featured countries.\nLast 12 Months Place Percentage for the runner",
+            "nullable": true,
+            "type": "string"
+          },
+          "last_12_w": {
+            "description": "Available only to registered partners and featured countries.\nLast 12 Months Win Percentage for the runner",
+            "nullable": true,
+            "type": "string"
+          },
+          "last_starts": {
+            "description": "Available only to registered partners and featured countries.\nA specific breakdown of an entrants last starts.",
+            "items": {
+              "$ref": "#/components/schemas/LastStart"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "last_twenty_starts": {
+            "description": "The last 20 start results of the entrant",
+            "type": "string"
+          },
+          "left_handed": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "market_name": {
+            "description": "The name of the market the entrant is available on",
+            "type": "string"
+          },
+          "mobile": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "mover": {
+            "description": "Indicates whether an entrant is a mover",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "The name of the entrant",
+            "type": "string"
+          },
+          "odds": {
+            "$ref": "#/components/schemas/odds"
+          },
+          "overall": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "owners": {
+            "description": "The owners of a given entrant",
+            "type": "string"
+          },
+          "past_performances": {
+            "$ref": "#/components/schemas/EventEntrantPastPerformances"
+          },
+          "place_p": {
+            "description": "Available only to registered partners and featured countries.\nPlace percentage for the runner",
+            "nullable": true,
+            "type": "string"
+          },
+          "predictors": {
+            "description": "Predictors for greyhound entrants.",
+            "items": {
+              "$ref": "#/components/schemas/Predictor"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "preview": {
+            "description": "Preview contains any runner comments",
+            "type": "string"
+          },
+          "primary_market": {
+            "description": "Whether the market is the primary market",
+            "type": "boolean"
+          },
+          "prize_money": {
+            "description": "The total prize money the entrant has won over its career in dollars",
+            "type": "string"
+          },
+          "rating": {
+            "description": "Attribute is no longer available",
+            "nullable": true,
+            "type": "string"
+          },
+          "right_handed": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "runner_change": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Available only to registered partners and featured countries.\nAny Runner Change for the entrant",
+            "nullable": true,
+            "type": "object"
+          },
+          "runner_number": {
+            "description": "The saddle number of the entrant",
+            "type": "integer"
+          },
+          "runner_win_history": {
+            "description": "The runner's winning history",
+            "items": {
+              "$ref": "#/components/schemas/WinHistory"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "scratch_time": {
+            "description": "If an entrant is scratched, the time it was declared in seconds",
+            "type": "integer"
+          },
+          "second_up": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "sex": {
+            "description": "The sex of the entrant",
+            "type": "string"
+          },
+          "silk_colours": {
+            "description": "The colours of the entrants' silks",
+            "type": "string"
+          },
+          "silk_url_64x64": {
+            "description": "The URL of the entrants' 64x64 silk image",
+            "type": "string"
+          },
+          "silk_url_128x128": {
+            "description": "The URL of the entrants' 128x128 silk image",
+            "type": "string"
+          },
+          "sire": {
+            "description": "The entrant's sire",
+            "type": "string"
+          },
+          "slow": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "soft": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "speedmap": {
+            "$ref": "#/components/schemas/Speedmap"
+          },
+          "spr": {
+            "description": "Available only to registered partners and featured countries.\nStakes per race won for the runner",
+            "nullable": true,
+            "type": "integer"
+          },
+          "standing": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "steeple": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "synthetic": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "third_up": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "track": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "track_distance": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "trainer_location": {
+            "description": "The location of the entrant's trainer.",
+            "type": "string"
+          },
+          "trainer_name": {
+            "description": "The name of the entrant's trainer",
+            "type": "string"
+          },
+          "turf": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "weight": {
+            "$ref": "#/components/schemas/Weight"
+          },
+          "weight_for_age": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "win_p": {
+            "description": "Available only to registered partners and featured countries.\nWin percentage for the runner",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "entrant_id",
+          "market_name",
+          "primary_market",
+          "name",
+          "is_scratched",
+          "gear",
+          "odds",
+          "scratch_time",
+          "barrier",
+          "runner_number",
+          "prize_money",
+          "age",
+          "sex",
+          "colour",
+          "silk_colours",
+          "silk_url_64x64",
+          "silk_url_128x128",
+          "class_level",
+          "jockey",
+          "apprentice_indicator",
+          "allowance_weight",
+          "owners",
+          "country",
+          "trainer_name",
+          "last_twenty_starts",
+          "sire",
+          "dam",
+          "breeding",
+          "weight",
+          "favourite",
+          "mover",
+          "form_indicators",
+          "trainer_location"
+        ],
+        "type": "object"
+      },
+      "EventEntrantPastPerformances": {
+        "description": "EventEntrantPastPerformances details.",
+        "nullable": true,
+        "properties": {
+          "jockey": {
+            "$ref": "#/components/schemas/StartSummary"
+          }
+        },
+        "type": "object"
+      },
+      "EventJockeyPastPerformances": {
+        "description": "EventJockeyPastPerformances details.",
+        "nullable": true,
+        "properties": {
+          "last_50_starts": {
+            "$ref": "#/components/schemas/StartSummary"
+          },
+          "trainer": {
+            "$ref": "#/components/schemas/StartSummary"
+          }
+        },
+        "type": "object"
+      },
+      "EventRace": {
+        "description": "EventRace is the struct to map info for one race in the response.",
+        "properties": {
+          "actual_start": {
+            "description": "The actual time the race started in seconds",
+            "type": "integer"
+          },
+          "actual_start_string": {
+            "description": "The actual time the race started as a datetime",
+            "type": "string"
+          },
+          "advertised_start": {
+            "description": "The advertised start time of the race in seconds",
+            "type": "integer"
+          },
+          "advertised_start_string": {
+            "description": "The advertised start time of the race as a datetime",
+            "type": "string"
+          },
+          "age_conditions": {
+            "description": "Available only to registered partners and featured countries.\nRestrictions on the age of participants",
+            "nullable": true,
+            "type": "string"
+          },
+          "allowance_conditions": {
+            "description": "Available only to registered partners and featured countries.\nRestrictions on the weight carried by participants",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "class": {
+            "description": "Available only to registered partners and featured countries.",
+            "nullable": true,
+            "type": "string"
+          },
+          "comment": {
+            "description": "The comment of the race",
+            "type": "string"
+          },
+          "country": {
+            "description": "The country the race is being held at",
+            "type": "string"
+          },
+          "description": {
+            "description": "The name of the race",
+            "type": "string"
+          },
+          "display_meeting_name": {
+            "description": "The meeting name that is displayed",
+            "type": "string"
+          },
+          "distance": {
+            "description": "The distance of the race in metres",
+            "type": "integer"
+          },
+          "entrant_count": {
+            "description": "The count of how many entrants are in the race",
+            "type": "integer"
+          },
+          "event_id": {
+            "description": "Unique eventID for the race",
+            "type": "string"
+          },
+          "fftop3_option_number": {
+            "description": "Available only to registered partners and featured countries.\nThe Option Number for Fixed Place",
+            "nullable": true,
+            "type": "integer"
+          },
+          "ffwin_option_number": {
+            "description": "Available only to registered partners and featured countries.\nThe Option Number for Fixed Win",
+            "nullable": true,
+            "type": "integer"
+          },
+          "field_size": {
+            "description": "The size of the field, excluding scratched runners",
+            "nullable": true,
+            "type": "integer"
+          },
+          "form_guide": {
+            "description": "The form guide",
+            "type": "string"
+          },
+          "gait": {
+            "description": "Available only to registered partners and featured countries.\nThe gait of the race",
+            "nullable": true,
+            "type": "string"
+          },
+          "gender_conditions": {
+            "description": "Available only to registered partners and featured countries.\nRestrictions on the gender of participants",
+            "nullable": true,
+            "type": "string"
+          },
+          "group": {
+            "description": "If the race is a group race, the group",
+            "type": "string"
+          },
+          "jockey_conditions": {
+            "description": "Available only to registered partners and featured countries.\nJockey Conditions of the race",
+            "nullable": true,
+            "type": "string"
+          },
+          "meeting_id": {
+            "description": "Unique meetingID of the meeting the race is at",
+            "type": "string"
+          },
+          "meeting_name": {
+            "description": "The name of the meeting the race is at",
+            "type": "string"
+          },
+          "mile_rate_400": {
+            "description": "Available only to registered partners and featured countries.\nMileRate400 is the sectional time for the last 400 meters of the race.",
+            "nullable": true,
+            "type": "string"
+          },
+          "mile_rate_800": {
+            "description": "Available only to registered partners and featured countries.\nMileRate800 is the sectional time for the last 800 meters of the race.",
+            "nullable": true,
+            "type": "string"
+          },
+          "positions_paid": {
+            "description": "The expected number of positions that dividends will be paid for",
+            "type": "integer"
+          },
+          "prize_monies": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "The prize money for the race",
+            "nullable": true,
+            "type": "object"
+          },
+          "protest": {
+            "description": "Protest denotes whether the race had a protest",
+            "type": "boolean"
+          },
+          "protest_reason": {
+            "description": "ProtestReason is the reason for the protest",
+            "type": "string"
+          },
+          "race_date_nz": {
+            "description": "Starting day of the event in NZST or NZDT",
+            "nullable": true,
+            "type": "string"
+          },
+          "race_number": {
+            "description": "The race number of the race",
+            "type": "integer"
+          },
+          "rail_position": {
+            "description": "The position of the rail",
+            "type": "string"
+          },
+          "silk_base_url": {
+            "description": "Unused silk URL for the entrants",
+            "type": "string"
+          },
+          "silk_url": {
+            "description": "The URL for a sprite-sheet for the silks in the race",
+            "type": "string"
+          },
+          "special_conditions": {
+            "description": "Available only to registered partners and featured countries.\nSpecial Conditions of the race",
+            "nullable": true,
+            "type": "string"
+          },
+          "start_time_nz": {
+            "description": "Starting time of the event in NZST or NZDT.",
+            "nullable": true,
+            "type": "string"
+          },
+          "start_type": {
+            "description": "The start type of the (harness) race",
+            "type": "string"
+          },
+          "state": {
+            "description": "The state the race is being held at",
+            "type": "string"
+          },
+          "status": {
+            "description": "The status of the race",
+            "type": "string"
+          },
+          "tips": {
+            "description": "Entrant_ID’s of tips that are displayed on the FE",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "track_circumference": {
+            "description": "Available only to registered partners and featured countries.\nThe track circumference",
+            "nullable": true,
+            "type": "integer"
+          },
+          "track_condition": {
+            "description": "The condition of the track",
+            "type": "string"
+          },
+          "track_direction": {
+            "description": "The track direction",
+            "type": "string"
+          },
+          "track_home_straight": {
+            "description": "The home straight of the track, in metres",
+            "type": "number"
+          },
+          "track_surface": {
+            "description": "Available only to registered partners and featured countries.\nThe track surface",
+            "nullable": true,
+            "type": "string"
+          },
+          "type": {
+            "description": "The racing code (Thoroughbreds, Harness, Greyhounds)",
+            "type": "string"
+          },
+          "video_channel": {
+            "description": "The singular video channel that this race will be on",
+            "type": "integer"
+          },
+          "video_channels": {
+            "description": "The channel(s) that the race will be displayed on",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "video_channels_meta": {
+            "additionalProperties": {
+              "items": {
+                "type": "integer"
+              },
+              "nullable": true,
+              "type": "array"
+            },
+            "description": "The meta for the channel(s) that the race will be displayed on",
+            "nullable": true,
+            "type": "object"
+          },
+          "weather": {
+            "description": "The weather at the track of the race",
+            "type": "string"
+          },
+          "weight_and_handicap_conditions": {
+            "description": "Available only to registered partners and featured countries.\nRestrictions on the weight carried by participants in this event",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id",
+          "meeting_name",
+          "display_meeting_name",
+          "meeting_id",
+          "status",
+          "description",
+          "advertised_start",
+          "actual_start",
+          "advertised_start_string",
+          "actual_start_string",
+          "race_number",
+          "type",
+          "start_type",
+          "country",
+          "state",
+          "distance",
+          "weather",
+          "form_guide",
+          "comment",
+          "silk_base_url",
+          "track_condition",
+          "track_direction",
+          "silk_url",
+          "entrant_count",
+          "positions_paid",
+          "tips",
+          "rail_position",
+          "group",
+          "prize_monies",
+          "track_home_straight"
+        ],
+        "type": "object"
+      },
+      "EventRaceDetails": {
+        "description": "EventRaceDetails response.",
+        "properties": {
+          "big_bets": {
+            "items": {
+              "$ref": "#/components/schemas/EventBet"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "biggest_bet": {
+            "$ref": "#/components/schemas/EventBet"
+          },
+          "derivatives": {
+            "items": {
+              "$ref": "#/components/schemas/EventRunner"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "dividends": {
+            "items": {
+              "$ref": "#/components/schemas/EventDividend"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "error": {
+            "type": "string"
+          },
+          "favourite": {
+            "$ref": "#/components/schemas/EventEntrant"
+          },
+          "live_bets": {
+            "items": {
+              "$ref": "#/components/schemas/EventBet"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "money_tracker": {
+            "$ref": "#/components/schemas/MoneyTracker"
+          },
+          "mover": {
+            "$ref": "#/components/schemas/EventEntrant"
+          },
+          "race": {
+            "$ref": "#/components/schemas/EventRace"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/EventResult"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "runners": {
+            "items": {
+              "$ref": "#/components/schemas/EventRunner"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "substitutions": {
+            "items": {
+              "$ref": "#/components/schemas/EventSubstitution"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "tote_pools": {
+            "items": {
+              "$ref": "#/components/schemas/TotePool"
+            },
+            "nullable": true,
+            "type": "array"
+          }
+        },
+        "required": [
+          "race",
+          "favourite",
+          "runners",
+          "derivatives",
+          "mover",
+          "big_bets",
+          "live_bets",
+          "error"
+        ],
+        "type": "object"
+      },
+      "EventResult": {
+        "description": "EventResult details.",
+        "nullable": true,
+        "properties": {
+          "barrier": {
+            "description": "The barrier of the entrant",
+            "type": "integer"
+          },
+          "entrant_id": {
+            "description": "Unique ID for an entrant of a race",
+            "type": "string"
+          },
+          "margin_length": {
+            "description": "The margin between the entrant and the winner",
+            "type": "number"
+          },
+          "name": {
+            "description": "The name of the entrant",
+            "type": "string"
+          },
+          "position": {
+            "description": "The position that the entrant placed in the race",
+            "type": "integer"
+          },
+          "positional_margin": {
+            "description": "The margin between the entrant and the entrant which placed before the it.",
+            "type": "string"
+          },
+          "runner_number": {
+            "description": "The saddlecloth of the entrant",
+            "type": "integer"
+          },
+          "time_ran": {
+            "description": "The time the entrant took to finish the race in seconds.",
+            "type": "number"
+          },
+          "winning_time": {
+            "description": "The Winning Time of the race in seconds",
+            "type": "number"
+          }
+        },
+        "required": [
+          "position",
+          "name",
+          "barrier",
+          "runner_number",
+          "margin_length",
+          "entrant_id"
+        ],
+        "type": "object"
+      },
+      "EventRunner": {
+        "description": "EventRunner details.",
+        "nullable": true,
+        "properties": {
+          "age": {
+            "description": "The age of the entrant in years",
+            "type": "integer"
+          },
+          "all_box_history": {
+            "description": "Available only to registered partners and featured countries.\nA summary of a greyhounds performance in all boxes",
+            "items": {
+              "$ref": "#/components/schemas/BarrierStartSummaries"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "all_weather": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "all_weather_slushy": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "allowance_weight": {
+            "description": "The weight an apprentice jockey can claim",
+            "type": "string"
+          },
+          "alt_silk_url_64x64": {
+            "description": "The URL of the runner's 64x64 silk image",
+            "type": "string"
+          },
+          "alt_silk_url_128x128": {
+            "description": "The URL of the runner's 128x128 silk image",
+            "type": "string"
+          },
+          "apprentice_indicator": {
+            "description": "Indicates if a jockey is an apprentice",
+            "type": "string"
+          },
+          "barrier": {
+            "description": "The barrier the entrant is in",
+            "type": "integer"
+          },
+          "barrier_position": {
+            "description": "The barrier position for an entrant (Harness Racing only)",
+            "nullable": true,
+            "type": "string"
+          },
+          "best_mile_rate": {
+            "description": "Available only to registered partners and featured countries.\nBest mile rate for the runner",
+            "type": "string"
+          },
+          "best_time": {
+            "description": "A greyhounds best time",
+            "nullable": true,
+            "type": "string"
+          },
+          "box_history": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "breeding": {
+            "description": "Breeding for the entrant",
+            "type": "string"
+          },
+          "class_level": {
+            "description": "The class level of the entrant",
+            "type": "string"
+          },
+          "colour": {
+            "description": "The colour of the entrant",
+            "type": "string"
+          },
+          "competitor_id": {
+            "type": "string"
+          },
+          "country": {
+            "description": "The country the entrant is registered in",
+            "type": "string"
+          },
+          "dam": {
+            "description": "The entrant's dam",
+            "type": "string"
+          },
+          "dam_dam": {
+            "description": "The name of the dam's dam",
+            "type": "string"
+          },
+          "dam_sire": {
+            "description": "The name of the dam's sire",
+            "type": "string"
+          },
+          "deduction": {
+            "$ref": "#/components/schemas/Deduction"
+          },
+          "distance": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "emergency_position": {
+            "description": "Available only to registered partners and featured countries.\nIndicates if it is an emergency position for the entrant",
+            "nullable": true,
+            "type": "string"
+          },
+          "entrant_id": {
+            "description": "Unique ID for an entrant of a race",
+            "type": "string"
+          },
+          "fast": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "favourite": {
+            "description": "Indicates whether the entrant is the favourite",
+            "type": "boolean"
+          },
+          "firm": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "first_start_indicator": {
+            "description": "Available only to registered partners and featured countries.\nIndicates if it is a first start for the entrant",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "first_up": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "flucs": {
+            "description": "The fluctuation of the entrants prices",
+            "items": {
+              "type": "number"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "flucs_with_timestamp": {
+            "$ref": "#/components/schemas/FlucWithTimeStamp"
+          },
+          "foaling_date": {
+            "description": "Available only to registered partners and featured countries.\nThe date of birth of an entrant",
+            "nullable": true,
+            "type": "string"
+          },
+          "form_comment": {
+            "description": "Available only to registered partners.\nThe form comment of an entrant in a race",
+            "nullable": true,
+            "type": "string"
+          },
+          "form_comment_short": {
+            "description": "Available only to registered partners.\nShort comment on the runner's form",
+            "nullable": true,
+            "type": "string"
+          },
+          "form_indicators": {
+            "description": "Specific indicators about an entrant's form",
+            "items": {
+              "$ref": "#/components/schemas/FormIndicator"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "fourth_up": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "fresh_30": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "fresh_90": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "gear": {
+            "description": "The gear an entrant is wearing in a race",
+            "type": "string"
+          },
+          "good": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "grass": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "grass_wet": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "handicap": {
+            "description": "Handicap is the handicap of the entrant.",
+            "type": "number"
+          },
+          "handicap_rating": {
+            "description": "Attribute is no longer available",
+            "nullable": true,
+            "type": "string"
+          },
+          "heavy": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "horse_id": {
+            "description": "The unique identifier of the horse",
+            "type": "integer"
+          },
+          "hurdle": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "is_emergency": {
+            "description": "Available only to registered partners and featured countries.\nIndicates whether an entrant is an emergency",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "is_late_scratched": {
+            "description": "Available only to registered partners and featured countries.\nIndicates whether an entrant was late scratched",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "is_scratched": {
+            "description": "Indicates whether the entrant is scratched",
+            "type": "boolean"
+          },
+          "jockey": {
+            "description": "The jockey riding the entrant in the race",
+            "type": "string"
+          },
+          "jockey_past_performances": {
+            "$ref": "#/components/schemas/EventJockeyPastPerformances"
+          },
+          "last_12_months": {
+            "$ref": "#/components/schemas/Last12MonthsSummary"
+          },
+          "last_12_months_prize_money": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "The runner's last 12 months estimated winnings",
+            "nullable": true,
+            "type": "object"
+          },
+          "last_12_p": {
+            "description": "Available only to registered partners and featured countries.\nLast 12 Months Place Percentage for the runner",
+            "nullable": true,
+            "type": "string"
+          },
+          "last_12_w": {
+            "description": "Available only to registered partners and featured countries.\nLast 12 Months Win Percentage for the runner",
+            "nullable": true,
+            "type": "string"
+          },
+          "last_starts": {
+            "description": "Available only to registered partners and featured countries.\nA specific breakdown of an entrants last starts.",
+            "items": {
+              "$ref": "#/components/schemas/LastStart"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "last_twenty_starts": {
+            "description": "The last 20 start results of the entant",
+            "type": "string"
+          },
+          "left_handed": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "market_name": {
+            "description": "The name of the market the entrant is available on",
+            "type": "string"
+          },
+          "meta": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "object"
+          },
+          "mobile": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "mover": {
+            "description": "Indicates whether an entrant is a mover",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "The name of the entrant",
+            "type": "string"
+          },
+          "odds": {
+            "$ref": "#/components/schemas/odds"
+          },
+          "overall": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "owners": {
+            "description": "The owners of a given entrant",
+            "type": "string"
+          },
+          "past_performances": {
+            "$ref": "#/components/schemas/EventEntrantPastPerformances"
+          },
+          "picks": {
+            "items": {
+              "$ref": "#/components/schemas/Pick"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "place_p": {
+            "description": "Available only to registered partners and featured countries.\nPlace percentage for the runner",
+            "nullable": true,
+            "type": "string"
+          },
+          "predictors": {
+            "description": "Predictors for greyhound entrants.",
+            "items": {
+              "$ref": "#/components/schemas/Predictor"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "preview": {
+            "description": "Preview contains any runner comments",
+            "type": "string"
+          },
+          "primary_market": {
+            "description": "Whether or not the market is the primary market",
+            "type": "boolean"
+          },
+          "prize_money": {
+            "description": "The total prize money the entrant has won over its career in dollars",
+            "type": "string"
+          },
+          "rating": {
+            "description": "Attribute is no longer available",
+            "nullable": true,
+            "type": "string"
+          },
+          "ride_guide_exists": {
+            "type": "boolean"
+          },
+          "ride_guide_file": {
+            "type": "string"
+          },
+          "ride_guide_thumbnail": {
+            "type": "string"
+          },
+          "right_handed": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "runner_change": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Available only to registered partners and featured countries.\nAny Runner Change for the entrant",
+            "nullable": true,
+            "type": "object"
+          },
+          "runner_number": {
+            "description": "The saddle number of the entrant",
+            "type": "integer"
+          },
+          "runner_win_history": {
+            "description": "The runner's winning history",
+            "items": {
+              "$ref": "#/components/schemas/WinHistory"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "scr_time": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "scratch_time": {
+            "description": "If an entrant is scratched, the time it was declared in seconds",
+            "type": "integer"
+          },
+          "second_up": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "sex": {
+            "description": "The sex of the entrant",
+            "type": "string"
+          },
+          "silk_colours": {
+            "description": "The colours of the entrants' silks",
+            "type": "string"
+          },
+          "silk_url_64x64": {
+            "description": "The URL of the runner's 64x64 silk image",
+            "type": "string"
+          },
+          "silk_url_128x128": {
+            "description": "The URL of the runner's 128x128 silk image",
+            "type": "string"
+          },
+          "sire": {
+            "description": "The entrant's sire",
+            "type": "string"
+          },
+          "slow": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "soft": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "speedmap": {
+            "$ref": "#/components/schemas/Speedmap"
+          },
+          "spr": {
+            "description": "Available only to registered partners and featured countries.\nStakes per race won for the runner",
+            "nullable": true,
+            "type": "integer"
+          },
+          "standing": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "steeple": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "synthetic": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "third_up": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "track": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "track_distance": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "trainer_location": {
+            "description": "The location of the entrant's trainer.",
+            "type": "string"
+          },
+          "trainer_name": {
+            "description": "The name of the entrant's trainer",
+            "type": "string"
+          },
+          "turf": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "weight": {
+            "$ref": "#/components/schemas/Weight"
+          },
+          "weight_for_age": {
+            "$ref": "#/components/schemas/StartSummaryAllAttributes"
+          },
+          "win_p": {
+            "description": "Available only to registered partners and featured countries.\nWin percentage for the runner",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "entrant_id",
+          "market_name",
+          "primary_market",
+          "name",
+          "is_scratched",
+          "gear",
+          "odds",
+          "scratch_time",
+          "barrier",
+          "runner_number",
+          "prize_money",
+          "age",
+          "sex",
+          "colour",
+          "silk_colours",
+          "silk_url_64x64",
+          "silk_url_128x128",
+          "class_level",
+          "jockey",
+          "apprentice_indicator",
+          "allowance_weight",
+          "owners",
+          "country",
+          "trainer_name",
+          "last_twenty_starts",
+          "sire",
+          "dam",
+          "breeding",
+          "weight",
+          "favourite",
+          "mover",
+          "form_indicators",
+          "trainer_location",
+          "meta",
+          "flucs",
+          "competitor_id",
+          "ride_guide_exists",
+          "ride_guide_thumbnail",
+          "ride_guide_file",
+          "flucs_with_timestamp"
+        ],
+        "type": "object"
+      },
+      "EventSubstitution": {
+        "description": "EventSubstitution contains all the information related to a substitution of an event.",
+        "nullable": true,
+        "properties": {
+          "entrant_id": {
+            "description": "The unique ID for an entrant of a race.",
+            "type": "string"
+          },
+          "product_name": {
+            "description": "The product name the substitution is for.",
+            "type": "string"
+          },
+          "tote": {
+            "description": "The tote name the substitution is for.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entrant_id",
+          "tote",
+          "product_name"
+        ],
+        "type": "object"
+      },
+      "ExtrasDetails": {
+        "description": "ExtrasDetails represents extras markets for a given meeting.",
+        "nullable": true,
+        "properties": {
+          "markets": {
+            "description": "The extras markets for the meeting",
+            "items": {
+              "$ref": "#/components/schemas/ExtrasMarket"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "meeting": {
+            "$ref": "#/components/schemas/ExtrasMeeting"
+          }
+        },
+        "required": [
+          "markets"
+        ],
+        "type": "object"
+      },
+      "ExtrasEntrant": {
+        "description": "ExtrasEntrant represents the details of an entrant in an extras market.",
+        "nullable": true,
+        "properties": {
+          "entrant_id": {
+            "description": "Unique entrantID of the market entrant",
+            "type": "string"
+          },
+          "entrant_name": {
+            "description": "The name of the market entrant",
+            "type": "string"
+          },
+          "odds": {
+            "$ref": "#/components/schemas/ExtrasOdds"
+          }
+        },
+        "required": [
+          "entrant_id",
+          "entrant_name"
+        ],
+        "type": "object"
+      },
+      "ExtrasListPayload": {
+        "description": "ExtrasListPayload response.",
+        "properties": {
+          "extras": {
+            "items": {
+              "$ref": "#/components/schemas/ExtrasDetails"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "next_page_token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "extras",
+          "next_page_token"
+        ],
+        "type": "object"
+      },
+      "ExtrasMarket": {
+        "description": "ExtrasMarket represents the details of an extras market.",
+        "nullable": true,
+        "properties": {
+          "entrants": {
+            "description": "The entrants in the market",
+            "items": {
+              "$ref": "#/components/schemas/ExtrasEntrant"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "market_id": {
+            "description": "Unique marketID of the market",
+            "type": "string"
+          },
+          "market_name": {
+            "description": "The name of the market",
+            "type": "string"
+          },
+          "results": {
+            "description": "The results of the market",
+            "items": {
+              "$ref": "#/components/schemas/ExtrasResult"
+            },
+            "nullable": true,
+            "type": "array"
+          }
+        },
+        "required": [
+          "market_id",
+          "market_name"
+        ],
+        "type": "object"
+      },
+      "ExtrasMeeting": {
+        "description": "ExtrasMeeting represents details about the meeting that the extras belong to.",
+        "nullable": true,
+        "properties": {
+          "advertised_start": {
+            "description": "The advertised start time of the meeting as a datetime",
+            "format": "date-time",
+            "type": "string"
+          },
+          "category": {
+            "description": "The category of the meeting (Thoroughbreds, Harness, Greyhounds)",
+            "type": "string"
+          },
+          "country": {
+            "description": "The country the meeting is being held at",
+            "type": "string"
+          },
+          "meeting_id": {
+            "description": "Unique meetingID of the meeting",
+            "type": "string"
+          },
+          "meeting_name": {
+            "description": "The name of the meeting the extras are for",
+            "type": "string"
+          },
+          "state": {
+            "description": "The state the meeting is being held at",
+            "type": "string"
+          }
+        },
+        "required": [
+          "meeting_id",
+          "meeting_name",
+          "advertised_start",
+          "country",
+          "state",
+          "category"
+        ],
+        "type": "object"
+      },
+      "ExtrasOdds": {
+        "description": "ExtrasOdds represents the odds for an entrant in an extras market.",
+        "nullable": true,
+        "properties": {
+          "fixed_place": {
+            "description": "The fixed place odds for the market entrant",
+            "type": "number"
+          },
+          "fixed_win": {
+            "description": "The fixed win odds for the market entrant",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "ExtrasPayload": {
+        "description": "ExtrasPayload response.",
+        "properties": {
+          "extras": {
+            "$ref": "#/components/schemas/ExtrasDetails"
+          }
+        },
+        "type": "object"
+      },
+      "ExtrasResult": {
+        "description": "ExtrasResult represents the details of a result in an extras market.",
+        "nullable": true,
+        "properties": {
+          "entrant_id": {
+            "description": "The entrantID of the result",
+            "type": "string"
+          },
+          "entrant_name": {
+            "description": "The name of the entrant",
+            "type": "string"
+          },
+          "position": {
+            "description": "The position that the entrant placed",
+            "type": "integer"
+          },
+          "result_status": {
+            "description": "The status of the result",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result_status",
+          "position",
+          "entrant_id",
+          "entrant_name"
+        ],
+        "type": "object"
+      },
+      "FlucDetails": {
+        "description": "FlucDetails details.",
+        "properties": {
+          "fluc": {
+            "type": "number"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "timestamp",
+          "fluc"
+        ],
+        "type": "object"
+      },
+      "FlucWithTimeStamp": {
+        "description": "FlucWithTimeStamp details.",
+        "properties": {
+          "high": {
+            "$ref": "#/components/schemas/FlucDetails"
+          },
+          "last_six": {
+            "items": {
+              "$ref": "#/components/schemas/FlucDetails"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "low": {
+            "$ref": "#/components/schemas/FlucDetails"
+          },
+          "nine_am": {
+            "$ref": "#/components/schemas/FlucDetails"
+          },
+          "open": {
+            "$ref": "#/components/schemas/FlucDetails"
+          }
+        },
+        "required": [
+          "last_six",
+          "open",
+          "high",
+          "low",
+          "nine_am"
+        ],
+        "type": "object"
+      },
+      "FormIndicator": {
+        "description": "FormIndicator details.",
+        "properties": {
+          "group": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "negative": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "group",
+          "negative",
+          "priority"
+        ],
+        "type": "object"
+      },
+      "Last12MonthsSummary": {
+        "description": "Last12MonthsSummary details.",
+        "nullable": true,
+        "properties": {
+          "number_of_seconds": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "integer"
+          },
+          "number_of_starts": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "integer"
+          },
+          "number_of_thirds": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "integer"
+          },
+          "number_of_wins": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "number_of_starts",
+          "number_of_wins",
+          "number_of_seconds",
+          "number_of_thirds"
+        ],
+        "type": "object"
+      },
+      "LastStart": {
+        "description": "LastStart details.",
+        "nullable": true,
+        "properties": {
+          "barrier": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "barrier_position": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "bon": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "class": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "comment": {
+            "description": "Available only to registered partners.",
+            "type": "string"
+          },
+          "date": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "days_since": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "distance": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "finish": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "gear": {
+            "description": "Available only to registered partners and featured countries.\nGear that was worn in a race",
+            "nullable": true,
+            "type": "string"
+          },
+          "gear_changes": {
+            "description": "Available only to registered partners and featured countries.",
+            "items": {
+              "$ref": "#/components/schemas/git_neds_sh_usvc_form_proto_form_Gear"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "id": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "in_run": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "jockey": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "last_600": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "limit_weight": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "margin": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "margin_1st_2nd": {
+            "description": "Available only to registered partners and featured countries.\nMargin between the 1st and 2nd in a race",
+            "nullable": true,
+            "type": "string"
+          },
+          "margin_2nd_3rd": {
+            "description": "Available only to registered partners and featured countries.\nMargin between the 2nd and 3rd in a race",
+            "nullable": true,
+            "type": "string"
+          },
+          "margin_3rd_4th": {
+            "description": "Available only to registered partners and featured countries.\nMargin between the 3rd and 4th in a race",
+            "nullable": true,
+            "type": "string"
+          },
+          "mile_rate": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "minimum_handicap": {
+            "description": "Available only to registered partners and featured countries.\nMinimum Handicap in a race",
+            "nullable": true,
+            "type": "string"
+          },
+          "number": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "number_of_runners": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "place_favouritism": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "prize_money": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "review": {
+            "description": "Available only to registered partners.\nReview of the runner's performance",
+            "nullable": true,
+            "type": "string"
+          },
+          "run_rating": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "second": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "start_type": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "starting_price": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "stipes": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "third": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "time": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "time_ran": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "track": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "track_condition": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "track_direction": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "track_four_char": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "track_surface": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "venue_id": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "venue_name": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "weight_carried": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "win_favouritism": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          },
+          "winner": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "MeetingData": {
+        "description": "MeetingData response.",
+        "nullable": true,
+        "properties": {
+          "category": {
+            "description": "The category of the meeting",
+            "type": "string"
+          },
+          "category_name": {
+            "description": "The category name of the meeting",
+            "type": "string"
+          },
+          "club_day": {
+            "description": "The Jetbet Club Day for the meeting",
+            "nullable": true,
+            "type": "integer"
+          },
+          "club_mnemonic": {
+            "description": "A 4 digit Mnemonic describing the Club for Tote betting",
+            "nullable": true,
+            "type": "string"
+          },
+          "comp_close_date": {
+            "description": "The date when FOB selling has stopped",
+            "nullable": true,
+            "type": "string"
+          },
+          "comp_complete_date": {
+            "description": "The date when the FOB is completed",
+            "nullable": true,
+            "type": "string"
+          },
+          "comp_day": {
+            "description": "The FOB Competition Day",
+            "nullable": true,
+            "type": "integer"
+          },
+          "comp_mnemonic": {
+            "description": "The FOB competition mnemonic for the meeting",
+            "nullable": true,
+            "type": "string"
+          },
+          "comp_sell_date": {
+            "description": "The date that selling commenced for the FOB meeting to this meeting",
+            "nullable": true,
+            "type": "string"
+          },
+          "country": {
+            "description": "The country that the meeting is ran in",
+            "type": "string"
+          },
+          "daily_double": {
+            "description": "The Daily Double for this meeting",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "date": {
+            "description": "The date that the meeting is on",
+            "format": "date-time",
+            "type": "string"
+          },
+          "early_quaddie": {
+            "description": "The Early Quaddie for this meeting",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "fob_close_date": {
+            "description": "The date Fixed Odds betting will be closed in jetbet - in the format yyyymmdd",
+            "nullable": true,
+            "type": "string"
+          },
+          "fob_club_day": {
+            "description": "The Jetbet Fixed Odds Club Day for the meeting",
+            "nullable": true,
+            "type": "integer"
+          },
+          "fob_complete_date": {
+            "description": "The date Fixed Odds betting will be completed/final in jetbet - in the format yyyymmdd",
+            "nullable": true,
+            "type": "string"
+          },
+          "fob_mnemonic": {
+            "description": "A 4 digit Mnemonic describing the Fixed Odds Betting identifier",
+            "nullable": true,
+            "type": "string"
+          },
+          "fob_sell_date": {
+            "description": "The date Fixed Odds betting will be available in jetbet - in the format yyyymmdd",
+            "nullable": true,
+            "type": "string"
+          },
+          "is_fob_meeting": {
+            "description": "Indicates whether or not the meeting is FOB only",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "jetbet_club_name": {
+            "description": "The name of the club as it appears in Jetbet",
+            "nullable": true,
+            "type": "string"
+          },
+          "jetbet_track_name": {
+            "description": "The name of the track as it appears in Jetbet",
+            "nullable": true,
+            "type": "string"
+          },
+          "meeting": {
+            "type": "string"
+          },
+          "meeting_date": {
+            "description": "The NZ Date of the first race in the meeting in the format yyyymmdd",
+            "nullable": true,
+            "type": "string"
+          },
+          "meeting_type": {
+            "description": "Indicates the type of meeting",
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "The name of the meeting",
+            "type": "string"
+          },
+          "quaddie": {
+            "description": "The Quaddie for this meeting",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "races": {
+            "items": {
+              "$ref": "#/components/schemas/MeetingRace"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "sell_date": {
+            "description": "The date Tote betting will be available in jetbet - in the format yyyymmdd",
+            "nullable": true,
+            "type": "string"
+          },
+          "state": {
+            "description": "The state that the meeting is in",
+            "type": "string"
+          },
+          "tote_meeting_number": {
+            "description": "The Meeting Number for this meeting",
+            "type": "integer"
+          },
+          "tote_raceday_date": {
+            "description": "The Raceday Date for this meeting",
+            "type": "string"
+          },
+          "tote_running_double": {
+            "description": "The Tote Pool Running Double for this meeting",
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "nullable": true,
+              "type": "array"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "tote_status": {
+            "description": "The Status for this meeting",
+            "type": "string"
+          },
+          "tote_treble": {
+            "description": "The Tote Pool Treble for this meeting",
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "nullable": true,
+              "type": "array"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "track_condition": {
+            "description": "The condition of the track",
+            "type": "string"
+          },
+          "track_mnemonic": {
+            "description": "A 4 digit Mnemonic describing the Club for Tote betting",
+            "nullable": true,
+            "type": "string"
+          },
+          "treble": {
+            "description": "The Treble for this meeting",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "video_channel": {
+            "description": "The singular video channel that this meeting will be on",
+            "type": "integer"
+          },
+          "video_channels": {
+            "description": "The multiple video channels that this meeting will be on",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          }
+        },
+        "required": [
+          "meeting",
+          "name",
+          "date",
+          "track_condition",
+          "category",
+          "category_name",
+          "country",
+          "state",
+          "races"
+        ],
+        "type": "object"
+      },
+      "MeetingPayload": {
+        "description": "MeetingPayload response.",
+        "properties": {
+          "meetings": {
+            "items": {
+              "$ref": "#/components/schemas/MeetingData"
+            },
+            "nullable": true,
+            "type": "array"
+          }
+        },
+        "required": [
+          "meetings"
+        ],
+        "type": "object"
+      },
+      "MeetingRace": {
+        "description": "MeetingRace details.",
+        "nullable": true,
+        "properties": {
+          "country": {
+            "description": "The country the race is being held at",
+            "type": "string"
+          },
+          "distance": {
+            "description": "The distance of the race in metres",
+            "type": "integer"
+          },
+          "id": {
+            "description": "Unique eventID for the race",
+            "type": "string"
+          },
+          "name": {
+            "description": "The name of the race",
+            "type": "string"
+          },
+          "protest": {
+            "description": "Protest denotes whether the race had a protest",
+            "type": "boolean"
+          },
+          "protest_reason": {
+            "description": "ProtestReason is the reason for the protest",
+            "type": "string"
+          },
+          "race_number": {
+            "description": "The Race Number for the race",
+            "type": "integer"
+          },
+          "start_time": {
+            "description": "The advertised start time of the race as a datetime",
+            "format": "date-time",
+            "type": "string"
+          },
+          "state": {
+            "description": "The state the race is being held at",
+            "type": "string"
+          },
+          "status": {
+            "description": "The status of the race",
+            "type": "string"
+          },
+          "tote_start_time": {
+            "description": "The event starting time in Jetbet-o-clock",
+            "type": "string"
+          },
+          "track_condition": {
+            "description": "The condition of the track",
+            "type": "string"
+          },
+          "weather": {
+            "description": "The weather at the track of the race",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "race_number",
+          "name",
+          "start_time",
+          "track_condition",
+          "distance",
+          "weather",
+          "country",
+          "state",
+          "status"
+        ],
+        "type": "object"
+      },
+      "MoneyTracker": {
+        "description": "MoneyTracker details.",
+        "nullable": true,
+        "properties": {
+          "entrants": {
+            "description": "Entrants are set of entrants returned for the request.",
+            "items": {
+              "$ref": "#/components/schemas/EntrantLiability"
+            },
+            "nullable": true,
+            "type": "array"
+          }
+        },
+        "required": [
+          "entrants"
+        ],
+        "type": "object"
+      },
+      "Pick": {
+        "description": "Pick details.",
+        "nullable": true,
+        "properties": {
+          "comment": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rank": {
+            "type": "integer"
+          },
+          "selector_type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "rank",
+          "selector_type",
+          "comment"
+        ],
+        "type": "object"
+      },
+      "Predictor": {
+        "description": "Predictor details.",
+        "nullable": true,
+        "properties": {
+          "average_kms": {
+            "type": "number"
+          },
+          "average_time": {
+            "type": "number"
+          },
+          "best_date": {
+            "type": "string"
+          },
+          "best_kms": {
+            "type": "number"
+          },
+          "best_time": {
+            "type": "number"
+          },
+          "class": {
+            "type": "string"
+          },
+          "class_change": {
+            "type": "string"
+          },
+          "place": {
+            "type": "number"
+          },
+          "win": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "QLAOdds": {
+        "description": "QLAOdds details.",
+        "nullable": true,
+        "properties": {
+          "favouritism": {
+            "description": "Order of entrant by Win Odds",
+            "type": "integer"
+          },
+          "oddsString": {
+            "description": "e.g. \"-|13.90|12.80|11.00|scr|15.20|20.60|18.90\"",
+            "type": "string"
+          },
+          "scratched": {
+            "description": "as a string e.g. \"true\"",
+            "type": "string"
+          },
+          "sel": {
+            "description": "The Selection involved in the Quinella Odds",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "RaceItem": {
+        "description": "RaceItem is the struct to map info for one race in the response.",
+        "nullable": true,
+        "properties": {
+          "actual_start": {
+            "description": "The actual time the race started in seconds",
+            "type": "integer"
+          },
+          "actual_start_string": {
+            "description": "The actual time the race started as a datetime",
+            "type": "string"
+          },
+          "advertised_start": {
+            "description": "The actual time the race started in seconds",
+            "type": "integer"
+          },
+          "advertised_start_string": {
+            "description": "The advertised start time of the race as a datetime",
+            "type": "string"
+          },
+          "country": {
+            "description": "The country the race is being held at",
+            "type": "string"
+          },
+          "event_id": {
+            "description": "Unique eventID for the race",
+            "type": "string"
+          },
+          "meeting_id": {
+            "description": "Unique meetingID of the meeting the race is at",
+            "type": "string"
+          },
+          "meeting_name": {
+            "description": "The name of the meeting the race is at",
+            "type": "string"
+          },
+          "protest": {
+            "description": "Protest denotes whether the race had a protest",
+            "type": "boolean"
+          },
+          "protest_reason": {
+            "description": "ProtestReason is the reason for the protest",
+            "type": "string"
+          },
+          "race_number": {
+            "description": "The race number of the race",
+            "type": "integer"
+          },
+          "status": {
+            "description": "The status of the race",
+            "type": "string"
+          },
+          "type": {
+            "description": "The racing code (Thoroughbreds, Harness, Greyhounds)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "meeting_name",
+          "meeting_id",
+          "race_number",
+          "event_id",
+          "type",
+          "country",
+          "status",
+          "advertised_start",
+          "actual_start",
+          "advertised_start_string",
+          "actual_start_string"
+        ],
+        "type": "object"
+      },
+      "RaceSummary": {
+        "description": "RaceSummary details.",
+        "nullable": true,
+        "properties": {
+          "actual_start": {
+            "description": "The actual time the race started as a datetime",
+            "format": "date-time",
+            "type": "string"
+          },
+          "advertised_start": {
+            "description": "The advertised start time of the race as a datetime",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "Unique eventID of the race",
+            "type": "string"
+          },
+          "meeting_id": {
+            "description": "The meetingID that the race is in",
+            "type": "string"
+          },
+          "name": {
+            "description": "The name of the race",
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "protest": {
+            "description": "Protest denotes whether the race had a protest",
+            "type": "boolean"
+          },
+          "protest_reason": {
+            "description": "ProtestReason is the reason for the protest",
+            "type": "string"
+          },
+          "silk_url": {
+            "description": "The URL for the silk Sprite Sheet for the race",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RacesByChannelData": {
+        "description": "RacesByChannelData represents the data attribute of the getting races by channel endpoint.",
+        "properties": {
+          "races": {
+            "items": {
+              "$ref": "#/components/schemas/RaceItem"
+            },
+            "nullable": true,
+            "type": "array"
+          }
+        },
+        "required": [
+          "races"
+        ],
+        "type": "object"
+      },
+      "RacesListData": {
+        "description": "RacesListData response.",
+        "properties": {
+          "next_page_token": {
+            "type": "string"
+          },
+          "races": {
+            "items": {
+              "$ref": "#/components/schemas/RaceSummary"
+            },
+            "nullable": true,
+            "type": "array"
+          }
+        },
+        "required": [
+          "races",
+          "next_page_token"
+        ],
+        "type": "object"
+      },
+      "Speedmap": {
+        "description": "Speedmap details.",
+        "properties": {
+          "barrier_speed": {
+            "description": "BarrierSpeed is the barrier speed.",
+            "type": "number"
+          },
+          "entrant_id": {
+            "description": "EntrantID is the ID of the entrant.",
+            "type": "string"
+          },
+          "finish_speed": {
+            "description": "FinishSpeed is the finishing speed.",
+            "type": "number"
+          },
+          "label": {
+            "description": "Label is the Speedmap label (eg. Front Runner etc.).",
+            "type": "string"
+          },
+          "settling_lengths": {
+            "description": "SettlingLengths is the settling lengths.",
+            "type": "integer"
+          },
+          "settling_width": {
+            "description": "SettlingWidth is the settling width.",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "StartSummary": {
+        "description": "StartSummary details.",
+        "nullable": true,
+        "properties": {
+          "number_of_placings": {
+            "type": "integer"
+          },
+          "number_of_seconds": {
+            "type": "integer"
+          },
+          "number_of_starts": {
+            "type": "integer"
+          },
+          "number_of_thirds": {
+            "type": "integer"
+          },
+          "number_of_wins": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "number_of_starts",
+          "number_of_wins",
+          "number_of_placings",
+          "number_of_seconds",
+          "number_of_thirds"
+        ],
+        "type": "object"
+      },
+      "StartSummaryAllAttributes": {
+        "description": "StartSummaryAllAttributes details.",
+        "nullable": true,
+        "properties": {
+          "number_of_placings": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "integer"
+          },
+          "number_of_seconds": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "integer"
+          },
+          "number_of_starts": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "integer"
+          },
+          "number_of_thirds": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "integer"
+          },
+          "number_of_wins": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "integer"
+          },
+          "winning_distance": {
+            "description": "Available only to registered partners and featured countries.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "number_of_starts",
+          "number_of_wins",
+          "number_of_placings",
+          "number_of_seconds",
+          "number_of_thirds",
+          "winning_distance"
+        ],
+        "type": "object"
+      },
+      "TotePool": {
+        "description": "TotePool is the struct to map info for one tote pool in the response.",
+        "nullable": true,
+        "properties": {
+          "brought_forward": {
+            "description": "The brought forward in dollars amount of the pool",
+            "type": "number"
+          },
+          "commingled_info": {
+            "description": "Indicates if the pool is actually commingled or not",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "early_quaddie": {
+            "description": "The Early Quaddie for the meeting, this race is on",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "guarantee": {
+            "description": "The guarantee amount in dollars of the pool",
+            "type": "number"
+          },
+          "is_commingled": {
+            "description": "Indicates if the pool is indented to be commingled or not",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "is_concession": {
+            "description": "Indicates if a Pool is a Concession",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "is_final": {
+            "description": "Determines if the odds of a pool is final",
+            "nullable": true,
+            "type": "boolean"
+          },
+          "jackpot": {
+            "description": "The jackpot amount of the pool",
+            "type": "number"
+          },
+          "leg": {
+            "description": "Leg Number of the Pool, will be 1 unless it's a compound",
+            "nullable": true,
+            "type": "integer"
+          },
+          "product_type": {
+            "description": "The type of pool",
+            "type": "string"
+          },
+          "qla_odds": {
+            "items": {
+              "$ref": "#/components/schemas/QLAOdds"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "quaddie": {
+            "description": "The Quaddie for the meeting, this race is on",
+            "items": {
+              "type": "integer"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "status": {
+            "description": "The status of the pool",
+            "type": "string"
+          },
+          "terminating": {
+            "description": "Whether or not the pool is terminating",
+            "type": "boolean"
+          },
+          "total": {
+            "description": "The total amount in dollars currently in the pool",
+            "type": "number"
+          },
+          "tote_running_double": {
+            "description": "The Tote Pool Running Double for the meeting, this race is on",
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "nullable": true,
+              "type": "array"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "tote_treble": {
+            "description": "The Tote Pool Treble for the meeting, this race is on",
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "nullable": true,
+              "type": "array"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "tote_trends": {
+            "$ref": "#/components/schemas/ToteTrends"
+          },
+          "will_pay_current_leg": {
+            "description": "The current leg for a Will Pay",
+            "nullable": true,
+            "type": "integer"
+          },
+          "will_pay_live_units": {
+            "description": "The amount of live units for a Will Pay",
+            "nullable": true,
+            "type": "number"
+          },
+          "will_pays": {
+            "items": {
+              "$ref": "#/components/schemas/WillPaysOdds"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "win_investment": {
+            "description": "The amount of Winning Units in a pool",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "product_type",
+          "total",
+          "status",
+          "guarantee",
+          "brought_forward",
+          "terminating",
+          "jackpot"
+        ],
+        "type": "object"
+      },
+      "ToteTrends": {
+        "description": "ToteTrends details.",
+        "nullable": true,
+        "properties": {
+          "final_leg_start_time": {
+            "description": "Final Leg Start Time from the tote trends data",
+            "type": "string"
+          },
+          "pool_total": {
+            "description": "Pool total from the tote trends data",
+            "type": "number"
+          },
+          "tote_trends_data": {
+            "description": "Raw Tote Trends Data in XML format",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Weight": {
+        "description": "Weight details.",
+        "properties": {
+          "allocated": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "allocated",
+          "total"
+        ],
+        "type": "object"
+      },
+      "WillPaysOdds": {
+        "description": "WillPaysOdds details.",
+        "nullable": true,
+        "properties": {
+          "change": {
+            "description": "S=Scratched U=Up D=Down -=No change",
+            "type": "string"
+          },
+          "odds": {
+            "description": "The odds of the Will Pay",
+            "type": "number"
+          },
+          "sel": {
+            "description": "The selection involved in the Will Pay",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "WinHistory": {
+        "description": "WinHistory details.",
+        "nullable": true,
+        "properties": {
+          "details": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "details"
+        ],
+        "type": "object"
+      },
+      "git_neds_sh_usvc_feedrouter_response_RESTHeader": {
+        "description": "RESTHeader is a standard header to attach to all REST responses.",
+        "nullable": true,
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": "string"
+          },
+          "generated_time": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "generated_time",
+          "url"
+        ],
+        "type": "object"
+      },
+      "git_neds_sh_usvc_form_proto_form_Gear": {
+        "description": "Gear is a parsed XML field from the feed provider",
+        "nullable": true,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "option": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "main_ErrorResponse": {
+        "properties": {
+          "header": {
+            "$ref": "#/components/schemas/git_neds_sh_usvc_feedrouter_response_RESTHeader"
+          }
+        },
+        "type": "object"
+      },
+      "odds": {
+        "properties": {
+          "fixed_place": {
+            "type": "number"
+          },
+          "fixed_win": {
+            "type": "number"
+          },
+          "pool_place": {
+            "type": "number"
+          },
+          "pool_win": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "fixed_win",
+          "fixed_place"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "The Affiliates API offers access to racing data for [TABNZ](https://www.tab.co.nz/) affiliates.\n\nIt provides both live updates and historical data, covering thoroughbred, harness, and greyhound races.  The REST API is structured to supply affiliates with necessary data for platform development, including race conditions, results, betting odds, and analytics.\n\nThis API provides much of the information available on TABNZ in a machine readable format.\nEach of the available endpoints have been described below.\nThese endpoints are for personal use only and are not to be republished without written permission from Entain Australia and New Zealand.\n## Versioning\nAPI versions are specified in the URL path, for example: `/affiliates/v1/racing/meetings`\n\nThe API adopts an open schema model, allowing the server to append additional properties to its responses. Similarly, the server will overlook any surplus query parameters and properties in the request body.\n\nClient implementations should be designed to disregard unexpected properties in responses, maintaining compatibility with future server updates.\n\nEndpoints flagged as `Beta` are under active development and are subject to change at any time.\n## Authentication\nTo avoid being blocked or inappropriately rate limited, please include `Headers` to identify who you are, and provide a way for us to contact you:\n\n```json\n{\n  From: joe@blogs.com.au\n  X-Partner: Joe Blogs Pty Ltd\n  X-Partner-ID: {Entain provided partner ID}\n}\n```",
+    "termsOfService": "https://entaingroup.com.au/terms-of-use/",
+    "title": "Affiliates API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/affiliates/v1/racing/events/{id}": {
+      "get": {
+        "description": "Retrieves a single specified race. Use optional parameters to enable additional betting information.",
+        "operationId": "Specified Race",
+        "parameters": [
+          {
+            "description": "Excludes the specified bet type from the response.",
+            "in": "query",
+            "name": "bet_type_filter",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `json`\n\nThe response encoding format.\n\nAvailable formats: (`json` | `xml` | `html`)",
+            "in": "query",
+            "name": "enc",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `false`",
+            "in": "query",
+            "name": "present_overlay",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Default: `false`\n\nInclude any big bets that have been placed on the event.",
+            "in": "query",
+            "name": "with_big_bets",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Default: `false`\n\nInclude the biggest bet placed on the event.",
+            "in": "query",
+            "name": "with_biggest_bet",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Default: `false`\n\nInclude live bets that have been placed on the event.",
+            "in": "query",
+            "name": "with_live_bets",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Default: `false`\n\nInclude data to track the total amount wagered on event entrants.",
+            "in": "query",
+            "name": "with_money_tracker",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Default: `false`\n\nInclude tote trends raw data in XML format.",
+            "in": "query",
+            "name": "with_tote_trends_data",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Default: `false`\n\nInclude any Will Pays that have been placed on the event.",
+            "in": "query",
+            "name": "with_will_pays",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "The ID of the race to retrieve.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventRaceDetails"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "tags": [
+          "Events"
+        ]
+      }
+    },
+    "/affiliates/v1/racing/extras": {
+      "get": {
+        "description": "Retrieves a list of meetings with extras markets available.\n\nRefine results using the optional filtering parameters.",
+        "operationId": "List of Meetings with Extras",
+        "parameters": [
+          {
+            "description": "Filter extras by categories: Thoroughbred, Harness, or Greyhound.\n\nAvailable filters: (`T` | `H` | `G`)",
+            "in": "query",
+            "name": "categories",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter extras by one or more countries.\n\nAvailable filters: (`AUS` | `ARG` | `CA` | `CHI` | `DEU` | `FR` | `HK` | `IND` | `IRE` | `JPN` | `KOR` | `NOR` | `NZ` | `PER` | `SAF` | `SGP` | `SWE` | `UK` | `URY` | `USA`)",
+            "in": "query",
+            "name": "countries",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `today` \n\nInclude extras from the specified date onwards.\n\nMust be within a maximum of 2 days from `date_to`.\n\nAvailable filters: (`YYYY-MM-DD` | `today` | `week` | `month` | `all`)",
+            "in": "query",
+            "name": "date_from",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `today` \n\nInclude extras up to and including the specified date.\n\nMust be within a maximum of 2 days from `date_from`.\n\nAvailable filters: (`YYYY-MM-DD` | `today` | `week` | `month` | `all`)",
+            "in": "query",
+            "name": "date_to",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `json`\n\nThe response encoding format.\n\nAvailable formats: (`json` | `xml`)",
+            "in": "query",
+            "name": "enc",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page token, used for pagination.",
+            "in": "query",
+            "name": "page_token",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtrasListPayload"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "tags": [
+          "Extras"
+        ]
+      }
+    },
+    "/affiliates/v1/racing/extras/{id}": {
+      "get": {
+        "description": "Retrieves detailed extras markets for a single specified meeting.",
+        "operationId": "Extras for a Specified Meeting",
+        "parameters": [
+          {
+            "description": "Default: `json`\n\nThe response encoding format.\n\nAvailable formats: (`json` | `xml`)",
+            "in": "query",
+            "name": "enc",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The ID of the meeting to retrieve extras for.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtrasPayload"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "tags": [
+          "Extras"
+        ]
+      }
+    },
+    "/affiliates/v1/racing/futures": {
+      "get": {
+        "description": "List futures markets",
+        "operationId": "List of Futures",
+        "parameters": [
+          {
+            "description": "Default: `json`\n\nThe response encoding format.\n\nAvailable formats: (`json` | `xml` | `html`)",
+            "in": "query",
+            "name": "enc",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingPayload"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "tags": [
+          "Futures"
+        ]
+      }
+    },
+    "/affiliates/v1/racing/list": {
+      "get": {
+        "description": "Retrieves a list of races. Refine results using the optional filtering parameters.",
+        "operationId": "List of Races",
+        "parameters": [
+          {
+            "description": "Filter races by one or more countries.\n\nAvailable filters: (`AUS` | `ARG` | `CA` | `CHI` | `DEU` | `FR` | `HK` | `IND` | `IRE` | `JPN` | `KOR` | `NOR` | `NZ` | `PER` | `SAF` | `SGP` | `SWE` | `UK` | `URY` | `USA`)",
+            "in": "query",
+            "name": "countries",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `today` \n\nInclude races from the specified date onwards.\n\nAvailable filters: (`YYYY-MM-DD` | `today` | `week` | `month` | `all`)",
+            "in": "query",
+            "name": "date_from",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `today` \n\nInclude races up to and including the specified date.\n\nAvailable filters: (`YYYY-MM-DD` | `today` | `week` | `month` | `all`)",
+            "in": "query",
+            "name": "date_to",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `json`\n\nThe response encoding format.\n\nAvailable formats: (`json` | `xml` | `html`)",
+            "in": "query",
+            "name": "enc",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `100` Max: `200`\n\nLimit the number of items included in the response.",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filter races by meet type: Thoroughbred, Harness, or Greyhound.\n\nAvailable filters: (`T` | `H` | `G`)",
+            "in": "query",
+            "name": "meet_types",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `1`\n\nSet ascending/descending order by datetime.\n\nAvailable filters: (`0` | `1`)",
+            "in": "query",
+            "name": "order_by",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Page token, used for pagination.",
+            "in": "query",
+            "name": "page_token",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RacesListData"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "tags": [
+          "Events"
+        ]
+      }
+    },
+    "/affiliates/v1/racing/meetings": {
+      "get": {
+        "description": "Retrieves a list of meetings. Refine results using the optional filtering parameters. If filtering by meeting numbers or IDs, ensure that only one is provided, not both",
+        "operationId": "List of Meetings",
+        "parameters": [
+          {
+            "description": "Filter meetings by category: Thoroughbred, Harness, or Greyhound.\n\nAvailable filters: (`T` | `H` | `G`)",
+            "in": "query",
+            "name": "category",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter meetings by country.\n\nAvailable filters: (`AUS` | `ARG` | `CA` | `CHI` | `DEU` | `FR` | `HK` | `IND` | `IRE` | `JPN` | `KOR` | `NOR` | `NZ` | `PER` | `SAF` | `SGP` | `SWE` | `UK` | `URY` | `USA`)",
+            "in": "query",
+            "name": "country",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `today`\n\nInclude meetings from the specified date onwards.\n\nAvailable filters: (`YYYY-MM-DD` | `today` | `week` | `month` | `all`)",
+            "in": "query",
+            "name": "date_from",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `today` \n\nInclude meetings up to and including the specified date.\n\nAvailable filters: (`YYYY-MM-DD` | `today` | `week` | `month` | `all`)",
+            "in": "query",
+            "name": "date_to",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `json`\n\nThe response encoding format.\n\nAvailable formats: (`json` | `xml` | `html`)",
+            "in": "query",
+            "name": "enc",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `false`\n\nInclude futures markets.",
+            "in": "query",
+            "name": "futures",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Filter meetings by one or more comma-separated IDs.",
+            "in": "query",
+            "name": "ids",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `100` Max: `200`\n\nLimit the number of items included in the response.",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filter meetings by one or more comma-separated meeting numbers. (Only available to selected partners)",
+            "in": "query",
+            "name": "meeting_numbers",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `0`\n\nSkip the first offset responses, used for pagination.",
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingPayload"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "tags": [
+          "Meetings"
+        ]
+      }
+    },
+    "/affiliates/v1/racing/meetings/{id}": {
+      "get": {
+        "description": "Retrieves a single specified meeting.",
+        "operationId": "Specified Meeting",
+        "parameters": [
+          {
+            "description": "Default: `json`\n\nThe response encoding format.\n\nAvailable formats: (`json` | `xml` | `html`)",
+            "in": "query",
+            "name": "enc",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The ID of the meeting to retrieve.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeetingPayload"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "tags": [
+          "Meetings"
+        ]
+      }
+    },
+    "/affiliates/v1/racing/races": {
+      "get": {
+        "description": "List races by broadcasting channel",
+        "operationId": "List of Races by Channel",
+        "parameters": [
+          {
+            "description": "Filter races by broadcasting channel.\n\nAvailable filters: (`Trackside1` | `Trackside2` | `Live1` | `Live2` | `NoVideos`)",
+            "in": "query",
+            "name": "channel",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `today` \n\nFilter races by date.\n\nAvailable filters: (`YYYY-MM-DD` | `today` | `week` | `month` | `all`)",
+            "in": "query",
+            "name": "date",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: `json`\n\nThe response encoding format. \n\nAvailable formats: (`json` | `xml` | `html`)",
+            "in": "query",
+            "name": "enc",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter races by meet type: Thoroughbred, Harness, or Greyhound.\n\nAvailable filters: (`T` | `H` | `G`)",
+            "in": "query",
+            "name": "type",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RacesByChannelData"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/main_ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "tags": [
+          "Channels"
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "description": "Endpoints for retrieving racing events.",
+      "name": "Events"
+    },
+    {
+      "description": "Endpoints for retrieving racing meetings.",
+      "name": "Meetings"
+    },
+    {
+      "description": "Endpoints for retrieving futures markets.",
+      "name": "Futures"
+    },
+    {
+      "description": "Endpoints for retrieving racing events by channel.",
+      "name": "Channels"
+    },
+    {
+      "description": "Endpoints for retrieving extras markets.",
+      "name": "Extras"
+    }
+  ]
+}
