@@ -88,7 +88,7 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 **So that** API responses are fast (<100ms)
 
 **Acceptance Criteria:**
-- Index on races(start_time) WHERE status IN ('upcoming', 'in_progress')
+- Index on races(start_time) WHERE status IN ('open', 'closed', 'interim')
 - Index on entrants(race_id)
 - Index on entrants(race_id, is_scratched) partial index WHERE is_scratched = false
 - Index on meetings(date, race_type) WHERE status = 'active'
