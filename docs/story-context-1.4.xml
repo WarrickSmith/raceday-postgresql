@@ -25,7 +25,7 @@
   <acceptanceCriteria>
     1. Index on races(start_time) WHERE status IN ('open', 'closed', 'interim')
     2. Index on entrants(race_id)
-    3. Index on entrants(race_id, is_scratched) partial index WHERE is_scratched = false
+    3. Partial index on entrants(race_id) WHERE is_scratched = false
     4. Index on meetings(date, race_type) WHERE status = 'active'
     5. Index on money_flow_history(entrant_id, event_timestamp DESC)
     6. Index on odds_history(entrant_id, event_timestamp DESC)
