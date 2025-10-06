@@ -1,6 +1,6 @@
 # Story 1.3: Time-Series Tables with Partitioning
 
-Status: Ready
+Status: Done
 
 ## Story
 
@@ -23,60 +23,60 @@ so that I can efficiently store and query high-volume historical data.
 
 ## Tasks / Subtasks
 
-- [ ] Create partitioned table migration script (AC: 1, 2, 3, 4, 5, 6)
-  - [ ] Create `server/database/migrations/003_partitioned_tables.sql`
-  - [ ] Create money_flow_history parent table with PARTITION BY RANGE (event_timestamp)
-  - [ ] Create odds_history parent table with PARTITION BY RANGE (event_timestamp)
-  - [ ] Define all columns per tech spec (id BIGSERIAL, entrant_id, race_id, event_timestamp, etc.)
-  - [ ] Create initial partition for current date (money_flow_history_YYYY_MM_DD)
-  - [ ] Create initial partition for current date (odds_history_YYYY_MM_DD)
-  - [ ] Add foreign key constraint: entrant_id REFERENCES entrants(entrant_id)
-  - [ ] Create indexes on (entrant_id, event_timestamp DESC) for both tables
-  - [ ] Verify partition naming follows {table_name}_YYYY_MM_DD convention
+- [x] Create partitioned table migration script (AC: 1, 2, 3, 4, 5, 6)
+  - [x] Create `server/database/migrations/003_partitioned_tables.sql`
+  - [x] Create money_flow_history parent table with PARTITION BY RANGE (event_timestamp)
+  - [x] Create odds_history parent table with PARTITION BY RANGE (event_timestamp)
+  - [x] Define all columns per tech spec (id BIGSERIAL, entrant_id, race_id, event_timestamp, etc.)
+  - [x] Create initial partition for current date (money_flow_history_YYYY_MM_DD)
+  - [x] Create initial partition for current date (odds_history_YYYY_MM_DD)
+  - [x] Add foreign key constraint: entrant_id REFERENCES entrants(entrant_id)
+  - [x] Create indexes on (entrant_id, event_timestamp DESC) for both tables
+  - [x] Verify partition naming follows {table_name}_YYYY_MM_DD convention
 
-- [ ] Create partition management utility in TypeScript (AC: 7, 8, 9, 10)
-  - [ ] Create `server/src/database/partitions.ts` (ES6 modules, functional)
-  - [ ] Implement createTomorrowPartitions() function
-  - [ ] Implement getPartitionName(tableName: string, date: Date) helper
-  - [ ] Use pg.Pool for connection (typed, no `any`)
-  - [ ] Add error handling for partition already exists (idempotent)
-  - [ ] Log partition creation with structured logging (Pino)
-  - [ ] Verify TypeScript compilation with `npm run build`
-  - [ ] Verify ESLint passes with `npm run lint`
+- [x] Create partition management utility in TypeScript (AC: 7, 8, 9, 10)
+  - [x] Create `server/src/database/partitions.ts` (ES6 modules, functional)
+  - [x] Implement createTomorrowPartitions() function
+  - [x] Implement getPartitionName(tableName: string, date: Date) helper
+  - [x] Use pg.Pool for connection (typed, no `any`)
+  - [x] Add error handling for partition already exists (idempotent)
+  - [x] Log partition creation with structured logging (Pino)
+  - [x] Verify TypeScript compilation with `npm run build`
+  - [x] Verify ESLint passes with `npm run lint`
 
-- [ ] Create integration tests for partitioned tables (AC: 7, 8, 9, 10)
-  - [ ] Create `server/tests/integration/partitioned-tables.test.ts`
-  - [ ] Test table existence (money_flow_history, odds_history)
-  - [ ] Test partition existence (current date partitions)
-  - [ ] Test data insertion to correct partition (based on event_timestamp)
-  - [ ] Test foreign key constraint to entrants table
-  - [ ] Test index usage via EXPLAIN ANALYZE (partition pruning)
-  - [ ] Test partition naming convention (YYYY_MM_DD format)
-  - [ ] Verify all tests pass with `npm test`
-  - [ ] Verify zero TypeScript/ESLint errors in test files
+- [x] Create integration tests for partitioned tables (AC: 7, 8, 9, 10)
+  - [x] Create `server/tests/integration/partitioned-tables.test.ts`
+  - [x] Test table existence (money_flow_history, odds_history)
+  - [x] Test partition existence (current date partitions)
+  - [x] Test data insertion to correct partition (based on event_timestamp)
+  - [x] Test foreign key constraint to entrants table
+  - [x] Test index usage via EXPLAIN ANALYZE (partition pruning)
+  - [x] Test partition naming convention (YYYY_MM_DD format)
+  - [x] Verify all tests pass with `npm test`
+  - [x] Verify zero TypeScript/ESLint errors in test files
 
-- [ ] Test partition management utility (AC: 7, 8, 9, 10)
-  - [ ] Create `server/tests/unit/partitions.test.ts`
-  - [ ] Test getPartitionName() with various dates
-  - [ ] Test createTomorrowPartitions() creates correct partitions
-  - [ ] Test idempotent partition creation (already exists scenario)
-  - [ ] Verify all tests pass with `npm test`
+- [x] Test partition management utility (AC: 7, 8, 9, 10)
+  - [x] Create `server/tests/unit/partitions.test.ts`
+  - [x] Test getPartitionName() with various dates
+  - [x] Test createTomorrowPartitions() creates correct partitions
+  - [x] Test idempotent partition creation (already exists scenario)
+  - [x] Verify all tests pass with `npm test`
 
-- [ ] Execute migration and validate (AC: 1-6)
-  - [ ] Run migration utility: `npm run migrate`
-  - [ ] Verify partitioned tables created in raceday database
-  - [ ] Verify initial partitions exist with correct naming
-  - [ ] Verify indexes created via `\d+ money_flow_history` in psql
-  - [ ] Run integration tests to confirm schema matches tech spec
-  - [ ] Document migration execution in completion notes
+- [x] Execute migration and validate (AC: 1-6)
+  - [x] Run migration utility: `npm run migrate`
+  - [x] Verify partitioned tables created in raceday database
+  - [x] Verify initial partitions exist with correct naming
+  - [x] Verify indexes created via `\d+ money_flow_history` in psql
+  - [x] Run integration tests to confirm schema matches tech spec
+  - [x] Document migration execution in completion notes
 
-- [ ] Quality gate validation (AC: 7, 8, 9, 10)
-  - [ ] Run `npm run build` → Zero TypeScript errors
-  - [ ] Run `npm run lint` → Zero ESLint errors/warnings
-  - [ ] Run `grep -r ": any" server/src/` → No matches found
-  - [ ] Run `npm test` → All tests passing
-  - [ ] Verify ES6 imports used throughout (no `require()`)
-  - [ ] Verify functional patterns (arrow functions, const/let, immutability)
+- [x] Quality gate validation (AC: 7, 8, 9, 10)
+  - [x] Run `npm run build` → Zero TypeScript errors
+  - [x] Run `npm run lint` → Zero ESLint errors/warnings
+  - [x] Run `grep -r ": any" server/src/` → No matches found
+  - [x] Run `npm test` → All tests passing
+  - [x] Verify ES6 imports used throughout (no `require()`)
+  - [x] Verify functional patterns (arrow functions, const/let, immutability)
 
 ## Dev Notes
 
@@ -236,10 +236,188 @@ WHERE entrant_id = 'ENT-123'
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+claude-sonnet-4-5-20250929
 
 ### Debug Log References
 
+Implementation completed in single session on 2025-10-06.
+
 ### Completion Notes List
 
+**2025-10-06 - Story 1.3 Implementation Complete**
+
+Successfully implemented partitioned time-series tables for money_flow_history and odds_history with the following outcomes:
+
+1. **Migration Script Created**: `003_partitioned_tables.sql` creates both partitioned parent tables with RANGE partitioning on event_timestamp, includes initial partitions for current date using dynamic SQL (idempotent), and establishes foreign key constraints to entrants table.
+
+2. **Partition Management Utility**: Created TypeScript utility `partitions.ts` with two core functions:
+   - `getPartitionName()`: Generates partition names following YYYY_MM_DD convention
+   - `createTomorrowPartitions()`: Idempotent function to create next day's partitions for both tables
+   - Uses pg-format for SQL safety, fully typed (no `any`), follows ES6 functional patterns
+
+3. **Comprehensive Testing**:
+   - Integration tests (12 tests): Validate schema structure, partition existence/naming, data insertion routing, foreign key enforcement, and partition pruning via EXPLAIN
+   - Unit tests (11 tests): Test partition naming logic, tomorrow partition creation, idempotency, and date handling edge cases
+   - All 49 tests passing across entire test suite
+
+4. **Quality Gates Passed**:
+   - TypeScript build: ✓ Zero errors
+   - ESLint: ✓ Zero errors/warnings
+   - No `any` types in codebase: ✓ Verified
+   - ES6 modules with `.js` extensions: ✓ Applied
+   - Functional programming patterns: ✓ Arrow functions, const/let, immutability
+
+5. **Migration Executed**: Successfully ran `npm run migrate` - all 4 migrations executed (000, 001, 002, 003). Partitioned tables and initial partitions created in raceday database.
+
+**Key Implementation Decisions**:
+- Used PostgreSQL DO blocks for dynamic partition creation (idempotent)
+- Partition naming: `{table_name}_YYYY_MM_DD` format for automated management
+- Indexes automatically cascade to all child partitions
+- No PRIMARY KEY on parent tables (PostgreSQL limitation for range-partitioned tables)
+- Used array destructuring for date string extraction (ESLint compliance)
+- Console.warn for partition creation logs (matches project logging convention)
+
+**Notes for Future Stories**:
+- Partition management cron job will be implemented in Epic 4
+- Partition retention/archival strategy deferred to Epic 4
+- Ready for data ingestion workflows in subsequent stories
+
 ### File List
+
+**New Files Created:**
+- `server/database/migrations/003_partitioned_tables.sql`
+- `server/src/database/partitions.ts`
+- `server/src/shared/logger.ts` (created for structured logging)
+- `server/tests/integration/partitioned-tables.test.ts`
+- `server/tests/unit/partitions.test.ts`
+
+**Modified Files:**
+- `server/package.json` (added pino dependency for structured logging)
+
+---
+
+## Senior Developer Review (AI)
+
+**Reviewer:** warrick
+**Date:** 2025-10-06
+**Outcome:** Approve
+
+### Summary
+
+Story 1.3 successfully implements partitioned time-series tables for money_flow_history and odds_history with daily range partitioning. The implementation demonstrates excellent adherence to PostgreSQL best practices, TypeScript strict typing standards, and functional programming principles. All 10 acceptance criteria are fully satisfied with comprehensive test coverage (23 tests specific to partitioning). Code quality is exceptional with zero TypeScript errors, zero ESLint warnings, and no `any` types.
+
+### Key Findings
+
+**High Severity:** None
+
+**Medium Severity:** None
+
+**Low Severity:**
+1. ~~**[LOW] Console logging instead of structured logger**~~ ✅ RESOLVED - Replaced console.warn/error with Pino structured logger in v1.1.1
+
+### Acceptance Criteria Coverage
+
+| AC# | Criterion | Status | Evidence |
+|-----|-----------|--------|----------|
+| 1 | money_flow_history table with PARTITION BY RANGE (event_timestamp) | ✅ PASS | [003_partitioned_tables.sql:7-29](server/database/migrations/003_partitioned_tables.sql#L7) |
+| 2 | odds_history table with PARTITION BY RANGE (event_timestamp) | ✅ PASS | [003_partitioned_tables.sql:53-60](server/database/migrations/003_partitioned_tables.sql#L53) |
+| 3 | Initial daily partition created for current date | ✅ PASS | [003_partitioned_tables.sql:36-49,66-80](server/database/migrations/003_partitioned_tables.sql#L36) - Dynamic SQL with DO blocks |
+| 4 | Partition naming: {table_name}_YYYY_MM_DD | ✅ PASS | [partitions.ts:10-15](server/src/database/partitions.ts#L10) + validated by test |
+| 5 | Foreign key to entrants table maintained | ✅ PASS | [003_partitioned_tables.sql:9,55](server/database/migrations/003_partitioned_tables.sql#L9) + enforced by tests |
+| 6 | Indexes on (entrant_id, event_timestamp DESC) | ✅ PASS | [003_partitioned_tables.sql:32-33,63-64](server/database/migrations/003_partitioned_tables.sql#L32) + verified by tests |
+| 7 | Zero TypeScript errors on build | ✅ PASS | `npm run build` - 0 errors |
+| 8 | Zero ESLint errors/warnings | ✅ PASS | `npm run lint` - 0 errors, 0 warnings |
+| 9 | No `any` types | ✅ PASS | All types explicitly defined, runtime validation with proper typing |
+| 10 | ES6+ functional programming | ✅ PASS | Arrow functions, const/let, destructuring, .js imports, pure functions throughout |
+
+### Test Coverage and Gaps
+
+**Coverage: Excellent (23 partition-specific tests)**
+
+**Integration Tests (12 tests):**
+- ✅ Table existence validation
+- ✅ Partition existence with correct naming (YYYY_MM_DD)
+- ✅ Data insertion routing to correct partition
+- ✅ Foreign key constraint enforcement
+- ✅ Index creation and partition pruning (EXPLAIN analysis)
+
+**Unit Tests (11 tests):**
+- ✅ Partition name generation (edge cases: single/double digits, year boundaries, leap years)
+- ✅ Tomorrow partition creation for both tables
+- ✅ Idempotency (safe to run multiple times)
+- ✅ Date handling accuracy
+
+**Gaps Identified:** None - coverage is comprehensive for the story scope
+
+### Architectural Alignment
+
+**✅ Excellent alignment with Epic 1 Technical Spec:**
+
+1. **Schema Compliance:** Partitioned tables match tech-spec-epic-1.md lines 169-244 exactly - all columns present, correct types, proper constraints
+2. **Partition Strategy:** Daily range partitioning by event_timestamp as specified (lines 208-213)
+3. **Naming Convention:** Strict adherence to {table_name}_YYYY_MM_DD format (line 212)
+4. **Index Strategy:** Cascade indexes on (entrant_id, event_timestamp DESC) per lines 204-205, 239-240
+5. **Migration Pattern:** Idempotent SQL with DO blocks and format() function (constraint #13 satisfied)
+6. **No PRIMARY KEY Limitation:** Correctly uses BIGSERIAL without PRIMARY KEY constraint (constraint #1 satisfied)
+
+**PostgreSQL 18 Best Practices:**
+- ✅ Native PARTITION BY RANGE syntax (optimal for time-series)
+- ✅ Dynamic partition creation with format(%I, %L) for SQL injection safety
+- ✅ CREATE IF NOT EXISTS for idempotency
+- ✅ Indexes automatically cascade to child partitions
+- ✅ Foreign keys work correctly across partitions
+
+### Security Notes
+
+**✅ No security issues identified**
+
+1. **SQL Injection Prevention:** Uses pg-format with %I (identifier) and %L (literal) escaping in [partitions.ts:41-47](server/src/database/partitions.ts#L41) - follows Story 1.2 lesson learned
+2. **Input Validation:** Date handling uses native Date objects with type safety
+3. **Error Handling:** Proper error type checking with `instanceof Error` (line 54)
+4. **Pool Error Listeners:** Not applicable to this utility (standalone functions, no persistent pool management)
+
+**Recommendations:** None - security posture is solid
+
+### Best-Practices and References
+
+**PostgreSQL 18 Partitioning:**
+- [PostgreSQL 18 Partitioning Docs](https://www.postgresql.org/docs/18/ddl-partitioning.html) - Native PARTITION BY RANGE syntax used correctly
+- [Partition Pruning](https://www.postgresql.org/docs/18/ddl-partition-pruning.html) - Validated via EXPLAIN test
+
+**Node.js/TypeScript Best Practices:**
+- ✅ ES Modules with explicit .js extensions (Node 22 requirement from Story 1.1)
+- ✅ Strict TypeScript typing with no `any` types
+- ✅ Functional programming: pure functions, immutability, array destructuring
+- ✅ pg-format for SQL safety (OWASP SQL Injection prevention)
+
+**Testing Standards:**
+- ✅ Vitest framework with TypeScript strict typing
+- ✅ Transaction isolation with ROLLBACK for integration tests (Story 1.2 lesson)
+- ✅ Proper async/await patterns throughout
+
+### Action Items
+
+~~**Low Priority:**~~
+1. ~~**[Enhancement]** Replace console.warn/console.error with structured Pino logger~~ ✅ **COMPLETED in v1.1.1**
+   - Implemented Pino structured logging in [partitions.ts](server/src/database/partitions.ts#L53)
+   - Created shared logger module at [shared/logger.ts](server/src/shared/logger.ts)
+   - All tests passing with new logging implementation
+
+---
+
+### Change Log
+
+**2025-10-06 - v1.1.0**
+- Senior Developer Review notes appended
+- Status: Ready for Review → Approved for merge
+
+**2025-10-06 - v1.1.1 (Post-Review Fix)**
+- Replaced console.warn/console.error with Pino structured logger in partitions.ts
+- Created shared/logger.ts for project-wide structured logging
+- Added pino@^9.5.0 to package.json dependencies
+- All tests passing with structured logging (11/11 partition tests ✓)
+
+**2025-10-06 - v1.2.0 (Final)**
+- Status: Approved → Done
+- All action items resolved
+- Production ready for merge to main branch
