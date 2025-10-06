@@ -1,7 +1,8 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { Pool } from 'pg'
 import 'dotenv/config'
 import { getPartitionName, createTomorrowPartitions } from '../../src/database/partitions.js'
+import { getTomorrowNzDate } from '../../src/shared/timezone.js'
 
 const buildDatabaseUrl = (): string => {
   const dbHost = process.env.DB_HOST ?? 'localhost'
@@ -71,6 +72,17 @@ describe('Partition Utility Functions', () => {
       await pool.end()
     })
 
+    // Clean up tomorrow's partitions before each test to ensure idempotent test execution
+    beforeEach(async () => {
+      const tomorrow = getTomorrowNzDate()
+      const tomorrowPartitionMoney = getPartitionName('money_flow_history', tomorrow)
+      const tomorrowPartitionOdds = getPartitionName('odds_history', tomorrow)
+
+      // Drop tomorrow's partitions if they exist (from previous test runs or other stories)
+      await pool.query(`DROP TABLE IF EXISTS ${tomorrowPartitionMoney}`)
+      await pool.query(`DROP TABLE IF EXISTS ${tomorrowPartitionOdds}`)
+    })
+
     it('should create partitions for tomorrow for both tables', async () => {
       const result = await createTomorrowPartitions(pool)
 
@@ -104,9 +116,8 @@ describe('Partition Utility Functions', () => {
       expect(result1.sort()).toEqual(result2.sort())
     })
 
-    it('should create partition for correct date (tomorrow)', async () => {
-      const tomorrow = new Date()
-      tomorrow.setDate(tomorrow.getDate() + 1)
+    it('should create partition for correct date (tomorrow in NZ timezone)', async () => {
+      const tomorrow = getTomorrowNzDate()
 
       const expectedMoneyFlowPartition = getPartitionName('money_flow_history', tomorrow)
       const expectedOddsPartition = getPartitionName('odds_history', tomorrow)
@@ -120,8 +131,7 @@ describe('Partition Utility Functions', () => {
     it('should verify partitions exist in database after creation', async () => {
       await createTomorrowPartitions(pool)
 
-      const tomorrow = new Date()
-      tomorrow.setDate(tomorrow.getDate() + 1)
+      const tomorrow = getTomorrowNzDate()
       const expectedPartition = getPartitionName('money_flow_history', tomorrow)
 
       const result = await pool.query<{ tablename: string }>(`

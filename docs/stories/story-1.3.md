@@ -202,6 +202,7 @@ WHERE entrant_id = 'ENT-123'
 3. Foreign keys work across partitions (entrant_id → entrants)
 4. Initial partition must cover current date to accept inserts immediately
 5. Partition naming must follow strict convention for automated management (Epic 4)
+6. **CRITICAL**: Partitions must align with NZ timezone (Pacific/Auckland), not UTC, to ensure each racing day's data resides in a single partition for optimal query performance
 
 ### Project Structure Alignment
 
@@ -421,3 +422,12 @@ Story 1.3 successfully implements partitioned time-series tables for money_flow_
 - Status: Approved → Done
 - All action items resolved
 - Production ready for merge to main branch
+
+**2025-10-07 - v1.3.0 (Timezone Fix)**
+- Fixed partition utility to use NZ timezone for racing day calculations
+- Created `server/src/shared/timezone.ts` with NZ timezone utility functions
+- Updated partition naming to align with NZ racing days (critical for query performance)
+- Added test cleanup to handle timezone-aware partition creation
+- All tests passing (67/67) including partition tests
+- **Rationale:** Racing days operate on NZ time. A single racing day's data must reside in one partition for optimal query performance. UTC-based partitioning would split NZ racing days across two UTC date partitions, significantly degrading performance.
+- **Impact:** Partition boundaries now correctly align with NZ midnight, ensuring all data for a racing day (6am-10pm NZ time) resides in a single partition.
