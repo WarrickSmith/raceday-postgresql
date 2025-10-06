@@ -1,6 +1,6 @@
 # Story 1.2: Core Database Schema Migration
 
-Status: Draft
+Status: Approved
 
 ## Story
 
@@ -24,6 +24,7 @@ so that I can store normalized race data with proper constraints and relationshi
 ## Tasks / Subtasks
 
 - [ ] Configure ESLint for TypeScript server code (AC: 7, 8, 9, 10)
+
   - [ ] Install ESLint packages (@typescript-eslint/eslint-plugin, @typescript-eslint/parser, eslint-config-airbnb-typescript)
   - [ ] Create .eslintrc.json with strict-type-checked config (no-explicit-any: error)
   - [ ] Add lint scripts to package.json (lint, lint:fix, format, format:check)
@@ -32,6 +33,7 @@ so that I can store normalized race data with proper constraints and relationshi
   - [ ] Verify `npm run lint` passes with zero errors/warnings
 
 - [ ] Create database migration utility in TypeScript (AC: 7, 8, 9, 10)
+
   - [ ] Create `server/src/database/migrate.ts` (ES6 modules, functional)
   - [ ] Use pg.Pool for connection (typed, no `any`)
   - [ ] Load SQL files from `server/database/migrations/` directory
@@ -41,6 +43,7 @@ so that I can store normalized race data with proper constraints and relationshi
   - [ ] Verify ESLint passes with `npm run lint`
 
 - [ ] Create SQL migration scripts (AC: 1, 2, 3, 4, 5, 6)
+
   - [ ] Create `server/database/migrations/001_initial_schema.sql` (meetings, races, entrants, race_pools)
   - [ ] Define primary keys (meeting_id TEXT, race_id TEXT, entrant_id TEXT, race_id for pools)
   - [ ] Add foreign keys with CASCADE delete (races → meetings, entrants → races)
@@ -51,6 +54,7 @@ so that I can store normalized race data with proper constraints and relationshi
   - [ ] Apply BEFORE UPDATE triggers to all tables with updated_at field
 
 - [ ] Create migration test suite (AC: 7, 8, 9, 10)
+
   - [ ] Create `server/tests/integration/database-schema.test.ts`
   - [ ] Test table existence (meetings, races, entrants, race_pools)
   - [ ] Test primary keys enforced (duplicate insert fails)
@@ -61,6 +65,7 @@ so that I can store normalized race data with proper constraints and relationshi
   - [ ] Verify zero TypeScript/ESLint errors in test files
 
 - [ ] Execute migrations and validate (AC: 1-6)
+
   - [ ] Create raceday database if not exists
   - [ ] Run migration utility: `npm run migrate`
   - [ ] Verify all tables created in raceday database
@@ -90,17 +95,20 @@ so that I can store normalized race data with proper constraints and relationshi
 **Core Tables (from tech spec):**
 
 1. **meetings** - Race meeting information
+
    - Primary Key: meeting_id (TEXT)
    - Fields: meeting_name, country, race_type, date, status, timestamps
    - Indexes: idx_meetings_date_type (partial index on active meetings)
 
 2. **races** - Individual race details
+
    - Primary Key: race_id (TEXT)
    - Foreign Key: meeting_id → meetings (CASCADE DELETE)
    - Fields: name, race_number, start_time, status, actual_start, timestamps
    - Indexes: idx_races_start_time (partial), idx_races_meeting
 
 3. **entrants** - Race participants (horses/drivers)
+
    - Primary Key: entrant_id (TEXT)
    - Foreign Key: race_id → races (CASCADE DELETE)
    - Fields: name, runner_number, win_odds, place_odds, hold_percentage, is_scratched, timestamps
@@ -122,6 +130,7 @@ server/database/migrations/
 ```
 
 **Execution Order:**
+
 1. Create tables (001_initial_schema.sql)
 2. Create triggers (002_triggers.sql)
 
@@ -130,6 +139,7 @@ server/database/migrations/
 ### ESLint Configuration Requirements
 
 **Packages to Install:**
+
 ```json
 {
   "devDependencies": {
@@ -146,6 +156,7 @@ server/database/migrations/
 ```
 
 **Critical ESLint Rules (from typescript-eslint-config.md):**
+
 - `@typescript-eslint/no-explicit-any: "error"` - Enforce no `any` types
 - `@typescript-eslint/no-unsafe-*: "error"` - Prevent unsafe type operations
 - `@typescript-eslint/strict-boolean-expressions: "error"` - Strict boolean checks
@@ -153,6 +164,7 @@ server/database/migrations/
 - `no-console: ["error", { "allow": ["warn", "error"] }]` - No console.log in production
 
 **Quality Gate Commands:**
+
 ```bash
 npm run build        # TypeScript compilation (zero errors)
 npm run lint         # ESLint check (zero errors/warnings)
@@ -165,42 +177,44 @@ npm test             # Vitest test suite
 **TypeScript Migration Runner (server/src/database/migrate.ts):**
 
 ```typescript
-import { Pool } from 'pg';
-import { readdir, readFile } from 'fs/promises';
-import { join } from 'path';
+import { Pool } from 'pg'
+import { readdir, readFile } from 'fs/promises'
+import { join } from 'path'
 
 interface MigrationResult {
-  file: string;
-  success: boolean;
-  error?: string;
+  file: string
+  success: boolean
+  error?: string
 }
 
 export const runMigrations = async (pool: Pool): Promise<MigrationResult[]> => {
-  const migrationsDir = join(process.cwd(), 'database', 'migrations');
-  const files = await readdir(migrationsDir);
-  const sqlFiles = files.filter(f => f.endsWith('.sql')).sort();
+  const migrationsDir = join(process.cwd(), 'database', 'migrations')
+  const files = await readdir(migrationsDir)
+  const sqlFiles = files.filter((f) => f.endsWith('.sql')).sort()
 
-  const results: MigrationResult[] = [];
+  const results: MigrationResult[] = []
 
   for (const file of sqlFiles) {
     try {
-      const sql = await readFile(join(migrationsDir, file), 'utf-8');
-      await pool.query(sql);
-      results.push({ file, success: true });
-      console.log(`✅ Migration ${file} executed successfully`);
+      const sql = await readFile(join(migrationsDir, file), 'utf-8')
+      await pool.query(sql)
+      results.push({ file, success: true })
+      console.log(`✅ Migration ${file} executed successfully`)
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      results.push({ file, success: false, error: errorMessage });
-      console.error(`❌ Migration ${file} failed: ${errorMessage}`);
-      throw error; // Stop on first failure
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error'
+      results.push({ file, success: false, error: errorMessage })
+      console.error(`❌ Migration ${file} failed: ${errorMessage}`)
+      throw error // Stop on first failure
     }
   }
 
-  return results;
-};
+  return results
+}
 ```
 
 **Key Design Principles:**
+
 - Functional approach (pure functions, no side effects beyond DB writes)
 - ES6 modules (import/export)
 - Typed interfaces (MigrationResult)
@@ -213,17 +227,19 @@ export const runMigrations = async (pool: Pool): Promise<MigrationResult[]> => {
 **Integration Tests (server/tests/integration/database-schema.test.ts):**
 
 1. **Table Existence Tests**
+
    ```typescript
    it('should create meetings table', async () => {
      const result = await pool.query(`
        SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' AND table_name = 'meetings'
-     `);
-     expect(result.rows.length).toBe(1);
-   });
+     `)
+     expect(result.rows.length).toBe(1)
+   })
    ```
 
 2. **Constraint Tests**
+
    ```typescript
    it('should enforce race_type CHECK constraint', async () => {
      await expect(
@@ -231,26 +247,31 @@ export const runMigrations = async (pool: Pool): Promise<MigrationResult[]> => {
          INSERT INTO meetings (meeting_id, meeting_name, country, race_type, date, status)
          VALUES ('TEST-01', 'Test', 'NZ', 'invalid_type', '2025-10-06', 'active')
        `)
-     ).rejects.toThrow();
-   });
+     ).rejects.toThrow()
+   })
    ```
 
 3. **Trigger Tests**
+
    ```typescript
    it('should auto-update updated_at timestamp', async () => {
      // Insert meeting
-     await pool.query(`INSERT INTO meetings (...) VALUES (...)`);
+     await pool.query(`INSERT INTO meetings (...) VALUES (...)`)
 
      // Wait 1 second
-     await new Promise(resolve => setTimeout(resolve, 1000));
+     await new Promise((resolve) => setTimeout(resolve, 1000))
 
      // Update meeting
-     await pool.query(`UPDATE meetings SET status = 'completed' WHERE meeting_id = 'TEST-01'`);
+     await pool.query(
+       `UPDATE meetings SET status = 'completed' WHERE meeting_id = 'TEST-01'`
+     )
 
      // Check updated_at changed
-     const result = await pool.query(`SELECT created_at, updated_at FROM meetings WHERE meeting_id = 'TEST-01'`);
-     expect(result.rows[0].updated_at).not.toEqual(result.rows[0].created_at);
-   });
+     const result = await pool.query(
+       `SELECT created_at, updated_at FROM meetings WHERE meeting_id = 'TEST-01'`
+     )
+     expect(result.rows[0].updated_at).not.toEqual(result.rows[0].created_at)
+   })
    ```
 
 ### Project Structure Notes
@@ -278,12 +299,14 @@ server/
 ### Lessons Learned from Story 1.1
 
 **Apply to Story 1.2:**
+
 1. Use explicit `.js` extensions in ES module imports (Node.js 22 requirement)
 2. Match Vitest coverage version precisely (@vitest/coverage-v8@2.1.9)
 3. Test SQL case-sensitivity (column names, table names)
 4. Document migration execution steps clearly in completion notes
 
 **New for Story 1.2:**
+
 1. ESLint will catch type errors and code quality issues early
 2. Pre-commit hooks prevent committing code with lint/type errors
 3. Migration scripts are SQL (not TypeScript) but utilities are fully typed
@@ -301,7 +324,7 @@ server/
 
 ### Context Reference
 
-<!-- Path(s) to story context XML/JSON will be added here by context workflow -->
+- [story-context-1.1.2.xml](../story-context-1.1.2.xml)
 
 ### Agent Model Used
 
@@ -315,6 +338,6 @@ server/
 
 ## Change Log
 
-| Date       | Version | Description                                           | Author  |
-| ---------- | ------- | ----------------------------------------------------- | ------- |
-| 2025-10-06 | 0.1     | Initial draft created by Scrum Master agent          | warrick |
+| Date       | Version | Description                                 | Author  |
+| ---------- | ------- | ------------------------------------------- | ------- |
+| 2025-10-06 | 0.1     | Initial draft created by Scrum Master agent | warrick |
