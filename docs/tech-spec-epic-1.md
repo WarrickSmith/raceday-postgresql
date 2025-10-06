@@ -90,7 +90,7 @@ CREATE TABLE races (
 
 -- Hot path: Get active races by time
 CREATE INDEX idx_races_start_time ON races(start_time)
-  WHERE status IN ('upcoming', 'in_progress');
+  WHERE status IN ('open', 'interim');
 
 -- Foreign key navigation
 CREATE INDEX idx_races_meeting ON races(meeting_id);
@@ -740,6 +740,19 @@ describe('Database Connection', () => {
 - [x] Testing strategy defined
 - [x] Acceptance criteria documented
 - [x] Ready for development (Epic 1)
+
+---
+
+## Post-Review Follow-ups
+
+**From Story 1.2 Review (2025-10-06):**
+
+1. **[HIGH] SQL Injection in Database Creation** - Fix CREATE DATABASE query in run-migrations.ts:31 using pg-format identifier escaping or strict regex validation for database name
+2. **[HIGH] Missing Pool Error Handlers** - Add error event listeners to all Pool instances in migrate.ts and run-migrations.ts to prevent unhandled promise rejections
+3. **[MED] Race Status Values Incorrect** - Update race status CHECK constraint to use correct values: 'open', 'closed', 'interim', 'final', 'abandoned' (currently using incorrect 'scheduled', 'running', 'completed', 'cancelled'). Update all Epic 1 documentation (this tech spec, schema examples, tests) to reflect correct race status values. Note: Meeting status is separate and unchanged.
+4. **[MED] Missing race_pools Trigger** - Add auto-update trigger for race_pools.last_updated field in 002_triggers.sql for consistency
+5. **[MED] Process.exit in Library Code** - Extract process.exit from executeMigrations function to CLI wrapper for better modularity and testability
+6. **[LOW] ESLint Ignore Pattern** - Refine ESLint ignore patterns from `**/*.js` to specific paths (dist/, node_modules/, coverage/)
 
 ---
 
