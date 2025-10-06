@@ -1,15 +1,14 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import 'dotenv/config'
 
 describe('Environment Configuration Tests', () => {
-  it('should have DATABASE_URL configured', () => {
-    expect(process.env.DATABASE_URL).toBeDefined()
-    expect(process.env.DATABASE_URL).toMatch(/^postgresql:\/\//)
-  })
-
-  it('should have valid DATABASE_URL format', () => {
-    const url = process.env.DATABASE_URL
-    expect(url).toMatch(/postgresql:\/\/[^:]+:[^@]+@[^:]+:\d+\/\w+/)
+  it('should have database connection parameters configured', () => {
+    expect(process.env.DB_HOST).toBeDefined()
+    expect(process.env.DB_PORT).toBeDefined()
+    expect(Number(process.env.DB_PORT)).toBeGreaterThan(0)
+    expect(process.env.DB_USER).toBeDefined()
+    expect(process.env.DB_PASSWORD).toBeDefined()
+    expect(process.env.DB_NAME).toBeDefined()
   })
 
   it('should have NZTAB_API_URL configured', () => {
@@ -19,7 +18,9 @@ describe('Environment Configuration Tests', () => {
 
   it('should have NODE_ENV configured', () => {
     expect(process.env.NODE_ENV).toBeDefined()
-    expect(['development', 'production', 'test']).toContain(process.env.NODE_ENV)
+    expect(['development', 'production', 'test']).toContain(
+      process.env.NODE_ENV
+    )
   })
 
   it('should have PORT configured', () => {
