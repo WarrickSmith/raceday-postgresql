@@ -1,0 +1,136 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { Pool } from 'pg'
+import 'dotenv/config'
+import { getPartitionName, createTomorrowPartitions } from '../../src/database/partitions.js'
+
+const buildDatabaseUrl = (): string => {
+  const dbHost = process.env.DB_HOST ?? 'localhost'
+  const dbPort = process.env.DB_PORT ?? '5432'
+  const dbUser = process.env.DB_USER ?? 'postgres'
+  const dbPassword = process.env.DB_PASSWORD ?? 'postgres'
+  const dbName = process.env.DB_NAME ?? 'raceday'
+  return `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}`
+}
+
+describe('Partition Utility Functions', () => {
+  describe('getPartitionName', () => {
+    it('should generate correct partition name for single-digit month and day', () => {
+      const date = new Date('2025-01-05')
+      const result = getPartitionName('money_flow_history', date)
+      expect(result).toBe('money_flow_history_2025_01_05')
+    })
+
+    it('should generate correct partition name for double-digit month and day', () => {
+      const date = new Date('2025-12-25')
+      const result = getPartitionName('money_flow_history', date)
+      expect(result).toBe('money_flow_history_2025_12_25')
+    })
+
+    it('should handle different table names', () => {
+      const date = new Date('2025-10-06')
+      const result1 = getPartitionName('money_flow_history', date)
+      const result2 = getPartitionName('odds_history', date)
+
+      expect(result1).toBe('money_flow_history_2025_10_06')
+      expect(result2).toBe('odds_history_2025_10_06')
+    })
+
+    it('should pad month and day with leading zeros', () => {
+      const date = new Date('2025-03-07')
+      const result = getPartitionName('odds_history', date)
+      expect(result).toBe('odds_history_2025_03_07')
+    })
+
+    it('should handle year boundary correctly', () => {
+      const date = new Date('2024-12-31')
+      const result = getPartitionName('money_flow_history', date)
+      expect(result).toBe('money_flow_history_2024_12_31')
+    })
+
+    it('should handle leap year date', () => {
+      const date = new Date('2024-02-29')
+      const result = getPartitionName('money_flow_history', date)
+      expect(result).toBe('money_flow_history_2024_02_29')
+    })
+  })
+
+  describe('createTomorrowPartitions', () => {
+    let pool: Pool
+
+    beforeAll(() => {
+      pool = new Pool({
+        connectionString: buildDatabaseUrl(),
+      })
+
+      pool.on('error', (err) => {
+        console.error('Unexpected pool error:', err)
+      })
+    })
+
+    afterAll(async () => {
+      await pool.end()
+    })
+
+    it('should create partitions for tomorrow for both tables', async () => {
+      const result = await createTomorrowPartitions(pool)
+
+      expect(result.length).toBe(2)
+
+      const hasMoneyFlowPartition = result.some((name) => name.startsWith('money_flow_history_'))
+      const hasOddsPartition = result.some((name) => name.startsWith('odds_history_'))
+
+      expect(hasMoneyFlowPartition).toBe(true)
+      expect(hasOddsPartition).toBe(true)
+    })
+
+    it('should create partitions with correct naming format YYYY_MM_DD', async () => {
+      const result = await createTomorrowPartitions(pool)
+
+      result.forEach((partitionName) => {
+        expect(partitionName).toMatch(/^(money_flow_history|odds_history)_\d{4}_\d{2}_\d{2}$/)
+      })
+    })
+
+    it('should be idempotent (safe to run multiple times)', async () => {
+      // First call
+      const result1 = await createTomorrowPartitions(pool)
+      expect(result1.length).toBe(2)
+
+      // Second call should not throw error
+      const result2 = await createTomorrowPartitions(pool)
+      expect(result2.length).toBe(2)
+
+      // Both calls should return same partition names
+      expect(result1.sort()).toEqual(result2.sort())
+    })
+
+    it('should create partition for correct date (tomorrow)', async () => {
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+
+      const expectedMoneyFlowPartition = getPartitionName('money_flow_history', tomorrow)
+      const expectedOddsPartition = getPartitionName('odds_history', tomorrow)
+
+      const result = await createTomorrowPartitions(pool)
+
+      expect(result).toContain(expectedMoneyFlowPartition)
+      expect(result).toContain(expectedOddsPartition)
+    })
+
+    it('should verify partitions exist in database after creation', async () => {
+      await createTomorrowPartitions(pool)
+
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      const expectedPartition = getPartitionName('money_flow_history', tomorrow)
+
+      const result = await pool.query<{ tablename: string }>(`
+        SELECT tablename FROM pg_tables
+        WHERE schemaname = 'public' AND tablename = $1
+      `, [expectedPartition])
+
+      expect(result.rows.length).toBe(1)
+      expect(result.rows[0]?.tablename).toBe(expectedPartition)
+    })
+  })
+})
