@@ -1,0 +1,150 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>7</storyId>
+    <title>Structured Logging with Pino</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-08</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>/home/warrick/Dev/raceday-postgresql/docs/stories/story-1.7.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>structured logging configured using Pino</iWant>
+    <soThat>application events are logged in a consistent, parseable JSON format with timestamps</soThat>
+    <tasks>
+      - Task 1: Install Pino dependency (DONE - pino@9.5.0 already in package.json)
+      - Task 2: Create logger module with Pino configuration
+      - Task 3: Configure ESLint rule for console.log (DONE - no-console rule already in eslint.config.js:75)
+      - Task 4: Write unit tests for logger configuration
+      - Task 5: Integration and validation
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Pino logger configured in server/src/shared/logger.ts
+    2. Log level controlled by env.LOG_LEVEL from validated environment (Story 1.6)
+    3. Structured JSON output (no plain text logging)
+    4. ISO 8601 timestamps using pino.stdTimeFunctions.isoTime
+    5. Base context includes env: NODE_ENV
+    6. Custom formatter for level field: { level: label }
+    7. Logger exported as named export for application-wide use
+    8. ESLint rule configured: No console.log in production code
+    9. Unit tests verify logger configuration and output format
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-1.md</path>
+        <title>Logging Infrastructure</title>
+        <section>Lines 443-486</section>
+        <snippet>Pino logger configuration with env-based log level, structured JSON output, ISO 8601 timestamps, base context (env: NODE_ENV), level formatter, and usage examples. Standards: structured JSON only, ISO 8601 timestamps, contextual fields, no console.log in production code (ESLint rule).</snippet>
+      </doc>
+      <doc>
+        <path>docs/CODING-STANDARDS.md</path>
+        <title>ES6+ Standards, TypeScript Best Practices</title>
+        <section>Lines 1-518</section>
+        <snippet>ES modules (ESM) mandatory, arrow functions, async/await, const/let, destructuring, template literals, functional programming principles (pure functions, immutability, array methods), TypeScript strict typing (no any), named exports, ESLint configuration (zero errors policy), Prettier configuration, testing standards.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/story-1.6.md</path>
+        <title>Environment Variable Validation with Zod</title>
+        <section>Entire story - prerequisite</section>
+        <snippet>Story 1.6 (Done) provides validated env.LOG_LEVEL and env.NODE_ENV used by logger. EnvSchema in server/src/shared/env.ts validates LOG_LEVEL as enum(['debug', 'info', 'warn', 'error']).default('info') and NODE_ENV as enum(['development', 'production', 'test']).</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>server/src/shared/logger.ts</path>
+        <kind>module</kind>
+        <symbol>logger</symbol>
+        <lines>1-13</lines>
+        <reason>Logger already exists but uses process.env directly instead of validated env from Story 1.6. Needs update to import env from './env' and use env.LOG_LEVEL and env.NODE_ENV.</reason>
+      </file>
+      <file>
+        <path>server/src/shared/env.ts</path>
+        <kind>module</kind>
+        <symbol>env, buildDatabaseUrl</symbol>
+        <lines>1-65</lines>
+        <reason>Provides validated env.LOG_LEVEL and env.NODE_ENV. Logger should import env from this module to use validated environment variables.</reason>
+      </file>
+      <file>
+        <path>server/tests/unit/environment-config.test.ts</path>
+        <kind>test</kind>
+        <symbol>N/A</symbol>
+        <lines>1-200+</lines>
+        <reason>Example unit test structure using Vitest (describe, it, expect). Follow this pattern for logger.test.ts.</reason>
+      </file>
+      <file>
+        <path>server/eslint.config.js</path>
+        <kind>config</kind>
+        <symbol>N/A</symbol>
+        <lines>75</lines>
+        <reason>no-console rule already configured: 'no-console': ['error', { allow: ['warn', 'error'] }]. AC #8 is already satisfied.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <package name="pino" version="^9.5.0" status="installed" />
+        <package name="zod" version="^3.25.76" status="installed" />
+        <package name="vitest" version="^2.0.0" status="dev-installed" />
+        <package name="typescript" version="^5.7.0" status="dev-installed" />
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - MUST use ES modules (import/export) - no CommonJS (server/package.json: "type": "module")
+    - MUST import env from validated environment module (server/src/shared/env.ts) - DO NOT use process.env directly
+    - MUST use named exports over default exports (eslint.config.js:94 enforces 'import/no-default-export': 'error')
+    - MUST NOT use console.log in production code (eslint.config.js:75 enforces 'no-console': ['error', { allow: ['warn', 'error'] }])
+    - MUST follow TypeScript strict mode (no any types) - eslint.config.js:21-26 enforces strict type checking
+    - MUST use functional programming patterns (arrow functions, const/let, array methods) per CODING-STANDARDS.md
+    - Logger configuration MUST match tech spec exactly: level formatter, ISO 8601 timestamps, base context with env
+    - All tests MUST use Vitest framework (existing pattern in tests/unit/)
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>env (validated environment)</name>
+      <kind>exported const</kind>
+      <signature>
+        import { env } from './env'
+        // env.LOG_LEVEL: 'debug' | 'info' | 'warn' | 'error'
+        // env.NODE_ENV: 'development' | 'production' | 'test'
+      </signature>
+      <path>server/src/shared/env.ts</path>
+    </interface>
+    <interface>
+      <name>pino logger instance</name>
+      <kind>default export from pino package</kind>
+      <signature>
+        import pino from 'pino'
+        const logger = pino({ level, formatters, timestamp, base })
+      </signature>
+      <path>node_modules/pino</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit tests use Vitest framework (describe, it, expect). Test files in server/tests/unit/ with naming pattern {module-name}.test.ts. Tests verify configuration, JSON output structure, ISO 8601 timestamp format, level formatter output, and contextual logging. All tests must pass with npm test.
+    </standards>
+    <locations>
+      server/tests/unit/ - Unit tests
+      Pattern: {module-name}.test.ts
+    </locations>
+    <ideas>
+      <test ac="1,2" desc="Verify logger instance is created with env.LOG_LEVEL and env.NODE_ENV" />
+      <test ac="3" desc="Test JSON output format - parse log output and verify structure (level, time, env, msg)" />
+      <test ac="4" desc="Test timestamp format is ISO 8601 (regex or Date.parse validation)" />
+      <test ac="5" desc="Test base context includes env: NODE_ENV in every log" />
+      <test ac="6" desc="Test level formatter outputs { level: 'info' } format (not numeric)" />
+      <test ac="7" desc="Test logger is exported as named export (import { logger })" />
+      <test ac="3,9" desc="Test contextual logging - additional fields (raceId, duration) appear in output" />
+      <test ac="9" desc="Test logger.error includes error object in output" />
+    </ideas>
+  </tests>
+</story-context>
