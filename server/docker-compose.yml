@@ -1,0 +1,56 @@
+# RaceDay Server Docker Compose Configuration
+#
+# This configuration deploys the Node.js server application only.
+# PostgreSQL is deployed independently (not managed by this compose file).
+# Independent from client deployment (see /client/docker-compose.yml)
+#
+# Deployment modes:
+#
+# 1. LOCAL DEVELOPMENT:
+#    - Run: docker-compose --env-file .env up --build -d
+#    - Reads variables from ./server/.env
+#
+# 2. PORTAINER PRODUCTION:
+#    - Deploy stack from GitHub repository
+#    - Define all environment variables in Portainer Stack UI
+#
+# 3. DOCKER DESKTOP:
+#    - Run: docker-compose up --build -d
+#    - Set environment variables in .env file or pass via command line
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: raceday-server
+    restart: unless-stopped
+    ports:
+      - '7000:7000'
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=7000
+      # Database connection components (DATABASE_URL built from these in application code)
+      - DB_HOST=${DB_HOST:-localhost}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME:-raceday}
+      - DB_POOL_MAX=${DB_POOL_MAX:-10}
+      # NZ TAB API
+      - NZTAB_API_URL=${NZTAB_API_URL:-https://api.tab.co.nz}
+      # Performance tuning
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - UV_THREADPOOL_SIZE=${UV_THREADPOOL_SIZE:-8}
+      - MAX_WORKER_THREADS=${MAX_WORKER_THREADS:-3}
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 4G
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:7000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

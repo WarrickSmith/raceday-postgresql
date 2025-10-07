@@ -1,25 +1,23 @@
-# RaceDay Docker Compose Configuration
+# RaceDay Client Docker Compose Configuration
 #
-# NOTE: This configuration is currently client-only (Appwrite-based).
-# Story 1.5 will add PostgreSQL and Node.js server services.
+# This configuration deploys the Next.js client application.
+# Independent from server deployment (see /server/docker-compose.yml)
 #
-# This file supports two deployment modes:
+# Deployment modes:
 #
 # 1. LOCAL DEVELOPMENT:
-#    - Run: docker-compose --env-file ./client/.env.local up --build -d
-#    - Reads variables from ./client/.env.local
-#    - Single source of truth for all environment variables
+#    - Run: docker-compose --env-file .env.local up --build -d
+#    - Reads variables from ./.env.local
 #
 # 2. PORTAINER PRODUCTION:
 #    - Deploy stack from GitHub repository
 #    - Define all environment variables in Portainer Stack UI
 #    - Portainer variables override defaults below
-#    - No .env.local file needed (won't exist in GitHub repo)
 
 services:
   raceday:
     build:
-      context: ./client
+      context: .
       args:
         - NEXT_PUBLIC_APPWRITE_ENDPOINT=${NEXT_PUBLIC_APPWRITE_ENDPOINT}
         - NEXT_PUBLIC_APPWRITE_PROJECT_ID=${NEXT_PUBLIC_APPWRITE_PROJECT_ID}
