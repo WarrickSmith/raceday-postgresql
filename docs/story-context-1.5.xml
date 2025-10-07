@@ -1,0 +1,164 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.5</storyId>
+    <title>Docker Configuration for Node.js Server</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-07</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>/home/warrick/Dev/raceday-postgresql/docs/stories/story-1.5.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a developer</asA>
+    <iWant>Docker container configured for Node.js 22 server with separate deployment from client</iWant>
+    <soThat>I can run the server application with consistent resource allocation on independent infrastructure</soThat>
+    <tasks>
+      <task id="1" acs="1,2">
+        <description>Create server Dockerfile with multi-stage build</description>
+        <subtasks>
+          <subtask id="1.1">Create builder stage with Node.js 22 Alpine</subtask>
+          <subtask id="1.2">Add TypeScript build step</subtask>
+          <subtask id="1.3">Create production runtime stage with minimal dependencies</subtask>
+        </subtasks>
+      </task>
+      <task id="2" acs="9,10">
+        <description>Create server docker-compose.yml in server directory</description>
+        <subtasks>
+          <subtask id="2.1">Define server service with resource limits (AC: 3, 4)</subtask>
+          <subtask id="2.2">Add PostgreSQL service configuration</subtask>
+          <subtask id="2.3">Configure environment variable passing (AC: 6)</subtask>
+          <subtask id="2.4">Configure health check using /health endpoint (AC: 5)</subtask>
+          <subtask id="2.5">Add volume mounts for logs if needed (AC: 7)</subtask>
+          <subtask id="2.6">Set restart policy to unless-stopped (AC: 8)</subtask>
+          <subtask id="2.7">Map container port 3000 to host port 7000 (AC: 10)</subtask>
+        </subtasks>
+      </task>
+      <task id="3" acs="9">
+        <description>Move existing client docker-compose.yml to client directory</description>
+        <subtasks>
+          <subtask id="3.1">Move docker-compose.yml to /client/docker-compose.yml</subtask>
+          <subtask id="3.2">Update any path references in client docker-compose.yml</subtask>
+          <subtask id="3.3">Test client deployment still works from new location</subtask>
+        </subtasks>
+      </task>
+      <task id="4">
+        <description>Update documentation for dual-deployment model</description>
+        <subtasks>
+          <subtask id="4.1">Document server deployment process (docker-compose up from /server)</subtask>
+          <subtask id="4.2">Document client deployment process (docker-compose up from /client)</subtask>
+          <subtask id="4.3">Update developer-quick-start.md with both deployment paths</subtask>
+          <subtask id="4.4">Document port allocation (client: 3444, server: 7000)</subtask>
+        </subtasks>
+      </task>
+      <task id="5">
+        <description>Test server container deployment</description>
+        <subtasks>
+          <subtask id="5.1">Build server Docker image successfully</subtask>
+          <subtask id="5.2">Verify container starts with correct resource limits</subtask>
+          <subtask id="5.3">Verify health check responds correctly at port 7000</subtask>
+          <subtask id="5.4">Verify environment variables are passed correctly</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Dockerfile created for Node.js 22 LTS Alpine base image</criterion>
+    <criterion id="2">Multi-stage build (dependencies → build → runtime)</criterion>
+    <criterion id="3">Container CPU limit: 4 cores</criterion>
+    <criterion id="4">Container memory limit: 4GB</criterion>
+    <criterion id="5">Health check configured (curl localhost:7000/health)</criterion>
+    <criterion id="6">Environment variables passed via docker-compose</criterion>
+    <criterion id="7">Volume mounts for logs (if needed)</criterion>
+    <criterion id="8">Container restart policy: unless-stopped</criterion>
+    <criterion id="9">Separate docker-compose.yml file for server deployment (independent from client)</criterion>
+    <criterion id="10">Server API accessible on port 7000 (externally mapped from container port 3000)</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="../tech-spec-epic-1.md" title="Epic 1 Technical Specification" section="Docker Configuration (L270-376)">
+        <snippet>Provides complete docker-compose.yml and Dockerfile specifications for Node.js 22 server with multi-stage build, PostgreSQL 18 Alpine, resource limits (4 CPU, 4GB RAM), health checks, and environment variables. Includes restart policy and port mapping strategy.</snippet>
+      </doc>
+      <doc path="../architecture-specification.md" title="Architecture Specification" section="Deployment Architecture (L689-807)">
+        <snippet>Defines deployment architecture with Docker configuration, REST endpoints for client compatibility, and resource allocation rationale. Specifies 4 CPU cores and 4GB RAM optimal for 5 concurrent races with worker thread pool.</snippet>
+      </doc>
+      <doc path="../developer-quick-start.md" title="Developer Quick Start Guide" section="Quick Setup (L1-50)">
+        <snippet>Provides developer setup instructions including Node.js 22 requirement, Docker setup, environment configuration, migration commands, and development server startup. Current setup assumes single docker-compose.yml in project root.</snippet>
+      </doc>
+      <doc path="../tech-spec-epic-1.md" title="Epic 1 Technical Specification" section="Environment Configuration (L379-425)">
+        <snippet>Lists all required environment variables: NODE_ENV, DATABASE_URL, NZTAB_API credentials, PORT=3000, LOG_LEVEL, UV_THREADPOOL_SIZE=8, MAX_WORKER_THREADS=3, DB_POOL_MAX=10. These must be configured in docker-compose.yml.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact path="/docker-compose.yml" kind="config" symbol="services" lines="1-60">
+        <reason>Existing client-only docker-compose.yml that needs to be moved to /client directory. Currently defines client service on port 3444 with health check.</reason>
+      </artifact>
+      <artifact path="/client/Dockerfile" kind="config" symbol="multi-stage" lines="1-95">
+        <reason>Existing client Dockerfile using Node.js 22 Alpine with multi-stage build pattern. Can be referenced as template for server Dockerfile structure.</reason>
+      </artifact>
+      <artifact path="/server/src/database/migrate.ts" kind="module" symbol="runMigrations" lines="1-37">
+        <reason>Migration runner that expects database/migrations directory. Server docker-compose must mount this directory for PostgreSQL container initialization.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem type="docker">
+        <package name="node" version="22-alpine">Alpine Linux-based Node.js 22 LTS for minimal container footprint</package>
+        <package name="postgres" version="18-alpine">PostgreSQL 18 Alpine for database service</package>
+      </ecosystem>
+      <ecosystem type="node">
+        <package name="typescript">TypeScript compiler for build stage</package>
+        <package name="pg">PostgreSQL client library for database connections</package>
+      </ecosystem>
+      <ecosystem type="system">
+        <package name="curl">Required for Docker health check commands in containers</package>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Multi-stage Docker build required (builder stage → production runtime stage) to minimize final image size and exclude dev dependencies</constraint>
+    <constraint type="deployment">Client and server must have separate docker-compose.yml files for independent deployment to different platforms via Portainer</constraint>
+    <constraint type="port-mapping">Server container internal port 3000 must map to external port 7000 (client uses 3444, avoiding conflict)</constraint>
+    <constraint type="resource-limits">Container must enforce 4 CPU cores and 4GB memory limits (architecture requirement for 5 concurrent races)</constraint>
+    <constraint type="database">PostgreSQL service must complete health check before server starts (depends_on with service_healthy condition)</constraint>
+    <constraint type="migration">Database migrations mounted at /docker-entrypoint-initdb.d in PostgreSQL container for automatic initialization</constraint>
+    <constraint type="restart-policy">Server container must use restart: unless-stopped for automatic recovery from failures</constraint>
+    <constraint type="health-check">Health endpoint /health must respond within container on port 3000, externally accessible on port 7000</constraint>
+  </constraints>
+  <interfaces>
+    <interface name="GET /health" kind="REST" path="server/src/api/health.ts" signature="GET /health → 200 OK">
+      Server health check endpoint used by Docker health check configuration. Must be implemented to respond on port 3000 within container.
+    </interface>
+    <interface name="DATABASE_URL" kind="environment" signature="postgresql://raceday:${DB_PASSWORD}@postgres:5432/raceday">
+      PostgreSQL connection string using service name 'postgres' for container networking. Must be passed via docker-compose environment.
+    </interface>
+    <interface name="Migration Volume Mount" kind="docker-volume" signature="./database/migrations:/docker-entrypoint-initdb.d">
+      PostgreSQL initialization expects SQL files in /docker-entrypoint-initdb.d. Server's database/migrations directory must be mounted here.
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Tests use Vitest framework (^2.1.9) with TypeScript strict typing. Integration tests validate Docker container behavior using shell commands (docker inspect, curl). All tests must follow strict TypeScript rules (no any types). Test files use .test.ts extension. Integration tests live in server/tests/integration/, deployment tests in server/tests/deployment/. Pre-commit hooks enforce zero TypeScript errors and zero ESLint errors/warnings before commit.
+    </standards>
+    <locations>
+      <location>server/tests/integration/*.test.ts</location>
+      <location>server/tests/deployment/docker.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="1">Test server Dockerfile builds successfully with Node.js 22 Alpine base image (verify FROM node:22-alpine in Dockerfile)</idea>
+      <idea ac="2">Test multi-stage build produces smaller final image than single-stage (compare image sizes)</idea>
+      <idea ac="3">Test container CPU limit is enforced at 4 cores using docker inspect (verify cpus: '4.0' in compose)</idea>
+      <idea ac="4">Test container memory limit is 4GB using docker inspect (verify mem_limit: 4g in compose)</idea>
+      <idea ac="5">Test health check endpoint responds 200 OK at http://localhost:7000/health using curl</idea>
+      <idea ac="6">Test environment variables are accessible inside container (exec into container and echo $DATABASE_URL)</idea>
+      <idea ac="7">Test log volume mount exists and is writable if configured (docker inspect volumes)</idea>
+      <idea ac="8">Test container restart policy is unless-stopped (docker inspect RestartPolicy)</idea>
+      <idea ac="9">Test server docker-compose.yml exists in /server directory and is independent from client compose</idea>
+      <idea ac="10">Test server API is accessible on port 7000 externally (curl http://localhost:7000/health from host)</idea>
+      <idea ac="postgres">Test PostgreSQL service starts and passes health check before server starts (depends_on condition)</idea>
+      <idea ac="migration">Test database migrations are auto-executed on first PostgreSQL startup (check /docker-entrypoint-initdb.d mount)</idea>
+    </ideas>
+  </tests>
+</story-context>
