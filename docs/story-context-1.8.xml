@@ -1,0 +1,94 @@
+<story-context id="story-context-1.8" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>8</storyId>
+    <title>PostgreSQL Connection Pooling</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-08T22:40:00Z</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-1.8.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>PostgreSQL connection pool configured with optimal settings</iWant>
+    <soThat>I can handle concurrent database operations without saturation</soThat>
+    <tasks><![CDATA[
+- Task 1: Implement shared connection pool module (AC: 1-4,6,7)
+  - Create server/src/database/pool.ts exporting a singleton pg.Pool configured via buildDatabaseUrl(env) and env.DB_POOL_MAX.
+  - Set min, idleTimeoutMillis, and connectionTimeoutMillis to spec values and document rationale inline.
+  - Log pool configuration metrics once at module initialization using the shared logger.
+  - Register pool.on('error') to escalate failures through the logger per earlier action items.
+  - Attach SIGTERM/SIGINT listeners that close the pool before process exit.
+- Task 2: Integrate shared pool across server entry points (AC: 1,5-7)
+  - Replace the inline pool in server/src/index.ts with the shared export and remove redundant initialization helpers.
+  - Ensure health checks and future routes import the shared pool without re-configuring connection options.
+  - Confirm startup logging occurs once while preserving existing health-check responses.
+- Task 3: Add validation and tests for pool configuration (AC: 2-4,6-7)
+  - Create unit tests that assert pool.options values (max, min, idle, connection timeout) and verify metrics logging with a spy.
+  - Add integration test (or extend existing health check tests) to verify the shared pool executes a SELECT 1 successfully and handles simulated exhaustion gracefully.
+  - Document test execution commands and expected outcomes in the change log.
+- Task 4: Update documentation to reflect environment-driven connection strings (AC: 1)
+  - Refresh docs/tech-spec-epic-1.md connection-pool section to reference buildDatabaseUrl(env) instead of env.DATABASE_URL.
+  - Add note in developer-quick-start.md troubleshooting that metrics log on startup and rely on DB_POOL_MAX.
+    ]]></tasks>
+  </story>
+
+  <acceptanceCriteria><![CDATA[
+1. Shared `pg.Pool` builds its connection string from validated `DB_*` environment variables via `buildDatabaseUrl(env)` so configuration remains environment-driven.
+2. `pool.options.max` resolves to 10 connections (using `env.DB_POOL_MAX`) and maintains at least two idle connections to meet throughput and warm-connection expectations.
+3. Pool configuration enforces `idleTimeoutMillis = 30000` (30 seconds) to recycle unused connections promptly.
+4. Pool configuration enforces `connectionTimeoutMillis = 2000` (2 seconds) to fail fast when saturation occurs.
+5. The shared pool instance is exported for reuse across application modules (HTTP server, migrations, future data layer) rather than instantiating ad-hoc pools.
+6. Startup logging records pool metrics (max, min, idle timeout, connection timeout) through the structured logger to provide observability baselines.
+7. Pool lifecycle management hooks process shutdown (SIGTERM/SIGINT) to end the pool cleanly and avoid dangling connections.
+  ]]></acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/epic-stories-2025-10-05.md" title="Epic Stories" section="Story 1.8: PostgreSQL Connection Pooling"><![CDATA[Story 1.8 defines the desired connection pool behavior, including environment-driven configuration, max/min sizing, timeouts, export requirement, and startup metrics logging.]]></doc>
+      <doc path="docs/tech-spec-epic-1.md" title="Technical Specification: Epic 1" section="PostgreSQL Connection Pool"><![CDATA[The tech spec prescribes server/src/database/pool.ts, the pg.Pool configuration values (max 10, min 2, idle 30s, timeout 2s), startup metrics logging, and graceful shutdown handling.]]></doc>
+      <doc path="docs/PRD-raceday-postgresql-2025-10-05.md" title="PRD" section="Non-Functional Requirements"><![CDATA[NFR003 mandates supporting 10 concurrent PostgreSQL connections without saturation, reinforcing the max pool size requirement for this story.]]></doc>
+      <doc path="docs/architectural-decisions.md" title="Architectural Decisions" section="ADR-001: Monolith vs Microservices"><![CDATA[Monolith architecture relies on a single shared connection pool to minimise latency and simplify operations, aligning with Story 1.8 objectives.]]></doc>
+      <doc path="docs/solution-architecture.md" title="Solution Architecture" section="Component Directory Structure"><![CDATA[The approved structure allocates server/src/database/pool.ts as the central pool module alongside database operations, ensuring reuse across the codebase.]]></doc>
+      <doc path="server/.env.example" title=".env Example" section="Database Configuration"><![CDATA[Environment template documents that DATABASE_URL is constructed from DB_* values and includes DB_POOL_MAX=10, informing pool configuration and logging.]]></doc>
+      <doc path="server/src/shared/env.ts" title="Env Validation" section="buildDatabaseUrl helper"><![CDATA[Validated environment schema exports `buildDatabaseUrl(env, database?)`, which must be used when constructing the pool connection string.]]></doc>
+    </docs>
+    <code>
+      <codeArtifact path="server/src/index.ts" kind="module" symbol="initDbPool" lines="1-140"><![CDATA[Current HTTP entry point creates its own Pool for health checks; Story 1.8 replaces this ad-hoc setup with the shared database/pool module.]]></codeArtifact>
+      <codeArtifact path="server/src/shared/env.ts" kind="function" symbol="buildDatabaseUrl" lines="45-48"><![CDATA[Utility that composes PostgreSQL URLs from validated DB_* variables; the shared pool must call this instead of relying on raw DATABASE_URL strings.]]></codeArtifact>
+      <codeArtifact path="server/src/database/run-migrations.ts" kind="module" symbol="executeMigrations" lines="1-64"><![CDATA[Migrations already leverage buildDatabaseUrl and pool.on('error'); reuse these patterns when promoting the shared pool module.]]></codeArtifact>
+      <codeArtifact path="server/tests/unit/environment-config.test.ts" kind="test" symbol="Environment Configuration Validation" lines="18-140"><![CDATA[Unit tests assert DB_POOL_MAX coercion and defaults, providing guidance for configuring test fixtures when exercising the shared pool.]]></codeArtifact>
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <package name="pg" version="^8.16.3">PostgreSQL client that provides Pool and PoolConfig used by the shared module (server/package.json).</package>
+        <package name="dotenv" version="^16.6.1">Loads .env files so buildDatabaseUrl receives populated DB_* variables (server/package.json).</package>
+        <package name="pino" version="^9.5.0">Structured logger required for startup metrics and pool error reporting (server/package.json).</package>
+        <package name="zod" version="^3.25.76">Runtime validation enforcing DB_* values before pool initialization (server/package.json).</package>
+        <package name="vitest" version="^2.0.0">Testing framework for unit/integration coverage of pool behavior (server/package.json).</package>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints><![CDATA[
+- Implement a single shared pg.Pool in server/src/database/pool.ts to avoid duplicative connections (docs/solution-architecture.md, docs/architectural-decisions.md).
+- Log pool metrics at startup through the shared logger to satisfy observability requirements (docs/tech-spec-epic-1.md).
+- Enforce graceful shutdown via SIGTERM/SIGINT handlers to close the pool cleanly (docs/tech-spec-epic-1.md).
+- Honor DB_POOL_MAX default of 10 and environment validation guarantees from Story 1.6 (server/.env.example, server/src/shared/env.ts).
+  ]]></constraints>
+
+  <interfaces>
+    <interface name="buildDatabaseUrl" kind="function" signature="buildDatabaseUrl(env: Env, database?: string): string" path="server/src/shared/env.ts:45-48">Composes PostgreSQL URLs from validated DB_* variables; must be used when configuring the shared Pool.</interface>
+  </interfaces>
+
+  <tests>
+    <standards><![CDATA[Use Vitest to exercise pool configuration and failure paths, leveraging existing environment validation suites for fixture setup and ensuring structured logs remain JSON per Story 1.7 (server/package.json, server/tests).]]></standards>
+    <locations><![CDATA[server/tests/unit; server/tests/integration]]></locations>
+    <ideas><![CDATA[
+- AC2: Instantiate the shared pool with env.DB_POOL_MAX overrides and assert options.max/min are applied.
+- AC4: Simulate connection exhaustion (e.g., pause queries) and verify connectionTimeoutMillis triggers a fail-fast error within ~2s.
+- AC6: Capture logger output during pool initialization to confirm metrics payload includes max, min, idleTimeoutMillis, and connectionTimeoutMillis.
+    ]]></ideas>
+  </tests>
+</story-context>
