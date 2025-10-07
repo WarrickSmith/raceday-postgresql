@@ -1,6 +1,5 @@
 import { config } from 'dotenv'
 import { z } from 'zod'
-import { logger } from './logger.js'
 
 // Load environment variables from .env file
 config()
@@ -31,7 +30,8 @@ export type Env = z.infer<typeof EnvSchema>
 const result = EnvSchema.safeParse(process.env)
 
 if (!result.success) {
-  logger.error({ errors: result.error.errors }, 'Environment validation failed')
+  // Cannot use logger here due to circular dependency (logger depends on env)
+  // Use console.error for environment validation failures
   console.error('Environment validation failed:')
   result.error.errors.forEach((err) => {
     console.error(`  - ${err.path.join('.')}: ${err.message}`)
