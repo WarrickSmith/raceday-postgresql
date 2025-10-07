@@ -27,9 +27,25 @@ cp .env.example .env
 # Edit .env with your NZ TAB API credentials
 ```
 
-### 2. Start Database
+### 2. Start Database & Server (Docker)
+
+**Option A: Full Stack (Server + PostgreSQL)**
 ```bash
-# From project root
+# From server directory
+cd server
+docker-compose up --build -d
+
+# Wait for healthy status
+docker-compose ps
+
+# Server accessible at http://localhost:7000
+# PostgreSQL accessible at localhost:5432
+```
+
+**Option B: Database Only (for local development)**
+```bash
+# From server directory
+cd server
 docker-compose up -d postgres
 
 # Wait for healthy status
@@ -43,9 +59,99 @@ npm run migrate
 ```
 
 ### 4. Start Development Server
+
+**Local Development (no Docker):**
 ```bash
+cd server
 npm run dev
+# Server runs on http://localhost:7000
 ```
+
+**Docker Development:**
+```bash
+cd server
+docker-compose up --build
+# Server runs on http://localhost:7000
+```
+
+---
+
+## Docker Deployment
+
+### Dual-Deployment Architecture
+
+The project uses **separate docker-compose configurations** for client and server:
+
+**Server Deployment** (`/server/docker-compose.yml`):
+- Node.js 22 server application only
+- **PostgreSQL deployed independently** (not included in server compose)
+- Port 7000 (external) → Port 7000 (container)
+- Resource limits: 4 CPU cores, 4GB memory
+
+**Client Deployment** (`/client/docker-compose.yml`):
+- Next.js client application
+- Port 3444 (external) → Port 3000 (container)
+
+**Database Deployment**:
+- PostgreSQL 18 is deployed separately (managed independently)
+- Server connects via DATABASE_URL environment variable
+
+### Deploy Server Stack
+
+**Prerequisites:** PostgreSQL must be running and accessible
+
+```bash
+cd server
+
+# Create .env file with database connection details
+# See .env.example for all available variables
+cat > .env << EOF
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_NAME=raceday
+NZTAB_API_URL=https://api.tab.co.nz
+EOF
+
+docker-compose up --build -d
+
+# Verify service
+docker-compose ps
+
+# Check health
+curl http://localhost:7000/health
+```
+
+### Deploy Client Stack
+```bash
+cd client
+docker-compose --env-file .env.local up --build -d
+
+# Verify
+docker-compose ps
+
+# Check health
+curl http://localhost:3444/api/health
+```
+
+### Production Deployment (Portainer or Docker Desktop)
+
+All stacks deploy independently:
+
+1. **PostgreSQL Database**: Deploy separately (not managed by app docker-compose files)
+   - Use native PostgreSQL installation, managed service, or separate container
+   - Ensure accessible from server container
+
+2. **Server Stack**: Deploy from `/server/docker-compose.yml`
+   - Set environment variables (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, NZTAB_API_URL, etc.) in Portainer UI or .env
+   - Node.js server application only
+   - External port: 7000
+
+3. **Client Stack**: Deploy from `/client/docker-compose.yml`
+   - Set environment variables in Portainer UI or .env.local
+   - Next.js application only
+   - External port: 3444
 
 ---
 
@@ -163,7 +269,8 @@ npm run test:perf
 
 ### Monitor Live Performance
 ```bash
-# Application logs
+# Application logs (from /server directory)
+cd server
 docker-compose logs -f server
 
 # Database metrics
@@ -346,17 +453,16 @@ curl -X GET "https://api.tab.co.nz/..." -H "Authorization: Bearer $API_KEY"
 ## Environment Variables
 
 ```env
-# Database
+# Database (required)
 DATABASE_URL=postgresql://raceday:password@localhost:5432/raceday
 DB_POOL_MAX=10
 
-# NZ TAB API
+# NZ TAB API (required - public API, no key needed)
 NZTAB_API_URL=https://api.tab.co.nz
-NZTAB_API_KEY=your-api-key-here
 
 # Server
 NODE_ENV=development
-PORT=3000
+PORT=7000
 UV_THREADPOOL_SIZE=8
 
 # Workers
