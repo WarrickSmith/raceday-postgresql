@@ -385,10 +385,13 @@ import { z } from 'zod';
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']),
-  DATABASE_URL: z.string().url(),
+  DB_HOST: z.string().min(1),
+  DB_PORT: z.coerce.number().int().positive(),
+  DB_USER: z.string().min(1),
+  DB_PASSWORD: z.string().min(1),
+  DB_NAME: z.string().min(1),
   NZTAB_API_URL: z.string().url(),
-  NZTAB_API_KEY: z.string().min(1),
-  PORT: z.coerce.number().int().positive().default(3000),
+  PORT: z.coerce.number().int().positive().default(7000),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   UV_THREADPOOL_SIZE: z.coerce.number().int().positive().default(8),
   MAX_WORKER_THREADS: z.coerce.number().int().positive().default(3),
@@ -407,21 +410,26 @@ export const env = EnvSchema.parse(process.env);
 # Environment
 NODE_ENV=development
 
-# Database
-DATABASE_URL=postgresql://raceday:password@localhost:5432/raceday
+# Database Configuration (PostgreSQL 18)
+# Connection parameters - DATABASE_URL is built from these values in code
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=raceday
+DB_POOL_MAX=10
 
-# NZ TAB API
+# NZ TAB API Configuration
+# Base URL for NZ TAB racing data API (public API, no key required)
 NZTAB_API_URL=https://api.tab.co.nz
-NZTAB_API_KEY=your-api-key-here
 
-# Server
-PORT=3000
+# Server Configuration
+PORT=7000
 LOG_LEVEL=info
 
 # Performance Tuning
 UV_THREADPOOL_SIZE=8
 MAX_WORKER_THREADS=3
-DB_POOL_MAX=10
 ```
 
 **Validation Strategy:**

@@ -94,7 +94,7 @@ The project uses **separate docker-compose configurations** for client and serve
 
 **Database Deployment**:
 - PostgreSQL 18 is deployed separately (managed independently)
-- Server connects via DATABASE_URL environment variable
+- Server connects via DB component variables (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME)
 
 ### Deploy Server Stack
 
@@ -453,8 +453,12 @@ curl -X GET "https://api.tab.co.nz/..." -H "Authorization: Bearer $API_KEY"
 ## Environment Variables
 
 ```env
-# Database (required)
-DATABASE_URL=postgresql://raceday:password@localhost:5432/raceday
+# Database Configuration (required)
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=raceday
 DB_POOL_MAX=10
 
 # NZ TAB API (required - public API, no key needed)
@@ -463,6 +467,7 @@ NZTAB_API_URL=https://api.tab.co.nz
 # Server
 NODE_ENV=development
 PORT=7000
+LOG_LEVEL=info
 UV_THREADPOOL_SIZE=8
 
 # Workers
