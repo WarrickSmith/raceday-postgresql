@@ -1,24 +1,14 @@
-import { config } from 'dotenv'
 import { Pool } from 'pg'
 import format from 'pg-format'
+import { env, buildDatabaseUrl } from '../shared/env.js'
 import { runMigrations } from './migrate.js'
 
-config()
-
-const buildDatabaseUrl = (database: string): string => {
-  const dbHost = process.env.DB_HOST ?? 'localhost'
-  const dbPort = process.env.DB_PORT ?? '5432'
-  const dbUser = process.env.DB_USER ?? 'postgres'
-  const dbPassword = process.env.DB_PASSWORD ?? 'postgres'
-  return `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${database}`
-}
-
 const createDatabaseIfNotExists = async (): Promise<void> => {
-  const dbName = process.env.DB_NAME ?? 'raceday'
+  const dbName = env.DB_NAME
 
   // Connect to postgres database to check if target database exists
   const adminPool = new Pool({
-    connectionString: buildDatabaseUrl('postgres'),
+    connectionString: buildDatabaseUrl(env, 'postgres'),
   })
 
   adminPool.on('error', (err) => {
@@ -49,11 +39,11 @@ export const executeMigrations = async (): Promise<void> => {
   // Create database if it doesn't exist
   await createDatabaseIfNotExists()
 
-  const dbName = process.env.DB_NAME ?? 'raceday'
+  const dbName = env.DB_NAME
 
   // Connect to the target database and run migrations
   const pool = new Pool({
-    connectionString: buildDatabaseUrl(dbName),
+    connectionString: buildDatabaseUrl(env, dbName),
   })
 
   pool.on('error', (err) => {

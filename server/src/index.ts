@@ -1,19 +1,8 @@
 import { createServer } from 'node:http';
 import { URL } from 'node:url';
 import { Pool } from 'pg';
+import { env, buildDatabaseUrl } from './shared/env.js';
 import { logger } from './shared/logger.js';
-
-const PORT = parseInt(process.env.PORT ?? '7000', 10);
-
-// Database connection pool for health checks
-const buildDatabaseUrl = (): string => {
-  const dbHost = process.env.DB_HOST ?? 'localhost';
-  const dbPort = process.env.DB_PORT ?? '5432';
-  const dbUser = process.env.DB_USER ?? 'postgres';
-  const dbPassword = process.env.DB_PASSWORD ?? 'postgres';
-  const dbName = process.env.DB_NAME ?? 'raceday';
-  return `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}`;
-};
 
 let dbPool: Pool | null = null;
 
@@ -21,7 +10,7 @@ let dbPool: Pool | null = null;
 const initDbPool = (): void => {
   try {
     dbPool = new Pool({
-      connectionString: buildDatabaseUrl(),
+      connectionString: buildDatabaseUrl(env),
       max: 1, // Minimal pool for health checks only
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
@@ -56,7 +45,7 @@ const checkDatabase = async (): Promise<{
 // Simple HTTP server with health endpoint
 const server = createServer((req, res) => {
   // Parse URL for query parameters
-  const url = new URL(req.url ?? '/', `http://localhost:${String(PORT)}`);
+  const url = new URL(req.url ?? '/', `http://localhost:${String(env.PORT)}`);
 
   // Health check endpoint
   if (url.pathname === '/health' && req.method === 'GET') {
@@ -76,7 +65,7 @@ const server = createServer((req, res) => {
             JSON.stringify({
               status,
               timestamp: new Date().toISOString(),
-              port: PORT,
+              port: env.PORT,
               database: dbHealth,
             }),
           );
@@ -88,7 +77,7 @@ const server = createServer((req, res) => {
             JSON.stringify({
               status: 'unhealthy',
               timestamp: new Date().toISOString(),
-              port: PORT,
+              port: env.PORT,
               database: { healthy: false, message: 'Check failed' },
             }),
           );
@@ -100,7 +89,7 @@ const server = createServer((req, res) => {
         JSON.stringify({
           status: 'healthy',
           timestamp: new Date().toISOString(),
-          port: PORT,
+          port: env.PORT,
         }),
       );
     }
@@ -116,8 +105,8 @@ const server = createServer((req, res) => {
 // Initialize database pool
 initDbPool();
 
-server.listen(PORT, '0.0.0.0', () => {
-  logger.info({ port: PORT }, `Server listening on port ${String(PORT)}`);
+server.listen(env.PORT, '0.0.0.0', () => {
+  logger.info({ port: env.PORT }, `Server listening on port ${String(env.PORT)}`);
   logger.info('Health endpoint available at /health');
   logger.info('Deep health check available at /health?deep=true');
 });
