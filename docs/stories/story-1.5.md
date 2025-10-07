@@ -1,6 +1,6 @@
 # Story 1.5: Docker Configuration for Node.js Server
 
-Status: Ready for Review
+Status: Done
 
 ## Story
 
@@ -282,6 +282,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 ### Completion Notes List
 
 **Docker Implementation Complete (2025-10-07)**:
+
 - Created server Dockerfile with multi-stage build (builder + runtime stages)
 - Implemented server docker-compose.yml for Node.js 22 server only
 - **PostgreSQL NOT included** - deployed independently (not managed by server docker-compose)
@@ -295,6 +296,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - All tests passing (67/67) - integration and unit tests verified
 
 **Architecture Clarifications**:
+
 - Server runs on port 7000 both internally (container) and externally (host) - mapping 7000:7000
 - PostgreSQL deployed separately - server connects using DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME environment variables
 - Application code builds DATABASE_URL from these components
@@ -302,6 +304,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 - NZTAB API is public (no API key required)
 
 **Test Results**:
+
 - Docker build: ✓ Successful
 - Container start: ✓ Healthy
 - Health check: ✓ Responds 200 OK at http://localhost:7000/health
@@ -312,20 +315,24 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
 ### File List
 
 **Created:**
+
 - [server/Dockerfile](../../server/Dockerfile) - Multi-stage Node.js 22 Alpine build
 - [server/docker-compose.yml](../../server/docker-compose.yml) - Server deployment config (PostgreSQL NOT included)
 - [server/src/index.ts](../../server/src/index.ts) - HTTP server with /health endpoint
 
 **Modified:**
+
 - [docs/developer-quick-start.md](../developer-quick-start.md) - Added Docker deployment section with dual-deployment model
 - [server/package-lock.json](../../server/package-lock.json) - Updated dependencies
 
 **Moved:**
+
 - [docker-compose.yml](../../docker-compose.yml) → [client/docker-compose.yml](../../client/docker-compose.yml)
 
 ### Change Log
 
 **2025-10-07**: Implemented Docker configuration for Node.js 22 server
+
 - Created server Dockerfile with multi-stage build (AC#1, AC#2)
 - Created server docker-compose.yml for server only with resource limits (AC#3, AC#4, AC#9)
 - PostgreSQL deployed separately (not in server docker-compose)
@@ -353,21 +360,26 @@ Story 1.5 successfully implements Docker configuration for the Node.js 22 server
 ### Key Findings
 
 **High Severity:**
+
 - None
 
 **Medium Severity:**
+
 1. **Service naming inconsistency** (docker-compose.yml:22)
    - Service named `raceday_server` (snake_case) while container named `raceday-server` (kebab-case)
    - **Recommendation:** Use consistent kebab-case: `server` or `raceday-server` for service name
    - **Rationale:** Consistency aids readability and prevents confusion in multi-service stacks
 
 **Low Severity:**
+
 1. **Missing database directory in Dockerfile** (Dockerfile:42)
+
    - Copies `./database` directory but this may not exist in minimal server contexts
    - **Recommendation:** Add conditional copy or document prerequisite
    - **File:** server/Dockerfile:42
 
 2. **Health endpoint lacks database connectivity check** (src/index.ts:9-19)
+
    - Current health check only confirms HTTP server is running
    - **Recommendation:** Consider adding optional `?deep=true` parameter to check database connectivity
    - **Rationale:** True health includes ability to serve requests requiring database access
@@ -378,22 +390,23 @@ Story 1.5 successfully implements Docker configuration for the Node.js 22 server
 
 ### Acceptance Criteria Coverage
 
-| AC | Status | Evidence |
-|----|--------|----------|
-| 1 | ✅ PASS | Dockerfile:2 uses `FROM node:22-alpine AS builder` |
-| 2 | ✅ PASS | Multi-stage build implemented (builder→runner stages) |
-| 3 | ✅ PASS | docker-compose.yml:49 `cpus: '4.0'` |
-| 4 | ✅ PASS | docker-compose.yml:50 `memory: 4G` |
-| 5 | ✅ PASS | Health check configured at docker-compose.yml:51-56 |
-| 6 | ✅ PASS | Environment variables properly configured (docker-compose.yml:30-45) |
-| 7 | ✅ PASS | Volume mounts not required for current implementation (logs handled by container runtime) |
-| 8 | ✅ PASS | docker-compose.yml:27 `restart: unless-stopped` |
-| 9 | ✅ PASS | Separate server/docker-compose.yml created, client moved to client/docker-compose.yml |
-| 10 | ⚠️ MODIFIED | Port mapping changed from spec (3000→7000) to implementation (7000→7000). **Improvement:** Simplifies configuration, approved deviation |
+| AC  | Status      | Evidence                                                                                                                                |
+| --- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | ✅ PASS     | Dockerfile:2 uses `FROM node:22-alpine AS builder`                                                                                      |
+| 2   | ✅ PASS     | Multi-stage build implemented (builder→runner stages)                                                                                   |
+| 3   | ✅ PASS     | docker-compose.yml:49 `cpus: '4.0'`                                                                                                     |
+| 4   | ✅ PASS     | docker-compose.yml:50 `memory: 4G`                                                                                                      |
+| 5   | ✅ PASS     | Health check configured at docker-compose.yml:51-56                                                                                     |
+| 6   | ✅ PASS     | Environment variables properly configured (docker-compose.yml:30-45)                                                                    |
+| 7   | ✅ PASS     | Volume mounts not required for current implementation (logs handled by container runtime)                                               |
+| 8   | ✅ PASS     | docker-compose.yml:27 `restart: unless-stopped`                                                                                         |
+| 9   | ✅ PASS     | Separate server/docker-compose.yml created, client moved to client/docker-compose.yml                                                   |
+| 10  | ⚠️ MODIFIED | Port mapping changed from spec (3000→7000) to implementation (7000→7000). **Improvement:** Simplifies configuration, approved deviation |
 
 ### Test Coverage and Gaps
 
 **Test Coverage:**
+
 - ✅ 67/67 tests passing (integration + unit)
 - ✅ ESLint compliance (0 errors)
 - ✅ TypeScript strict mode compliance
@@ -402,6 +415,7 @@ Story 1.5 successfully implements Docker configuration for the Node.js 22 server
 - ✅ Health endpoint verification
 
 **Test Gaps:**
+
 - No automated Docker Compose validation tests
 - Health endpoint lacks error scenario testing (database down, etc.)
 - No load testing for resource limit effectiveness
@@ -411,17 +425,20 @@ Story 1.5 successfully implements Docker configuration for the Node.js 22 server
 ### Architectural Alignment
 
 **Alignment with Tech Spec:**
+
 - ✅ Multi-stage Docker build pattern (tech-spec-epic-1.md#L270-376)
 - ✅ Resource allocation (4 CPU, 4GB) matches architecture specification
 - ✅ Health check configuration matches spec requirements
 - ✅ Environment variable schema aligns with tech-spec-epic-1.md#L379-425
 
 **Architectural Deviation (APPROVED):**
+
 - **PostgreSQL Deployment Separation:** Story context expected PostgreSQL in server docker-compose (story-context-1.5.xml:29, Dev Notes:L173-205), but implementation correctly deploys it independently
 - **Rationale:** Improves deployment flexibility, aligns with production best practices (database as managed service), reduces docker-compose complexity
 - **Impact:** Positive - better separation of concerns, no negative impact on functionality
 
 **Port Configuration Change (APPROVED):**
+
 - AC#10 specified "7000 (externally mapped from container port 3000)"
 - Implementation uses 7000:7000 mapping
 - **Rationale:** Simplifies configuration, eliminates port translation confusion, improves debugging
@@ -430,6 +447,7 @@ Story 1.5 successfully implements Docker configuration for the Node.js 22 server
 ### Security Notes
 
 **Strengths:**
+
 - ✅ Uses Alpine base images (minimal attack surface)
 - ✅ Multi-stage build excludes dev dependencies from production
 - ✅ `--ignore-scripts` prevents potentially malicious npm scripts during production install
@@ -437,6 +455,7 @@ Story 1.5 successfully implements Docker configuration for the Node.js 22 server
 - ✅ Graceful shutdown handlers prevent data corruption on container stop
 
 **Recommendations:**
+
 1. **[Med] Add .dockerignore** - Prevent accidental inclusion of sensitive files (.env, credentials)
 2. **[Low] Consider non-root user** - Current Dockerfile runs as root. Consider adding `USER node` after WORKDIR for defense-in-depth
 3. **[Low] Health endpoint rate limiting** - Consider basic rate limiting to prevent health check abuse
@@ -444,6 +463,7 @@ Story 1.5 successfully implements Docker configuration for the Node.js 22 server
 ### Best-Practices and References
 
 **Docker Best Practices (Aligned):**
+
 - ✅ Multi-stage builds ([Docker Docs](https://docs.docker.com/build/building/multi-stage/))
 - ✅ .dockerignore usage (recommended) - **ACTION NEEDED**
 - ✅ Explicit base image versions (`node:22-alpine` not `node:latest`)
@@ -451,18 +471,21 @@ Story 1.5 successfully implements Docker configuration for the Node.js 22 server
 - ✅ Health checks with appropriate intervals
 
 **Node.js Docker Best Practices (Aligned):**
+
 - ✅ Production NODE_ENV set
 - ✅ npm ci instead of npm install
 - ✅ Graceful shutdown signal handling (SIGTERM/SIGINT)
 - ✅ Proper port binding to 0.0.0.0 (not 127.0.0.1)
 
 **Docker Compose Best Practices:**
+
 - ✅ Resource limits defined
 - ✅ Health checks configured
 - ✅ Restart policies appropriate for production
 - ⚠️ Service naming convention inconsistency (see Medium finding #1)
 
 **References:**
+
 - [Node.js Docker Best Practices](https://github.com/nodejs/docker-node/blob/main/docs/BestPractices.md)
 - [Docker Multi-stage Builds](https://docs.docker.com/build/building/multi-stage/)
 - [Docker Compose Health Checks](https://docs.docker.com/compose/compose-file/compose-file-v3/#healthcheck)
@@ -470,20 +493,24 @@ Story 1.5 successfully implements Docker configuration for the Node.js 22 server
 ### Action Items
 
 1. **[Low Priority] Rename docker-compose service** (docker-compose.yml:22)
+
    - Change `raceday_server:` to `server:` for consistency with container name pattern
    - Related: AC#9
 
 2. **[Low Priority] Add .dockerignore file** (server/.dockerignore)
+
    - Create with common exclusions: `.git`, `.env*`, `node_modules`, `*.test.ts`, `coverage`, `.github`
    - Improves build performance and security
    - Related: Security best practices
 
 3. **[Low Priority] Consider non-root user in Dockerfile** (server/Dockerfile after line 30)
+
    - Add `USER node` after WORKDIR for defense-in-depth
    - Node.js Alpine images include `node` user by default
    - Related: Security hardening
 
 4. **[Optional] Enhance health endpoint** (server/src/index.ts:9-19)
+
    - Consider adding `?deep=true` query parameter for database connectivity check
    - Useful for distinguishing between "server up" vs "server functional"
    - Related: AC#5
@@ -507,21 +534,24 @@ Story 1.5 successfully implements Docker configuration for the Node.js 22 server
 All 5 action items from the Senior Developer Review have been implemented:
 
 ### Action Item 1: Service Naming Consistency ✅
+
 - **File:** [server/docker-compose.yml](../../server/docker-compose.yml)
 - **Change:** Renamed service from `raceday_server` to `server` (line 22)
 - **Benefit:** Consistent kebab-case naming pattern matching container name
 
 ### Action Item 2: .dockerignore File ✅
+
 - **File:** [server/.dockerignore](../../server/.dockerignore)
 - **Change:** Created comprehensive .dockerignore with exclusions for:
   - Git files (.git, .github)
   - Node modules and build artifacts (node_modules, dist)
-  - Environment files (.env, .env.*)
-  - Test files (*.test.ts, coverage)
+  - Environment files (.env, .env.\*)
+  - Test files (\*.test.ts, coverage)
   - IDE and OS files (.vscode, .DS_Store)
 - **Benefit:** Reduced build context size, improved security, faster builds
 
 ### Action Item 3: Non-Root User in Dockerfile ✅
+
 - **File:** [server/Dockerfile](../../server/Dockerfile)
 - **Changes:** (lines 44-48)
   - Added `RUN chown -R node:node /app` to set ownership
@@ -529,6 +559,7 @@ All 5 action items from the Senior Developer Review have been implemented:
 - **Benefit:** Defense-in-depth security, follows least-privilege principle
 
 ### Action Item 4: Enhanced Health Endpoint ✅
+
 - **File:** [server/src/index.ts](../../server/src/index.ts)
 - **Changes:**
   - Added database connection pool for health checks (lines 8-36)
@@ -542,6 +573,7 @@ All 5 action items from the Senior Developer Review have been implemented:
 - **Benefit:** Distinguishes between "server up" vs "server functional", better monitoring
 
 ### Action Item 5: Docker Compose Validation Test ✅
+
 - **File:** [server/tests/integration/docker-compose.test.ts](../../server/tests/integration/docker-compose.test.ts)
 - **Tests Added:** 4 integration tests
   1. Validates docker-compose.yml syntax using `docker-compose config --quiet`
@@ -552,6 +584,7 @@ All 5 action items from the Senior Developer Review have been implemented:
 - **Benefit:** Catches YAML syntax errors and configuration issues early
 
 ### Build & Test Verification
+
 - ✅ TypeScript build: Successful
 - ✅ ESLint: 0 errors, 0 warnings
 - ✅ Test suite: 71/71 passing
@@ -559,6 +592,7 @@ All 5 action items from the Senior Developer Review have been implemented:
 - ✅ All review action items: Complete
 
 ### Files Modified
+
 1. server/docker-compose.yml - Service renamed
 2. server/.dockerignore - Created
 3. server/Dockerfile - Non-root user added
