@@ -1,19 +1,23 @@
 # Raceday PostgreSQL - Developer Quick Start
 
-**Last Updated:** 2025-10-05
+**Last Updated:** 2025-10-08
 **Architecture:** See [architecture-specification.md](./architecture-specification.md)
+**Technical Specifications:** See [tech-spec-epic-1.md](./tech-spec-epic-1.md)
+**Product Requirements:** See [PRD-raceday-postgresql-2025-10-05.md](./PRD-raceday-postgresql-2025-10-05.md)
 
 ---
 
 ## Quick Setup (5 Minutes)
 
 ### Prerequisites
+
 - **Node.js 22 LTS** (minimum v22.0.0) - **REQUIRED**
 - Docker & Docker Compose
 - Git
 - npm 10+ (comes with Node.js 22)
 
 ### 1. Clone & Setup
+
 ```bash
 # Already on raceday-postgresql branch
 cd /home/warrick/Dev/raceday-postgresql
@@ -30,6 +34,7 @@ cp .env.example .env
 ### 2. Start Database & Server (Docker)
 
 **Option A: Full Stack (Server + PostgreSQL)**
+
 ```bash
 # From server directory
 cd server
@@ -43,6 +48,7 @@ docker-compose ps
 ```
 
 **Option B: Database Only (for local development)**
+
 ```bash
 # From server directory
 cd server
@@ -53,6 +59,7 @@ docker-compose ps
 ```
 
 ### 3. Run Migrations
+
 ```bash
 cd server
 npm run migrate
@@ -61,6 +68,7 @@ npm run migrate
 ### 4. Start Development Server
 
 **Local Development (no Docker):**
+
 ```bash
 cd server
 npm run dev
@@ -68,6 +76,7 @@ npm run dev
 ```
 
 **Docker Development:**
+
 ```bash
 cd server
 docker-compose up --build
@@ -83,16 +92,19 @@ docker-compose up --build
 The project uses **separate docker-compose configurations** for client and server:
 
 **Server Deployment** (`/server/docker-compose.yml`):
+
 - Node.js 22 server application only
 - **PostgreSQL deployed independently** (not included in server compose)
 - Port 7000 (external) → Port 7000 (container)
 - Resource limits: 4 CPU cores, 4GB memory
 
 **Client Deployment** (`/client/docker-compose.yml`):
+
 - Next.js client application
 - Port 3444 (external) → Port 3000 (container)
 
 **Database Deployment**:
+
 - PostgreSQL 18 is deployed separately (managed independently)
 - Server connects via DB component variables (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME)
 
@@ -124,6 +136,7 @@ curl http://localhost:7000/health
 ```
 
 ### Deploy Client Stack
+
 ```bash
 cd client
 docker-compose --env-file .env.local up --build -d
@@ -140,10 +153,12 @@ curl http://localhost:3444/api/health
 All stacks deploy independently:
 
 1. **PostgreSQL Database**: Deploy separately (not managed by app docker-compose files)
+
    - Use native PostgreSQL installation, managed service, or separate container
    - Ensure accessible from server container
 
 2. **Server Stack**: Deploy from `/server/docker-compose.yml`
+
    - Set environment variables (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, NZTAB_API_URL, etc.) in Portainer UI or .env
    - Node.js server application only
    - External port: 7000
@@ -164,6 +179,7 @@ NZ TAB API → Fetcher → Worker Threads → Bulk UPSERT → PostgreSQL
 ```
 
 **Key Decisions:**
+
 - **Monolith** (not microservices)
 - **Hybrid transforms** (Node.js + PostgreSQL)
 - **Worker threads** for CPU-intensive calculations
@@ -174,12 +190,12 @@ NZ TAB API → Fetcher → Worker Threads → Bulk UPSERT → PostgreSQL
 
 ## Performance Targets
 
-| Operation | Target | Current Appwrite |
-|-----------|--------|------------------|
-| Single race | <2s | ~6-10s |
-| 5 concurrent races | <15s | >30s |
-| Database write | <300ms | N/A |
-| API response | <100ms | N/A |
+| Operation          | Target | Current Appwrite |
+| ------------------ | ------ | ---------------- |
+| Single race        | <2s    | ~6-10s           |
+| 5 concurrent races | <15s   | >30s             |
+| Database write     | <300ms | N/A              |
+| API response       | <100ms | N/A              |
 
 ---
 
@@ -203,36 +219,42 @@ server/
 ## Key Files to Understand
 
 ### 1. Race Processor (Orchestrator)
+
 **`src/scheduler/processor.ts`**
+
 ```typescript
 // Coordinates: Fetch → Transform → Write
 export async function processRaces(races: Race[]) {
   const results = await Promise.allSettled(
     races.map(async (race) => {
-      const rawData = await fetchRaceData(race.id);
-      const transformed = await transformInWorker(rawData);
-      await bulkUpsertRaceData(transformed);
+      const rawData = await fetchRaceData(race.id)
+      const transformed = await transformInWorker(rawData)
+      await bulkUpsertRaceData(transformed)
     })
-  );
-  return results;
+  )
+  return results
 }
 ```
 
 ### 2. Dynamic Scheduler
+
 **`src/scheduler/index.ts`**
+
 ```typescript
 // Adjusts polling frequency based on race start time
 if (minutesToStart <= 5) {
-  intervalMs = 15000;  // 15 seconds (2x improvement!)
+  intervalMs = 15000 // 15 seconds (2x improvement!)
 } else if (minutesToStart <= 15) {
-  intervalMs = 30000;  // 30 seconds
+  intervalMs = 30000 // 30 seconds
 } else {
-  intervalMs = 60000;  // 1 minute
+  intervalMs = 60000 // 1 minute
 }
 ```
 
 ### 3. Bulk Database Operations
+
 **`src/database/operations.ts`**
+
 ```typescript
 // Multi-row UPSERT with conditional updates
 INSERT INTO entrants (...) VALUES ($1...), ($2...)
@@ -246,6 +268,7 @@ WHERE entrants.win_odds IS DISTINCT FROM EXCLUDED.win_odds;
 ## Common Tasks
 
 ### Extract Business Logic from server-old
+
 ```bash
 # Reference these files in server-old:
 # - Money flow calculations
@@ -258,6 +281,7 @@ cp server-old/functions/transform.js server/src/transformers/moneyflow.ts
 ```
 
 ### Run Performance Benchmarks
+
 ```bash
 npm run test:perf
 
@@ -268,6 +292,7 @@ npm run test:perf
 ```
 
 ### Monitor Live Performance
+
 ```bash
 # Application logs (from /server directory)
 cd server
@@ -282,15 +307,16 @@ docker-compose exec postgres psql -U raceday -c "
 ```
 
 ### Debug Worker Threads
+
 ```typescript
 // Add logging in workers/transformWorker.ts
-console.log('[Worker] Processing:', workerData.raceId);
+console.log('[Worker] Processing:', workerData.raceId)
 
 // Monitor worker pool
-import { performance } from 'perf_hooks';
-const start = performance.now();
-const result = await transformInWorker(data);
-console.log('Transform took:', performance.now() - start, 'ms');
+import { performance } from 'perf_hooks'
+const start = performance.now()
+const result = await transformInWorker(data)
+console.log('Transform took:', performance.now() - start, 'ms')
 ```
 
 ---
@@ -298,6 +324,7 @@ console.log('Transform took:', performance.now() - start, 'ms');
 ## Database Quick Reference
 
 ### Key Tables
+
 - `meetings` - Race meetings
 - `races` - Individual races
 - `entrants` - Horse entries
@@ -308,6 +335,7 @@ console.log('Transform took:', performance.now() - start, 'ms');
 ### Useful Queries
 
 **Get active races:**
+
 ```sql
 SELECT * FROM races
 WHERE status IN ('upcoming', 'in_progress')
@@ -316,6 +344,7 @@ ORDER BY start_time;
 ```
 
 **Latest money flow for race:**
+
 ```sql
 SELECT e.name, mf.hold_percentage, mf.event_timestamp
 FROM entrants e
@@ -326,6 +355,7 @@ LIMIT 20;
 ```
 
 **Performance metrics:**
+
 ```sql
 -- Table sizes
 SELECT schemaname, tablename,
@@ -345,30 +375,77 @@ SELECT count(*), state FROM pg_stat_activity GROUP BY state;
 ### For Client App (near drop-in Appwrite replacement)
 
 **Get meetings:**
+
 ```bash
 GET /api/meetings?date=2025-10-05&raceType=thoroughbred
 ```
 
 **Get races:**
+
 ```bash
 GET /api/races?meetingId=NZ-AUK-20251005
 ```
 
 **Get entrants with history:**
+
 ```bash
 GET /api/entrants?raceId=NZ-AUK-20251005-R1
 ```
 
 **Health check:**
+
 ```bash
 GET /health
 ```
 
 ---
 
-## Testing Strategy
+## Common Development Commands
+
+### Development Workflow
+
+```bash
+# Start development server with hot reload
+npm run dev
+# Server runs on http://localhost:7000
+
+# Build for production
+npm run build
+
+# Start production server
+npm run start
+
+# Run database migrations
+npm run migrate
+```
+
+### Code Quality
+
+```bash
+# Run ESLint
+npm run lint
+
+# Fix ESLint issues automatically
+npm run lint:fix
+
+# Format code with Prettier
+npm run format
+
+# Check code formatting
+npm run format:check
+```
+
+### Testing Strategy
+
+```bash
+# Run all tests
+npm test
+# or
+npm run test
+```
 
 ### Unit Tests
+
 ```bash
 npm run test:unit
 
@@ -379,6 +456,7 @@ npm run test:unit
 ```
 
 ### Integration Tests
+
 ```bash
 npm run test:integration
 
@@ -388,6 +466,7 @@ npm run test:integration
 ```
 
 ### Performance Tests
+
 ```bash
 npm run test:perf
 
@@ -396,13 +475,131 @@ npm run test:perf
 # - <300ms database writes
 ```
 
+### Test Coverage
+
+```bash
+# Run tests with coverage report
+npm run test:coverage
+```
+
 ---
 
 ## Troubleshooting
 
-### Problem: Processing > 15s
+### Setup Issues
+
+#### Problem: Node.js version mismatch
+
+**Error:** "Engine node version mismatch" or "Unsupported Node.js version"
+
+**Solution:**
+
+```bash
+# Check your Node.js version
+node --version
+# Should be v22.0.0 or higher
+
+# If using nvm (Node Version Manager):
+nvm install 22
+nvm use 22
+nvm alias default 22
+
+# Verify after switching
+node --version
+```
+
+#### Problem: Docker won't start
+
+**Error:** "Docker daemon not running" or "Cannot connect to Docker daemon"
+
+**Solution:**
+
+```bash
+# Check Docker status
+docker --version
+docker-compose --version
+
+# Start Docker (Linux)
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Start Docker Desktop (macOS/Windows)
+# Launch Docker Desktop application
+
+# Verify Docker is running
+docker ps
+```
+
+#### Problem: Database connection failed
+
+**Error:** "Connection refused" or "Authentication failed"
+
+**Solution:**
+
+```bash
+# Check PostgreSQL container status
+docker-compose ps
+
+# Check PostgreSQL logs
+docker-compose logs postgres
+
+# Verify environment variables
+cat .env | grep DB_
+
+# Test connection manually
+docker-compose exec postgres psql -U postgres -c "\l"
+
+# Common fixes:
+# 1. Ensure PostgreSQL is running: docker-compose up -d postgres
+# 2. Verify DB_HOST, DB_PORT, DB_USER, DB_PASSWORD in .env
+# 3. Check if database exists: docker-compose exec postgres createdb -U postgres raceday
+```
+
+#### Problem: Port already in use
+
+**Error:** "Port 7000 is already in use" or "EADDRINUSE"
+
+**Solution:**
+
+```bash
+# Find what's using the port
+lsof -i :7000
+# or on Windows:
+netstat -ano | findstr :7000
+
+# Kill the process (replace PID with actual process ID)
+kill -9 PID
+
+# Or change the port in .env:
+PORT=7001
+```
+
+#### Problem: npm install fails
+
+**Error:** "npm ERR!" during dependency installation
+
+**Solution:**
+
+```bash
+# Clear npm cache
+npm cache clean --force
+
+# Delete node_modules and package-lock.json
+rm -rf node_modules package-lock.json
+
+# Try installing again
+npm install
+
+# If still failing, try with legacy peer deps
+npm install --legacy-peer-deps
+```
+
+### Runtime Issues
+
+#### Problem: Processing > 15s
 
 **Check:**
+
 1. Database connection pool exhausted?
    ```sql
    SELECT count(*) FROM pg_stat_activity WHERE state = 'active';
@@ -415,10 +612,11 @@ npm run test:perf
    ```
 3. Worker threads healthy?
    ```typescript
-   console.log('Worker pool status:', workerPool.stats());
+   console.log('Worker pool status:', workerPool.stats())
    ```
 
 **Solutions:**
+
 - Increase `DB_POOL_MAX` (currently 10)
 - Add missing indexes
 - Restart worker pool
@@ -427,11 +625,13 @@ npm run test:perf
 ### Problem: Worker thread crashes
 
 **Check logs:**
+
 ```bash
 docker-compose logs server | grep Worker
 ```
 
 **Common causes:**
+
 - Memory leak (restart workers periodically)
 - Unhandled exceptions (add try-catch)
 - Invalid data format (validate inputs)
@@ -439,15 +639,45 @@ docker-compose logs server | grep Worker
 ### Problem: NZ TAB API timeouts
 
 **Check:**
+
 ```bash
 # Test API connectivity
 curl -X GET "https://api.tab.co.nz/..." -H "Authorization: Bearer $API_KEY"
 ```
 
 **Solutions:**
+
 - Increase fetch timeout (currently 5s)
 - Implement retry with exponential backoff
 - Cache responses for redundancy
+
+### Log Files Reference
+
+**Docker Environment:**
+
+```bash
+# Server logs
+docker-compose logs -f server
+
+# PostgreSQL logs
+docker-compose logs -f postgres
+
+# All logs
+docker-compose logs -f
+```
+
+**Local Development:**
+
+```bash
+# Application logs (if configured)
+tail -f logs/app.log
+
+# Error logs
+tail -f logs/error.log
+
+# Database logs (PostgreSQL)
+tail -f /usr/local/var/log/postgres.log
+```
 
 ---
 
@@ -483,12 +713,14 @@ LOG_LEVEL=debug  # production: info
 ## Migration Checklist
 
 ### Phase 1: Setup ✅
+
 - [x] Architecture documented
 - [ ] Dev environment running
 - [ ] PostgreSQL schema created
 - [ ] Business logic extracted from server-old
 
 ### Phase 2: Development
+
 - [ ] Database operations implemented
 - [ ] Worker threads configured
 - [ ] NZ TAB fetcher built
@@ -497,12 +729,14 @@ LOG_LEVEL=debug  # production: info
 - [ ] API endpoints created
 
 ### Phase 3: Testing
+
 - [ ] Unit tests passing
 - [ ] Integration tests passing
 - [ ] Performance benchmarks met (<15s)
 - [ ] Client compatibility validated
 
 ### Phase 4: Deployment
+
 - [ ] Shadow mode validation
 - [ ] Gradual traffic cutover
 - [ ] Monitoring dashboards active
@@ -527,6 +761,7 @@ LOG_LEVEL=debug  # production: info
 **Database Questions:** See "Database Quick Reference" section
 
 **Quick Wins:**
+
 1. Extract money flow calculations from server-old first
 2. Build single race MVP before scaling to 5
 3. Use shadow mode to validate before cutover
@@ -535,4 +770,4 @@ LOG_LEVEL=debug  # production: info
 
 **Happy Coding! 🚀**
 
-*Target: <15s processing for 5 races (2x improvement)*
+_Target: <15s processing for 5 races (2x improvement)_
