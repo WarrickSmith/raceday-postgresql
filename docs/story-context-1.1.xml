@@ -1,0 +1,101 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1</storyId>
+    <title>PostgreSQL 18 Database Configuration &amp; Project Setup</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-06</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>/home/warrick/Dev/raceday-postgresql/docs/stories/story-1.1.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>the project structure prepared and PostgreSQL 18 configured for the raceday application</iWant>
+    <soThat>I have a clean foundation ready for building the new backend infrastructure</soThat>
+    <tasks>
+      - Prepare project structure (rename ./server to ./server-old, create new ./server)
+      - Create server environment configuration (.env with PORT=7000, .env.example)
+      - Update client environment configuration (remove Appwrite, add NEXT_PUBLIC_API_URL=http://localhost:7000/api)
+      - Update docker-compose.yml documentation
+      - Verify PostgreSQL 18 instance (version, pgAdmin, pgAgent)
+      - Test database connectivity (connection test script)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Existing ./server folder renamed to ./server-old for reference
+    2. New ./server folder created with initial structure
+    3. Server environment variables configured for PostgreSQL connection
+    4. Client environment variables updated to point to new backend
+    5. Database connection verified from Node.js application
+    6. .env and .env.example files created/updated appropriately
+    7. Connection credentials documented for existing PostgreSQL 18 instance
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="/home/warrick/Dev/raceday-postgresql/docs/tech-spec-epic-1.md" title="Technical Specification: Epic 1 - Core Infrastructure Setup" section="Environment Configuration" snippet="Lines 376-421: Zod schema for environment validation, .env.example template with all required variables (DATABASE_URL, NZTAB_API_URL, PORT, LOG_LEVEL, UV_THREADPOOL_SIZE, MAX_WORKER_THREADS, DB_POOL_MAX)"/>
+      <doc path="/home/warrick/Dev/raceday-postgresql/docs/tech-spec-epic-1.md" title="Technical Specification: Epic 1 - Core Infrastructure Setup" section="Docker Configuration" snippet="Lines 265-324: docker-compose.yml configuration for PostgreSQL 18-alpine and Node.js server with health checks, resource limits, and environment variables"/>
+      <doc path="/home/warrick/Dev/raceday-postgresql/docs/tech-spec-epic-1.md" title="Technical Specification: Epic 1 - Core Infrastructure Setup" section="PostgreSQL Connection Pool" snippet="Lines 477-509: Connection pool configuration using pg Pool with max 10 connections, min 2 idle, timeouts, and graceful shutdown"/>
+      <doc path="/home/warrick/Dev/raceday-postgresql/docs/architecture-specification.md" title="Raceday PostgreSQL Architecture Specification" section="Environment Variables" snippet="Lines 773-792: Complete environment variable specification including DATABASE_URL format, NZTAB_API configuration, performance tuning parameters"/>
+      <doc path="/home/warrick/Dev/raceday-postgresql/docs/architecture-specification.md" title="Raceday PostgreSQL Architecture Specification" section="Directory Structure" snippet="Lines 1083-1123: Complete project structure showing server/ directory organization (src/, tests/, workers/, database/, shared/)"/>
+      <doc path="/home/warrick/Dev/raceday-postgresql/docs/PRD-raceday-postgresql-2025-10-05.md" title="raceday-postgresql Product Requirements Document" section="Preparation Phase" snippet="Lines 504-510: Week 1 preparation tasks including fork repository, rename ./server to ./server-old, extract business logic, set up dev environment"/>
+      <doc path="/home/warrick/Dev/raceday-postgresql/docs/epic-stories-2025-10-05.md" title="raceday-postgresql - Epic Breakdown" section="Story 1.1" snippet="Lines 40-52: PostgreSQL 18 Database Setup acceptance criteria - container runs via docker-compose, database accessible, health check configured"/>
+      <doc path="/home/warrick/Dev/raceday-postgresql/.gitignore" title="Project .gitignore" section="Environment files" snippet="Lines 39-40, 52-54: .env* exclusions already configured for project-level and server-specific .env files, .env.example files are included"/>
+      <doc path="/home/warrick/Dev/raceday-postgresql/docker-compose.yml" title="Docker Compose Configuration" section="Client service" snippet="Lines 1-57: Existing Appwrite-based client-only configuration, needs extension for postgres and server services in future story"/>
+    </docs>
+    <code>
+      <artifact path="/home/warrick/Dev/raceday-postgresql/server/.env.example" kind="config" symbol="Appwrite configuration template" lines="1-26" reason="Existing Appwrite environment template to be replaced with Node.js/PostgreSQL configuration with PORT=7000"/>
+      <artifact path="/home/warrick/Dev/raceday-postgresql/client/.env.local" kind="config" symbol="Client environment configuration" lines="1-40" reason="Current Appwrite client configuration to be updated with NEXT_PUBLIC_API_URL=http://localhost:7000/api, remove Appwrite variables, keep polling configuration"/>
+      <artifact path="/home/warrick/Dev/raceday-postgresql/client/.env.example" kind="config" symbol="Client environment template" lines="1-49" reason="Template showing client environment structure including polling, health monitoring configuration to preserve"/>
+    </code>
+    <dependencies>
+      <node>
+        <package name="pg" version="^8.13.1" purpose="PostgreSQL client for connection testing and database operations"/>
+        <package name="dotenv" version="^16.4.7" purpose="Load environment variables from .env files"/>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Server backend will run on PORT 7000 (not 3000)
+    - Client API URL must be http://localhost:7000/api
+    - Project-level .gitignore already excludes .env files (lines 39-40, 52-54), no changes needed
+    - Existing PostgreSQL 18 instance assumed to be running with pgAdmin and pgAgent installed
+    - 'raceday' database will be created in Story 1.2, use 'postgres' database for initial connectivity testing
+    - Preserve NZTAB_API_URL and NZTAB_API_KEY from ./server-old/.env for business continuity
+    - Keep client polling configuration variables (POLLING_ENABLED, POLLING_TIMEOUT, ENABLE_HEALTH_MONITORING) when updating .env files
+    - docker-compose.yml currently configured for client-only deployment, complete postgres/server configuration deferred to Story 1.5
+    - server-old/ must be preserved for business logic extraction (money flow calculations, polling algorithms) in future stories
+  </constraints>
+
+  <interfaces>
+    <interface name="PostgreSQL Connection Pool" kind="database" signature="new Pool({ connectionString, max, min, idleTimeoutMillis, connectionTimeoutMillis })" path="pg.Pool" purpose="Database connection pooling configuration for testing connectivity"/>
+    <interface name="Environment Variables Schema" kind="validation" signature="z.object({ NODE_ENV, DATABASE_URL, NZTAB_API_URL, NZTAB_API_KEY, PORT, LOG_LEVEL, UV_THREADPOOL_SIZE, MAX_WORKER_THREADS, DB_POOL_MAX })" path="zod" purpose="Runtime validation schema for environment variables (to be implemented in Story 1.6)"/>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Connection test script should use pg Pool to verify DATABASE_URL connectivity. Test should execute SELECT 1 query and confirm successful connection. Script should load environment variables using dotenv. Exit code 0 on success, 1 on failure. Clear console output indicating success or failure with error details.
+    </standards>
+    <locations>
+      ./server/test-connection.js (connection test script)
+      ./server/tests/ (future unit and integration tests)
+    </locations>
+    <ideas>
+      <test ac="1" idea="Verify ./server-old folder exists after rename operation"/>
+      <test ac="2" idea="Verify ./server folder exists and contains src/, tests/, workers/, database/ subdirectories"/>
+      <test ac="2" idea="Verify ./server/package.json exists and is valid JSON"/>
+      <test ac="3" idea="Verify ./server/.env contains PORT=7000 and all required variables (DATABASE_URL, NZTAB_API_URL, etc.)"/>
+      <test ac="3" idea="Verify DATABASE_URL format is valid postgresql://[user]:[password]@[host]:[port]/[database]"/>
+      <test ac="4" idea="Verify ./client/.env.local contains NEXT_PUBLIC_API_URL=http://localhost:7000/api and no Appwrite variables"/>
+      <test ac="5" idea="Execute test-connection.js script and verify exit code 0 (success)"/>
+      <test ac="5" idea="Verify PostgreSQL query SELECT 1 returns expected result"/>
+      <test ac="6" idea="Verify ./server/.env.example contains PORT=7000 and documentation comments for each variable"/>
+      <test ac="6" idea="Verify ./client/.env.example updated with NEXT_PUBLIC_API_URL=http://localhost:7000/api"/>
+      <test ac="7" idea="Verify PostgreSQL version is 18 (SELECT version())"/>
+      <test ac="7" idea="Verify pgAdmin accessible and can connect to PostgreSQL instance"/>
+    </ideas>
+  </tests>
+</story-context>

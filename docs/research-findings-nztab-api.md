@@ -1,8 +1,10 @@
 # NZ TAB API Research Findings - UPDATED
 
-**Date:** 2025-10-05
+**Date:** 2025-10-05 (Updated: 2025-10-07)
 **Source:** Direct confirmation from Warrick Smith (Product Owner)
 **Status:** ✅ CRITICAL BLOCKER RESOLVED
+
+**OpenAPI Specification:** [docs/api/nztab-openapi.json](./api/nztab-openapi.json)
 
 ---
 
@@ -94,6 +96,101 @@ export async function fetchRaceData(raceId: string): Promise<RaceData> {
   return RaceDataSchema.parse(response.data);
 }
 ```
+
+---
+
+### ✅ NZ Timezone Fields Available
+
+**Critical Discovery:** The NZ TAB API provides timezone-specific fields that eliminate the need for timezone conversion utilities in many cases.
+
+**NZ Timezone Fields (from OpenAPI spec):**
+
+| Field | Description | Format | Use Case |
+|-------|-------------|--------|----------|
+| `race_date_nz` | Starting day of the event in NZST or NZDT | String (YYYY-MM-DD) | Partition key, racing day identification |
+| `start_time_nz` | Starting time of the event in NZST or NZDT | String (HH:MM format) | Display, scheduling |
+
+**Impact on Implementation:**
+
+✅ **Preferred Approach:** Use `race_date_nz` from API response
+- Already in NZ timezone (no conversion needed)
+- Matches racing day business logic
+- Aligns with partition naming strategy
+
+⚠️ **Fallback Only:** Use `server/src/shared/timezone.ts` utilities
+- Only when API field not available
+- For server-side date calculations (e.g., partition creation)
+- For validation/comparison logic
+
+**Example Usage:**
+```typescript
+// PREFERRED: Use API-provided NZ date
+const raceDate = apiResponse.race_date_nz;  // Already in NZ timezone
+const partitionName = `money_flow_history_${raceDate.replace(/-/g, '_')}`;
+
+// FALLBACK: Server-side calculation when API data not available
+import { getCurrentNzDate } from '../shared/timezone.js';
+const today = getCurrentNzDate();
+```
+
+**Lesson Learned (Story 1.3):**
+Partition boundaries must align with NZ racing days to ensure optimal query performance. Using `race_date_nz` from the API ensures consistency between data ingestion and partition strategy.
+
+---
+
+### ✅ Race Status and Fetch Parameters
+
+**Critical Discovery:** The API supports fetch parameters that reduce payload size based on race status, optimizing bandwidth and processing time.
+
+**Race Status Values:**
+- `open` - Pre-race, odds available
+- `interim` - Race finished, preliminary results available
+- `closed` - Final results and dividends confirmed
+- `abandoned` - Race cancelled
+
+**Fetch Parameters (Query String):**
+
+| Parameter | Available When | Impact |
+|-----------|----------------|--------|
+| `with_tote_trends_data` | `status = 'open'` | Money flow trends (critical pre-race) |
+| `with_money_tracker` | `status = 'open'` | Real-time betting patterns |
+| `with_big_bets` | `status = 'open'` | Large bet notifications |
+| `with_live_bets` | `status = 'open'` | Live betting activity |
+| `with_will_pays` | `status = 'open'` | Potential payout calculations |
+| `with_results` | `status IN ('interim', 'closed')` | Race results (NOT available during 'open') |
+| `with_dividends` | `status = 'closed'` | Final dividends |
+
+**Optimization Strategy:**
+
+```typescript
+// Epic 2: Race Data Ingestion
+function buildFetchParams(status: string) {
+  if (status === 'open') {
+    return {
+      with_tote_trends_data: true,
+      with_money_tracker: true,
+      with_big_bets: true,
+      with_live_bets: true,
+      with_will_pays: true,
+    };
+  }
+
+  if (status === 'interim' || status === 'closed') {
+    return {
+      with_results: true,
+      with_dividends: status === 'closed',
+    };
+  }
+
+  return {}; // Minimal payload for other statuses
+}
+```
+
+**Benefits:**
+- ✅ Reduces API payload size by 40-60% for non-critical races
+- ✅ Faster response times during high-traffic periods
+- ✅ Lower bandwidth consumption
+- ✅ Prevents requesting unavailable data (e.g., results during 'open')
 
 ---
 

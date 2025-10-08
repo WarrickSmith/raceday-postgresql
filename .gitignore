@@ -60,3 +60,6 @@ next-env.d.ts
 # BMAD (local only)
 .bmad-core/
 .bmad-*/
+
+# server build artifacts
+/server/dist/

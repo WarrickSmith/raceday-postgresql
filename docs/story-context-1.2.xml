@@ -1,0 +1,122 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.2</storyId>
+    <title>Core Database Schema Migration</title>
+    <status>Approved</status>
+    <generatedAt>2025-10-06</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>/home/warrick/Dev/raceday-postgresql/docs/stories/story-1.2.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a developer</asA>
+    <iWant>core database tables (meetings, races, entrants, race_pools) created via migration scripts</iWant>
+    <soThat>I can store normalized race data with proper constraints and relationships</soThat>
+    <tasks>
+      <task id="1" status="pending">Configure ESLint for TypeScript server code (AC: 7, 8, 9, 10)</task>
+      <task id="2" status="pending">Create database migration utility in TypeScript (AC: 7, 8, 9, 10)</task>
+      <task id="3" status="pending">Create SQL migration scripts (AC: 1, 2, 3, 4, 5, 6)</task>
+      <task id="4" status="pending">Create migration test suite (AC: 7, 8, 9, 10)</task>
+      <task id="5" status="pending">Execute migrations and validate (AC: 1-6)</task>
+      <task id="6" status="pending">Quality gate validation (AC: 7, 8, 9, 10)</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Core tables created: meetings, races, entrants, race_pools</criterion>
+    <criterion id="2">Primary keys defined for all tables</criterion>
+    <criterion id="3">Foreign key relationships enforced (races → meetings, entrants → races)</criterion>
+    <criterion id="4">Status fields use CHECK constraints (race_type IN ('thoroughbred', 'harness'))</criterion>
+    <criterion id="5">All timestamp fields use TIMESTAMPTZ</criterion>
+    <criterion id="6">created_at and updated_at fields auto-populate via triggers</criterion>
+    <criterion id="7">ESLint fully configured and passing on all TypeScript server code</criterion>
+    <criterion id="8">Zero TypeScript errors or warnings on build</criterion>
+    <criterion id="9">No `any` types in codebase</criterion>
+    <criterion id="10">All code follows ES6+ functional programming standards</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-1.md" title="Database Schema Design" section="Core Tables" lines="40-167">
+        Complete SQL DDL for meetings, races, entrants, race_pools tables with primary keys, foreign keys, CHECK constraints, TIMESTAMPTZ fields, indexes, and auto-update triggers
+      </doc>
+      <doc path="docs/tech-spec-epic-1.md" title="Migration Scripts Organization" section="Directory Structure" lines="581-605">
+        Migration directory structure and execution order: 001_initial_schema.sql (core tables), 002_partitioned_tables.sql, 003_indexes.sql, 004_triggers.sql
+      </doc>
+      <doc path="docs/CODING-STANDARDS.md" title="TypeScript Best Practices" section="Strict Typing" lines="169-238">
+        No any types, type inference, interface vs type, runtime validation with Zod, named exports only
+      </doc>
+      <doc path="docs/typescript-eslint-config.md" title="ESLint Configuration" section="Rules" lines="92-223">
+        Complete .eslintrc.json with strict-type-checked, no-explicit-any: error, no-unsafe-*, naming conventions, import order, no default exports
+      </doc>
+    </docs>
+    <code>
+      <artifact path="server/src/database" kind="directory" symbol="N/A" lines="N/A" reason="Empty directory created in Story 1.1 - ready for migrate.ts implementation" />
+      <artifact path="server/package.json" kind="manifest" symbol="N/A" lines="1-42" reason="Existing package.json with pg dependency, ESLint/Prettier scripts already configured, type:module for ES6 imports" />
+      <artifact path="server/tsconfig.json" kind="config" symbol="N/A" lines="1-57" reason="TypeScript configuration with strict mode, ES2022 target, ESNext modules - ready for strict type checking" />
+    </code>
+    <dependencies>
+      <node>
+        <runtime>
+          <package name="pg" version="^8.16.3" purpose="PostgreSQL client for database migrations" />
+          <package name="dotenv" version="^16.6.1" purpose="Environment variable loading" />
+        </runtime>
+        <devDependencies>
+          <package name="@typescript-eslint/eslint-plugin" version="^8.0.0" purpose="TypeScript ESLint rules - MUST UPGRADE to ^8.19.1" />
+          <package name="@typescript-eslint/parser" version="^8.0.0" purpose="TypeScript ESLint parser - MUST UPGRADE to ^8.19.1" />
+          <package name="eslint" version="^9.0.0" purpose="Linting tool - MUST UPGRADE to ^9.17.0" />
+          <package name="prettier" version="^3.3.0" purpose="Code formatter - MUST UPGRADE to ^3.4.2" />
+          <package name="typescript" version="^5.7.0" purpose="TypeScript compiler" />
+          <package name="vitest" version="^2.0.0" purpose="Test framework - MUST UPGRADE to ^2.1.9" />
+          <package name="@vitest/coverage-v8" version="^2.1.9" purpose="Code coverage (already correct version)" />
+          <package name="tsx" version="^4.19.0" purpose="TypeScript execution for dev mode" />
+          <package name="@types/node" version="^22.0.0" purpose="Node.js type definitions" />
+          <package name="@types/pg" version="^8.11.10" purpose="PostgreSQL client type definitions" />
+        </devDependencies>
+        <toInstall>
+          <package name="eslint-config-airbnb-typescript" version="^18.0.0" purpose="Airbnb style guide for TypeScript" />
+          <package name="eslint-plugin-import" version="^2.31.0" purpose="Import/export validation" />
+          <package name="husky" version="^9.1.7" purpose="Git hooks for pre-commit linting" />
+          <package name="lint-staged" version="^15.2.11" purpose="Run linters on staged files only" />
+        </toInstall>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">Use ES6+ functional programming patterns: arrow functions, const/let (no var), immutability, pure functions</constraint>
+    <constraint type="typescript">Strict TypeScript with no `any` types - use explicit types or type inference only</constraint>
+    <constraint type="linting">ESLint must pass with zero errors/warnings before committing - enforced by pre-commit hooks</constraint>
+    <constraint type="imports">Use explicit .js extensions in ES module imports (Node.js 22 requirement from Story 1.1 lessons learned)</constraint>
+    <constraint type="exports">Named exports only - no default exports (import/no-default-export: error)</constraint>
+    <constraint type="database">All migration SQL files must be idempotent and numbered sequentially (001, 002, 003...)</constraint>
+    <constraint type="testing">Integration tests must clean up database state using transactions or test database</constraint>
+    <constraint type="sql">SQL identifiers are case-sensitive in queries - use exact case from DDL (Story 1.1 lesson learned)</constraint>
+    <constraint type="migration-structure">Separate concerns: 001_initial_schema.sql (tables), 002_triggers.sql (functions/triggers)</constraint>
+  </constraints>
+  <interfaces>
+    <interface name="Pool" kind="class" signature="import { Pool } from 'pg'" path="node_modules/pg">
+      PostgreSQL connection pool - use pool.query(sql: string) to execute migrations. Must be properly typed, no any.
+    </interface>
+    <interface name="MigrationResult" kind="interface" signature="{ file: string; success: boolean; error?: string }" path="server/src/database/migrate.ts">
+      Return type for migration runner - tracks success/failure per migration file
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Use Vitest test framework with TypeScript. Integration tests connect to PostgreSQL using pg.Pool. All tests must follow strict TypeScript rules (no any types). Test files use .test.ts extension. Integration tests live in server/tests/integration/, unit tests in server/tests/unit/. Run with `npm test`, coverage with `npm run test:coverage`.</standards>
+    <locations>
+      <location>server/tests/integration/*.test.ts</location>
+      <location>server/tests/unit/*.test.ts</location>
+    </locations>
+    <ideas>
+      <test-idea ac="1" description="Test table existence: Query information_schema.tables for meetings, races, entrants, race_pools" />
+      <test-idea ac="2" description="Test primary keys: Attempt duplicate inserts on meeting_id, race_id, entrant_id - expect constraint violation" />
+      <test-idea ac="3" description="Test foreign keys: Insert race without valid meeting_id (expect error), delete meeting and verify cascade to races" />
+      <test-idea ac="4" description="Test CHECK constraints: Insert meeting with invalid race_type (not 'thoroughbred' or 'harness') - expect constraint violation" />
+      <test-idea ac="5" description="Test TIMESTAMPTZ: Query pg_catalog.pg_type to verify created_at, updated_at, start_time are timestamptz not timestamp" />
+      <test-idea ac="6" description="Test triggers: Insert meeting, wait 1 second, UPDATE status, verify updated_at changed and is > created_at" />
+      <test-idea ac="7,8,9,10" description="Test ESLint/TypeScript: Run `npm run lint` and `npm run build` as part of test suite, assert zero errors/warnings" />
+    </ideas>
+  </tests>
+</story-context>

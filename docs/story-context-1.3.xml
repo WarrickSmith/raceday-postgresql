@@ -1,0 +1,131 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>3</storyId>
+    <title>Time-Series Tables with Partitioning</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-06</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>/home/warrick/Dev/raceday-postgresql/docs/stories/story-1.3.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a developer</asA>
+    <iWant>partitioned time-series tables for money_flow_history and odds_history</iWant>
+    <soThat>I can efficiently store and query high-volume historical data</soThat>
+    <tasks>
+      <task id="1" acs="1,2,3,4,5,6">Create partitioned table migration script</task>
+      <task id="2" acs="7,8,9,10">Create partition management utility in TypeScript</task>
+      <task id="3" acs="7,8,9,10">Create integration tests for partitioned tables</task>
+      <task id="4" acs="7,8,9,10">Test partition management utility</task>
+      <task id="5" acs="1,2,3,4,5,6">Execute migration and validate</task>
+      <task id="6" acs="7,8,9,10">Quality gate validation</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">money_flow_history table created with PARTITION BY RANGE (event_timestamp)</criterion>
+    <criterion id="2">odds_history table created with PARTITION BY RANGE (event_timestamp)</criterion>
+    <criterion id="3">Initial daily partition created for current date</criterion>
+    <criterion id="4">Partition naming convention: {table_name}_YYYY_MM_DD</criterion>
+    <criterion id="5">Foreign key relationships to entrants table maintained</criterion>
+    <criterion id="6">Indexes created on (entrant_id, event_timestamp DESC)</criterion>
+    <criterion id="7">Zero TypeScript errors on build</criterion>
+    <criterion id="8">Zero ESLint errors/warnings</criterion>
+    <criterion id="9">No `any` types in codebase</criterion>
+    <criterion id="10">All code follows ES6+ functional programming standards</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-1.md" title="Technical Specification: Epic 1 - Core Infrastructure Setup" section="Partitioned Time-Series Tables" lines="169-244">
+        <snippet>Defines complete schema for money_flow_history and odds_history partitioned tables including all columns, partition strategy (PARTITION BY RANGE event_timestamp), initial partition creation for current date, foreign key relationships to entrants table, and indexes on (entrant_id, event_timestamp DESC)</snippet>
+      </doc>
+      <doc path="docs/tech-spec-epic-1.md" title="Technical Specification: Epic 1" section="Partition Management" lines="468-524">
+        <snippet>Describes automated partition creation strategy using create_tomorrow_partitions() PostgreSQL function, daily partition naming convention {table_name}_YYYY_MM_DD, and 30-day retention policy for archival (Epic 4)</snippet>
+      </doc>
+      <doc path="docs/architecture-specification.md" title="Raceday PostgreSQL Architecture Specification" section="Time-Series Tables (Partitioned)" lines="380-432">
+        <snippet>Architecture context for partitioned tables including partition pruning benefits, query performance optimization strategies, and why partitioning is essential for high-volume time-series data</snippet>
+      </doc>
+      <doc path="docs/CODING-STANDARDS.md" title="Coding Standards" section="ES6+ Modern Standards">
+        <snippet>Defines mandatory ES6+ functional programming standards: ES modules with .js extensions, arrow functions, async/await, const/let (never var), destructuring, template literals, spread/rest operators, optional chaining, nullish coalescing, pure functions, immutability, array methods over loops, no classes for business logic</snippet>
+      </doc>
+      <doc path="docs/CODING-STANDARDS.md" title="Coding Standards" section="TypeScript Best Practices">
+        <snippet>Strict typing requirements: zero `any` types policy (use `unknown` when type truly unknown), runtime validation with Zod for API boundaries, named exports over default exports, type inference, interface over type for object shapes</snippet>
+      </doc>
+      <doc path="docs/epic-stories-2025-10-05.md" title="Epic Breakdown" section="Story 1.3" lines="70-82">
+        <snippet>Original acceptance criteria from epic planning: partitioned tables with PARTITION BY RANGE (event_timestamp), initial daily partition for current date, partition naming convention {table_name}_YYYY_MM_DD, foreign key to entrants, indexes on (entrant_id, event_timestamp DESC)</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file path="server/src/database/migrate.ts" kind="module" symbol="runMigrations" lines="11-36" reason="Existing migration execution pattern to follow - shows how SQL files are read from migrations directory, executed sequentially, with error handling and logging. New partitioned tables migration (003_partitioned_tables.sql) will be auto-discovered and executed by this utility."/>
+      <file path="server/database/migrations/001_initial_schema.sql" kind="sql" symbol="CREATE TABLE entrants" reason="Reference for entrants table structure - partitioned tables will have foreign key constraint: entrant_id REFERENCES entrants(entrant_id). Shows pattern for PRIMARY KEY, foreign keys with ON DELETE CASCADE, CHECK constraints, TIMESTAMPTZ columns."/>
+      <file path="server/database/migrations/002_triggers.sql" kind="sql" symbol="update_updated_at_column()" reason="Example trigger pattern for auto-updating timestamps. Partitioned tables may need similar patterns for maintenance tasks in Epic 4."/>
+      <file path="server/tests/integration/database-schema.test.ts" kind="test" symbol="database schema tests" reason="Integration test patterns to follow for new partitioned-tables.test.ts - shows how to test table existence, constraints (primary keys, foreign keys, CHECK constraints), timestamp behavior, using transactions for test isolation with ROLLBACK cleanup."/>
+      <file path="server/src/database/run-migrations.ts" kind="module" reason="Shows database URL construction, Pool initialization with error event listeners (lesson from Story 1.2), and greenfield database creation pattern. Reference for partition utility implementation."/>
+    </code>
+    <dependencies>
+      <node>
+        <package name="pg" version="^8.16.3">PostgreSQL client library for connection pooling and query execution</package>
+        <package name="pg-format" version="^1.0.4">Safe SQL identifier escaping for dynamic partition name generation (lesson from Story 1.2 - prevents SQL injection)</package>
+        <package name="typescript" version="^5.7.0">TypeScript 5.7+ for strict type checking</package>
+        <package name="vitest" version="^2.0.0">Test framework for unit and integration tests</package>
+        <package name="@vitest/coverage-v8" version="^2.1.9">Test coverage reporting (must match exact version per Story 1.1 lesson)</package>
+        <package name="tsx" version="^4.19.0">TypeScript execution for migration scripts</package>
+        <package name="eslint" version="^9.0.0">Linting with typescript-eslint strict-type-checked preset</package>
+        <package name="prettier" version="^3.3.0">Code formatting enforced by pre-commit hooks</package>
+        <package name="husky" version="^9.1.7">Git hooks for pre-commit linting</package>
+        <package name="lint-staged" version="^15.5.2">Run linters on staged files only</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint id="1" type="schema">Partition parent tables cannot have PRIMARY KEY on id field (PostgreSQL limitation with range partitioning) - use BIGSERIAL without PRIMARY KEY constraint</constraint>
+    <constraint id="2" type="schema">Initial partition must cover current date to accept inserts immediately - use FOR VALUES FROM (CURRENT_DATE) TO (CURRENT_DATE + INTERVAL '1 day')</constraint>
+    <constraint id="3" type="schema">Partition naming must follow strict convention {table_name}_YYYY_MM_DD for automated management in Epic 4</constraint>
+    <constraint id="4" type="schema">Foreign key relationships work across partitions - entrant_id REFERENCES entrants(entrant_id) applies to all child partitions</constraint>
+    <constraint id="5" type="schema">Indexes on partitioned tables automatically cascade to all child partitions - create index once on parent table</constraint>
+    <constraint id="6" type="coding">Use explicit .js extensions in ES module imports (Node.js 22 requirement from Story 1.1 lesson)</constraint>
+    <constraint id="7" type="coding">Use pg-format for SQL identifier escaping if generating dynamic partition names in TypeScript (Story 1.2 lesson - prevents SQL injection)</constraint>
+    <constraint id="8" type="coding">Add Pool error event listeners: pool.on('error', ...) to prevent unhandled promise rejections (Story 1.2 lesson)</constraint>
+    <constraint id="9" type="coding">Zero `any` types allowed - ESLint rule no-explicit-any: error enforced by pre-commit hooks</constraint>
+    <constraint id="10" type="coding">All functions must be pure, immutable, using arrow functions and functional patterns - no classes for business logic</constraint>
+    <constraint id="11" type="testing">Integration tests must use transactions with ROLLBACK for cleanup to avoid polluting test database</constraint>
+    <constraint id="12" type="testing">Test SQL case-sensitivity for table names, column names (Story 1.1 lesson)</constraint>
+    <constraint id="13" type="migration">All SQL migrations must be idempotent using CREATE IF NOT EXISTS, CREATE OR REPLACE (allows safe re-running)</constraint>
+    <constraint id="14" type="migration">Migrations execute in numbered order (000, 001, 002, 003...) via runMigrations() utility</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="Pool" kind="class" signature="Pool(config: PoolConfig)" path="pg">
+      <description>PostgreSQL connection pool from pg library - use for database connections in partition utility. Import from 'pg'.</description>
+    </interface>
+    <interface name="runMigrations" kind="function" signature="runMigrations(pool: Pool): Promise&lt;MigrationResult[]&gt;" path="server/src/database/migrate.ts">
+      <description>Existing migration runner that auto-discovers and executes SQL files from server/database/migrations/ directory in sorted order. New 003_partitioned_tables.sql will be auto-detected.</description>
+    </interface>
+    <interface name="format" kind="function" signature="format(fmt: string, ...args: any[]): string" path="pg-format">
+      <description>Safe SQL identifier escaping utility. Use %I for identifiers (table/column names) to prevent SQL injection when generating dynamic partition names. Example: format('CREATE TABLE %I ...', tableName)</description>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Tests use Vitest framework with TypeScript strict typing. Integration tests connect to test database using Pool from pg library, execute schema validation queries, and use transactions with ROLLBACK for cleanup. Unit tests validate pure TypeScript functions in isolation. All test files follow naming convention *.test.ts and live in server/tests/integration/ or server/tests/unit/. Pre-commit hooks enforce zero TypeScript errors and zero ESLint errors/warnings before commit.
+    </standards>
+    <locations>
+      <location>server/tests/integration/partitioned-tables.test.ts</location>
+      <location>server/tests/unit/partitions.test.ts</location>
+    </locations>
+    <ideas>
+      <idea ac="1,2">Test parent table existence using SELECT to query pg_tables where tablename IN ('money_flow_history', 'odds_history')</idea>
+      <idea ac="3">Test initial partition existence using SELECT to query pg_class where relname = 'money_flow_history_2025_10_06' (current date)</idea>
+      <idea ac="4">Test partition naming convention by inserting test data and verifying partition name matches YYYY_MM_DD format</idea>
+      <idea ac="5">Test foreign key constraint by attempting to insert row with invalid entrant_id (should fail), and verify CASCADE DELETE from entrants table</idea>
+      <idea ac="6">Test index existence and usage via EXPLAIN ANALYZE on query with WHERE entrant_id = X AND event_timestamp > Y, verify partition pruning occurs</idea>
+      <idea ac="7,8,9">Quality gate tests: run npm run build (check exit code 0), npm run lint (check exit code 0), grep -r ": any" server/src/ (check no matches)</idea>
+      <idea ac="10">Unit test getPartitionName() with various dates (edge cases: year boundaries, leap years), verify output format matches {table_name}_YYYY_MM_DD</idea>
+      <idea ac="10">Unit test createTomorrowPartitions() idempotency - call twice, verify second call handles "partition already exists" gracefully without error</idea>
+    </ideas>
+  </tests>
+</story-context>

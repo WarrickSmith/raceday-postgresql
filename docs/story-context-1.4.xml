@@ -1,0 +1,147 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>4</storyId>
+    <title>Database Indexes for Query Optimization</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-06</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>/home/warrick/Dev/raceday-postgresql/docs/stories/story-1.4.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>indexes optimized for client query patterns</iWant>
+    <soThat>API responses are fast (&lt;100ms)</soThat>
+    <tasks>
+      - Create index migration script with 6 indexes (partial indexes on races, entrants, meetings; descending indexes on time-series tables)
+      - Create query validation utility using EXPLAIN ANALYZE to verify index usage
+      - Create integration tests for all indexes validating existence and usage via EXPLAIN ANALYZE
+      - Execute migration and validate query plans show Index Scan (not Seq Scan)
+      - Quality gate validation (TypeScript build, ESLint, no any types, ES6 standards)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Index on races(start_time) WHERE status IN ('open', 'closed', 'interim')
+    2. Index on entrants(race_id)
+    3. Partial index on entrants(race_id) WHERE is_scratched = false
+    4. Index on meetings(date, race_type) WHERE status = 'active'
+    5. Index on money_flow_history(entrant_id, event_timestamp DESC)
+    6. Index on odds_history(entrant_id, event_timestamp DESC)
+    7. All indexes verified via EXPLAIN ANALYZE on representative queries
+    8. Zero TypeScript errors on build
+    9. Zero ESLint errors/warnings
+    10. No `any` types in codebase
+    11. All code follows ES6+ functional programming standards
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-1.md" title="Epic 1 Technical Specification" section="Database Schema Design">
+        Lines 41-147: Complete index specifications for all 6 required indexes with rationale.
+        - Partial indexes on races(start_time), entrants(race_id, is_scratched), meetings(date, race_type) reduce index size ~50%
+        - Descending indexes on time-series tables support ORDER BY...DESC without re-sorting
+        - All indexes designed for hot-path API queries (&lt;100ms target)
+      </doc>
+      <doc path="docs/epic-stories-2025-10-05.md" title="Epic Stories" section="Story 1.4">
+        Lines 85-98: Story acceptance criteria and performance targets.
+        All indexes must be verified via EXPLAIN ANALYZE on representative queries. No sequential scans allowed on large tables.
+      </doc>
+      <doc path="docs/CODING-STANDARDS.md" title="Coding Standards" section="ES6+ Standards and TypeScript">
+        Lines 1-518: Complete coding standards for ES6 modules, functional programming, strict TypeScript, and quality gates.
+        Mandatory: Zero TypeScript errors, zero ESLint warnings, no `any` types, ES module imports with .js extensions.
+      </doc>
+      <doc path="docs/stories/story-1.3.md" title="Story 1.3 Completion Notes" section="Lessons Learned">
+        Lines 196-204: Indexes on partitioned tables automatically cascade to all child partitions. Partition pruning must be verified via EXPLAIN ANALYZE.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="server/database/migrations/001_initial_schema.sql" kind="migration" lines="17-67">
+        Existing partial indexes already created in 001_initial_schema.sql:
+        - idx_meetings_date_type (lines 18-20): Partial index WHERE status = 'active' - CORRECT, satisfies AC #4
+        - idx_races_start_time (lines 41-43): Partial index WHERE status IN ('open', 'interim') - NEEDS UPDATE to add 'closed' for AC #1
+        - idx_active_entrants (lines 65-67): Partial index WHERE is_scratched = FALSE - WRONG COLUMNS (has runner_number, should be race_id only per AC #3)
+        - idx_entrants_race (line 61-62): Index on entrants(race_id) - CORRECT, satisfies AC #2
+
+        Story 1.4 must create 004_indexes.sql to FIX idx_races_start_time and idx_active_entrants.
+      </artifact>
+      <artifact path="server/database/migrations/003_partitioned_tables.sql" kind="migration" reason="Contains time-series table index definitions">
+        Lines 32-33, 63-64: Existing descending indexes on partitioned tables:
+        - idx_money_flow_entrant_time ON money_flow_history(entrant_id, event_timestamp DESC) - CORRECT, satisfies AC #5
+        - idx_odds_entrant_time ON odds_history(entrant_id, event_timestamp DESC) - CORRECT, satisfies AC #6
+
+        These indexes already satisfy AC #5 and #6. Verify they exist and work correctly.
+      </artifact>
+      <artifact path="server/src/database/partitions.ts" kind="utility" symbol="createTomorrowPartitions" lines="1-67">
+        Example TypeScript utility showing ES6 patterns:
+        - ES module imports with .js extensions (line 3)
+        - Pure functions with explicit types (line 24-26)
+        - pg-format for SQL safety (line 42-48)
+        - Structured logging with Pino (lines 53, 59-62)
+
+        Use as reference for query-validator.ts implementation.
+      </artifact>
+      <artifact path="server/src/database/migrate.ts" kind="utility" reason="Shows how to execute SQL queries with typed Pool">
+        Migration execution pattern for running SQL files with proper error handling and transaction management.
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="pg" version="^8.13.1">PostgreSQL client with typed Pool and query execution</package>
+        <package name="pg-format" version="^1.0.4">SQL identifier/literal escaping for dynamic queries</package>
+        <package name="pino" version="^9.5.0">Structured JSON logging</package>
+        <package name="vitest" version="^2.1.9">Testing framework with TypeScript support</package>
+        <package name="@vitest/coverage-v8" version="2.1.9">Code coverage for tests</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Migration 004_indexes.sql must be idempotent (CREATE INDEX IF NOT EXISTS)
+    - Must DROP and recreate idx_races_start_time to add 'closed' status (cannot ALTER INDEX partial WHERE clause)
+    - Must DROP and recreate idx_active_entrants with correct columns: (race_id) not (race_id, runner_number)
+    - Partial indexes require WHERE clause in CREATE INDEX statement
+    - DESC in index definition enables reverse-order scans without re-sorting
+    - Composite indexes must match query WHERE clause column order
+    - All TypeScript code must use ES modules with .js extensions
+    - Zero tolerance for `any` types - all types must be explicit
+    - All code must pass TypeScript build and ESLint with zero errors/warnings
+    - Use pg-format for any dynamic SQL to prevent SQL injection
+    - Use Pino structured logging (no console.log/warn/error)
+  </constraints>
+
+  <interfaces>
+    <interface name="Pool.query" kind="method" signature="query(sql: string, params?: any[]): Promise&lt;QueryResult&gt;" path="node_modules/@types/pg">
+      PostgreSQL query execution method. Use with parameterized queries for safety.
+    </interface>
+    <interface name="logger" kind="object" signature="{ info: (obj, msg) =&gt; void, warn: (obj, msg) =&gt; void, error: (obj, msg) =&gt; void }" path="server/src/shared/logger.ts">
+      Pino structured logger instance. Use for all logging (no console methods).
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Vitest framework with TypeScript strict mode. All tests must:
+      - Use describe/it/expect from vitest
+      - Use async/await for database operations
+      - Use transactions with ROLLBACK for test isolation
+      - Verify EXPLAIN ANALYZE output contains "Index Scan" (not "Seq Scan")
+      - Cover both index existence and actual usage by queries
+      - Pass TypeScript compilation and ESLint validation
+    </standards>
+    <locations>
+      server/tests/integration/indexes.test.ts - Integration tests for index validation
+      server/tests/unit/query-validator.test.ts - Unit tests for EXPLAIN ANALYZE parsing (if utility created)
+    </locations>
+    <ideas>
+      AC #1: Test races(start_time) index usage for query: WHERE start_time &gt; NOW() AND status IN ('open', 'closed', 'interim')
+      AC #2: Test entrants(race_id) index usage for query: WHERE race_id = 'NZ-AUK-20251006-R1'
+      AC #3: Test partial index on active entrants for query: WHERE race_id = 'X' AND is_scratched = false
+      AC #4: Test meetings partial index for query: WHERE date = '2025-10-06' AND race_type = 'thoroughbred' AND status = 'active'
+      AC #5: Test money_flow_history index with partition pruning: WHERE entrant_id = 'X' AND event_timestamp &gt; NOW() - INTERVAL '1 hour' ORDER BY event_timestamp DESC
+      AC #6: Test odds_history index with partition pruning: WHERE entrant_id = 'X' AND event_timestamp &gt; NOW() - INTERVAL '1 hour' ORDER BY event_timestamp DESC
+      AC #7: Parse EXPLAIN ANALYZE output to confirm "Index Scan" appears (not "Seq Scan")
+    </ideas>
+  </tests>
+</story-context>

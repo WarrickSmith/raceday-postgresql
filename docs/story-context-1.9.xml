@@ -1,0 +1,264 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.9</storyId>
+    <title>Health Check Endpoint</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-08</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>/home/warrick/Dev/raceday-postgresql/docs/stories/story-1.9.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a developer and operations team member</asA>
+    <iWant>a `/health` endpoint that verifies system health</iWant>
+    <soThat>I can monitor database connectivity and ensure the application is operational</soThat>
+    <tasks>
+- Task 1: Set up Express server infrastructure (AC: 1, 7)
+  - Install production dependencies: express, helmet, compression
+  - Install dev dependencies: @types/express, @types/compression
+  - Create `server/src/api/server.ts` with Express app configuration including helmet, compression, and JSON middleware
+  - Configure Express to listen on `env.PORT` with startup logging via Pino
+- Task 2: Implement /health route (AC: 2-5)
+  - Create `server/src/api/routes/health.ts` with GET /health handler
+  - Implement database connectivity check using shared pool from `server/src/database/pool.ts`
+  - Add worker health placeholder (hardcoded `true` until Epic 2)
+  - Return 200 with structured JSON `{ status, timestamp, database, workers }` on success
+  - Return 503 with error details on failure
+  - Log health check failures via Pino logger with error context
+- Task 3: Migrate server entry point (AC: 1)
+  - Update `server/src/index.ts` to import and start Express server instead of native HTTP
+  - Remove inline HTTP server and health check logic
+  - Preserve environment validation and logging initialization
+  - Ensure graceful shutdown hooks (SIGTERM/SIGINT) remain intact
+- Task 4: Update Docker healthcheck configuration (AC: 6)
+  - Update `docker-compose.yml` healthcheck to use `curl -f http://localhost:3000/health`
+  - Set interval=30s, timeout=10s, retries=3 per specification
+  - Update `server/Dockerfile` healthcheck to match docker-compose configuration
+- Task 5: Add integration tests for health endpoint (AC: 2-5)
+  - Create integration test verifying 200 OK response when database is connected
+  - Create integration test verifying 503 response when database is unavailable
+  - Verify response JSON structure matches specification
+  - Confirm error logging occurs on failures
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+1. Express server replaces the native HTTP server, binding to `env.PORT` and serving as the application entry point ([solution-architecture.md](../solution-architecture.md#api-design), [tech-spec-epic-1.md](../tech-spec-epic-1.md#health-check-endpoint)).
+2. GET `/health` endpoint returns 200 OK with structured JSON when system is healthy: `{ status: 'healthy', timestamp: ISO8601, database: 'connected', workers: 'operational' }` ([tech-spec-epic-1.md](../tech-spec-epic-1.md#health-check-endpoint), [architecture-specification.md](../architecture-specification.md#health-checks)).
+3. Health check verifies PostgreSQL connectivity via `pool.query('SELECT 1')` and returns 503 Service Unavailable with error details if database check fails ([tech-spec-epic-1.md](../tech-spec-epic-1.md#health-check-endpoint), [solution-architecture.md](../solution-architecture.md#high-level-architecture)).
+4. Worker pool health check placeholder returns `workers: 'operational'` (hardcoded true until Epic 2 implements worker pool) ([tech-spec-epic-1.md](../tech-spec-epic-1.md#health-check-endpoint)).
+5. Health check failures log structured error messages via Pino logger for observability ([architecture-specification.md](../architecture-specification.md#logging-strategy), [tech-spec-epic-1.md](../tech-spec-epic-1.md#logging-infrastructure)).
+6. Docker healthcheck configuration uses `/health` endpoint with appropriate timeout and retry settings ([tech-spec-epic-1.md](../tech-spec-epic-1.md#docker-configuration), [solution-architecture.md](../solution-architecture.md#deployment-architecture)).
+7. Express server includes security middleware (helmet) and compression for production readiness ([solution-architecture.md](../solution-architecture.md#api-design), [architecture-specification.md](../architecture-specification.md#dependencies)).
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/tech-spec-epic-1.md</path>
+        <title>Epic 1 Technical Specification</title>
+        <section>Health Check Endpoint (lines 550-609)</section>
+        <snippet>Defines Express-based /health endpoint implementation with database connectivity check via pool.query('SELECT 1'), structured JSON responses (200 OK: {status, timestamp, database, workers}, 503 Service Unavailable on failure), worker pool placeholder (hardcoded true until Epic 2), and Pino error logging for failures.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/solution-architecture.md</path>
+        <title>Solution Architecture</title>
+        <section>Express Server Setup (lines 363-410)</section>
+        <snippet>Prescribes Express as HTTP framework with helmet for security headers, compression for response optimization, and express.json() middleware. Server listens on env.PORT with Pino logging. Establishes pattern for Epic 3 API endpoints.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/architecture-specification.md</path>
+        <title>Architecture Specification</title>
+        <section>Dependencies (lines 160-197)</section>
+        <snippet>Lists required production dependencies: express ^4.21.2, helmet ^8.0.0, compression ^1.7.5, pino ^9.5.0, pg ^8.13.1, zod ^3.23.8. Dev dependencies: @types/express ^5.0.0, @types/compression ^1.7.5, typescript ^5.7.2. All must be Node.js 22 LTS compatible.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/architecture-specification.md</path>
+        <title>Architecture Specification</title>
+        <section>Logging Strategy (lines 1008-1026)</section>
+        <snippet>Defines Pino structured JSON logging with level, formatters, and isoTime timestamps. Usage: logger.error({err, raceId}, 'Processing failed') for error context. Health check failures must log with structured error information.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/architecture-specification.md</path>
+        <title>Architecture Specification</title>
+        <section>Health Checks (lines 1028-1053)</section>
+        <snippet>Application health endpoint pattern: GET /health with database check (pool.query('SELECT 1')), worker pool health check (workerPool.isHealthy()), returns 200 {status: 'healthy', timestamp, database: 'connected', workers: 'operational'} on success, 503 {status: 'unhealthy', error} on failure.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/CODING-STANDARDS.md</path>
+        <title>Coding Standards</title>
+        <section>Full Document</section>
+        <snippet>ES modules mandatory (import/export), arrow functions for functional patterns, async/await (no callbacks), const/let only, TypeScript strict mode (no any types), Zod runtime validation, named exports preferred, max 300 lines/file, max 50 lines/function, Prettier formatting (semi: false, singleQuote: true, tabWidth: 2).</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/DEFINITION-OF-DONE.md</path>
+        <title>Definition of Done</title>
+        <section>Quality Gates</section>
+        <snippet>Zero TypeScript errors (npm run build), zero ESLint errors/warnings (npm run lint), no any types, all tests passing (npm test -- --run), Prettier formatting, security scan (npm audit), story file updated with tasks marked complete, regression tests passing, architectural alignment verified.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <item>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/index.ts</path>
+        <kind>entry-point</kind>
+        <symbol>server, shutdown</symbol>
+        <lines>1-113</lines>
+        <reason>Current HTTP server implementation using native Node.js http.createServer with inline /health endpoint logic. Story 1.9 will replace this with Express server while preserving environment validation, logging initialization, and graceful shutdown handlers (SIGTERM/SIGINT).</reason>
+      </item>
+      <item>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/database/pool.ts</path>
+        <kind>database</kind>
+        <symbol>pool, closePool, poolConfig</symbol>
+        <lines>1-78</lines>
+        <reason>Shared PostgreSQL pool (Story 1.8) that health check must use for database connectivity verification. Exports pool instance configured with max/min connections, idle timeout, and connection timeout. Health check will call pool.query('SELECT 1') per AC3.</reason>
+      </item>
+      <item>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/health/database.ts</path>
+        <kind>health-check</kind>
+        <symbol>checkDatabase, DatabaseHealth</symbol>
+        <lines>1-19</lines>
+        <reason>Existing database health check utility that performs pool.query('SELECT 1') and returns {healthy: boolean, message?: string}. Can be reused or adapted for Express /health route to verify PostgreSQL connectivity per AC3.</reason>
+      </item>
+      <item>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/shared/logger.ts</path>
+        <kind>logging</kind>
+        <symbol>logger</symbol>
+        <lines>1-14</lines>
+        <reason>Pino logger instance configured with level, formatters, isoTime timestamp, and env context. Health check failures must use logger.error({err}, 'Health check failed') per AC5 for structured error logging.</reason>
+      </item>
+      <item>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/shared/env.ts</path>
+        <kind>configuration</kind>
+        <symbol>env, Env, EnvSchema, buildDatabaseUrl</symbol>
+        <lines>1-50</lines>
+        <reason>Validated environment configuration using Zod. Provides env.PORT for Express server binding (AC1) and env.LOG_LEVEL for logger. Environment validation must be preserved when migrating to Express server.</reason>
+      </item>
+    </code>
+    <dependencies>
+      <nodejs>
+        <production>
+          <package name="express" version="^4.21.2" status="needs-install">HTTP server and API routing framework (Node 22 compatible)</package>
+          <package name="helmet" version="^8.0.0" status="needs-install">Security headers middleware for Express</package>
+          <package name="compression" version="^1.7.5" status="needs-install">Response compression middleware for Express</package>
+          <package name="pg" version="^8.16.3" status="installed">PostgreSQL client with connection pooling</package>
+          <package name="pino" version="^9.5.0" status="installed">High-performance structured JSON logging</package>
+          <package name="dotenv" version="^16.6.1" status="installed">Environment variable configuration</package>
+          <package name="zod" version="^3.25.76" status="installed">Runtime type validation</package>
+        </production>
+        <development>
+          <package name="@types/express" version="^5.0.0" status="needs-install">TypeScript definitions for Express</package>
+          <package name="@types/compression" version="^1.7.5" status="needs-install">TypeScript definitions for compression middleware</package>
+          <package name="@types/node" version="^22.0.0" status="installed">Node.js 22 type definitions</package>
+          <package name="@types/pg" version="^8.11.10" status="installed">TypeScript definitions for pg</package>
+          <package name="typescript" version="^5.7.0" status="installed">TypeScript compiler</package>
+          <package name="vitest" version="^2.0.0" status="installed">Testing framework</package>
+          <package name="@vitest/coverage-v8" version="^2.1.9" status="installed">Test coverage reporting</package>
+          <package name="eslint" version="^9.0.0" status="installed">Code linting</package>
+          <package name="prettier" version="^3.3.0" status="installed">Code formatting</package>
+        </development>
+      </nodejs>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint id="1" category="architecture">
+      Express server must replace native HTTP server as application entry point, binding to env.PORT and serving all requests through Express middleware chain (AC1).
+    </constraint>
+    <constraint id="2" category="dependency">
+      Health check must use shared PostgreSQL pool from server/src/database/pool.ts (Story 1.8) rather than creating ad-hoc connections, ensuring consistent connection management and observability.
+    </constraint>
+    <constraint id="3" category="implementation">
+      Worker pool health check returns hardcoded 'workers: operational' placeholder until Epic 2 implements worker thread pool, allowing Story 1.9 to be completed independently (AC4).
+    </constraint>
+    <constraint id="4" category="migration">
+      Server entry point migration (server/src/index.ts) must preserve existing functionality: environment validation via Zod, logging initialization via Pino, graceful shutdown handlers for SIGTERM/SIGINT (Task 3).
+    </constraint>
+    <constraint id="5" category="error-handling">
+      Health check failures must log via Pino with structured error context (error message, stack trace if available) using logger.error({err}, 'message') pattern. 503 response should include error message but avoid exposing sensitive internal details (AC5).
+    </constraint>
+    <constraint id="6" category="docker">
+      Docker healthcheck configuration must use curl-based check against /health endpoint with fail-fast timeout (10s) and appropriate retry logic (3 retries, 30s interval) to enable container orchestration health monitoring (AC6).
+    </constraint>
+    <constraint id="7" category="testing">
+      Integration tests mandatory for both success path (200 OK with database connected) and failure path (503 with database unavailable). Tests must verify JSON structure matches specification and confirm error logging occurs on failures (Task 5).
+    </constraint>
+    <constraint id="8" category="code-quality">
+      All code must follow CODING-STANDARDS.md: ES modules only (import/export), arrow functions, async/await, no any types, TypeScript strict mode, Zod validation, max 300 lines/file, max 50 lines/function, Prettier formatting.
+    </constraint>
+    <constraint id="9" category="file-structure">
+      New files must follow target architecture: server/src/api/server.ts (Express app configuration), server/src/api/routes/health.ts (health route handler). This establishes pattern for Epic 3 API endpoints.
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>pool</name>
+      <kind>database-pool</kind>
+      <signature>export const pool: Pool</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/database/pool.ts</path>
+      <description>Shared PostgreSQL connection pool configured with max/min connections, idle timeout, and connection timeout. Health check must import and use this pool instance for database connectivity verification via pool.query('SELECT 1').</description>
+    </interface>
+    <interface>
+      <name>logger</name>
+      <kind>logging</kind>
+      <signature>export const logger: pino.Logger</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/shared/logger.ts</path>
+      <description>Pino logger instance with structured JSON logging. Health check failures must use logger.error({err}, 'Health check failed') to log errors with context for observability.</description>
+    </interface>
+    <interface>
+      <name>env</name>
+      <kind>configuration</kind>
+      <signature>export const env: Env</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/shared/env.ts</path>
+      <description>Validated environment configuration object with env.PORT (server port), env.LOG_LEVEL (logging level), env.NODE_ENV (environment), and database connection parameters. Express server must bind to env.PORT.</description>
+    </interface>
+    <interface>
+      <name>closePool</name>
+      <kind>lifecycle</kind>
+      <signature>export const closePool: (reason?: string) => Promise&lt;void&gt;</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/database/pool.ts</path>
+      <description>Graceful PostgreSQL pool shutdown function. Must be called in SIGTERM/SIGINT handlers to close database connections cleanly during server shutdown.</description>
+    </interface>
+    <interface>
+      <name>checkDatabase</name>
+      <kind>health-check</kind>
+      <signature>export const checkDatabase: () => Promise&lt;DatabaseHealth&gt;</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/health/database.ts</path>
+      <description>Existing database health check utility that executes pool.query('SELECT 1') and returns {healthy: boolean, message?: string}. Can be reused or adapted for Express /health route implementation.</description>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Project uses Vitest as testing framework with strict quality requirements per DEFINITION-OF-DONE.md: all tests must pass (npm test -- --run), zero failures allowed. Tests follow describe/it structure with meaningful assertions and descriptive names ('should...' format). Integration tests verify component interactions with real database connections. Test files located in server/tests/{unit,integration}/ directories. Coverage reporting via @vitest/coverage-v8. All new/modified code requires comprehensive test coverage including edge cases and error scenarios.
+    </standards>
+    <locations>
+      <location>server/tests/unit/**/*.test.ts</location>
+      <location>server/tests/integration/**/*.test.ts</location>
+    </locations>
+    <ideas>
+      <test id="1" ac="AC2" priority="high">
+        Integration test: GET /health with database connected should return 200 OK with JSON structure {status: 'healthy', timestamp: ISO8601, database: 'connected', workers: 'operational'}. Verify timestamp is valid ISO8601 format and all required fields present.
+      </test>
+      <test id="2" ac="AC3" priority="high">
+        Integration test: GET /health with database unavailable (simulate by stopping PostgreSQL or using invalid connection) should return 503 Service Unavailable with JSON {status: 'unhealthy', timestamp: ISO8601, error: string}. Verify error message is included but doesn't expose sensitive details.
+      </test>
+      <test id="3" ac="AC5" priority="high">
+        Integration test: Verify health check failure logs structured error message via Pino. Mock or capture logger.error calls and assert error context includes error object and descriptive message.
+      </test>
+      <test id="4" ac="AC4" priority="medium">
+        Unit test: Verify /health response includes workers: 'operational' field (hardcoded placeholder until Epic 2). Assert field is always 'operational' regardless of other health checks.
+      </test>
+      <test id="5" ac="AC1,AC7" priority="medium">
+        Integration test: Verify Express server starts on env.PORT with helmet and compression middleware active. Test that security headers are present in response and responses are compressed.
+      </test>
+      <test id="6" ac="AC6" priority="medium">
+        Integration test: Verify Docker healthcheck curl command works against /health endpoint. Test both healthy (200) and unhealthy (503) scenarios to ensure container orchestration can detect failures.
+      </test>
+      <test id="7" ac="AC1" priority="high">
+        Integration test: Verify graceful shutdown works with Express server. Send SIGTERM/SIGINT and confirm server closes cleanly, database pool closes via closePool, and no connections leak.
+      </test>
+    </ideas>
+  </tests>
+</story-context>

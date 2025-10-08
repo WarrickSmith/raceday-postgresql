@@ -44,48 +44,16 @@ jobs:
     defaults:
       run:
         working-directory: ./server
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Validate consolidated appwrite.json
-        run: |
-          test -f appwrite.json && echo "✓ appwrite.json exists" || exit 1
-          node -e "const config = JSON.parse(require('fs').readFileSync('appwrite.json', 'utf8')); console.log('✓ appwrite.json is valid JSON with', Object.keys(config.functions || {}).length, 'functions')" || exit 1
-
-  backend-daily-meetings:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./server/daily-meetings
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: ./server/package-lock.json
-      - name: Validate function configuration
-        run: |
-          test -f ../appwrite.json && echo "✓ consolidated appwrite.json exists" || exit 1
-          test -f src/main.js && echo "✓ main.js exists" || exit 1
-          test -f package.json && echo "✓ package.json exists" || exit 1
-      - name: Install dependencies
-        run: npm install
-      - name: Validate JavaScript syntax
-        run: |
-          node -c src/main.js && echo "✓ main.js syntax valid" || exit 1
-
-  backend-daily-races:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./server/daily-races
+    env:
+      NODE_ENV: test
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: raceday
+      NZTAB_API_URL: 'https://example.com/api'
+      LOG_LEVEL: 'info'
+      SKIP_DB_TESTS: 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -95,138 +63,11 @@ jobs:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: ./server/package-lock.json
-      - name: Validate function configuration
-        run: |
-          test -f ../appwrite.json && echo "✓ consolidated appwrite.json exists" || exit 1
-          test -f src/main.js && echo "✓ main.js exists" || exit 1
-          test -f package.json && echo "✓ package.json exists" || exit 1
       - name: Install dependencies
-        run: npm install
-      - name: Validate JavaScript syntax
-        run: |
-          node -c src/main.js && echo "✓ main.js syntax valid" || exit 1
-
-  backend-daily-initial-data:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./server/daily-initial-data
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: ./server/package-lock.json
-      - name: Validate function configuration
-        run: |
-          test -f ../appwrite.json && echo "✓ consolidated appwrite.json exists" || exit 1
-          test -f src/main.js && echo "✓ main.js exists" || exit 1
-          test -f package.json && echo "✓ package.json exists" || exit 1
-      - name: Install dependencies
-        run: npm install
-      - name: Validate JavaScript syntax
-        run: |
-          node -c src/main.js && echo "✓ main.js syntax valid" || exit 1
-
-  backend-enhanced-race-poller:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./server/enhanced-race-poller
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: ./server/package-lock.json
-      - name: Validate function configuration
-        run: |
-          test -f ../appwrite.json && echo "✓ consolidated appwrite.json exists" || exit 1
-          test -f src/main.js && echo "✓ main.js exists" || exit 1
-          test -f package.json && echo "✓ package.json exists" || exit 1
-      - name: Install dependencies
-        run: npm install
-      - name: Validate JavaScript syntax
-        run: |
-          node -c src/main.js && echo "✓ main.js syntax valid" || exit 1
-
-  backend-master-race-scheduler:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./server/master-race-scheduler
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: ./server/package-lock.json
-      - name: Validate function configuration
-        run: |
-          test -f ../appwrite.json && echo "✓ consolidated appwrite.json exists" || exit 1
-          test -f src/main.js && echo "✓ main.js exists" || exit 1
-          test -f package.json && echo "✓ package.json exists" || exit 1
-      - name: Install dependencies
-        run: npm install
-      - name: Validate JavaScript syntax
-        run: |
-          node -c src/main.js && echo "✓ main.js syntax valid" || exit 1
-
-  backend-meeting-status-poller:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./server/meeting-status-poller
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: ./server/package-lock.json
-      - name: Validate function configuration
-        run: |
-          test -f ../appwrite.json && echo "✓ consolidated appwrite.json exists" || exit 1
-          test -f src/main.js && echo "✓ main.js exists" || exit 1
-          test -f package.json && echo "✓ package.json exists" || exit 1
-      - name: Install dependencies
-        run: npm install
-      - name: Validate JavaScript syntax
-        run: |
-          node -c src/main.js && echo "✓ main.js syntax valid" || exit 1
-
-  backend-database-setup:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./server/database-setup
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: ./server/package-lock.json
-      - name: Validate function configuration
-        run: |
-          test -f ../appwrite.json && echo "✓ consolidated appwrite.json exists" || exit 1
-          test -f src/main.js && echo "✓ main.js exists" || exit 1
-          test -f package.json && echo "✓ package.json exists" || exit 1
-      - name: Install dependencies
-        run: npm install
-      - name: Validate JavaScript syntax
-        run: |
-          node -c src/main.js && echo "✓ main.js syntax valid" || exit 1
+        run: npm ci
+      - name: Run lint
+        run: npm run lint
+      - name: Run unit tests
+        run: npm run test:unit
+      - name: Build backend
+        run: npm run build

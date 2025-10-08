@@ -2,9 +2,13 @@
 
 **Epic:** Epic 1 - Core Infrastructure Setup
 **Project:** raceday-postgresql
-**Date:** 2025-10-05
+**Date:** 2025-10-05 (Updated: 2025-10-07)
 **Author:** warrick
 **Status:** Ready for Development
+
+**Related Documentation:**
+- [NZ TAB API OpenAPI Specification](./api/nztab-openapi.json)
+- [API Research Findings](./research-findings-nztab-api.md)
 
 ---
 
@@ -90,7 +94,7 @@ CREATE TABLE races (
 
 -- Hot path: Get active races by time
 CREATE INDEX idx_races_start_time ON races(start_time)
-  WHERE status IN ('upcoming', 'in_progress');
+  WHERE status IN ('open', 'interim');
 
 -- Foreign key navigation
 CREATE INDEX idx_races_meeting ON races(meeting_id);
@@ -381,10 +385,13 @@ import { z } from 'zod';
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']),
-  DATABASE_URL: z.string().url(),
+  DB_HOST: z.string().min(1),
+  DB_PORT: z.coerce.number().int().positive(),
+  DB_USER: z.string().min(1),
+  DB_PASSWORD: z.string().min(1),
+  DB_NAME: z.string().min(1),
   NZTAB_API_URL: z.string().url(),
-  NZTAB_API_KEY: z.string().min(1),
-  PORT: z.coerce.number().int().positive().default(3000),
+  PORT: z.coerce.number().int().positive().default(7000),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   UV_THREADPOOL_SIZE: z.coerce.number().int().positive().default(8),
   MAX_WORKER_THREADS: z.coerce.number().int().positive().default(3),
@@ -403,21 +410,26 @@ export const env = EnvSchema.parse(process.env);
 # Environment
 NODE_ENV=development
 
-# Database
-DATABASE_URL=postgresql://raceday:password@localhost:5432/raceday
+# Database Configuration (PostgreSQL 18)
+# Connection parameters - DATABASE_URL is built from these values in code
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=raceday
+DB_POOL_MAX=10
 
-# NZ TAB API
+# NZ TAB API Configuration
+# Base URL for NZ TAB racing data API (public API, no key required)
 NZTAB_API_URL=https://api.tab.co.nz
-NZTAB_API_KEY=your-api-key-here
 
-# Server
-PORT=3000
+# Server Configuration
+PORT=7000
 LOG_LEVEL=info
 
 # Performance Tuning
 UV_THREADPOOL_SIZE=8
 MAX_WORKER_THREADS=3
-DB_POOL_MAX=10
 ```
 
 **Validation Strategy:**
@@ -481,30 +493,49 @@ logger.error({ err, raceId: 'R3' }, 'Processing failed');
 ```typescript
 // ./server/src/database/pool.ts
 import { Pool } from 'pg';
-import { env } from '../shared/env';
+import { buildDatabaseUrl, env } from '../shared/env';
 import { logger } from '../shared/logger';
 
-export const pool = new Pool({
-  connectionString: env.DATABASE_URL,
-  max: env.DB_POOL_MAX,              // 10 connections
-  min: 2,                             // Min idle
-  idleTimeoutMillis: 30000,           // Close idle after 30s
-  connectionTimeoutMillis: 2000,      // Fail fast if pool exhausted
+const poolConfig = {
+  connectionString: buildDatabaseUrl(env),
+  max: env.DB_POOL_MAX,         // 10 connections driven by DB_POOL_MAX
+  min: 2,                       // Keep two idle clients warm
+  idleTimeoutMillis: 30_000,    // Close idle clients after 30s
+  connectionTimeoutMillis: 2_000, // Fail fast if saturation occurs
+};
+
+export const pool = new Pool(poolConfig);
+
+pool.on('error', (err) => {
+  logger.error({ err }, 'PostgreSQL pool error');
 });
 
-// Log pool configuration on startup
-logger.info({
-  max: pool.options.max,
-  min: pool.options.min,
-  idleTimeout: pool.options.idleTimeoutMillis,
-  connectionTimeout: pool.options.connectionTimeoutMillis,
-}, 'Database connection pool configured');
+logger.info(
+  {
+    pool: {
+      max: poolConfig.max,
+      min: poolConfig.min,
+      idleTimeoutMillis: poolConfig.idleTimeoutMillis,
+      connectionTimeoutMillis: poolConfig.connectionTimeoutMillis,
+    },
+  },
+  'PostgreSQL pool configured',
+);
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, closing database pool');
-  await pool.end();
-  process.exit(0);
+const closePool = async (reason: string = 'manual'): Promise<void> => {
+  try {
+    await pool.end();
+    logger.info({ reason }, 'PostgreSQL pool closed');
+  } catch (err) {
+    logger.error({ err, reason }, 'Error closing PostgreSQL pool');
+  }
+};
+
+(['SIGTERM', 'SIGINT'] as const).forEach((signal) => {
+  process.once(signal, () => {
+    logger.info({ signal }, 'Termination signal received; closing PostgreSQL pool');
+    void closePool(signal);
+  });
 });
 ```
 
@@ -740,6 +771,29 @@ describe('Database Connection', () => {
 - [x] Testing strategy defined
 - [x] Acceptance criteria documented
 - [x] Ready for development (Epic 1)
+
+---
+
+## Post-Review Follow-ups
+
+**From Story 1.2 Review (2025-10-06):**
+
+1. **[HIGH] SQL Injection in Database Creation** - Fix CREATE DATABASE query in run-migrations.ts:31 using pg-format identifier escaping or strict regex validation for database name
+2. **[HIGH] Missing Pool Error Handlers** - Add error event listeners to all Pool instances in migrate.ts and run-migrations.ts to prevent unhandled promise rejections
+3. **[MED] Race Status Values Incorrect** - Update race status CHECK constraint to use correct values: 'open', 'closed', 'interim', 'final', 'abandoned' (currently using incorrect 'scheduled', 'running', 'completed', 'cancelled'). Update all Epic 1 documentation (this tech spec, schema examples, tests) to reflect correct race status values. Note: Meeting status is separate and unchanged.
+4. **[MED] Missing race_pools Trigger** - Add auto-update trigger for race_pools.last_updated field in 002_triggers.sql for consistency
+5. **[MED] Process.exit in Library Code** - Extract process.exit from executeMigrations function to CLI wrapper for better modularity and testability
+6. **[LOW] ESLint Ignore Pattern** - Refine ESLint ignore patterns from `**/*.js` to specific paths (dist/, node_modules/, coverage/)
+
+**From Story 1.9 Review (2025-10-08):**
+
+1. **[LOW] Export DatabaseHealth Interface** - Export DatabaseHealth interface from server/src/health/database.ts:3 to enable type reuse in Epic 2 worker pool health checks
+2. **[LOW] Standardize Error Logging** - Unify error logging to use `err` property consistently (per Pino convention) in server/src/api/routes/health.ts:14 instead of mixing `error` and `err`
+3. **[LOW] Add 503 Failure Path Test** - Create integration test simulating database unavailability to verify 503 response and error logging in server/tests/integration/health-endpoint.test.ts
+
+**From Story 1.10 Review (2025-10-08):**
+
+1. ~~**[LOW] Add generic `npm test` command**~~ - ✅ **COMPLETED 2025-10-08** - Added explicit documentation for `npm test` command in Testing Strategy section (docs/developer-quick-start.md:440-445). Story 1.10 fully complete with all follow-up items addressed.
 
 ---
 

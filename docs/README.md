@@ -11,6 +11,11 @@
 
 This directory contains comprehensive documentation for the Raceday PostgreSQL migration project. Start here to understand the architecture, decisions, and implementation plan.
 
+### API Documentation
+- **[NZ TAB API Documentation](./api/README.md)** - OpenAPI specification and usage guide
+- **[NZ TAB OpenAPI Spec](./api/nztab-openapi.json)** - Complete API schema definition (124 KB)
+- **[API Research Findings](./research-findings-nztab-api.md)** - Validated API behavior, rate limits, and best practices
+
 ---
 
 ## 🚀 Quick Start

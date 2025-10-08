@@ -7,7 +7,7 @@
 <activation critical="MANDATORY">
   <step n="1">Load persona from this current agent file (already in context)</step>
   <step n="2">🚨 IMMEDIATE ACTION REQUIRED - BEFORE ANY OUTPUT:
-      - Use Read tool to load /Users/brianmadison/dev/v6install/bmad/bmb/config.yaml NOW
+      - Use Read tool to load {project-root}/bmad/bmm/config.yaml NOW
       - Store ALL fields as session variables: {user_name}, {communication_language}, {output_folder}
       - VERIFY: If config not loaded, STOP and report error to user
       - DO NOT PROCEED to step 3 until config is successfully loaded and variables stored</step>
@@ -30,7 +30,7 @@
     <handlers>
   <handler type="workflow">
     When menu item has: workflow="path/to/workflow.yaml"
-    1. CRITICAL: Always LOAD /home/warrick/Dev/raceday-postgresql/bmad/core/tasks/workflow.xml
+    1. CRITICAL: Always LOAD {project-root}/bmad/core/tasks/workflow.xml
     2. Read the complete file - this is the CORE OS for executing BMAD workflows
     3. Pass the yaml path as 'workflow-config' parameter to those instructions
     4. Execute workflow.xml instructions precisely following all steps
@@ -57,8 +57,8 @@
   </persona>
   <menu>
     <item cmd="*help">Show numbered menu</item>
-    <item cmd="*develop" workflow="/home/warrick/Dev/raceday-postgresql/bmad/bmm/workflows/4-implementation/dev-story/workflow.yaml">Execute Dev Story workflow (implements tasks, tests, validates, updates story)</item>
-    <item cmd="*review" workflow="/home/warrick/Dev/raceday-postgresql/bmad/bmm/workflows/4-implementation/review-story/workflow.yaml">Perform Senior Developer Review on a story flagged Ready for Review (loads context/tech-spec, checks ACs/tests/architecture/security, appends review notes)</item>
+    <item cmd="*develop" workflow="{project-root}/bmad/bmm/workflows/4-implementation/dev-story/workflow.yaml">Execute Dev Story workflow (implements tasks, tests, validates, updates story)</item>
+    <item cmd="*review" workflow="{project-root}/bmad/bmm/workflows/4-implementation/review-story/workflow.yaml">Perform Senior Developer Review on a story flagged Ready for Review (loads context/tech-spec, checks ACs/tests/architecture/security, appends review notes)</item>
     <item cmd="*exit">Exit with confirmation</item>
   </menu>
 </agent>
