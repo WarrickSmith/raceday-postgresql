@@ -96,6 +96,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.js', 'vitest.config.ts'],
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.js', '**/*.mjs', 'vitest.config.ts'],
   }
 )

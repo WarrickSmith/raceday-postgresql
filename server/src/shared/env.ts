@@ -5,9 +5,8 @@ import { z } from 'zod'
 config()
 
 // Zod schema for environment variable validation
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const EnvSchema = z.object({
-  /* eslint-disable @typescript-eslint/naming-convention */
+/* eslint-disable @typescript-eslint/naming-convention */
+const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']),
   DB_HOST: z.string().min(1),
   DB_PORT: z.coerce.number().int().positive(),
@@ -20,14 +19,14 @@ const EnvSchema = z.object({
   UV_THREADPOOL_SIZE: z.coerce.number().int().positive().default(8),
   MAX_WORKER_THREADS: z.coerce.number().int().positive().default(3),
   DB_POOL_MAX: z.coerce.number().int().positive().default(10),
-  /* eslint-enable @typescript-eslint/naming-convention */
 })
+/* eslint-enable @typescript-eslint/naming-convention */
 
 // Infer TypeScript type from schema
-export type Env = z.infer<typeof EnvSchema>
+export type Env = z.infer<typeof envSchema>
 
 // Validate environment variables using safeParse for better error handling
-const result = EnvSchema.safeParse(process.env)
+const result = envSchema.safeParse(process.env)
 
 if (!result.success) {
   // Cannot use logger here due to circular dependency (logger depends on env)

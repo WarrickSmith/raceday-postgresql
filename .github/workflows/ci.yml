@@ -67,7 +67,7 @@ jobs:
         run: npm ci
       - name: Run lint
         run: npm run lint
-      - name: Run unit tests
-        run: npm run test:unit
+      - name: Run Vitest stability checks
+        run: npm run test:stability
       - name: Build backend
         run: npm run build
