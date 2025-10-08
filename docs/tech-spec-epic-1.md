@@ -493,30 +493,49 @@ logger.error({ err, raceId: 'R3' }, 'Processing failed');
 ```typescript
 // ./server/src/database/pool.ts
 import { Pool } from 'pg';
-import { env } from '../shared/env';
+import { buildDatabaseUrl, env } from '../shared/env';
 import { logger } from '../shared/logger';
 
-export const pool = new Pool({
-  connectionString: env.DATABASE_URL,
-  max: env.DB_POOL_MAX,              // 10 connections
-  min: 2,                             // Min idle
-  idleTimeoutMillis: 30000,           // Close idle after 30s
-  connectionTimeoutMillis: 2000,      // Fail fast if pool exhausted
+const poolConfig = {
+  connectionString: buildDatabaseUrl(env),
+  max: env.DB_POOL_MAX,         // 10 connections driven by DB_POOL_MAX
+  min: 2,                       // Keep two idle clients warm
+  idleTimeoutMillis: 30_000,    // Close idle clients after 30s
+  connectionTimeoutMillis: 2_000, // Fail fast if saturation occurs
+};
+
+export const pool = new Pool(poolConfig);
+
+pool.on('error', (err) => {
+  logger.error({ err }, 'PostgreSQL pool error');
 });
 
-// Log pool configuration on startup
-logger.info({
-  max: pool.options.max,
-  min: pool.options.min,
-  idleTimeout: pool.options.idleTimeoutMillis,
-  connectionTimeout: pool.options.connectionTimeoutMillis,
-}, 'Database connection pool configured');
+logger.info(
+  {
+    pool: {
+      max: poolConfig.max,
+      min: poolConfig.min,
+      idleTimeoutMillis: poolConfig.idleTimeoutMillis,
+      connectionTimeoutMillis: poolConfig.connectionTimeoutMillis,
+    },
+  },
+  'PostgreSQL pool configured',
+);
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, closing database pool');
-  await pool.end();
-  process.exit(0);
+const closePool = async (reason: string = 'manual'): Promise<void> => {
+  try {
+    await pool.end();
+    logger.info({ reason }, 'PostgreSQL pool closed');
+  } catch (err) {
+    logger.error({ err, reason }, 'Error closing PostgreSQL pool');
+  }
+};
+
+(['SIGTERM', 'SIGINT'] as const).forEach((signal) => {
+  process.once(signal, () => {
+    logger.info({ signal }, 'Termination signal received; closing PostgreSQL pool');
+    void closePool(signal);
+  });
 });
 ```
 

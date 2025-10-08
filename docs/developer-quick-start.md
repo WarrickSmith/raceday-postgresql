@@ -422,6 +422,7 @@ npm run test:perf
 - Increase `DB_POOL_MAX` (currently 10)
 - Add missing indexes
 - Restart worker pool
+- Review the startup log entry `PostgreSQL pool configured` to confirm the pool metrics (`max`, `min`, `idleTimeoutMillis`, `connectionTimeoutMillis`) and verify that `DB_POOL_MAX` is set correctly for the environment.
 
 ### Problem: Worker thread crashes
 
