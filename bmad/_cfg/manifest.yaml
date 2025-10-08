@@ -1,7 +1,7 @@
 installation:
   version: 6.0.0-alpha.0
-  installDate: '2025-10-06T20:47:05.458Z'
-  lastUpdated: '2025-10-06T20:47:05.458Z'
+  installDate: '2025-10-08T03:48:48.417Z'
+  lastUpdated: '2025-10-08T03:48:48.417Z'
 modules:
   - core
   - bmb
@@ -10,3 +10,4 @@ modules:
 ides:
   - claude-code
   - codex
+  - roo
