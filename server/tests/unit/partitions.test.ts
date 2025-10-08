@@ -1,8 +1,31 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { Pool } from 'pg'
-import 'dotenv/config'
-import { getPartitionName, createTomorrowPartitions } from '../../src/database/partitions.js'
 import { getTomorrowNzDate } from '../../src/shared/timezone.js'
+
+type PartitionModule = typeof import('../../src/database/partitions.js')
+
+const ensureTestEnv = (): void => {
+  process.env.NODE_ENV ||= 'test'
+  process.env.DB_HOST ||= 'localhost'
+  process.env.DB_PORT ||= '5432'
+  process.env.DB_USER ||= 'postgres'
+  process.env.DB_PASSWORD ||= 'postgres'
+  process.env.DB_NAME ||= 'raceday'
+  process.env.NZTAB_API_URL ||= 'https://api.tab.co.nz'
+  process.env.LOG_LEVEL ||= 'info'
+}
+
+let getPartitionName: PartitionModule['getPartitionName']
+let createTomorrowPartitions: PartitionModule['createTomorrowPartitions']
+
+beforeAll(async () => {
+  ensureTestEnv()
+  const partitionModule: PartitionModule = await import(
+    '../../src/database/partitions.js'
+  )
+  getPartitionName = partitionModule.getPartitionName
+  createTomorrowPartitions = partitionModule.createTomorrowPartitions
+})
 
 const buildDatabaseUrl = (): string => {
   const dbHost = process.env.DB_HOST ?? 'localhost'
@@ -55,7 +78,10 @@ describe('Partition Utility Functions', () => {
     })
   })
 
-  describe('createTomorrowPartitions', () => {
+  const skipDbTests = process.env.SKIP_DB_TESTS === 'true'
+  const describeDb = skipDbTests ? describe.skip : describe
+
+  describeDb('createTomorrowPartitions', () => {
     let pool: Pool
 
     beforeAll(() => {

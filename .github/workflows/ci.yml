@@ -44,6 +44,16 @@ jobs:
     defaults:
       run:
         working-directory: ./server
+    env:
+      NODE_ENV: test
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: raceday
+      NZTAB_API_URL: 'https://example.com/api'
+      LOG_LEVEL: 'info'
+      SKIP_DB_TESTS: 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
