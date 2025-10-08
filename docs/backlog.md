@@ -20,3 +20,4 @@ Routing guidance:
 | 2025-10-08 | 1.9 | 1 | Enhancement | Low | Claude | Resolved | Exported DatabaseHealth interface from server/src/health/database.ts:3 to enable reuse in Epic 2 worker pool health checks |
 | 2025-10-08 | 1.9 | 1 | TechDebt | Low | Claude | Resolved | Standardized error logging to use `err` property consistently (server/src/api/routes/health.ts:14) per Pino convention |
 | 2025-10-08 | 1.9 | 1 | Testing | Low | Claude | Resolved | Added 503 failure path integration test simulating database unavailability using Vitest mock (server/tests/integration/health-endpoint.test.ts:84-109) - All 99 tests passing |
+| 2025-10-08 | 1.10 | 1 | Enhancement | Low | Claude | Resolved | Added generic `npm test` command documentation in Testing Strategy section (docs/developer-quick-start.md:440-445) - Story 1.10 fully complete |
