@@ -1,0 +1,149 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1.10</storyId>
+    <title>Development Environment Setup Documentation</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-08T04:09:40.529Z</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-1.10.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a developer new to the raceday-postgresql project</asA>
+    <iWant>comprehensive documentation for setting up the local development environment</iWant>
+    <soThat>I can get started quickly and consistently</soThat>
+    <tasks>- [ ] Task 1: Review and enhance developer-quick-start.md prerequisites section (AC: 1)
+  - [ ] Verify Node.js 22 LTS requirement is clearly stated
+  - [ ] Confirm Docker and Docker Compose prerequisites are documented
+  - [ ] Check that all necessary tools (Git, npm) are listed
+- [ ] Task 2: Verify step-by-step setup instructions (AC: 2)
+  - [ ] Confirm clone repository instructions are accurate
+  - [ ] Verify dependency installation steps are correct
+  - [ ] Check Docker startup instructions are complete
+  - [ ] Validate database migration steps are documented
+- [ ] Task 3: Document common development commands (AC: 3)
+  - [ ] Verify npm run dev command is documented
+  - [ ] Confirm npm run build command is included
+  - [ ] Check npm test command is documented
+  - [ ] Add any additional useful commands
+- [ ] Task 4: Enhance troubleshooting section (AC: 4)
+  - [ ] Review existing troubleshooting section for completeness
+  - [ ] Add solutions for common setup issues
+  - [ ] Include references to relevant log files
+- [ ] Task 5: Verify .env.example completeness (AC: 5)
+  - [ ] Confirm server/.env.example includes all required variables
+  - [ ] Check that each variable has descriptive comments
+  - [ ] Verify example values are appropriate for development
+- [ ] Task 6: Add references to technical specifications (AC: 6)
+  - [ ] Add references to tech-spec-epic-1.md for additional context
+  - [ ] Include links to architecture documentation
+  - [ ] Reference PRD for business context
+- [ ] Task 7: Fix server docker-compose.yml configuration consistency
+  - [ ] Update server/docker-compose.yml comments to clarify Portainer variable support
+  - [ ] Ensure server/docker-compose.yml properly references environment variables
+  - [ ] Document deployment modes in server/docker-compose.yml to match client</tasks>
+  </story>
+
+  <acceptanceCriteria>1. developer-quick-start.md includes complete setup instructions for Node.js 22 LTS, Docker, and Docker Compose prerequisites
+2. developer-quick-start.md documents step-by-step setup process: clone repo, install dependencies, start Docker, run migrations
+3. developer-quick-start.md documents common development commands: npm run dev, npm run build, npm test
+4. developer-quick-start.md includes a troubleshooting section for common issues
+5. server/.env.example provides a complete template for all required environment variables
+6. Documentation references Epic 1 technical specifications for additional context</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/developer-quick-start.md" title="Developer Quick Start Guide" section="Complete setup instructions">
+        Comprehensive 538-line guide covering prerequisites, setup process, common commands, troubleshooting, and architecture overview. Already includes detailed instructions for Node.js 22 LTS, Docker, and Docker Compose setup.
+      </doc>
+      <doc path="docs/tech-spec-epic-1.md" title="Technical Specification for Epic 1" section="Database schema and environment configuration">
+        Complete technical specification for Epic 1 including database schema design, Docker configuration, environment variables schema, and logging infrastructure. Provides context for the development environment setup.
+      </doc>
+      <doc path="docs/architecture-specification.md" title="Architecture Specification" section="System architecture and technology stack">
+        Detailed system architecture including technology stack (Node.js 22 LTS, PostgreSQL 18), coding standards, and deployment architecture. Provides context for development environment requirements.
+      </doc>
+      <doc path="server/.env.example" title="Environment Variables Template" section="Complete environment configuration">
+        Template file with all required environment variables for the development environment including database configuration, NZ TAB API settings, and performance tuning parameters.
+      </doc>
+    </docs>
+    <code>
+      <artifact path="server/package.json" kind="package" symbol="scripts" lines="10-22" reason="Defines development commands referenced in AC3 (npm run dev, npm run build, npm test)">
+        Contains npm scripts for development workflow including dev server, build process, testing, and code quality tools
+      </artifact>
+      <artifact path="server/docker-compose.yml" kind="docker" symbol="services" lines="1-50" reason="Docker configuration for development environment">
+        Defines PostgreSQL and server services for development environment setup
+      </artifact>
+      <artifact path="server/test-connection.js" kind="script" symbol="test" lines="1-20" reason="Utility for testing database connection">
+        Helper script for verifying database connectivity during setup
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="Node.js">
+        <package name="express" version="^4.21.2" />
+        <package name="pg" version="^8.16.3" />
+        <package name="dotenv" version="^16.6.1" />
+        <package name="pino" version="^9.5.0" />
+        <package name="zod" version="^3.25.76" />
+        <package name="helmet" version="^8.1.0" />
+        <package name="compression" version="^1.8.1" />
+        <package name="pg-format" version="^1.0.4" />
+      </ecosystem>
+      <ecosystem name="TypeScript">
+        <package name="typescript" version="^5.7.0" />
+        <package name="tsx" version="^4.19.0" />
+      </ecosystem>
+      <ecosystem name="Development Tools">
+        <package name="vitest" version="^2.0.0" />
+        <package name="eslint" version="^9.0.0" />
+        <package name="prettier" version="^3.3.0" />
+        <package name="husky" version="^9.1.7" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint id="1" type="requirement">Node.js 22 LTS is required (minimum v22.0.0) as specified in package.json engines field</constraint>
+    <constraint id="2" type="architecture">Project uses ES modules (type: "module" in package.json) - all code must use import/export syntax</constraint>
+    <constraint id="3" type="database">PostgreSQL 18 is required with specific connection parameters defined in .env.example</constraint>
+    <constraint id="4" type="development">Docker and Docker Compose are required for local development environment</constraint>
+    <constraint id="5" type="code-quality">ESLint and Prettier are configured with pre-commit hooks via Husky</constraint>
+    <constraint id="6" type="testing">Vitest is used as the testing framework with coverage reporting</constraint>
+  </constraints>
+  <interfaces>
+    <interface name="Database Connection" kind="config" signature="DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME" path="server/.env.example" />
+    <interface name="Server Configuration" kind="config" signature="PORT, LOG_LEVEL, NODE_ENV" path="server/.env.example" />
+    <interface name="NZ TAB API" kind="external" signature="NZTAB_API_URL" path="server/.env.example" />
+    <interface name="Performance Tuning" kind="config" signature="UV_THREADPOOL_SIZE, MAX_WORKER_THREADS, DB_POOL_MAX" path="server/.env.example" />
+  </interfaces>
+  <tests>
+    <standards>
+      The project uses Vitest as the testing framework with TypeScript support. Tests are configured to run sequentially with a single worker to avoid database connection pool exhaustion. Test timeout is set to 60 seconds to accommodate database operations. The testing environment is Node.js with globals enabled.
+    </standards>
+    <locations>
+      Unit tests are located in server/tests/unit/
+      Integration tests are located in server/tests/integration/
+      Test configuration is defined in server/vitest.config.ts
+    </locations>
+    <ideas>
+      <test idea="Verify developer-quick-start.md prerequisites section" acceptanceCriteriaId="1">
+        Test that the documentation correctly lists Node.js 22 LTS, Docker, and Docker Compose as prerequisites
+      </test>
+      <test idea="Validate step-by-step setup instructions" acceptanceCriteriaId="2">
+        Test each step in the setup process: clone repo, install dependencies, start Docker, run migrations
+      </test>
+      <test idea="Check common development commands documentation" acceptanceCriteriaId="3">
+        Verify that npm run dev, npm run build, and npm test commands are correctly documented
+      </test>
+      <test idea="Verify troubleshooting section completeness" acceptanceCriteriaId="4">
+        Test that common issues and their solutions are documented
+      </test>
+      <test idea="Validate .env.example completeness" acceptanceCriteriaId="5">
+        Check that server/.env.example includes all required environment variables with proper descriptions
+      </test>
+      <test idea="Verify technical specification references" acceptanceCriteriaId="6">
+        Test that documentation properly references Epic 1 technical specifications
+      </test>
+    </ideas>
+  </tests>
+</story-context>
