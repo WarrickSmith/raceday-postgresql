@@ -791,6 +791,10 @@ describe('Database Connection', () => {
 2. **[LOW] Standardize Error Logging** - Unify error logging to use `err` property consistently (per Pino convention) in server/src/api/routes/health.ts:14 instead of mixing `error` and `err`
 3. **[LOW] Add 503 Failure Path Test** - Create integration test simulating database unavailability to verify 503 response and error logging in server/tests/integration/health-endpoint.test.ts
 
+**From Story 1.10 Review (2025-10-08):**
+
+1. ~~**[LOW] Add generic `npm test` command**~~ - ✅ **COMPLETED 2025-10-08** - Added explicit documentation for `npm test` command in Testing Strategy section (docs/developer-quick-start.md:440-445). Story 1.10 fully complete with all follow-up items addressed.
+
 ---
 
 **Next Epic:** [tech-spec-epic-2.md](./tech-spec-epic-2.md) - High-Performance Data Pipeline
