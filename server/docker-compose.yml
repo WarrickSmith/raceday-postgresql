@@ -13,10 +13,17 @@
 # 2. PORTAINER PRODUCTION:
 #    - Deploy stack from GitHub repository
 #    - Define all environment variables in Portainer Stack UI
+#    - Portainer supports direct variable input (no .env file needed)
 #
 # 3. DOCKER DESKTOP:
 #    - Run: docker-compose up --build -d
 #    - Set environment variables in .env file or pass via command line
+#
+# Environment Variables:
+# All variables referenced with ${VAR_NAME} will be substituted from:
+# - .env file (local development)
+# - Portainer UI (production deployment)
+# - Command line arguments (docker run -e VAR=value)
 
 services:
   server:
