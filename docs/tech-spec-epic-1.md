@@ -785,6 +785,12 @@ describe('Database Connection', () => {
 5. **[MED] Process.exit in Library Code** - Extract process.exit from executeMigrations function to CLI wrapper for better modularity and testability
 6. **[LOW] ESLint Ignore Pattern** - Refine ESLint ignore patterns from `**/*.js` to specific paths (dist/, node_modules/, coverage/)
 
+**From Story 1.9 Review (2025-10-08):**
+
+1. **[LOW] Export DatabaseHealth Interface** - Export DatabaseHealth interface from server/src/health/database.ts:3 to enable type reuse in Epic 2 worker pool health checks
+2. **[LOW] Standardize Error Logging** - Unify error logging to use `err` property consistently (per Pino convention) in server/src/api/routes/health.ts:14 instead of mixing `error` and `err`
+3. **[LOW] Add 503 Failure Path Test** - Create integration test simulating database unavailability to verify 503 response and error logging in server/tests/integration/health-endpoint.test.ts
+
 ---
 
 **Next Epic:** [tech-spec-epic-2.md](./tech-spec-epic-2.md) - High-Performance Data Pipeline

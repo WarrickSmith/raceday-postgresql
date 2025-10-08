@@ -1,6 +1,6 @@
 import { pool } from '../database/pool.js'
 
-interface DatabaseHealth {
+export interface DatabaseHealth {
   healthy: boolean
   message?: string
 }
