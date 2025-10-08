@@ -38,11 +38,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 **Estimated Stories:** 8-10
 
 ### Story 1.1: PostgreSQL 18 Database Setup
+
 **As a** developer
 **I want** PostgreSQL 18 database running in Docker
 **So that** I have a performant database foundation for the migration
 
 **Acceptance Criteria:**
+
 - PostgreSQL 18 container runs via docker-compose
 - Database accessible at localhost:5432
 - Database name: raceday
@@ -53,11 +55,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 1.2: Core Database Schema Migration
+
 **As a** developer
 **I want** core database tables created from schema migrations
 **So that** I can store race data in normalized structure
 
 **Acceptance Criteria:**
+
 - Core tables created: meetings, races, entrants, race_pools
 - Primary keys defined for all tables
 - Foreign key relationships enforced (races → meetings, entrants → races)
@@ -68,26 +72,30 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 1.3: Time-Series Tables with Partitioning
+
 **As a** developer
 **I want** partitioned time-series tables for money_flow_history and odds_history
 **So that** I can efficiently store and query high-volume historical data
 
 **Acceptance Criteria:**
+
 - money_flow_history table created with PARTITION BY RANGE (event_timestamp)
 - odds_history table created with PARTITION BY RANGE (event_timestamp)
 - Initial daily partition created for current date
-- Partition naming convention: {table_name}_YYYY_MM_DD
+- Partition naming convention: {table_name}\_YYYY_MM_DD
 - Foreign key relationships to entrants table maintained
 - Indexes created on (entrant_id, event_timestamp DESC)
 
 ---
 
 ### Story 1.4: Database Indexes for Query Optimization
+
 **As a** developer
 **I want** indexes optimized for client query patterns
 **So that** API responses are fast (<100ms)
 
 **Acceptance Criteria:**
+
 - Index on races(start_time) WHERE status IN ('open', 'closed', 'interim')
 - Index on entrants(race_id)
 - Index on entrants(race_id, is_scratched) partial index WHERE is_scratched = false
@@ -99,11 +107,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 1.5: Docker Configuration for Node.js Server
+
 **As a** developer
 **I want** Docker container configured for Node.js 22 server
 **So that** I can run the application with consistent resource allocation
 
 **Acceptance Criteria:**
+
 - Dockerfile created for Node.js 22 LTS Alpine base image
 - Multi-stage build (dependencies → build → runtime)
 - Container CPU limit: 4 cores
@@ -116,11 +126,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 1.6: Environment Variable Validation with Zod
+
 **As a** developer
 **I want** environment variables validated at startup using Zod
 **So that** configuration errors are caught immediately with clear messages
 
 **Acceptance Criteria:**
+
 - Zod schema defined for all required environment variables
 - Required variables: NODE_ENV, DATABASE_URL, NZTAB_API_URL, NZTAB_API_KEY, PORT
 - Type coercion for numeric values (PORT → number)
@@ -132,11 +144,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 1.7: Structured Logging with Pino
+
 **As a** developer
 **I want** structured JSON logging with Pino
 **So that** I can track application behavior and debug issues in production
 
 **Acceptance Criteria:**
+
 - Pino logger configured with JSON output
 - Log level configurable via LOG_LEVEL environment variable (default: info)
 - ISO 8601 timestamps on all log entries
@@ -148,11 +162,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 1.8: PostgreSQL Connection Pooling
+
 **As a** developer
 **I want** PostgreSQL connection pool configured with optimal settings
 **So that** I can handle concurrent database operations without saturation
 
 **Acceptance Criteria:**
+
 - pg Pool configured with DATABASE_URL from environment
 - Max connections: 10
 - Min idle connections: 2
@@ -164,11 +180,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 1.9: Health Check Endpoint
+
 **As a** developer
 **I want** /health endpoint returning system health status
 **So that** Docker and monitoring can verify system is operational
 
 **Acceptance Criteria:**
+
 - GET /health endpoint implemented
 - Returns 200 OK if system healthy, 503 Service Unavailable if unhealthy
 - Health check validates: database connectivity (SELECT 1 query)
@@ -180,11 +198,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 1.10: Development Environment Setup Documentation
+
 **As a** developer
 **I want** clear documentation for setting up local development environment
 **So that** I can get started quickly and consistently
 
 **Acceptance Criteria:**
+
 - README.md or developer-quick-start.md updated with setup instructions
 - Prerequisites listed: Node.js 22 LTS, Docker, Docker Compose
 - Step-by-step setup: clone repo, install dependencies, start Docker, run migrations
@@ -207,11 +227,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 **Estimated Stories:** 12-15
 
 ### Story 2.1: NZ TAB API Client with Axios
+
 **As a** developer
 **I want** NZ TAB API client that fetches race data with retry logic
 **So that** I can reliably retrieve race data even with transient API failures
 
 **Acceptance Criteria:**
+
 - Axios client configured with base URL from NZTAB_API_URL environment variable
 - API key authentication via headers (if required)
 - Timeout: 5 seconds per request
@@ -224,11 +246,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 2.2: NZ TAB API Response Type Definitions
+
 **As a** developer
 **I want** TypeScript types and Zod schemas for NZ TAB API responses
 **So that** I have type-safe, validated data from external API
 
 **Acceptance Criteria:**
+
 - Zod schemas defined for: RaceData, Entrant, Odds, Pool, MeetingData
 - TypeScript types inferred from Zod schemas using z.infer<>
 - All external API responses validated with schema.parse() or schema.safeParse()
@@ -239,11 +263,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 2.3: Worker Thread Pool for CPU-Bound Transforms
+
 **As a** developer
 **I want** worker thread pool (3 workers) for money flow calculations
 **So that** CPU-intensive work doesn't block the main event loop
 
 **Acceptance Criteria:**
+
 - Worker pool class created with configurable size (default: 3)
 - Worker threads created from transformWorker.ts script
 - Workers communicate via postMessage / on('message')
@@ -257,11 +283,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 2.4: Money Flow Calculation Transform Logic
+
 **As a** developer
 **I want** money flow calculation logic extracted from server-old and implemented in worker
 **So that** I can transform raw NZ TAB data into calculated money flow patterns
 
 **Acceptance Criteria:**
+
 - Transform logic extracted from ./server-old codebase
 - Money flow calculations implemented per-race, per-entrant, over time
 - Calculations include: hold_percentage, bet_percentage, win_pool_percentage, place_pool_percentage
@@ -274,11 +302,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 2.5: Bulk UPSERT Database Operations
+
 **As a** developer
 **I want** bulk UPSERT operations using multi-row INSERT with ON CONFLICT
 **So that** I can write entire race data in single transaction (<300ms)
 
 **Acceptance Criteria:**
+
 - bulkUpsertMeetings(meetings: Meeting[]) function implemented
 - bulkUpsertRaces(races: Race[]) function implemented
 - bulkUpsertEntrants(entrants: Entrant[]) function implemented
@@ -292,11 +322,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 2.6: Time-Series Data Insert Operations
+
 **As a** developer
 **I want** efficient INSERT operations for time-series tables (money_flow_history, odds_history)
 **So that** I can store historical data without UPSERT overhead
 
 **Acceptance Criteria:**
+
 - insertMoneyFlowHistory(records: MoneyFlowRecord[]) function implemented
 - insertOddsHistory(records: OddsRecord[]) function implemented
 - Multi-row INSERT (no ON CONFLICT - always append)
@@ -309,11 +341,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 2.7: Race Processor Orchestrator
+
 **As a** developer
 **I want** race processor that orchestrates fetch → transform → write pipeline
 **So that** I can process a complete race in <2s end-to-end
 
 **Acceptance Criteria:**
+
 - processRace(raceId: string) function implemented
 - Pipeline steps: fetch → transform (worker) → write (bulk UPSERT)
 - Steps executed sequentially (await each step)
@@ -326,11 +360,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 2.8: Parallel Race Processing with Promise.all()
+
 **As a** developer
 **I want** parallel processing of up to 5 concurrent races
 **So that** I can process multiple races within a single 15-second window
 
 **Acceptance Criteria:**
+
 - processRaces(raceIds: string[]) function implemented
 - Uses Promise.allSettled() to process all races in parallel
 - Each race processed independently (no shared state except connection pool)
@@ -343,17 +379,19 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 2.9: Dynamic Scheduler with Time-Based Intervals
+
 **As a** developer
 **I want** scheduler that adjusts polling frequency based on time-to-start
 **So that** I can poll at 15s intervals during critical 5-minute window
 
 **Acceptance Criteria:**
+
 - Scheduler queries database for upcoming races
 - For each race, calculates time-to-start
 - Determines polling interval:
   - ≤5 minutes: 15 seconds
   - 5-15 minutes: 30 seconds
-  - >15 minutes: 60 seconds
+  - > 15 minutes: 60 seconds
 - Schedules race processing using setInterval per race
 - Clears interval when race completes or is abandoned
 - Scheduler runs continuously, re-evaluating intervals every minute
@@ -362,11 +400,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 2.10: Performance Metrics Tracking
+
 **As a** developer
 **I want** detailed performance metrics logged for every processing cycle
 **So that** I can monitor and optimize system performance
 
 **Acceptance Criteria:**
+
 - Metrics logged for each race: fetch_duration, transform_duration, write_duration, total_duration
 - Metrics logged for batch: max_duration, race_count, success_count, failure_count
 - Metrics include raceId for correlation
@@ -388,11 +428,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 2.11: Worker Thread Error Handling and Restart
+
 **As a** developer
 **I want** worker threads to restart automatically on crash
 **So that** temporary failures don't cause permanent system degradation
 
 **Acceptance Criteria:**
+
 - Worker pool listens for worker 'error' and 'exit' events
 - On worker crash: log error details, create new worker, add to pool
 - Crashed worker's pending task requeued for retry
@@ -403,11 +445,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 2.12: Fetch Timeout and Error Handling
+
 **As a** developer
 **I want** robust timeout and error handling for NZ TAB API fetches
 **So that** transient network issues don't cause processing failures
 
 **Acceptance Criteria:**
+
 - Fetch timeout: 5 seconds (configurable via environment variable)
 - Network errors caught and logged with details
 - HTTP 4xx errors (client errors) logged but not retried
@@ -420,11 +464,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 2.13: Integration Test - Single Race End-to-End
+
 **As a** developer
 **I want** integration test for single race fetch → transform → write
 **So that** I can validate the complete pipeline works correctly
 
 **Acceptance Criteria:**
+
 - Test fetches real or mocked NZ TAB data for single race
 - Test validates data transformation (money flow calculations correct)
 - Test validates database writes (data appears in all tables)
@@ -435,11 +481,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 2.14: Integration Test - 5 Concurrent Races
+
 **As a** developer
 **I want** integration test for 5 concurrent races processed in parallel
 **So that** I can validate performance target (<15s)
 
 **Acceptance Criteria:**
+
 - Test processes 5 races in parallel using Promise.allSettled()
 - Test validates all 5 races complete successfully
 - Test measures total processing time (asserts <15s)
@@ -450,11 +498,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 2.15: Performance Benchmarking Tool
+
 **As a** developer
 **I want** standalone benchmarking tool to measure pipeline performance
 **So that** I can validate 2x improvement target and identify bottlenecks
 
 **Acceptance Criteria:**
+
 - Benchmark script runs independent of main application
 - Benchmark tests: 1 race, 5 races, 10 races (stress test)
 - Benchmark reports: min, max, avg, p95, p99 durations
@@ -478,28 +528,32 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 **Estimated Stories:** 8-10
 
 ### Story 3.1: Express Server Setup with Middleware
+
 **As a** developer
 **I want** Express server configured with security and compression middleware
 **So that** I have a production-ready HTTP server foundation
 
 **Acceptance Criteria:**
+
 - Express app created and exported
 - Helmet middleware applied (security headers)
 - Compression middleware applied (gzip)
 - JSON body parser configured
 - CORS configured (if needed for client)
 - Error handling middleware (catch-all for 500 errors)
-- Server listens on PORT from environment variable (default 3000)
+- Server listens on PORT from environment variable (default 7000)
 - Graceful shutdown on SIGTERM/SIGINT (close connections, exit cleanly)
 
 ---
 
 ### Story 3.2: GET /api/meetings Endpoint
+
 **As a** developer
 **I want** GET /api/meetings endpoint with filtering by date and race_type
 **So that** clients can query meetings matching Appwrite API contract
 
 **Acceptance Criteria:**
+
 - Endpoint: GET /api/meetings?date={YYYY-MM-DD}&raceType={type}
 - Query parameters: date (optional), raceType (optional, values: 'thoroughbred', 'harness')
 - Query database: meetings table with WHERE filters matching params
@@ -522,11 +576,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 3.3: GET /api/races Endpoint
+
 **As a** developer
 **I want** GET /api/races endpoint with filtering by meeting_id
 **So that** clients can query races for a specific meeting
 
 **Acceptance Criteria:**
+
 - Endpoint: GET /api/races?meetingId={id}
 - Query parameter: meetingId (required)
 - Query database: races table with WHERE meeting_id = {id}
@@ -549,11 +605,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 3.4: GET /api/entrants Endpoint with Embedded History
+
 **As a** developer
 **I want** GET /api/entrants endpoint with embedded odds_history and money_flow_history
 **So that** clients can query complete entrant data with historical trends
 
 **Acceptance Criteria:**
+
 - Endpoint: GET /api/entrants?raceId={id}
 - Query parameter: raceId (required)
 - Query database: entrants table with JOIN to odds_history and money_flow_history
@@ -565,15 +623,19 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
       "entrant_id": "ENT-001",
       "name": "Thunder Bolt",
       "runner_number": 1,
-      "win_odds": 3.50,
-      "place_odds": 1.80,
+      "win_odds": 3.5,
+      "place_odds": 1.8,
       "hold_percentage": 15.2,
       "is_scratched": false,
       "odds_history": [
-        { "odds": 3.50, "type": "win", "timestamp": "2025-10-05T11:59:00Z" }
+        { "odds": 3.5, "type": "win", "timestamp": "2025-10-05T11:59:00Z" }
       ],
       "money_flow_history": [
-        { "hold_percentage": 15.2, "win_pool_amount": 50000, "timestamp": "2025-10-05T11:59:00Z" }
+        {
+          "hold_percentage": 15.2,
+          "win_pool_amount": 50000,
+          "timestamp": "2025-10-05T11:59:00Z"
+        }
       ]
     }
   ]
@@ -584,11 +646,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 3.5: API Response Type Validation
+
 **As a** developer
 **I want** API responses validated against Appwrite schema using Zod
 **So that** client compatibility is guaranteed
 
 **Acceptance Criteria:**
+
 - Zod schemas defined for: MeetingResponse, RaceResponse, EntrantResponse
 - Schemas match Appwrite API contract exactly (field names, types, structure)
 - Responses validated with schema.parse() before sending (fail fast on mismatch)
@@ -598,11 +662,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 3.6: API Error Handling and Status Codes
+
 **As a** developer
 **I want** consistent error handling across all API endpoints
 **So that** clients receive informative error messages with correct status codes
 
 **Acceptance Criteria:**
+
 - 400 Bad Request: invalid/missing query parameters
 - 404 Not Found: resource not found (e.g., invalid raceId)
 - 500 Internal Server Error: database errors, unexpected exceptions
@@ -619,13 +685,15 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 3.7: API Performance Optimization - Query Tuning
+
 **As a** developer
 **I want** optimized database queries for all API endpoints
 **So that** response times are consistently <100ms
 
 **Acceptance Criteria:**
+
 - All queries use indexes (validated via EXPLAIN ANALYZE)
-- Queries use SELECT with explicit column lists (no SELECT *)
+- Queries use SELECT with explicit column lists (no SELECT \*)
 - Queries use LIMIT where appropriate (e.g., latest 50 history records)
 - Partitioned table queries include partition key in WHERE clause
 - Connection pool reused (no new connection per request)
@@ -634,11 +702,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 3.8: API Integration Tests with Client Contract Validation
+
 **As a** developer
 **I want** integration tests validating API responses match Appwrite contract
 **So that** client application works without code changes
 
 **Acceptance Criteria:**
+
 - Test suite for GET /api/meetings (with/without filters)
 - Test suite for GET /api/races (valid/invalid meetingId)
 - Test suite for GET /api/entrants (with embedded history)
@@ -650,11 +720,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 3.9: API Documentation with OpenAPI/Swagger
+
 **As a** developer
 **I want** API documented using OpenAPI/Swagger specification
 **So that** clients have clear reference for endpoint contracts
 
 **Acceptance Criteria:**
+
 - OpenAPI 3.0 spec created (YAML or JSON)
 - All endpoints documented: /api/meetings, /api/races, /api/entrants
 - Query parameters documented with types, required/optional, examples
@@ -666,11 +738,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 3.10: Client Application Integration Testing
+
 **As a** developer
 **I want** end-to-end integration test with actual client application
 **So that** I can confirm zero client-side code changes required
 
 **Acceptance Criteria:**
+
 - Client application configured to use new backend URL
 - Client application runs without errors
 - Client application displays meetings, races, entrants correctly
@@ -694,27 +768,31 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 **Estimated Stories:** 6-8
 
 ### Story 4.1: Automated Daily Partition Creation
+
 **As a** developer
 **I want** automated creation of tomorrow's partitions every day at midnight
 **So that** time-series data inserts succeed without manual intervention
 
 **Acceptance Criteria:**
+
 - PostgreSQL function: create_tomorrow_partitions() implemented
 - Function creates partitions for: money_flow_history, odds_history
-- Partition naming: {table}_YYYY_MM_DD (e.g., money_flow_history_2025_10_06)
+- Partition naming: {table}\_YYYY_MM_DD (e.g., money_flow_history_2025_10_06)
 - Partition range: FOR VALUES FROM (date) TO (date + 1 day)
-- Function scheduled via pg_cron extension (0 0 * * * = midnight)
+- Function scheduled via pg_cron extension (0 0 \* \* \* = midnight)
 - Function logs partition creation (PostgreSQL logs or application logs)
 - Function handles errors gracefully (e.g., partition already exists)
 
 ---
 
 ### Story 4.2: Automated Partition Archival (30-Day Retention)
+
 **As a** developer
 **I want** old partitions (>30 days) detached and archived automatically
 **So that** database size is managed and query performance maintained
 
 **Acceptance Criteria:**
+
 - PostgreSQL function: archive_old_partitions() implemented
 - Function detaches partitions older than 30 days
 - Detached partitions can be backed up separately (not dropped immediately)
@@ -726,11 +804,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 4.3: Index Performance Validation with EXPLAIN ANALYZE
+
 **As a** developer
 **I want** all production queries validated with EXPLAIN ANALYZE
 **So that** I can confirm indexes are used and queries are optimized
 
 **Acceptance Criteria:**
+
 - EXPLAIN ANALYZE run on all API endpoint queries
 - EXPLAIN ANALYZE run on data pipeline queries (fetch races, upsert operations)
 - Query plans documented showing index usage (Index Scan, Bitmap Index Scan)
@@ -741,11 +821,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 4.4: Connection Pool Monitoring and Tuning
+
 **As a** developer
 **I want** connection pool metrics logged and monitored
 **So that** I can detect saturation and tune pool size if needed
 
 **Acceptance Criteria:**
+
 - Pool metrics logged on startup: max, min, idle timeout
 - Pool metrics logged periodically (every 5 min): active connections, idle connections, waiting requests
 - Pool saturation warning: log warning if active ≥ 90% of max
@@ -756,11 +838,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 4.5: Query Performance Testing Under Load
+
 **As a** developer
 **I want** load testing on API endpoints with realistic concurrent requests
 **So that** I can validate <100ms response time under production load
 
 **Acceptance Criteria:**
+
 - Load test simulates 10 concurrent API requests
 - Load test uses realistic query patterns (meetings, races, entrants)
 - Load test measures: min, max, avg, p95, p99 response times
@@ -772,11 +856,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 4.6: Database Backup and Restore Procedures
+
 **As a** developer
 **I want** documented backup and restore procedures
 **So that** I can recover from data loss or corruption
 
 **Acceptance Criteria:**
+
 - pg_dump backup script documented (full database dump)
 - Backup schedule documented (daily, retention period)
 - Backup storage location documented (local, cloud)
@@ -788,14 +874,16 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 4.7: Partition Pruning Validation
+
 **As a** developer
 **I want** queries validated to use partition pruning
 **So that** time-series queries only scan relevant partitions
 
 **Acceptance Criteria:**
+
 - EXPLAIN ANALYZE shows partition pruning for history queries
 - Queries include event_timestamp in WHERE clause (enables pruning)
-- Example: SELECT * FROM money_flow_history WHERE entrant_id = X AND event_timestamp > NOW() - INTERVAL '7 days'
+- Example: SELECT \* FROM money_flow_history WHERE entrant_id = X AND event_timestamp > NOW() - INTERVAL '7 days'
 - Query plan shows only relevant partitions scanned (not all partitions)
 - Documentation on writing partition-aware queries
 - Performance comparison: with pruning vs without pruning (demonstrate speedup)
@@ -803,11 +891,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 4.8: Database Migration Scripts Organization
+
 **As a** developer
 **I want** database migration scripts organized and versioned
 **So that** schema changes are reproducible and traceable
 
 **Acceptance Criteria:**
+
 - Migrations stored in ./migrations directory (or similar)
 - Migrations numbered sequentially: 001_initial_schema.sql, 002_add_indexes.sql
 - Each migration includes: up migration (apply), down migration (rollback)
@@ -831,11 +921,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 **Estimated Stories:** 10-12
 
 ### Story 5.1: Shadow Mode Deployment Infrastructure
+
 **As a** developer
 **I want** new stack deployed alongside Appwrite (not serving client traffic yet)
 **So that** I can validate data consistency before cutover
 
 **Acceptance Criteria:**
+
 - New stack deployed to production environment
 - New stack URL/port different from Appwrite (e.g., localhost:3001 vs 3000)
 - New stack NOT accessible to client application yet
@@ -847,11 +939,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 5.2: Data Consistency Validation Tool
+
 **As a** developer
 **I want** automated tool comparing Appwrite vs new stack outputs
 **So that** I can validate data consistency before cutover
 
 **Acceptance Criteria:**
+
 - Tool queries both systems for same raceId
 - Tool compares: meetings, races, entrants, odds, money flow
 - Tool identifies differences (missing records, field mismatches, calculation errors)
@@ -863,11 +957,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 5.3: Feature Flag for Backend Selection
+
 **As a** developer
 **I want** feature flag controlling which backend the client uses
 **So that** I can instantly switch traffic or rollback if needed
 
 **Acceptance Criteria:**
+
 - Environment variable: USE_NEW_BACKEND (true/false, default: false)
 - Client application (or proxy) reads flag and routes to Appwrite or new stack
 - Flag change takes effect immediately (no restart required, or <1 min restart)
@@ -878,11 +974,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 5.4: Shadow Mode Validation - 48 Hours
+
 **As a** test engineer
 **I want** shadow mode running for 48 hours with continuous monitoring
 **So that** I can validate stability and data consistency under real-world load
 
 **Acceptance Criteria:**
+
 - Shadow mode runs for 48 hours minimum
 - Data consistency validation runs every 15 seconds (matches polling cycle)
 - Consistency reports generated hourly
@@ -894,11 +992,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 5.5: Gradual Traffic Cutover - 10% Phase
+
 **As a** deployment engineer
 **I want** 10% of client traffic routed to new stack
 **So that** I can validate production behavior with minimal risk
 
 **Acceptance Criteria:**
+
 - Feature flag or load balancer routes 10% traffic to new stack
 - 90% traffic remains on Appwrite
 - Monitoring tracks: error rates, response times, user reports for both backends
@@ -910,11 +1010,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 5.6: Gradual Traffic Cutover - 50% Phase
+
 **As a** deployment engineer
 **I want** 50% of client traffic routed to new stack
 **So that** I can validate production behavior under significant load
 
 **Acceptance Criteria:**
+
 - Feature flag or load balancer routes 50% traffic to new stack
 - 50% traffic remains on Appwrite
 - Monitoring tracks: error rates, response times, performance metrics, resource usage
@@ -926,11 +1028,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 5.7: Full Traffic Cutover - 100% Phase
+
 **As a** deployment engineer
 **I want** 100% of client traffic routed to new stack
 **So that** migration is complete and Appwrite can be decommissioned
 
 **Acceptance Criteria:**
+
 - Feature flag or load balancer routes 100% traffic to new stack
 - Appwrite receives zero client traffic (kept running as backup)
 - Monitoring tracks: error rates, response times, performance metrics, user feedback
@@ -942,11 +1046,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 5.8: Performance Validation in Production
+
 **As a** product owner
 **I want** production performance measured and validated against 2x improvement target
 **So that** I can confirm migration success
 
 **Acceptance Criteria:**
+
 - Measure: 5 concurrent races processing time (target <15s)
 - Measure: single race processing time (target <2s)
 - Measure: database write time per race (target <300ms)
@@ -959,11 +1065,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 5.9: Rollback Testing and Documentation
+
 **As a** deployment engineer
 **I want** rollback procedures tested and documented
 **So that** I can confidently revert if issues arise
 
 **Acceptance Criteria:**
+
 - Rollback procedure documented: how to switch traffic back to Appwrite
 - Rollback tested in staging: execute rollback, validate client traffic shifts
 - Rollback time measured: target <5 minutes from decision to traffic shifted
@@ -974,11 +1082,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 5.10: User Acceptance Testing (UAT)
+
 **As a** product owner
 **I want** user acceptance testing with real users during gradual cutover
 **So that** I can validate user experience is acceptable
 
 **Acceptance Criteria:**
+
 - UAT conducted during 50% or 100% traffic phase
 - Test scenarios: view races, detect patterns, place bets (external), verify data freshness
 - UAT participants: power bettors (primary persona)
@@ -989,11 +1099,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 5.11: Appwrite Decommissioning Plan
+
 **As a** deployment engineer
 **I want** documented plan for decommissioning Appwrite
 **So that** resources are reclaimed safely after successful migration
 
 **Acceptance Criteria:**
+
 - Decommissioning plan documented: when, how, what to backup
 - Plan includes: Appwrite data backup (full export), Appwrite config backup
 - Plan includes: 7-day validation period after 100% cutover before decommissioning
@@ -1005,11 +1117,13 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ---
 
 ### Story 5.12: Operations Runbook for New Stack
+
 **As a** operations engineer
 **I want** comprehensive runbook for operating new stack in production
 **So that** I can troubleshoot issues and maintain system health
 
 **Acceptance Criteria:**
+
 - Runbook sections: deployment, monitoring, troubleshooting, rollback, disaster recovery
 - Deployment: how to deploy new version, restart containers, apply migrations
 - Monitoring: key metrics, dashboards, alerting thresholds
@@ -1025,22 +1139,24 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 
 ## Appendix: Story Estimation Summary
 
-| Epic | Stories | Estimated Points | Priority |
-|------|---------|------------------|----------|
-| Epic 1: Core Infrastructure Setup | 8-10 | 13-16 | Must Have |
-| Epic 2: High-Performance Data Pipeline | 12-15 | 21-26 | Must Have |
-| Epic 3: REST API Layer | 8-10 | 13-16 | Must Have |
-| Epic 4: Database Optimization & Partitioning | 6-8 | 8-13 | Must Have |
-| Epic 5: Migration & Deployment | 10-12 | 13-21 | Must Have |
-| **Total** | **44-55** | **68-92** | - |
+| Epic                                         | Stories   | Estimated Points | Priority  |
+| -------------------------------------------- | --------- | ---------------- | --------- |
+| Epic 1: Core Infrastructure Setup            | 8-10      | 13-16            | Must Have |
+| Epic 2: High-Performance Data Pipeline       | 12-15     | 21-26            | Must Have |
+| Epic 3: REST API Layer                       | 8-10      | 13-16            | Must Have |
+| Epic 4: Database Optimization & Partitioning | 6-8       | 8-13             | Must Have |
+| Epic 5: Migration & Deployment               | 10-12     | 13-21            | Must Have |
+| **Total**                                    | **44-55** | **68-92**        | -         |
 
 **Velocity Assumptions:**
+
 - Single developer (warrick)
 - 5-week timeline
 - Weeks 1-4: Development (Epics 1-4)
 - Week 5: Migration (Epic 5)
 
 **Risk Buffer:**
+
 - 10-20% buffer built into estimates
 - Critical path: Epic 1 → Epic 2 → Epic 5 (cannot parallelize)
 - Parallelization opportunities: Epic 3 during Epic 2, Epic 4 during Epic 3
