@@ -1,46 +1,9 @@
 import { createServer } from 'node:http';
 import { URL } from 'node:url';
-import { Pool } from 'pg';
-import { env, buildDatabaseUrl } from './shared/env.js';
+import { env } from './shared/env.js';
 import { logger } from './shared/logger.js';
-
-let dbPool: Pool | null = null;
-
-// Initialize database pool if DATABASE_URL or DB_HOST is configured
-const initDbPool = (): void => {
-  try {
-    dbPool = new Pool({
-      connectionString: buildDatabaseUrl(env),
-      max: 1, // Minimal pool for health checks only
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
-    });
-
-    dbPool.on('error', (err) => {
-      logger.error({ err }, 'Database pool error');
-    });
-  } catch {
-    logger.warn('Database pool initialization skipped - DB not configured');
-  }
-};
-
-// Check database connectivity
-const checkDatabase = async (): Promise<{
-  healthy: boolean;
-  message?: string;
-}> => {
-  if (dbPool === null) {
-    return { healthy: false, message: 'Database not configured' };
-  }
-
-  try {
-    const result = await dbPool.query('SELECT 1');
-    return { healthy: result.rowCount === 1 };
-  } catch (err) {
-    const error = err as Error;
-    return { healthy: false, message: error.message };
-  }
-};
+import { closePool } from './database/pool.js';
+import { checkDatabase } from './health/database.js';
 
 // Simple HTTP server with health endpoint
 const server = createServer((req, res) => {
@@ -53,7 +16,7 @@ const server = createServer((req, res) => {
 
     res.setHeader('Content-Type', 'application/json');
 
-    if (deep && dbPool !== null) {
+    if (deep) {
       // Deep health check - includes database connectivity
       void checkDatabase()
         .then((dbHealth) => {
@@ -102,9 +65,6 @@ const server = createServer((req, res) => {
   res.end(JSON.stringify({ error: 'Not Found' }));
 });
 
-// Initialize database pool
-initDbPool();
-
 server.listen(env.PORT, '0.0.0.0', () => {
   logger.info({ port: env.PORT }, `Server listening on port ${String(env.PORT)}`);
   logger.info('Health endpoint available at /health');
@@ -112,29 +72,41 @@ server.listen(env.PORT, '0.0.0.0', () => {
 });
 
 // Graceful shutdown
-const shutdown = async (): Promise<void> => {
-  logger.info('Shutting down gracefully');
+let isShuttingDown = false;
 
-  server.close(() => {
-    logger.info('HTTP server closed');
-  });
-
-  if (dbPool !== null) {
-    try {
-      await dbPool.end();
-      logger.info('Database pool closed');
-    } catch (err) {
-      logger.error({ err }, 'Error closing database pool');
-    }
+const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
+  if (isShuttingDown) {
+    logger.warn({ signal }, 'Shutdown already in progress');
+    return;
   }
+  isShuttingDown = true;
+
+  logger.info({ signal }, 'Shutting down gracefully');
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.close((err?: Error | null) => {
+        if (err != null) {
+          reject(err);
+          return;
+        }
+        logger.info('HTTP server closed');
+        resolve();
+      });
+    });
+  } catch (err) {
+    logger.error({ err }, 'Error closing HTTP server');
+  }
+
+  await closePool(signal);
 
   process.exit(0);
 };
 
 process.on('SIGTERM', () => {
-  void shutdown();
+  void shutdown('SIGTERM');
 });
 
 process.on('SIGINT', () => {
-  void shutdown();
+  void shutdown('SIGINT');
 });
