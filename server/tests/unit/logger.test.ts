@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import pino, { type Logger } from 'pino'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -45,6 +46,9 @@ const serializeLog = (
   ) => string
   const timeFn = Reflect.get(logger, pino.symbols.timeSym) as () => string
   const levelValue = logger.levels.values[level]
+  if (levelValue === undefined) {
+    throw new Error(`Missing logger level value for ${String(level)}`)
+  }
   const serialized = asJson.call(logger, obj, msg, levelValue, timeFn())
   return JSON.parse(serialized) as LogRecord
 }
@@ -157,7 +161,7 @@ describe('logger', () => {
 
     expect(entry.raceId).toBe('R3')
     expect(entry.msg).toBe('Processing failed')
-    expect(err?.type).toBe('Error')
-    expect(err?.message).toBe('Test error')
+    expect(err.type).toBe('Error')
+    expect(err.message).toBe('Test error')
   })
 })

@@ -7,13 +7,14 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: [],
-    pool: 'forks', // Use forks instead of threads for better isolation
+    pool: 'threads',
     poolOptions: {
-      forks: {
-        singleFork: false, // Allow parallel execution
-        isolate: true, // Isolate test files
+      threads: {
+        singleThread: true, // Enforce a single worker when running in threads mode
       },
     },
+    maxWorkers: 1, // Run using a single worker to keep DB usage predictable
+    minWorkers: 1,
     // Run tests sequentially to avoid database connection pool exhaustion
     fileParallelism: false,
   },
