@@ -16,6 +16,10 @@ This directory contains comprehensive documentation for the Raceday PostgreSQL m
 - **[NZ TAB OpenAPI Spec](./api/nztab-openapi.json)** - Complete API schema definition (124 KB)
 - **[API Research Findings](./research-findings-nztab-api.md)** - Validated API behavior, rate limits, and best practices
 
+### PRD Artifacts
+- **[Project PRD – 2025-10-05](./PRD-raceday-postgresql-2025-10-05.md)** - Canonical requirements covering all epics
+- **[Epic 002 PRD Pointer](./PRD-epic-002.md)** - Placeholder routing to the upcoming dedicated Epic 002 PRD
+
 ---
 
 ## 🚀 Quick Start
