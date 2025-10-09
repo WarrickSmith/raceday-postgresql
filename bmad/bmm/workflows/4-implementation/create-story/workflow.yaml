@@ -18,7 +18,7 @@ validation: "{installed_path}/checklist.md"
 # Variables and inputs
 variables:
   story_dir: "{config_source}:dev_story_location" # Directory where stories are stored
-  epics_file: "{output_folder}/epics.md" # Preferred source for epic/story breakdown
+  epics_file: "{output_folder}/epic-stories-2025-10-05.md" # Preferred source for epic/story breakdown
   prd_file: "{output_folder}/prd.md" # Fallback for requirements
   hla_file: "{output_folder}/high-level-architecture.md" # Optional architecture context
   tech_spec_file: "" # Will be auto-discovered from docs as tech-spec-epic-{{epic_num}}-*.md

@@ -1,0 +1,182 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>1</storyId>
+    <title>NZ TAB API Client with Axios</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-09T03:47:44Z</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-2.1.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>backend developer</asA>
+    <iWant>a resilient NZ TAB API client with retry, timeout, validation, and observability baked in</iWant>
+    <soThat>the data pipeline can ingest race data reliably within the 15-second polling window.</soThat>
+    <tasks>
+      <task status="todo"><![CDATA[Create `server/src/clients/nztab.ts` Axios instance with required headers, timeout, and shared logger wiring.]]></task>
+      <task status="todo"><![CDATA[Extend `fetchRaceData` to build status-aware query params and return `RaceDataSchema`-validated payloads.]]></task>
+      <task status="todo"><![CDATA[Update `server/src/shared/env.ts` (and associated tests) to include NZ TAB partner config surfaced in `.env.example`.]]></task>
+      <task status="todo"><![CDATA[Implement structured logging helpers for fetch attempts and integrate with existing Pino logger.]]></task>
+      <task status="todo"><![CDATA[Add Vitest unit tests covering success, retry success, retry exhaustion, and 4xx early exit scenarios.]]></task>
+      <task status="todo"><![CDATA[Document any new configuration toggles or operational notes in `docs/runbooks/nztab-credential-preflight.md` if the interface changes.]]></task>
+  </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criteria>
+      <criterion id="AC1"><![CDATA[`server/src/clients/nztab.ts` instantiates a reusable Axios client that pulls `env.NZTAB_API_URL`, enforces a 5 000 ms timeout, and applies the verified partner headers (`User-Agent`, `From`, `X-Partner`, `X-Partner-ID`) captured in the API research findings [docs/research-findings-nztab-api.md:67](../research-findings-nztab-api.md#L67).]]></criterion>
+      <criterion id="AC2"><![CDATA[`fetchRaceData(raceId: string)` issues a GET to `/racing/events/{raceId}` with the full pre-race parameter set (`with_tote_trends_data`, `with_money_tracker`, `with_big_bets`, `with_live_bets`, `with_will_pays`) and adapts parameters for post-race statuses per the research guidance [docs/research-findings-nztab-api.md:166](../research-findings-nztab-api.md#L166).]]></criterion>
+      <criterion id="AC3"><![CDATA[The response is validated via `RaceDataSchema` (Zod) before returning, rejecting malformed payloads in line with the PRD’s runtime validation mandate [docs/research-findings-nztab-api.md:82](../research-findings-nztab-api.md#L82), [docs/PRD-raceday-postgresql-2025-10-05.md:189](../PRD-raceday-postgresql-2025-10-05.md#L189).]]></criterion>
+      <criterion id="AC4"><![CDATA[Retry logic covers network errors, timeouts, and 5xx responses with exponential backoff delays of 100 ms, 200 ms, and 400 ms (max three attempts) exactly as required in Story 2.1 and PRD NFR005 [docs/epic-stories-2025-10-05.md:252](../epic-stories-2025-10-05.md#L252), [docs/PRD-raceday-postgresql-2025-10-05.md:179](../PRD-raceday-postgresql-2025-10-05.md#L179).]]></criterion>
+      <criterion id="AC5"><![CDATA[Each attempt logs structured Pino events for start, retry, success, and terminal failure, including `raceId`, `attempt`, duration, and error metadata to feed downstream observability [docs/tech-spec-epic-2.md:42](../tech-spec-epic-2.md#L42), [docs/architecture-specification.md:1002](../architecture-specification.md#L1002).]]></criterion>
+      <criterion id="AC6"><![CDATA[4xx responses (non-retriable) surface a typed error without retry and include sanitized response excerpts for debugging while honoring logging standards [docs/PRD-raceday-postgresql-2025-10-05.md:136](../PRD-raceday-postgresql-2025-10-05.md#L136), [docs/architecture-specification.md:1002](../architecture-specification.md#L1002).]]></criterion>
+      <criterion id="AC7"><![CDATA[Unit tests cover the success path, retry-with-eventual-success, retry-exhaustion, and 4xx immediate failure scenarios using mocked Axios timers to enforce backoff sequencing [docs/tech-spec-epic-2.md:192](../tech-spec-epic-2.md#L192).]]></criterion>
+      <criterion id="AC8"><![CDATA[Implementation adheres to coding standards (ESM imports, strict TypeScript, no `any`) and extends `env.ts` Zod schema plus `.env.example` to expose any new partner headers, keeping configuration validation intact [docs/CODING-STANDARDS.md:19](../CODING-STANDARDS.md#L19), [docs/research-findings-nztab-api.md:252](../research-findings-nztab-api.md#L252).]]></criterion>
+    </criteria>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+    <doc path="docs/epic-stories-2025-10-05.md" section="Story 2.1" title="Epic Stories 2025-10-05">
+      <snippet><![CDATA[Story 2.1: NZ TAB API Client with Axios
+
+As a developer
+I want NZ TAB API client that fetches race data with retry logic
+So that I can reliably retrieve race data even with transient API failures
+
+Acceptance Criteria:
+- Axios client configured with base URL from NZTAB_API_URL environment variable
+- Timeout: 5 seconds per request
+- Retry logic: max 3 retries with exponential backoff (100ms, 200ms, 400ms)
+- Error handling for: timeout, network errors, 4xx/5xx responses
+- Fetch race data endpoint implemented: fetchRaceData(raceId: string)
+- Response validated using Zod schema (RaceDataSchema)
+- Logging for: fetch start, fetch success/failure, retry attempts]]></snippet>
+    </doc>
+    <doc path="docs/PRD-raceday-postgresql-2025-10-05.md" section="Non-Functional Requirements" title="PRD (2025-10-05)">
+      <snippet><![CDATA[NFR005: System SHALL implement retry logic with exponential backoff for NZ TAB API failures (max 3 retries)
+NFR009: System SHALL validate all external data (NZ TAB API responses, environment variables, worker messages) using Zod runtime schemas
+FR012: System SHALL log all operations using structured JSON format (Pino) with configurable log levels]]></snippet>
+    </doc>
+    <doc path="docs/tech-spec-epic-2.md" section="Services and Modules" title="Tech Spec Epic 2">
+      <snippet><![CDATA[Module: NZ TAB Fetcher (`clients/nztab.ts`) — Fetch race payloads with Axios, retries, timeout, and structured logging (Story 2.1). Inputs: Race ID, NZTAB_API_URL, API key headers, retry configuration. Outputs: RaceData JSON validated by Zod schemas, fetch telemetry metrics.]]></snippet>
+    </doc>
+    <doc path="docs/research-findings-nztab-api.md" section="Verified Partner Headers" title="Research Findings: NZ TAB API">
+      <snippet><![CDATA[const nztabClient = axios.create({
+  baseURL: env.NZTAB_API_URL,  // https://api.tab.co.nz/affiliates/v1
+  timeout: 5000,
+  headers: {
+    'User-Agent': 'RaceDay-PostgreSQL/2.0.0',
+    'From': 'ws@baybox.co.nz',  // ✅ CORRECT
+    'X-Partner': 'Warrick Smith',
+    'X-Partner-ID': 'Private Developer',  // ✅ UPDATED (removed hyphen)
+  },
+});]]></snippet>
+    </doc>
+    <doc path="docs/research-findings-nztab-api.md" section="Fetch Parameters" title="Research Findings: NZ TAB API">
+      <snippet><![CDATA[with_tote_trends_data, with_money_tracker, with_big_bets, with_live_bets, with_will_pays are enabled when status === 'open'.
+with_results is enabled for interim/closed statuses, with_dividends only for closed.]]></snippet>
+    </doc>
+    <doc path="docs/architecture-specification.md" section="Fetchers" title="Architecture Specification">
+      <snippet><![CDATA[Fetchers purpose: Retrieve race data from NZ TAB API with concurrent fetching (up to 5 races), retry logic with exponential backoff, and 5s timeout handling. Output: Raw race data (JSON).]]></snippet>
+    </doc>
+    <doc path="docs/CODING-STANDARDS.md" section="ES Modules" title="Coding Standards">
+      <snippet><![CDATA[ES Modules (ESM) — MANDATORY. All server-side code must use `import`/`export`; CommonJS `require` is not allowed.
+Strict Typing — No `any` types.]]></snippet>
+    </doc>
+    <doc path="docs/runbooks/nztab-credential-preflight.md" section="Validate Pipeline Environment Variables" title="Runbook: NZ TAB Credential Pre-Flight">
+      <snippet><![CDATA[Confirm NZTAB_API_URL, NZTAB_FROM_EMAIL, NZTAB_PARTNER_NAME, and NZTAB_PARTNER_ID are present and non-empty in the pipeline environment. Update `.env.example` to match and log any changes.]]></snippet>
+    </doc>
+  </docs>
+    <code>
+
+<artifact path="server/src/shared/env.ts:9" kind="module" symbol="envSchema">
+  <lines>9-48</lines>
+  <reason><![CDATA[Environment schema already validates NZTAB_API_URL and will need partner headers added so the Axios client can read them from env.ts with type safety.]]></reason>
+</artifact>
+<artifact path="server/src/shared/logger.ts:4" kind="module" symbol="logger">
+  <lines>4-13</lines>
+  <reason><![CDATA[Provides the Pino instance referenced by PRD logging requirements; new client should reuse this logger for structured attempt events.]]></reason>
+</artifact>
+<artifact path="server/src/database/pool.ts:10" kind="module" symbol="poolConfig">
+  <lines>10-33</lines>
+  <reason><![CDATA[Shows existing configuration driven by env.ts, reinforcing that the client should follow the same env/telemetry patterns when configuring Axios and retries.]]></reason>
+</artifact>
+<artifact path="server/src/api/routes/health.ts:7" kind="handler" symbol="healthRouter.get">
+  <lines>7-42</lines>
+  <reason><![CDATA[Demonstrates established logging and error-handling style (structured logger usage, sanitized responses) that the client’s retry and error surfacing must align with.]]></reason>
+</artifact>
+<artifact path="server/src/shared/timezone.ts:16" kind="module" symbol="getCurrentNzTime">
+  <lines>16-121</lines>
+  <reason><![CDATA[Existing timezone utilities confirm NZ-specific context; when adapting parameters for post-race statuses the client must keep NZ schedule handling consistent with these helpers.]]></reason>
+</artifact>
+  </code>
+    <dependencies>
+
+<ecosystem name="node" manifest="server/package.json">
+  <package name="express" version="^4.21.2" />
+  <package name="pino" version="^9.5.0" />
+  <package name="pg" version="^8.16.3" />
+  <package name="dotenv" version="^16.6.1" />
+  <package name="zod" version="^3.25.76" />
+  <package name="vitest" scope="dev" version="^2.0.0" />
+  <package name="eslint" scope="dev" version="^9.0.0" />
+  <note><![CDATA[Axios is not yet listed; Story 2.1 will need to add it alongside retry/backoff helpers.]]></note>
+</ecosystem>
+<ecosystem name="node" manifest="client/package.json">
+  <package name="next" version="15.4.1" />
+  <package name="react" version="19.1.0" />
+  <package name="node-appwrite" version="^17.2.0" />
+  <package name="tailwindcss" scope="dev" version="^3.4.17" />
+</ecosystem>
+  </dependencies>
+  </artifacts>
+
+  <constraints>
+
+<constraint source="docs/stories/story-2.1.md#Dev Notes">
+  <![CDATA[Client must live at server/src/clients/nztab.ts and use ESM imports per architecture map to align with module structure.]]>
+</constraint>
+<constraint source="docs/CODING-STANDARDS.md:1">
+  <![CDATA[Strict TypeScript (no `any`), ESM-only modules, and async/await patterns are mandatory for new code.]]>
+</constraint>
+<constraint source="docs/PRD-raceday-postgresql-2025-10-05.md#L120">
+  <![CDATA[Retry logic limited to three exponential backoff attempts (100ms, 200ms, 400ms) with structured JSON logging for each attempt.]]>
+</constraint>
+<constraint source="docs/stories/story-2.1.md#Acceptance Criteria">
+  <![CDATA[Responses must pass RaceDataSchema validation before returning; malformed payloads rejected immediately.]]>
+</constraint>
+<constraint source="docs/runbooks/nztab-credential-preflight.md:1">
+  <![CDATA[NZTAB partner headers must stay in sync with credential pre-flight checklist and env templates for operational readiness.]]>
+</constraint>
+  </constraints>
+  <interfaces>
+
+<interface name="GET /affiliates/v1/racing/events/{id}" kind="HTTP" spec="docs/api/nztab-openapi.json#L3161">
+  <signature><![CDATA[GET https://api.tab.co.nz/affiliates/v1/racing/events/{id}?with_tote_trends_data&with_money_tracker&with_big_bets&with_live_bets&with_will_pays&...]]></signature>
+  <notes><![CDATA[OpenAPI spec defines optional query params for tote trends, money tracker, big bets, live bets, will pays, plus status-specific parameters; response schema references EventRaceDetails.]]></notes>
+</interface>
+<interface name="env" kind="configuration" spec="server/src/shared/env.ts:9">
+  <signature><![CDATA[{ NZTAB_API_URL: string, LOG_LEVEL: 'debug'|'info'|'warn'|'error', ... }]]></signature>
+  <notes><![CDATA[Validated via Zod before boot; partner headers must be added here so the client can consume typed credentials and update `.env.example`.]]></notes>
+</interface>
+  </interfaces>
+  <tests>
+    <standards><![CDATA[Vitest is the primary test runner (server/package.json). Definition of Done mandates zero failing tests, strict TypeScript (no `any`), ESLint clean, and meaningful assertions. Tests must exercise async/await flows, structured logging, and Zod validation, with coverage for both success and failure paths. Run via `npm test`, `npm run test:unit`, or `npm run test:integration` per DoD.]]></standards>
+    <locations>
+<location type="unit" path="server/tests/unit/**/*.test.ts" note="Use Vitest with mocked Axios and timers" />
+<location type="integration" path="server/tests/integration/**/*.test.ts" note="Reuse database pool fixtures; ensure retries don’t exhaust connections" />
+  </locations>
+    <ideas>
+<idea ac="AC1" goal="Client config">Instantiate client with env-driven base URL and headers; assert axios.create receives 5s timeout and required headers.</idea>
+<idea ac="AC2" goal="Parameter selection">Mock status permutations to ensure fetchRaceData applies pre-race vs post-race query params.</idea>
+<idea ac="AC3" goal="Schema validation">Feed malformed payload to fetchRaceData and assert RaceDataSchema rejection surfaces typed error.</idea>
+<idea ac="AC4" goal="Retry policy">Simulate network errors/timeouts to verify exponential delays (100ms/200ms/400ms) and max 3 attempts with logging.</idea>
+<idea ac="AC5" goal="Logging">Capture Pino logs to confirm start/retry/success/failure events include raceId, attempt, duration, and error metadata.</idea>
+<idea ac="AC6" goal="4xx handling">Ensure 4xx responses return typed error without retry and sanitize response excerpt per logging standard.</idea>
+<idea ac="AC7" goal="Test coverage">Vitest suite covering success, eventual success after retry, retry exhaustion, and immediate 4xx failure using mocked timers.</idea>
+<idea ac="AC8" goal="Env updates">Add regression test around env schema to guarantee new partner headers are required and mirrored into `.env.example`.</idea>
+  </ideas>
+  </tests>
+</story-context>

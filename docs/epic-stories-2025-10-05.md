@@ -214,6 +214,21 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 
 ---
 
+### Story 1.11: Epic 2 Kickoff Readiness
+
+**As a** product owner
+**I want** to confirm Epic 2 prerequisites and update planning artifacts
+**So that** the data pipeline work can start without blockers
+
+**Acceptance Criteria:**
+
+- All Epic 1 deliverables verified as Done/Approved and captured in the latest retrospective
+- Epic 2 readiness checklist completed, including references to tech-spec-epic-2, PRD-epic-002, and supporting architecture documents
+- Story 2.1 identified as the next development item and linked in planning artifacts
+- Sprint goal and capacity notes updated to reflect the Epic 2 kickoff
+
+---
+
 ---
 
 ## Epic 2: High-Performance Data Pipeline
