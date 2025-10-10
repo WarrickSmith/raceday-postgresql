@@ -18,9 +18,9 @@ validation: "{installed_path}/checklist.md"
 # Variables and inputs
 variables:
   story_dir: "{config_source}:dev_story_location" # Directory where stories are stored
-  epics_file: "{output_folder}/epics.md" # Preferred source for epic/story breakdown
-  prd_file: "{output_folder}/PRD.md" # Fallback for requirements
-  solution-architecture_file: "{output_folder}/solution-architecture.md" # Optional architecture context
+  epics_file: "{output_folder}/epic-stories-2025-10-05.md" # Preferred source for epic/story breakdown
+  prd_file: "{output_folder}/prd.md" # Fallback for requirements
+  hla_file: "{output_folder}/high-level-architecture.md" # Optional architecture context
   tech_spec_file: "" # Will be auto-discovered from docs as tech-spec-epic-{{epic_num}}-*.md
   tech_spec_search_dir: "{project-root}/docs"
   tech_spec_glob_template: "tech-spec-epic-{{epic_num}}*.md"
@@ -28,8 +28,16 @@ variables:
     - "{project-root}/docs"
     - "{output_folder}"
   arch_docs_file_names: |
-    - solution-architecture.md
-    - infrastructure-architecture.md
+    - tech-stack.md
+    - unified-project-structure.md
+    - coding-standards.md
+    - testing-strategy.md
+    - backend-architecture.md
+    - frontend-architecture.md
+    - data-models.md
+    - database-schema.md
+    - rest-api-spec.md
+    - external-apis.md
   story_title: "" # Will be elicited if not derivable
   epic_num: 1
   story_num: 1
@@ -49,9 +57,9 @@ required_tools:
   - glob
 
 recommended_inputs:
-  - epics: "Epic breakdown (epics.md)"
+  - epics: "Epic breakdown (epic-list.md)"
   - prd: "PRD document"
-  - solution-architecture: "Solution Architecture (optional)"
+  - hla: "High-Level Architecture (optional)"
 
 tags:
   - story-generation
@@ -59,6 +67,6 @@ tags:
   - bmad-v6
 
 execution_hints:
-  interactive: false # Minimize prompts; intended to run to completion
-  autonomous: true # Proceed without user input unless blocked
+  interactive: false
+  autonomous: true
   iterative: true
