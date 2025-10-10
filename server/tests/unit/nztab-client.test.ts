@@ -1,9 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/unbound-method */
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import axios from 'axios'
+import type { Mock } from 'vitest'
+import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
 import { fetchRaceData, RaceDataSchema, NzTabError } from '../../src/clients/nztab.js'
 
 // Mock axios and logger
@@ -17,18 +15,33 @@ vi.mock('../../src/shared/logger.js', () => ({
 }))
 
 describe('NZ TAB Client', () => {
-  const mockAxiosInstance = {
-    get: vi.fn(),
+  interface MockAxiosResponse {
+    data: unknown
+    status?: number
   }
+
+  type MockAxiosGet = Mock<
+    (url: string, config?: AxiosRequestConfig) => Promise<MockAxiosResponse>
+  >
+
+  const mockAxiosGet: MockAxiosGet = vi.fn()
+  const mockAxiosInstance: { get: MockAxiosGet } = {
+    get: mockAxiosGet,
+  }
+
+  const mockAxiosAsInstance = mockAxiosInstance as unknown as AxiosInstance
 
   beforeEach(() => {
     vi.clearAllMocks()
-    // Mock axios.create to return our mock instance
-    vi.mocked(axios.create).mockReturnValue(mockAxiosInstance as any)
-    // Mock axios.isAxiosError
-    const mockedIsAxiosError = vi.mocked(axios.isAxiosError)
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    mockedIsAxiosError.mockImplementation((error: any) => error?.isAxiosError === true)
+    const mockedAxios = vi.mocked(axios, true)
+    mockedAxios.create.mockReturnValue(mockAxiosAsInstance)
+    mockedAxios.isAxiosError.mockImplementation(
+      (error: unknown) =>
+        typeof error === 'object' &&
+        error !== null &&
+        'isAxiosError' in error &&
+        (error as { isAxiosError?: unknown }).isAxiosError === true
+    )
   })
 
   describe('RaceDataSchema validation', () => {
@@ -84,16 +97,16 @@ describe('NZ TAB Client', () => {
         start_time_nz: '15:00',
       }
 
-      mockAxiosInstance.get.mockResolvedValueOnce({
+      mockAxiosGet.mockResolvedValueOnce({
         data: mockRaceData,
         status: 200,
       })
 
-      const result = await fetchRaceData('race-456', undefined, mockAxiosInstance as any)
+      const result = await fetchRaceData('race-456', undefined, mockAxiosAsInstance)
 
       expect(result).toEqual(mockRaceData)
-      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1)
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/racing/events/race-456', {
+      expect(mockAxiosGet).toHaveBeenCalledTimes(1)
+      expect(mockAxiosGet).toHaveBeenCalledWith('/racing/events/race-456', {
         params: {
           with_tote_trends_data: true,
           with_money_tracker: true,
@@ -113,11 +126,11 @@ describe('NZ TAB Client', () => {
         start_time_nz: '16:00',
       }
 
-      mockAxiosInstance.get.mockResolvedValueOnce({ data: mockRaceData })
+      mockAxiosGet.mockResolvedValueOnce({ data: mockRaceData })
 
-      await fetchRaceData('race-789', 'open', mockAxiosInstance as any)
+      await fetchRaceData('race-789', 'open', mockAxiosAsInstance)
 
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/racing/events/race-789', {
+      expect(mockAxiosGet).toHaveBeenCalledWith('/racing/events/race-789', {
         params: {
           with_tote_trends_data: true,
           with_money_tracker: true,
@@ -137,11 +150,11 @@ describe('NZ TAB Client', () => {
         start_time_nz: '17:00',
       }
 
-      mockAxiosInstance.get.mockResolvedValueOnce({ data: mockRaceData })
+      mockAxiosGet.mockResolvedValueOnce({ data: mockRaceData })
 
-      await fetchRaceData('race-interim', 'interim', mockAxiosInstance as any)
+      await fetchRaceData('race-interim', 'interim', mockAxiosAsInstance)
 
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/racing/events/race-interim', {
+      expect(mockAxiosGet).toHaveBeenCalledWith('/racing/events/race-interim', {
         params: {
           with_results: true,
         },
@@ -157,11 +170,11 @@ describe('NZ TAB Client', () => {
         start_time_nz: '18:00',
       }
 
-      mockAxiosInstance.get.mockResolvedValueOnce({ data: mockRaceData })
+      mockAxiosGet.mockResolvedValueOnce({ data: mockRaceData })
 
-      await fetchRaceData('race-closed', 'closed', mockAxiosInstance as any)
+      await fetchRaceData('race-closed', 'closed', mockAxiosAsInstance)
 
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/racing/events/race-closed', {
+      expect(mockAxiosGet).toHaveBeenCalledWith('/racing/events/race-closed', {
         params: {
           with_results: true,
           with_dividends: true,
@@ -186,14 +199,14 @@ describe('NZ TAB Client', () => {
         start_time_nz: '19:00',
       }
 
-      mockAxiosInstance.get
+      mockAxiosGet
         .mockRejectedValueOnce(networkError)
         .mockResolvedValueOnce({ data: mockRaceData })
 
-      const result = await fetchRaceData('race-retry', undefined, mockAxiosInstance as any)
+      const result = await fetchRaceData('race-retry', undefined, mockAxiosAsInstance)
 
       expect(result).toEqual(mockRaceData)
-      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(2)
+      expect(mockAxiosGet).toHaveBeenCalledTimes(2)
     })
 
     it('should retry on 5xx error with exponential backoff', async () => {
@@ -211,15 +224,15 @@ describe('NZ TAB Client', () => {
         start_time_nz: '20:00',
       }
 
-      mockAxiosInstance.get
+      mockAxiosGet
         .mockRejectedValueOnce(serverError)
         .mockRejectedValueOnce(serverError)
         .mockResolvedValueOnce({ data: mockRaceData })
 
-      const result = await fetchRaceData('race-503', undefined, mockAxiosInstance as any)
+      const result = await fetchRaceData('race-503', undefined, mockAxiosAsInstance)
 
       expect(result).toEqual(mockRaceData)
-      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3)
+      expect(mockAxiosGet).toHaveBeenCalledTimes(3)
     })
 
     it('should enforce exponential backoff delays (100ms, 200ms, 400ms)', async () => {
@@ -239,7 +252,7 @@ describe('NZ TAB Client', () => {
 
       const attemptTimestamps: number[] = []
 
-      mockAxiosInstance.get.mockImplementation(() => {
+      mockAxiosGet.mockImplementation(() => {
         attemptTimestamps.push(Date.now())
         if (attemptTimestamps.length < 3) {
           // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
@@ -248,9 +261,9 @@ describe('NZ TAB Client', () => {
         return Promise.resolve({ data: mockRaceData })
       })
 
-      await fetchRaceData('race-backoff', undefined, mockAxiosInstance as any)
+      await fetchRaceData('race-backoff', undefined, mockAxiosAsInstance)
 
-      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3)
+      expect(mockAxiosGet).toHaveBeenCalledTimes(3)
     })
   })
 
@@ -262,17 +275,17 @@ describe('NZ TAB Client', () => {
         message: 'Network timeout',
       }
 
-      mockAxiosInstance.get.mockRejectedValue(networkError)
+      mockAxiosGet.mockRejectedValue(networkError)
 
       try {
-        await fetchRaceData('race-fail', undefined, mockAxiosInstance as any)
+        await fetchRaceData('race-fail', undefined, mockAxiosAsInstance)
         expect.fail('Should have thrown')
       } catch (error) {
         expect(error).toBeInstanceOf(NzTabError)
         expect((error as NzTabError).message).toContain('after 3 attempts')
       }
 
-      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3)
+      expect(mockAxiosGet).toHaveBeenCalledTimes(3)
     })
 
     it('should fail after 3 retry attempts with 5xx errors', async () => {
@@ -282,10 +295,10 @@ describe('NZ TAB Client', () => {
         message: '500 error',
       }
 
-      mockAxiosInstance.get.mockRejectedValue(serverError)
+      mockAxiosGet.mockRejectedValue(serverError)
 
-      await expect(fetchRaceData('race-500', undefined, mockAxiosInstance as any)).rejects.toThrow(NzTabError)
-      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3)
+      await expect(fetchRaceData('race-500', undefined, mockAxiosAsInstance)).rejects.toThrow(NzTabError)
+      expect(mockAxiosGet).toHaveBeenCalledTimes(3)
     })
   })
 
@@ -300,10 +313,10 @@ describe('NZ TAB Client', () => {
         message: '404 error',
       }
 
-      mockAxiosInstance.get.mockRejectedValueOnce(notFoundError)
+      mockAxiosGet.mockRejectedValueOnce(notFoundError)
 
       try {
-        await fetchRaceData('race-404', undefined, mockAxiosInstance as any)
+        await fetchRaceData('race-404', undefined, mockAxiosAsInstance)
         expect.fail('Should have thrown')
       } catch (error) {
         expect(error).toBeInstanceOf(NzTabError)
@@ -311,7 +324,7 @@ describe('NZ TAB Client', () => {
         expect((error as NzTabError).isRetriable).toBe(false)
       }
 
-      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1)
+      expect(mockAxiosGet).toHaveBeenCalledTimes(1)
     })
 
     it('should fail immediately on 400 without retry', async () => {
@@ -324,10 +337,10 @@ describe('NZ TAB Client', () => {
         message: '400 error',
       }
 
-      mockAxiosInstance.get.mockRejectedValueOnce(badRequestError)
+      mockAxiosGet.mockRejectedValueOnce(badRequestError)
 
-      await expect(fetchRaceData('race-400', undefined, mockAxiosInstance as any)).rejects.toThrow(NzTabError)
-      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1)
+      await expect(fetchRaceData('race-400', undefined, mockAxiosAsInstance)).rejects.toThrow(NzTabError)
+      expect(mockAxiosGet).toHaveBeenCalledTimes(1)
     })
 
     it('should include sanitized response excerpt in 4xx errors', async () => {
@@ -340,10 +353,10 @@ describe('NZ TAB Client', () => {
         message: '401 error',
       }
 
-      mockAxiosInstance.get.mockRejectedValueOnce(unauthorizedError)
+      mockAxiosGet.mockRejectedValueOnce(unauthorizedError)
 
       try {
-        await fetchRaceData('race-401', undefined, mockAxiosInstance as any)
+        await fetchRaceData('race-401', undefined, mockAxiosAsInstance)
         expect.fail('Should have thrown')
       } catch (error) {
         expect(error).toBeInstanceOf(NzTabError)
@@ -363,17 +376,17 @@ describe('NZ TAB Client', () => {
         start_time_nz: '22:00',
       }
 
-      mockAxiosInstance.get.mockResolvedValueOnce({ data: invalidData })
+      mockAxiosGet.mockResolvedValueOnce({ data: invalidData })
 
       try {
-        await fetchRaceData('race-invalid', undefined, mockAxiosInstance as any)
+        await fetchRaceData('race-invalid', undefined, mockAxiosAsInstance)
         expect.fail('Should have thrown')
       } catch (error) {
         expect(error).toBeInstanceOf(NzTabError)
         expect((error as NzTabError).isRetriable).toBe(false)
       }
 
-      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1)
+      expect(mockAxiosGet).toHaveBeenCalledTimes(1)
     })
 
     it('should reject payloads missing required fields', async () => {
@@ -382,9 +395,9 @@ describe('NZ TAB Client', () => {
         // Missing name, status, race_date_nz, start_time_nz
       }
 
-      mockAxiosInstance.get.mockResolvedValueOnce({ data: incompleteData })
+      mockAxiosGet.mockResolvedValueOnce({ data: incompleteData })
 
-      await expect(fetchRaceData('race-incomplete', undefined, mockAxiosInstance as any)).rejects.toThrow(NzTabError)
+      await expect(fetchRaceData('race-incomplete', undefined, mockAxiosAsInstance)).rejects.toThrow(NzTabError)
     })
   })
 
@@ -402,11 +415,11 @@ describe('NZ TAB Client', () => {
     it('should handle non-Axios errors as non-retriable', async () => {
       const genericError = new Error('Generic error')
 
-      mockAxiosInstance.get.mockRejectedValue(genericError)
+      mockAxiosGet.mockRejectedValue(genericError)
 
-      await expect(fetchRaceData('race-generic-error', undefined, mockAxiosInstance as any)).rejects.toThrow()
+      await expect(fetchRaceData('race-generic-error', undefined, mockAxiosAsInstance)).rejects.toThrow()
       // Non-Axios errors are non-retriable, so only 1 attempt
-      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1)
+      expect(mockAxiosGet).toHaveBeenCalledTimes(1)
     })
   })
 })
