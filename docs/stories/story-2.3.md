@@ -1,6 +1,6 @@
 # Story 2.3: Worker Thread Pool for CPU-Bound Transforms
 
-Status: Ready for Review
+Status: Done
 
 ## Story
 
@@ -156,15 +156,18 @@ claude-sonnet-4-5-20250929 (Sonnet 4.5)
 **Outcome:** Changes Requested
 
 **Summary**
+
 - Story remains unimplemented; no worker pool module, worker script, or supporting wiring exists in the repository, so none of the CPU-offloading requirements can be validated.
 - Detected stack: Node.js 22 + TypeScript server with Pino logging and Vitest, so review expectations follow those tooling conventions.
 
 **Key Findings**
+
 - **High** – Worker pool infrastructure is absent. There is no `server/src/workers/` directory or `worker-pool.ts` implementation, so AC1–AC7 and AC9 cannot be met.
 - **High** – Application startup does not initialize any worker pool (`server/src/index.ts:1` still only boots the HTTP server), violating AC8.
 - **High** – Required unit/integration tests for the worker pool were not delivered; the existing `server/tests` tree contains only prior modules, leaving all story-specific test tasks undone.
 
 **Acceptance Criteria Coverage**
+
 - AC1: Not Met – No WorkerPool class or singleton export exists.
 - AC2: Not Met – No `transformWorker.ts` script found.
 - AC3: Not Met – No worker messaging or Zod validation implemented.
@@ -176,18 +179,23 @@ claude-sonnet-4-5-20250929 (Sonnet 4.5)
 - AC9: Not Met – No Pino logging for worker lifecycle events implemented.
 
 **Test Coverage and Gaps**
+
 - No new unit or integration tests exist under `server/tests` for worker pool behavior, queueing, or restart logic, leaving every test-related subtask incomplete.
 
 **Architectural Alignment**
+
 - Worker pool module and bootstrap points defined in `docs/tech-spec-epic-2.md` are missing entirely, so the implementation is not aligned with the approved architecture.
 
 **Security Notes**
+
 - No code delivered for review; security implications cannot be assessed until the worker infrastructure exists.
 
 **Best-Practices and References**
+
 - Node.js Worker Threads API (https://nodejs.org/api/worker_threads.html) – required for implementing CPU-bound workers with proper lifecycle management.
 
 **Action Items**
+
 1. Implement `server/src/workers/worker-pool.ts`, `transformWorker.ts`, and associated queueing/restart logic per AC1–AC9, exporting a singleton and wiring it into application startup.
 2. Add structured Pino logging around worker lifecycle events and expose pool metrics for observability.
 3. Deliver unit and integration tests covering worker initialization, task queueing, promise resolution/rejection, restart handling, and metrics reporting.
@@ -199,31 +207,39 @@ claude-sonnet-4-5-20250929 (Sonnet 4.5)
 **Outcome:** Changes Requested
 
 **Summary**
+
 - Worker pool code and tests exist, but mandatory runtime dependencies are still marked as dev-only, so the production build crashes before any worker threads start.
 
 **Key Findings**
+
 - **High** – `worker-pool.ts` requires `typescript` during module import (`server/src/workers/worker-pool.ts:20`), yet `typescript` remains in devDependencies only (`server/package.json:33-50`). A production install with `npm ci --omit=dev` cannot load the worker pool, leaving AC2/AC8 unmet.
 - **High** – `transformWorker.entry.js` unconditionally imports `tsx/esm/api` (`server/src/workers/transformWorker.entry.js:4`), but `tsx` is also scoped to devDependencies (`server/package.json:33-50`). Worker threads therefore fail immediately in production, preventing any transform execution (AC2/AC8).
 
 **Acceptance Criteria Coverage**
+
 - AC1, AC3, AC4, AC5, AC6, AC7, AC9: Implementation present pending dependency fix.
 - AC2: Not Met – Missing runtime dependency stops workers from spawning.
 - AC8: Not Met – Worker pool cannot initialize in production when devDependencies are omitted.
 
 **Test Coverage and Gaps**
+
 - Unit and integration suites validate queueing, restart, and success/error flows, but no test simulates a production install without devDependencies. Add coverage (e.g., CI step) to surface this regression.
 
 **Architectural Alignment**
+
 - Structure aligns with the worker-pool blueprint, but runtime availability is blocked until the dependency issue is resolved.
 
 **Security Notes**
+
 - No new security regressions detected; primary risk is availability.
 
 **Best-Practices and References**
+
 - Node.js Worker Threads API – https://nodejs.org/api/worker_threads.html
 - npm install documentation on dependency types – https://docs.npmjs.com/cli/v10/configuring-npm/install#production
 
 **Action Items**
+
 1. Gate the `typescript` import behind the fallback path or precompile the worker so production never requires `typescript` (`server/src/workers/worker-pool.ts`) – restores AC2/AC8.
 2. Replace the `tsx` loader with a production-safe entry point or promote `tsx` to a runtime dependency so workers can boot (`server/src/workers/transformWorker.entry.js`) – restores AC2/AC8.
 3. Add a CI/QA check that installs with `--omit=dev` and starts the server to ensure runtime dependencies stay correct.
