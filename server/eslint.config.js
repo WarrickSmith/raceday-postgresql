@@ -96,6 +96,15 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.js', '**/*.mjs', 'vitest.config.ts'],
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'coverage/**',
+      '**/*.mjs',
+      'vitest.config.ts',
+      'src/workers/transformWorker.entry.js',
+      'eslint.config.js',
+      'test-connection.js',
+    ],
   }
 )

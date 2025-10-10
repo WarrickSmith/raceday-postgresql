@@ -2,6 +2,7 @@ import { createServer } from './api/server.js'
 import { env } from './shared/env.js'
 import { logger } from './shared/logger.js'
 import { closePool } from './database/pool.js'
+import { workerPool } from './workers/worker-pool.js'
 import type { Server } from 'node:http'
 
 // Create and start Express server
@@ -9,6 +10,14 @@ const app = createServer()
 const server: Server = app.listen(env.PORT, '0.0.0.0', () => {
   logger.info({ port: env.PORT }, `Server listening on port ${String(env.PORT)}`)
   logger.info('Health endpoint available at /health')
+  logger.info(
+    {
+      event: 'worker_pool_ready',
+      size: workerPool.size,
+      metrics: workerPool.getMetrics(),
+    },
+    'Worker pool ready at startup'
+  )
 })
 
 // Graceful shutdown
@@ -39,6 +48,7 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
   }
 
   await closePool(signal)
+  await workerPool.shutdown()
 
   process.exit(0)
 }
