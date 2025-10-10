@@ -24,14 +24,20 @@
 3. **Validate Pipeline Environment Variables**
    - In Portainer → Stacks → `raceday-pipeline`, open the environment variable editor.
    - Confirm the following variables are present and non-empty:
-     - `NZTAB_API_URL`
-     - `NZTAB_FROM_EMAIL`
-     - `NZTAB_PARTNER_NAME`
-     - `NZTAB_PARTNER_ID`
+     - `NZTAB_API_URL` (e.g., `https://api.tab.co.nz/affiliates/v1`)
+     - `NZTAB_FROM_EMAIL` (required, valid email format)
+     - `NZTAB_PARTNER_NAME` (required, non-empty string)
+     - `NZTAB_PARTNER_ID` (required, non-empty string)
+   - **NOTE (Story 2.1)**: As of Epic 2, all NZ TAB partner headers are **required** fields. The env validation will fail at startup if any are missing or empty.
    - If any value is missing or outdated, update it immediately and record the change in the sprint log.
 4. **Sync Local Templates**
-   - Verify `server/.env.example` reflects the same values (or safe defaults).
+   - Verify `server/.env.example` reflects the correct values from the research findings:
+     - `NZTAB_API_URL=https://api.tab.co.nz/affiliates/v1`
+     - `NZTAB_FROM_EMAIL=ws@baybox.co.nz`
+     - `NZTAB_PARTNER_NAME=Warrick Smith`
+     - `NZTAB_PARTNER_ID=Private Developer`
    - Run `npm run lint -- --quiet` from `server/` to confirm the file parses correctly after edits.
+   - Run `npm run build` to verify TypeScript compilation with the new required fields.
 5. **Smoke-Test the Credentials**
    - From `server/`, run:
      ```bash
