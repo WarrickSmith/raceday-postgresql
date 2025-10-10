@@ -1,0 +1,166 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>3</storyId>
+    <title>Worker Thread Pool for CPU-Bound Transforms</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-10</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>/home/warrick/Dev/raceday-postgresql/docs/stories/story-2.3.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>backend developer</asA>
+    <iWant>a worker thread pool (3 workers) for money flow calculations</iWant>
+    <soThat>CPU-intensive work doesn't block the main event loop and enables concurrent race processing</soThat>
+    <tasks>
+      - Create server/src/workers/worker-pool.ts with WorkerPool class (AC: 1, 6, 7)
+      - Create server/src/workers/transformWorker.ts worker script (AC: 2, 3)
+      - Implement worker lifecycle management (AC: 4, 8)
+      - Implement task queuing and assignment (AC: 5, 6)
+      - Add structured logging with Pino (AC: 9)
+      - Write unit tests for worker pool
+      - Integration test: Initialize pool and verify worker readiness
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Worker pool class created with configurable worker count (default: 3) that exports a singleton pool instance for application-wide use
+    2. Worker threads instantiated from transformWorker.ts script using Node.js Worker API with message-passing IPC
+    3. Workers communicate via postMessage() / on('message') pattern, passing typed payloads validated with Zod schemas
+    4. Workers handle uncaught errors and 'error' events by logging details and triggering graceful restart (crash → restart flow scaffolded, Story 2.11 adds full retry logic)
+    5. Pool queues tasks when all workers are busy, maintaining FIFO order and preventing task loss
+    6. Pool tracks each worker's status (idle / busy) and exposes metrics for observability (active count, queue depth)
+    7. exec(data) method returns Promise&lt;TransformedRace&gt; that resolves when worker completes transform, rejects on worker failure
+    8. Worker pool initialized on application startup (in server/src/index.ts or dedicated bootstrap module) before scheduler starts
+    9. Structured logging via Pino for: worker start, task assignment, task completion, worker crash/restart with contextual data (workerId, taskId, duration)
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-2.md" title="Technical Specification: Epic 2 - High-Performance Data Pipeline" section="Services and Modules - Worker Pool">
+        Defines Worker Pool module at workers/worker-pool.ts with 3-worker configuration. Workers execute CPU-bound money-flow transforms without blocking event loop. Maintains three worker threads, queues tasks if all busy, tracks worker status (idle/busy), exports exec(data) method returning Promise. Logs worker start, task assignment, task completion, worker crash/restart.
+      </doc>
+      <doc path="docs/tech-spec-epic-2.md" title="Technical Specification: Epic 2" section="APIs and Interfaces - workerPool.exec">
+        API signature: exec(payload: RacePayload): Promise&lt;TransformedRace&gt;. Queues work on available worker, requeues if all busy, auto-restarts crashed workers and retries tasks up to 3 times.
+      </doc>
+      <doc path="docs/PRD-raceday-postgresql-2025-10-05.md" title="Product Requirements Document" section="NFR011 - Worker Configuration">
+        System SHALL use 3 worker threads for CPU-bound processing with 1 CPU reserved for orchestrator/DB work (4 CPU cores total). Node.js 22 LTS with Worker Threads API.
+      </doc>
+      <doc path="docs/epic-stories-2025-10-05.md" title="Epic Breakdown" section="Story 2.3: Worker Thread Pool for CPU-Bound Transforms">
+        Defines 9 acceptance criteria for worker pool: configurable size (default 3), transformWorker.ts script, postMessage/on('message') IPC, error handling with restart, task queuing (FIFO), status tracking, exec() Promise API, application startup initialization, structured Pino logging.
+      </doc>
+      <doc path="docs/CODING-STANDARDS.md" title="Coding Standards" section="ESM Imports">
+        All imports must use ESM syntax with .js extensions per Node.js 22 standards. No CommonJS require() allowed.
+      </doc>
+      <doc path="docs/tech-spec-epic-2.md" title="Technical Specification: Epic 2" section="Reliability/Availability">
+        99.9% uptime during race hours (NFR004) achieved through resilient scheduler intervals, automatic worker restart logic, and retryable fetches. Transactional safety with rollback on failure.
+      </doc>
+      <doc path="docs/stories/story-2.2.md" title="Story 2.2: NZ TAB API Response Type Definitions" section="Implementation">
+        Type definitions module created at server/src/clients/nztab-types.ts with Zod schemas for RaceData, Entrant, Odds, Pool, MeetingData. Provides TypeScript types via z.infer&lt;&gt; with zero 'any' types. Worker pool will import these for payload validation.
+      </doc>
+    </docs>
+    <code>
+      <file path="server/src/index.ts" kind="entry-point" symbol="main" lines="1-53" reason="Application startup file where worker pool must be initialized before scheduler starts (AC 8). Currently initializes Express server and graceful shutdown handlers.">
+        import { createServer } from './api/server.js'
+        import { env } from './shared/env.js'
+        import { logger } from './shared/logger.js'
+        import { closePool } from './database/pool.js'
+
+        const app = createServer()
+        const server = app.listen(env.PORT, '0.0.0.0', () => {
+          logger.info({ port: env.PORT }, 'Server listening')
+        })
+
+        // Graceful shutdown with SIGTERM/SIGINT handlers
+        // TODO: Add worker pool initialization and shutdown here
+      </file>
+      <file path="server/src/shared/logger.ts" kind="module" symbol="logger" lines="N/A" reason="Pino logger instance used for structured logging. Worker pool must import this for logging worker events (AC 9).">
+        Export: logger (Pino instance)
+      </file>
+      <file path="server/src/clients/nztab-types.ts" kind="types" symbol="RaceData, TransformedRace" lines="N/A" reason="Zod schemas and TypeScript types for NZ TAB API responses from Story 2.2. Worker pool will use RaceData as input type and define TransformedRace as output type for exec() method.">
+        Exports: RaceDataSchema, RaceData type, and validation helpers
+      </file>
+      <file path="server/src/database/pool.ts" kind="module" symbol="closePool" lines="N/A" reason="Database connection pool with graceful shutdown pattern. Worker pool should follow similar pattern for cleanup.">
+        Export: closePool(signal) - graceful shutdown pattern to follow
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <package name="pino" version="^9.5.0">Structured JSON logging library. Worker pool uses for logging worker lifecycle events.</package>
+        <package name="zod" version="^3.25.76">Runtime validation. Worker pool uses for validating message payloads between main thread and workers.</package>
+        <package name="typescript" version="^5.7.0">TypeScript compiler with strict mode. Ensures zero 'any' types in worker pool code.</package>
+        <package name="vitest" version="^2.0.0">Testing framework. Worker pool unit tests use Vitest with worker thread mocks.</package>
+        <package name="@types/node" version="^22.0.0">Node.js type definitions including worker_threads module types.</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - Module location: server/src/workers/ per architecture specification
+    - ESM imports with .js extensions required (Node.js 22 standard)
+    - Zero 'any' types policy enforced by TypeScript strict mode and ESLint
+    - Singleton pattern for worker pool instance (prevent multiple pools competing for CPU)
+    - Worker count fixed at 3 (NFR011: 3 workers + 1 CPU for orchestrator = 4 cores total)
+    - All message payloads validated with Zod schemas
+    - Structured logging with Pino (no console.log in production)
+    - Graceful shutdown pattern matching database pool (close workers on SIGTERM/SIGINT)
+    - FIFO task queuing to prevent task loss and ensure fair processing order
+    - Worker restart on crash (basic flow in this story, full retry logic in Story 2.11)
+    - Story 2.4 will add actual money flow calculation logic; this story provides infrastructure with passthrough/echo worker
+  </constraints>
+  <interfaces>
+    <interface name="WorkerPool.exec" kind="method" signature="exec(data: RaceData): Promise&lt;TransformedRace&gt;" path="server/src/workers/worker-pool.ts">
+      Main API for queueing work to worker pool. Returns Promise that resolves when worker completes transform or rejects on failure. Queues task if all workers busy.
+    </interface>
+    <interface name="parentPort" kind="Node.js API" signature="parentPort.on('message', handler)" path="worker_threads module">
+      Worker thread message listener from Node.js worker_threads module. Worker script uses to receive tasks from main thread.
+    </interface>
+    <interface name="parentPort.postMessage" kind="Node.js API" signature="parentPort.postMessage(data)" path="worker_threads module">
+      Worker thread message sender. Worker script uses to send transformed results back to main thread.
+    </interface>
+    <interface name="Worker" kind="Node.js API" signature="new Worker(scriptPath, options)" path="worker_threads module">
+      Node.js Worker class for creating worker threads. Pool uses to instantiate workers from transformWorker.ts script.
+    </interface>
+    <interface name="logger" kind="module" signature="logger.info(data, message), logger.error(data, message)" path="server/src/shared/logger.ts">
+      Pino logger instance for structured logging. Import and use for all worker pool logging.
+    </interface>
+    <interface name="RaceDataSchema" kind="Zod schema" signature="RaceDataSchema.parse(data)" path="server/src/clients/nztab-types.ts">
+      Zod schema from Story 2.2 for validating NZ TAB API race data. Worker pool uses for input validation.
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      - Testing framework: Vitest 2.0 with @vitest/coverage-v8
+      - Test locations: server/tests/unit/ for unit tests, server/tests/integration/ for integration tests
+      - Worker thread mocking: Use Vitest vi.fn() and manual mocks for Worker class
+      - TypeScript strict mode in tests (no 'any' types)
+      - Test file naming: *.test.ts (e.g., worker-pool.test.ts)
+      - Code coverage target: ≥80% per project standards
+      - Run tests: npm run test (watch mode), npm test:unit (unit only), npm test:coverage (with coverage)
+    </standards>
+    <locations>
+      - server/tests/unit/workers/worker-pool.test.ts
+      - server/tests/integration/worker-pool.test.ts
+    </locations>
+    <ideas>
+      AC1: Test worker pool initialization with configurable size (default 3)
+      AC2: Test worker thread creation from transformWorker.ts script
+      AC3: Test postMessage/on('message') communication pattern with mock workers
+      AC4: Test worker crash handling (error event) triggers restart
+      AC5: Test task queuing when all workers are busy (FIFO order)
+      AC6: Test worker status tracking (idle → busy → idle transitions)
+      AC7: Test exec() Promise resolves on success, rejects on worker failure
+      AC8: Integration test: Pool initializes on app startup before scheduler
+      AC9: Test structured logging for worker start, task assignment, task completion, crash/restart events
+
+      Additional test ideas:
+      - Test concurrent task execution across multiple workers
+      - Test queue depth metrics accuracy
+      - Test graceful shutdown (workers terminate cleanly on SIGTERM)
+      - Test worker restart doesn't affect other workers
+      - Test exec() rejects when worker postMessage fails
+      - Test Zod validation failures in worker message payloads
+    </ideas>
+  </tests>
+</story-context>
