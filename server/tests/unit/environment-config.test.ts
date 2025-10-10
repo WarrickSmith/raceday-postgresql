@@ -25,6 +25,9 @@ describe('Environment Configuration Validation', () => {
         DB_PASSWORD: 'postgres',
         DB_NAME: 'raceday',
         NZTAB_API_URL: 'https://api.tab.co.nz',
+        NZTAB_FROM_EMAIL: 'test@example.com',
+        NZTAB_PARTNER_NAME: 'Test Partner',
+        NZTAB_PARTNER_ID: 'Test ID',
         PORT: '7000',
         LOG_LEVEL: 'info',
         UV_THREADPOOL_SIZE: '8',
@@ -41,6 +44,9 @@ describe('Environment Configuration Validation', () => {
       expect(env.DB_PASSWORD).toBe('postgres')
       expect(env.DB_NAME).toBe('raceday')
       expect(env.NZTAB_API_URL).toBe('https://api.tab.co.nz')
+      expect(env.NZTAB_FROM_EMAIL).toBe('test@example.com')
+      expect(env.NZTAB_PARTNER_NAME).toBe('Test Partner')
+      expect(env.NZTAB_PARTNER_ID).toBe('Test ID')
       expect(env.PORT).toBe(7000)
       expect(env.LOG_LEVEL).toBe('info')
       expect(env.UV_THREADPOOL_SIZE).toBe(8)
@@ -57,6 +63,9 @@ describe('Environment Configuration Validation', () => {
         DB_PASSWORD: 'postgres',
         DB_NAME: 'raceday',
         NZTAB_API_URL: 'https://api.tab.co.nz',
+        NZTAB_FROM_EMAIL: 'test@example.com',
+        NZTAB_PARTNER_NAME: 'Test Partner',
+        NZTAB_PARTNER_ID: 'Test ID',
       }
 
       const { env } = await import('../../src/shared/env.js')
@@ -79,6 +88,9 @@ describe('Environment Configuration Validation', () => {
         DB_PASSWORD: 'postgres',
         DB_NAME: 'raceday',
         NZTAB_API_URL: 'https://api.tab.co.nz',
+        NZTAB_FROM_EMAIL: 'test@example.com',
+        NZTAB_PARTNER_NAME: 'Test Partner',
+        NZTAB_PARTNER_ID: 'Test ID',
         PORT: '8080',
       }
 
@@ -96,6 +108,9 @@ describe('Environment Configuration Validation', () => {
         DB_PASSWORD: 'postgres',
         DB_NAME: 'raceday',
         NZTAB_API_URL: 'https://api.tab.co.nz',
+        NZTAB_FROM_EMAIL: 'test@example.com',
+        NZTAB_PARTNER_NAME: 'Test Partner',
+        NZTAB_PARTNER_ID: 'Test ID',
       }
 
       const { env } = await import('../../src/shared/env.js')
@@ -112,6 +127,9 @@ describe('Environment Configuration Validation', () => {
         DB_PASSWORD: 'postgres',
         DB_NAME: 'raceday',
         NZTAB_API_URL: 'https://api.tab.co.nz',
+        NZTAB_FROM_EMAIL: 'test@example.com',
+        NZTAB_PARTNER_NAME: 'Test Partner',
+        NZTAB_PARTNER_ID: 'Test ID',
         DB_POOL_MAX: '20',
       }
 
@@ -262,6 +280,9 @@ describe('Environment Configuration Validation', () => {
         DB_PASSWORD: 'postgres',
         DB_NAME: 'raceday',
         NZTAB_API_URL: 'https://api.tab.co.nz',
+        NZTAB_FROM_EMAIL: 'test@example.com',
+        NZTAB_PARTNER_NAME: 'Test Partner',
+        NZTAB_PARTNER_ID: 'Test ID',
       }
 
       const { env } = await import('../../src/shared/env.js')
@@ -279,6 +300,9 @@ describe('Environment Configuration Validation', () => {
         DB_PASSWORD: 'mypassword',
         DB_NAME: 'mydb',
         NZTAB_API_URL: 'https://api.tab.co.nz',
+        NZTAB_FROM_EMAIL: 'test@example.com',
+        NZTAB_PARTNER_NAME: 'Test Partner',
+        NZTAB_PARTNER_ID: 'Test ID',
       }
 
       const { env, buildDatabaseUrl } = await import('../../src/shared/env.js')
@@ -296,6 +320,9 @@ describe('Environment Configuration Validation', () => {
         DB_PASSWORD: 'postgres',
         DB_NAME: 'raceday',
         NZTAB_API_URL: 'https://api.tab.co.nz',
+        NZTAB_FROM_EMAIL: 'test@example.com',
+        NZTAB_PARTNER_NAME: 'Test Partner',
+        NZTAB_PARTNER_ID: 'Test ID',
       }
 
       const { env, buildDatabaseUrl } = await import('../../src/shared/env.js')
@@ -335,6 +362,9 @@ describe('Environment Configuration Validation', () => {
         DB_PASSWORD: 'postgres',
         DB_NAME: 'raceday',
         NZTAB_API_URL: 'https://api.tab.co.nz',
+        NZTAB_FROM_EMAIL: 'test@example.com',
+        NZTAB_PARTNER_NAME: 'Test Partner',
+        NZTAB_PARTNER_ID: 'Test ID',
       }
 
       const { env } = await import('../../src/shared/env.js')
@@ -344,6 +374,110 @@ describe('Environment Configuration Validation', () => {
       expect(env.NODE_ENV).toMatch(/^(development|production|test)$/)
       expect(typeof env.DB_PORT).toBe('number')
       expect(typeof env.PORT).toBe('number')
+    })
+  })
+
+  describe('NZ TAB Partner Headers (Story 2.1)', () => {
+    it('should require partner headers and validate correct values', async () => {
+      process.env = {
+        NODE_ENV: 'test',
+        DB_HOST: 'localhost',
+        DB_PORT: '5432',
+        DB_USER: 'postgres',
+        DB_PASSWORD: 'postgres',
+        DB_NAME: 'raceday',
+        NZTAB_API_URL: 'https://api.tab.co.nz',
+        NZTAB_FROM_EMAIL: 'partner@example.com',
+        NZTAB_PARTNER_NAME: 'Warrick Smith',
+        NZTAB_PARTNER_ID: 'Private Developer',
+      }
+
+      const { env } = await import('../../src/shared/env.js')
+
+      expect(env.NZTAB_FROM_EMAIL).toBe('partner@example.com')
+      expect(env.NZTAB_PARTNER_NAME).toBe('Warrick Smith')
+      expect(env.NZTAB_PARTNER_ID).toBe('Private Developer')
+    })
+
+    it('should fail validation when partner headers are missing', () => {
+      const EnvSchema = z.object({
+        NODE_ENV: z.enum(['development', 'production', 'test']),
+        DB_HOST: z.string().min(1),
+        DB_PORT: z.coerce.number().int().positive(),
+        DB_USER: z.string().min(1),
+        DB_PASSWORD: z.string().min(1),
+        DB_NAME: z.string().min(1),
+        NZTAB_API_URL: z.string().url(),
+        NZTAB_FROM_EMAIL: z.string().email(),
+        NZTAB_PARTNER_NAME: z.string().min(1),
+        NZTAB_PARTNER_ID: z.string().min(1),
+      })
+
+      expect(() => {
+        EnvSchema.parse({
+          NODE_ENV: 'test',
+          DB_HOST: 'localhost',
+          DB_PORT: '5432',
+          DB_USER: 'postgres',
+          DB_PASSWORD: 'postgres',
+          DB_NAME: 'raceday',
+          NZTAB_API_URL: 'https://api.tab.co.nz',
+        })
+      }).toThrow()
+    })
+
+    it('should validate NZTAB_FROM_EMAIL as valid email format', () => {
+      const EnvSchema = z.object({
+        NODE_ENV: z.enum(['development', 'production', 'test']),
+        DB_HOST: z.string().min(1),
+        DB_PORT: z.coerce.number().int().positive(),
+        DB_USER: z.string().min(1),
+        DB_PASSWORD: z.string().min(1),
+        DB_NAME: z.string().min(1),
+        NZTAB_API_URL: z.string().url(),
+        NZTAB_FROM_EMAIL: z.string().email(),
+        NZTAB_PARTNER_NAME: z.string().min(1),
+        NZTAB_PARTNER_ID: z.string().min(1),
+      })
+
+      expect(() => {
+        EnvSchema.parse({
+          NODE_ENV: 'test',
+          DB_HOST: 'localhost',
+          DB_PORT: '5432',
+          DB_USER: 'postgres',
+          DB_PASSWORD: 'postgres',
+          DB_NAME: 'raceday',
+          NZTAB_API_URL: 'https://api.tab.co.nz',
+          NZTAB_FROM_EMAIL: 'not-an-email',
+          NZTAB_PARTNER_NAME: 'Test Partner',
+          NZTAB_PARTNER_ID: 'Test ID',
+        })
+      }).toThrow(/Invalid email/)
+    })
+
+    it('should reject empty string values for required partner headers', () => {
+      const EnvSchema = z.object({
+        NZTAB_FROM_EMAIL: z.string().email(),
+        NZTAB_PARTNER_NAME: z.string().min(1),
+        NZTAB_PARTNER_ID: z.string().min(1),
+      })
+
+      expect(() => {
+        EnvSchema.parse({
+          NZTAB_FROM_EMAIL: 'valid@email.com',
+          NZTAB_PARTNER_NAME: '',
+          NZTAB_PARTNER_ID: 'Test ID',
+        })
+      }).toThrow()
+
+      expect(() => {
+        EnvSchema.parse({
+          NZTAB_FROM_EMAIL: 'valid@email.com',
+          NZTAB_PARTNER_NAME: 'Test Partner',
+          NZTAB_PARTNER_ID: '',
+        })
+      }).toThrow()
     })
   })
 })
