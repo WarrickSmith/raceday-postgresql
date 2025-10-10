@@ -1,0 +1,125 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2</storyId>
+    <title>NZ TAB API Response Type Definitions</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-10T13:45:00Z</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>/home/warrick/Dev/raceday-postgresql/docs/stories/story-2.2.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>backend developer</asA>
+    <iWant>comprehensive Zod schemas and TypeScript types for all NZ TAB API response shapes</iWant>
+    <soThat>the pipeline validates external data at runtime and ensures type-safe data flow with zero `any` types</soThat>
+    <tasks>
+      - Create server/src/clients/nztab-types.ts with Zod schemas for all NZ TAB response shapes
+      - Define MeetingDataSchema, EntrantSchema, OddsSchema, PoolSchema, RaceDataSchema
+      - Export TypeScript types via z.infer for pipeline module consumption
+      - Extend or refactor RaceDataSchema from Story 2.1 into comprehensive schema set
+      - Add Vitest unit tests in server/tests/unit/nztab-types.test.ts
+      - Document schema design decisions in JSDoc comments
+      - Verify zero any types via npm run build and npm run lint
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">Zod schemas defined for RaceData, Entrant, Odds, Pool, and MeetingData that match NZ TAB API response structure and Appwrite field mappings from database-setup.js</criterion>
+    <criterion id="2">TypeScript types inferred from Zod schemas using z.infer with no any types anywhere in the type definitions, enforced by strict TypeScript configuration</criterion>
+    <criterion id="3">All external API responses validated with schema.parse() or schema.safeParse() before use in the pipeline, emitting structured validation errors on failure</criterion>
+    <criterion id="4">Validation errors logged with structured details (field path, expected type, actual value, error reason) using Pino logger for debugging API contract changes</criterion>
+    <criterion id="5">No any types used in type definitions or validation code, verified by ESLint strict rules (npm run lint) and TypeScript build (npm run build)</criterion>
+    <criterion id="6">Example test cases covering valid API responses, invalid status enums, missing required fields, and malformed nested structures to guard against API drift</criterion>
+    <criterion id="7">Schemas align with Appwrite legacy fields: fixedWinOdds/fixedPlaceOdds for entrants (float), holdPercentage/betPercentage for money flow calculations, datetime fields for all timestamps per database-setup.js mappings</criterion>
+    <criterion id="8">Schemas use .passthrough() to allow additional fields from API while validating critical fields required by transform (Story 2.4) and database layers (Story 2.5), enabling API evolution without breaking changes</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/CODING-STANDARDS.md" title="TypeScript and Zod Validation Standards" section="TypeScript Best Practices">
+        No any types allowed (enforced by ESLint strict rules), runtime validation with Zod for external data, interface vs type usage patterns
+      </doc>
+      <doc path="docs/tech-spec-epic-2.md" title="Epic 2 Technical Specification" section="APIs and Interfaces">
+        RaceDataSchema specification: validates critical fields (id, name, status enum, date/time) with .passthrough() for extensibility
+      </doc>
+      <doc path="docs/PRD-raceday-postgresql-2025-10-05.md" title="Product Requirements Document" section="NFR009">
+        Runtime validation requirement: All external API data must be validated using Zod before entering the pipeline
+      </doc>
+      <doc path="server-old/database-setup/src/database-setup.js" title="Appwrite Legacy Schema" section="Entrants Collection">
+        fixedWinOdds (float), fixedPlaceOdds (float), runnerNumber (integer), isScratched (boolean) - exact field mappings for PostgreSQL migration
+      </doc>
+      <doc path="docs/api/nztab-openapi.json" title="NZ TAB API Contract" section="EntrantLiability Schema">
+        bet_percentage and hold_percentage fields for money flow calculations, authoritative API response structure
+      </doc>
+      <doc path="docs/research-findings-nztab-api.md" title="NZ TAB API Research" section="Response Structure">
+        Detailed analysis of API response shapes, required fields, and validation requirements
+      </doc>
+    </docs>
+    <code>
+      <artifact path="server/src/clients/nztab.ts" kind="module" symbol="RaceDataSchema" lines="13-26">
+        Existing basic RaceDataSchema from Story 2.1 - validates id, name, status (enum), race_date, advertised_start with .passthrough()
+      </artifact>
+      <artifact path="server/src/clients/nztab.ts" kind="type" symbol="RaceData" lines="28">
+        Type inference pattern: export type RaceData = z.infer&lt;typeof RaceDataSchema&gt;
+      </artifact>
+      <artifact path="server/src/clients/nztab.ts" kind="function" symbol="fetchRaceData" lines="182">
+        Usage pattern: const validatedData = RaceDataSchema.parse(response.data) - shows validation integration point
+      </artifact>
+      <artifact path="server/src/shared/env.ts" kind="module" symbol="envSchema" lines="9-29">
+        Reference Zod schema pattern using z.object() with type inference via z.infer for environment variables
+      </artifact>
+      <artifact path="server/tests/unit/nztab-client.test.ts" kind="test" symbol="RaceDataSchema validation" lines="34-71">
+        Test patterns: valid data parsing, invalid enum rejection, .passthrough() behavior for extra fields
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package name="zod" version="^3.25.76">Runtime validation library for schemas</package>
+        <package name="typescript" version="^5.7.0">Type system and compilation</package>
+        <package name="vitest" version="^2.0.0">Testing framework for unit tests</package>
+        <package name="@typescript-eslint/eslint-plugin" version="^8.0.0">Linting for strict type enforcement</package>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>All schemas MUST use .passthrough() to allow API evolution while validating critical fields</constraint>
+    <constraint>Zero any types enforced - verified by npm run build and npm run lint before story completion</constraint>
+    <constraint>Field names must match Appwrite legacy schema exactly: fixedWinOdds/fixedPlaceOdds (not toteOdds)</constraint>
+    <constraint>All imports must use ESM syntax with .js extensions per Node.js 22 standards</constraint>
+    <constraint>Validation errors must be logged with structured Pino format including field path and error details</constraint>
+    <constraint>Place type definitions in server/src/clients/nztab-types.ts for shared consumption across pipeline modules</constraint>
+  </constraints>
+  <interfaces>
+    <interface name="z.object" kind="function" signature="z.object(shape: ZodRawShape): ZodObject" path="node_modules/zod">
+      Core Zod schema builder for object validation
+    </interface>
+    <interface name="z.infer" kind="type utility" signature="z.infer&lt;T extends ZodType&gt;: TypeScriptType" path="node_modules/zod">
+      Extract TypeScript type from Zod schema for compile-time checking
+    </interface>
+    <interface name="schema.parse" kind="method" signature="parse(data: unknown): T | throws ZodError" path="node_modules/zod">
+      Validate and parse data, throwing detailed errors on failure
+    </interface>
+    <interface name="schema.safeParse" kind="method" signature="safeParse(data: unknown): { success: boolean; data?: T; error?: ZodError }" path="node_modules/zod">
+      Validate data without throwing, returning success/error result
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>
+      Use Vitest for all unit tests. Test files located at server/tests/unit/*.test.ts. Follow patterns from nztab-client.test.ts: mock dependencies, test valid inputs, test validation failures with specific error assertions, test edge cases. All tests must pass before story completion (npm test -- --run).
+    </standards>
+    <locations>
+      - server/tests/unit/nztab-types.test.ts (new test file for Story 2.2)
+      - server/tests/unit/ (all unit tests)
+    </locations>
+    <ideas>
+      <idea ac="1,7" desc="Test MeetingDataSchema validates meetingId (string), date (datetime), raceType enum ('thoroughbred' | 'harness'), status field">Fixture with valid meeting data passes; invalid raceType fails with enum error</idea>
+      <idea ac="1,7" desc="Test EntrantSchema validates fixedWinOdds/fixedPlaceOdds (float), runnerNumber (integer), isScratched (boolean)">Fixture with null odds fails; negative runnerNumber fails; string isScratched fails</idea>
+      <idea ac="3,6" desc="Test RaceDataSchema.parse() throws ZodError on missing raceId">Fixture without raceId triggers validation error with field path details</idea>
+      <idea ac="6" desc="Test invalid status enum value rejection">Fixture with status='invalid' fails with enum constraint error listing valid options</idea>
+      <idea ac="8" desc="Test .passthrough() allows extra fields">Fixture with unknown fields (e.g., futureApiField) passes validation without error</idea>
+      <idea ac="4" desc="Test validation error logging structure">Parse failure logs include field path, expected type, actual value using Pino structured format</idea>
+    </ideas>
+  </tests>
+</story-context>
