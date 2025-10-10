@@ -22,44 +22,44 @@ so that CPU-intensive work doesn't block the main event loop and enables concurr
 
 ## Tasks / Subtasks
 
-- [ ] Create `server/src/workers/worker-pool.ts` with WorkerPool class (AC: 1, 6, 7)
-  - [ ] Define WorkerPool class with configurable size (default: 3)
-  - [ ] Implement worker status tracking (idle/busy map keyed by worker ID)
-  - [ ] Implement task queue (FIFO array) for when all workers busy
-  - [ ] Implement exec(data) method returning Promise<TransformedRace>
-  - [ ] Export singleton pool instance for application-wide use
-- [ ] Create `server/src/workers/transformWorker.ts` worker script (AC: 2, 3)
-  - [ ] Set up message listener using parentPort.on('message')
-  - [ ] Define typed message payload schema with Zod
-  - [ ] Implement postMessage response with transformed data
-  - [ ] Add error event handlers for uncaught exceptions
-- [ ] Implement worker lifecycle management (AC: 4, 8)
-  - [ ] Bootstrap worker threads on pool initialization
-  - [ ] Listen for worker 'error' and 'exit' events
-  - [ ] Implement graceful worker restart on crash (log + create new worker)
-  - [ ] Initialize pool in application startup (server/src/index.ts or bootstrap)
-- [ ] Implement task queuing and assignment (AC: 5, 6)
-  - [ ] Queue tasks when all workers are busy
-  - [ ] Assign queued tasks to workers as they become available
-  - [ ] Track active task count and queue depth
-  - [ ] Ensure FIFO ordering for task assignment
-- [ ] Add structured logging with Pino (AC: 9)
-  - [ ] Log worker start events (workerId, script path)
-  - [ ] Log task assignment (workerId, taskId/raceId)
-  - [ ] Log task completion (workerId, taskId, duration)
-  - [ ] Log worker crash/restart events with error details
-- [ ] Write unit tests for worker pool
-  - [ ] Test worker pool initialization with correct worker count
-  - [ ] Test task assignment to idle workers
-  - [ ] Test task queuing when all workers busy
-  - [ ] Test exec() Promise resolution on successful transform
-  - [ ] Test exec() Promise rejection on worker failure
-  - [ ] Test worker status tracking (idle → busy → idle transitions)
-  - [ ] Mock worker threads using Vitest worker mocks
-- [ ] Integration test: Initialize pool and verify worker readiness
-  - [ ] Pool initializes 3 workers successfully
-  - [ ] Workers respond to postMessage with echo or simple transform
-  - [ ] Pool correctly tracks worker status
+- [x] Create `server/src/workers/worker-pool.ts` with WorkerPool class (AC: 1, 6, 7)
+  - [x] Define WorkerPool class with configurable size (default: 3)
+  - [x] Implement worker status tracking (idle/busy map keyed by worker ID)
+  - [x] Implement task queue (FIFO array) for when all workers busy
+  - [x] Implement exec(data) method returning Promise<TransformedRace>
+  - [x] Export singleton pool instance for application-wide use
+- [x] Create `server/src/workers/transformWorker.ts` worker script (AC: 2, 3)
+  - [x] Set up message listener using parentPort.on('message')
+  - [x] Define typed message payload schema with Zod
+  - [x] Implement postMessage response with transformed data
+  - [x] Add error event handlers for uncaught exceptions
+- [x] Implement worker lifecycle management (AC: 4, 8)
+  - [x] Bootstrap worker threads on pool initialization
+  - [x] Listen for worker 'error' and 'exit' events
+  - [x] Implement graceful worker restart on crash (log + create new worker)
+  - [x] Initialize pool in application startup (server/src/index.ts or bootstrap)
+- [x] Implement task queuing and assignment (AC: 5, 6)
+  - [x] Queue tasks when all workers are busy
+  - [x] Assign queued tasks to workers as they become available
+  - [x] Track active task count and queue depth
+  - [x] Ensure FIFO ordering for task assignment
+- [x] Add structured logging with Pino (AC: 9)
+  - [x] Log worker start events (workerId, script path)
+  - [x] Log task assignment (workerId, taskId/raceId)
+  - [x] Log task completion (workerId, taskId, duration)
+  - [x] Log worker crash/restart events with error details
+- [x] Write unit tests for worker pool
+  - [x] Test worker pool initialization with correct worker count
+  - [x] Test task assignment to idle workers
+  - [x] Test task queuing when all workers busy
+  - [x] Test exec() Promise resolution on successful transform
+  - [x] Test exec() Promise rejection on worker failure
+  - [x] Test worker status tracking (idle → busy → idle transitions)
+  - [x] Mock worker threads using Vitest worker mocks
+- [x] Integration test: Initialize pool and verify worker readiness
+  - [x] Pool initializes 3 workers successfully
+  - [x] Workers respond to postMessage with echo or simple transform
+  - [x] Pool correctly tracks worker status
 
 ## Dev Notes
 
@@ -105,9 +105,23 @@ claude-sonnet-4-5-20250929 (Sonnet 4.5)
 
 ### Debug Log References
 
+- **2025-10-10 – Implementation Plan:** Stage work by (a) scaffolding `server/src/workers` with `worker-pool.ts` + singleton that tracks worker states, queue depth, metrics, and Promise resolution (AC1, AC5–AC7); (b) authoring `transformWorker.ts` to load Zod schemas, validate payloads, execute placeholder transform hook, and reply via `postMessage` while trapping errors (AC2–AC4); (c) wiring lifecycle handlers for crash/restart and startup bootstrap in `server/src/index.ts` (AC4, AC8); (d) layering structured Pino logging around worker lifecycle + queue stats (AC6, AC9); (e) delivering Vitest unit/integration suites that mock Worker threads and verify queueing, metrics, restart, and Promise semantics (test tasks, AC1–AC7).
+
 ### Completion Notes List
 
+- **2025-10-10 – Worker pool delivered and validated:** Implemented WorkerPool singleton with temp TS compilation fallback entry, comprehensive queueing/restart logic, Pino lifecycle logging, and integration/unit suites covering idle/busy states, FIFO queueing, crash recovery, and real worker exec; validated via `npm run test:unit` and `npm run test:integration`.
+- **2025-10-10 – Worker pool runtime dependencies hardened:** Removed on-the-fly TypeScript compilation, added guarded loader for dev-only `tsx`, and introduced production runtime test coverage to guarantee worker threads boot without dev dependencies (AC2, AC8).
+
 ### File List
+
+- server/src/index.ts
+- server/src/workers/messages.ts
+- server/src/workers/transformWorker.ts
+- server/src/workers/transformWorker.entry.js
+- server/src/workers/worker-pool.ts
+- server/tests/unit/workers/worker-pool.test.ts
+- server/tests/unit/workers/worker-pool.prod-env.test.ts
+- server/tests/integration/workers/worker-pool.integration.test.ts
 
 ## Change Log
 
@@ -120,6 +134,20 @@ claude-sonnet-4-5-20250929 (Sonnet 4.5)
 - Story context XML generated with documentation artifacts, code references, interfaces, constraints, and test ideas
 
 **2025-10-10** - Senior Developer Review notes appended by warrick (AI reviewer)
+
+**2025-10-10** - Worker pool infrastructure implemented by warrick (Dev agent)
+
+- Added worker pool module, transform worker script, message schemas, and startup wiring to satisfy AC1–AC9
+- Authored Vitest unit and integration coverage for queueing, restart, metrics, and happy-path execution
+- Registered new worker entry loader to support TypeScript execution in dev environments and ensured teardown cleans temp artifacts
+
+**2025-10-10** - Worker pool production runtime hardened by Amelia (Dev agent)
+
+- Removed dynamic TypeScript compiler usage from `worker-pool.ts` and replaced with build-time entry resolution
+- Updated `transformWorker.entry.js` to avoid loading `tsx` in production and to error with actionable guidance when builds are missing
+- Added `worker-pool.prod-env.test.ts` ensuring production environments operate without dev-only dependencies
+
+**2025-10-10** - Senior Developer Review (second pass) notes appended by warrick (AI reviewer)
 
 ## Senior Developer Review (AI)
 
@@ -163,3 +191,39 @@ claude-sonnet-4-5-20250929 (Sonnet 4.5)
 1. Implement `server/src/workers/worker-pool.ts`, `transformWorker.ts`, and associated queueing/restart logic per AC1–AC9, exporting a singleton and wiring it into application startup.
 2. Add structured Pino logging around worker lifecycle events and expose pool metrics for observability.
 3. Deliver unit and integration tests covering worker initialization, task queueing, promise resolution/rejection, restart handling, and metrics reporting.
+
+## Senior Developer Review (AI)
+
+**Reviewer:** warrick  
+**Date:** 2025-10-10  
+**Outcome:** Changes Requested
+
+**Summary**
+- Worker pool code and tests exist, but mandatory runtime dependencies are still marked as dev-only, so the production build crashes before any worker threads start.
+
+**Key Findings**
+- **High** – `worker-pool.ts` requires `typescript` during module import (`server/src/workers/worker-pool.ts:20`), yet `typescript` remains in devDependencies only (`server/package.json:33-50`). A production install with `npm ci --omit=dev` cannot load the worker pool, leaving AC2/AC8 unmet.
+- **High** – `transformWorker.entry.js` unconditionally imports `tsx/esm/api` (`server/src/workers/transformWorker.entry.js:4`), but `tsx` is also scoped to devDependencies (`server/package.json:33-50`). Worker threads therefore fail immediately in production, preventing any transform execution (AC2/AC8).
+
+**Acceptance Criteria Coverage**
+- AC1, AC3, AC4, AC5, AC6, AC7, AC9: Implementation present pending dependency fix.
+- AC2: Not Met – Missing runtime dependency stops workers from spawning.
+- AC8: Not Met – Worker pool cannot initialize in production when devDependencies are omitted.
+
+**Test Coverage and Gaps**
+- Unit and integration suites validate queueing, restart, and success/error flows, but no test simulates a production install without devDependencies. Add coverage (e.g., CI step) to surface this regression.
+
+**Architectural Alignment**
+- Structure aligns with the worker-pool blueprint, but runtime availability is blocked until the dependency issue is resolved.
+
+**Security Notes**
+- No new security regressions detected; primary risk is availability.
+
+**Best-Practices and References**
+- Node.js Worker Threads API – https://nodejs.org/api/worker_threads.html
+- npm install documentation on dependency types – https://docs.npmjs.com/cli/v10/configuring-npm/install#production
+
+**Action Items**
+1. Gate the `typescript` import behind the fallback path or precompile the worker so production never requires `typescript` (`server/src/workers/worker-pool.ts`) – restores AC2/AC8.
+2. Replace the `tsx` loader with a production-safe entry point or promote `tsx` to a runtime dependency so workers can boot (`server/src/workers/transformWorker.entry.js`) – restores AC2/AC8.
+3. Add a CI/QA check that installs with `--omit=dev` and starts the server to ensure runtime dependencies stay correct.
