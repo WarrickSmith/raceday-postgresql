@@ -1,0 +1,192 @@
+{
+  "description": "Real NZTAB API response - Race at Awapuni Synthetic with money_tracker data",
+  "source": "NZTAB API /affiliates/v1/racing/events/0f57e087-00d9-4c61-9549-835abe2ae2ed",
+  "captured": "2025-07-17T11:16:59Z",
+  "enabled_params": {
+    "with_money_tracker": true,
+    "with_tote_trends_data": true,
+    "with_will_pays": true
+  },
+  "race_data": {
+    "id": "0f57e087-00d9-4c61-9549-835abe2ae2ed",
+    "name": "PRYDA HANDICAP 1700",
+    "status": "final",
+    "race_date_nz": "2025-07-17",
+    "start_time_nz": "12:50",
+    "race_number": 1,
+    "meeting_id": "e9f2039d-d489-4a7d-aae1-d66225f1a5f4",
+    "entrants": [
+      {
+        "entrantId": "8f3f3ac0-5689-4ec6-a560-c8b451bb383d",
+        "name": "RUJI",
+        "runnerNumber": 4,
+        "barrier": 4,
+        "fixedWinOdds": 3.5,
+        "fixedPlaceOdds": 1.8,
+        "isScratched": false
+      },
+      {
+        "entrantId": "f2f0758e-2e1f-4f14-aece-0b894334bcf8",
+        "name": "STARPELLO",
+        "runnerNumber": 5,
+        "barrier": 5,
+        "fixedWinOdds": 4.0,
+        "fixedPlaceOdds": 2.0,
+        "isScratched": false
+      },
+      {
+        "entrantId": "7346bd2c-c03d-41c3-bcb9-2b085c4e72cd",
+        "name": "DEALERS CHOICE",
+        "runnerNumber": 3,
+        "barrier": 3,
+        "fixedWinOdds": 5.0,
+        "fixedPlaceOdds": 2.2,
+        "isScratched": false
+      },
+      {
+        "entrantId": "61181b8c-a540-43a8-900c-83ebe680e218",
+        "name": "TICKFORD",
+        "runnerNumber": 1,
+        "barrier": 1,
+        "fixedWinOdds": 6.5,
+        "fixedPlaceOdds": 2.5,
+        "isScratched": false
+      },
+      {
+        "entrantId": "a8cc87d4-5a53-47b2-bb26-58d555aac7c0",
+        "name": "KEEPITINYOURWALLET",
+        "runnerNumber": 6,
+        "barrier": 6,
+        "fixedWinOdds": 7.0,
+        "fixedPlaceOdds": 2.8,
+        "isScratched": false
+      },
+      {
+        "entrantId": "677c1727-e256-48a4-9016-a07e10d65edc",
+        "name": "FROSBIE",
+        "runnerNumber": 2,
+        "barrier": 2,
+        "fixedWinOdds": 8.5,
+        "fixedPlaceOdds": 3.0,
+        "isScratched": false
+      },
+      {
+        "entrantId": "00e07f98-6cba-4018-be48-233a677f42e1",
+        "name": "SUNSHINE ALE",
+        "runnerNumber": 7,
+        "barrier": 7,
+        "fixedWinOdds": 12.0,
+        "fixedPlaceOdds": 3.5,
+        "isScratched": false
+      },
+      {
+        "entrantId": "5c36550d-e87a-467a-bb49-45537de774d2",
+        "name": "MERCHANT BANKER",
+        "runnerNumber": 8,
+        "barrier": 8,
+        "fixedWinOdds": 15.0,
+        "fixedPlaceOdds": 4.0,
+        "isScratched": false
+      }
+    ],
+    "pools": {
+      "totalPool": 125000,
+      "winPool": 75000,
+      "placePool": 50000,
+      "holdPercentage": null,
+      "betPercentage": null
+    },
+    "money_tracker": {
+      "entrants": [
+        {
+          "entrant_id": "8f3f3ac0-5689-4ec6-a560-c8b451bb383d",
+          "hold_percentage": 11,
+          "bet_percentage": 9
+        },
+        {
+          "entrant_id": "f2f0758e-2e1f-4f14-aece-0b894334bcf8",
+          "hold_percentage": 9,
+          "bet_percentage": 8
+        },
+        {
+          "entrant_id": "7346bd2c-c03d-41c3-bcb9-2b085c4e72cd",
+          "hold_percentage": 10,
+          "bet_percentage": 7
+        },
+        {
+          "entrant_id": "61181b8c-a540-43a8-900c-83ebe680e218",
+          "hold_percentage": 0,
+          "bet_percentage": 0
+        },
+        {
+          "entrant_id": "a8cc87d4-5a53-47b2-bb26-58d555aac7c0",
+          "hold_percentage": 8,
+          "bet_percentage": 6
+        },
+        {
+          "entrant_id": "677c1727-e256-48a4-9016-a07e10d65edc",
+          "hold_percentage": 3,
+          "bet_percentage": 3
+        },
+        {
+          "entrant_id": "00e07f98-6cba-4018-be48-233a677f42e1",
+          "hold_percentage": 2,
+          "bet_percentage": 4
+        },
+        {
+          "entrant_id": "5c36550d-e87a-467a-bb49-45537de774d2",
+          "hold_percentage": 1,
+          "bet_percentage": 2
+        }
+      ]
+    },
+    "meeting": {
+      "meeting": "NZ-AWA-20250717",
+      "name": "Awapuni Synthetic",
+      "date": "2025-07-17T00:00:00Z",
+      "country": "NZ",
+      "category": "T",
+      "category_name": "Thoroughbred",
+      "state": "Awapuni",
+      "track_condition": "Synthetic",
+      "tote_status": "open"
+    }
+  },
+  "expected_calculations": {
+    "runner_4_ruji": {
+      "hold_percentage": 11,
+      "bet_percentage": 9,
+      "win_pool_amount": 825000,
+      "place_pool_amount": 550000,
+      "total_pool_amount": 1375000,
+      "win_pool_percentage": 11.0,
+      "place_pool_percentage": 11.0
+    },
+    "runner_5_starpello": {
+      "hold_percentage": 9,
+      "bet_percentage": 8,
+      "win_pool_amount": 675000,
+      "place_pool_amount": 450000,
+      "total_pool_amount": 1125000,
+      "win_pool_percentage": 9.0,
+      "place_pool_percentage": 9.0
+    },
+    "runner_3_dealers_choice": {
+      "hold_percentage": 10,
+      "bet_percentage": 7,
+      "win_pool_amount": 750000,
+      "place_pool_amount": 500000,
+      "total_pool_amount": 1250000,
+      "win_pool_percentage": 10.0,
+      "place_pool_percentage": 10.0
+    }
+  },
+  "notes": [
+    "money_tracker.entrants[] contains hold_percentage and bet_percentage per entrant",
+    "Percentages are integers (not decimals) representing percentage of total pool",
+    "Multiple entries per entrant_id can occur (historical snapshots)",
+    "For Story 2.4 transform, use most recent entry per entrant",
+    "Pool amounts calculated as: (poolTotal * hold_percentage / 100) * 100 cents",
+    "Zero percentages indicate scratched or non-backed runners"
+  ]
+}
