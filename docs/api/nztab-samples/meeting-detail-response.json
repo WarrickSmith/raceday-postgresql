@@ -1,0 +1,164 @@
+{
+    "header": {
+        "title": "Get meeting by id",
+        "generated_time": "2025-07-17T10:50:32.499932693Z",
+        "url": "/affiliates/v1/racing/meetings/d3f82a25-7acb-4a07-a942-e5fb36a1e426?enc=json"
+    },
+    "params": {
+        "enc": "json",
+        "id": "d3f82a25-7acb-4a07-a942-e5fb36a1e426"
+    },
+    "data": {
+        "meetings": [
+            {
+                "meeting": "d3f82a25-7acb-4a07-a942-e5fb36a1e426",
+                "name": "Grafton",
+                "date": "2025-07-17T00:00:00Z",
+                "track_condition": "Good4",
+                "category": "T",
+                "category_name": "Thoroughbred Horse Racing",
+                "country": "AUS",
+                "state": "NSW",
+                "races": [
+                    {
+                        "id": "2a862302-6e24-427a-8470-77b59f3b59e4",
+                        "race_number": 1,
+                        "name": "Sky Racing Mother's Gift",
+                        "start_time": "2025-07-17T02:42:00Z",
+                        "tote_start_time": "14:42:00",
+                        "track_condition": "Good4",
+                        "distance": 1400,
+                        "weather": "FINE",
+                        "country": "AUS",
+                        "state": "NSW",
+                        "status": "Final"
+                    },
+                    {
+                        "id": "3c4ff666-90b5-4a98-bd0c-13706f9f7fae",
+                        "race_number": 2,
+                        "name": "The Provedores Country Boosted Showcase Hcp (C1)",
+                        "start_time": "2025-07-17T03:20:00Z",
+                        "tote_start_time": "15:20:00",
+                        "track_condition": "Good4",
+                        "distance": 1400,
+                        "weather": "FINE",
+                        "country": "AUS",
+                        "state": "NSW",
+                        "status": "Final"
+                    },
+                    {
+                        "id": "5ace6d61-7b59-4274-90dc-1f2f4f95fb5e",
+                        "race_number": 3,
+                        "name": "Corbett Earthmoving Big Super Showcase Mdn",
+                        "start_time": "2025-07-17T03:50:00Z",
+                        "tote_start_time": "15:50:00",
+                        "track_condition": "Good4",
+                        "distance": 1175,
+                        "weather": "FINE",
+                        "country": "AUS",
+                        "state": "NSW",
+                        "status": "Final"
+                    },
+                    {
+                        "id": "092c9c2c-f7c8-45ea-8656-a8cd1a904560",
+                        "race_number": 4,
+                        "name": "Nbn News Springboard To Fame 2Yo Showcase",
+                        "start_time": "2025-07-17T04:23:00Z",
+                        "tote_start_time": "16:23:00",
+                        "track_condition": "Good4",
+                        "distance": 1175,
+                        "weather": "FINE",
+                        "country": "AUS",
+                        "state": "NSW",
+                        "status": "Final"
+                    },
+                    {
+                        "id": "932447f4-19c4-41b2-add9-c8ae66fce052",
+                        "race_number": 5,
+                        "name": "Village Green Hotel Showcase (Bm66)",
+                        "start_time": "2025-07-17T04:53:00Z",
+                        "tote_start_time": "16:53:00",
+                        "track_condition": "Good4",
+                        "distance": 1000,
+                        "weather": "FINE",
+                        "country": "AUS",
+                        "state": "NSW",
+                        "status": "Final"
+                    },
+                    {
+                        "id": "9c68f112-c63b-4d2b-96ba-482a679bd86e",
+                        "race_number": 6,
+                        "name": "Era Legal Belflyer Association Showcase Plate",
+                        "start_time": "2025-07-17T05:25:00Z",
+                        "tote_start_time": "17:25:00",
+                        "track_condition": "Good4",
+                        "distance": 1175,
+                        "weather": "FINE",
+                        "country": "AUS",
+                        "state": "NSW",
+                        "status": "Final"
+                    },
+                    {
+                        "id": "48a84406-6494-4d7f-abd9-6fbb5d621308",
+                        "race_number": 7,
+                        "name": "Westlawn Finance Grafton Cup (L)",
+                        "start_time": "2025-07-17T06:05:00Z",
+                        "tote_start_time": "18:05:00",
+                        "track_condition": "Good4",
+                        "distance": 2350,
+                        "weather": "FINE",
+                        "country": "AUS",
+                        "state": "NSW",
+                        "status": "Final"
+                    },
+                    {
+                        "id": "7b791209-5cdf-4ee5-acaf-12de9b2c8f2c",
+                        "race_number": 8,
+                        "name": "Sir James Kirby Qlty",
+                        "start_time": "2025-07-17T06:40:00Z",
+                        "tote_start_time": "18:40:00",
+                        "track_condition": "Good4",
+                        "distance": 1000,
+                        "weather": "FINE",
+                        "country": "AUS",
+                        "state": "NSW",
+                        "status": "Final"
+                    }
+                ],
+                "video_channels": [
+                    "Trackside1",
+                    "Trackside2"
+                ],
+                "quaddie": [
+                    5,
+                    6,
+                    7,
+                    8
+                ],
+                "early_quaddie": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "tote_meeting_number": 21,
+                "tote_raceday_date": "2025-07-17",
+                "tote_status": "Open",
+                "jetbet_club_name": "",
+                "club_day": 228,
+                "club_mnemonic": "NSWC",
+                "jetbet_track_name": "Grafton",
+                "sell_date": "2025-07-17",
+                "fob_mnemonic": "",
+                "fob_sell_date": "",
+                "fob_close_date": "",
+                "fob_complete_date": "",
+                "fob_club_day": 0,
+                "meeting_date": "2025-07-17",
+                "track_mnemonic": "INTL",
+                "is_fob_meeting": false,
+                "meeting_type": ""
+            }
+        ]
+    }
+}

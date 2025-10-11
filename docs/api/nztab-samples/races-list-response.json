@@ -1,0 +1,884 @@
+{
+    "header": {
+        "title": "List Races",
+        "generated_time": "2025-07-17T11:07:39.058303432Z",
+        "url": "/affiliates/v1/racing/list?date_from=today"
+    },
+    "params": {
+        "enc": "json",
+        "limit": 100,
+        "countries": null,
+        "meet_types": null,
+        "date_from": "2025-07-17T00:00:00Z",
+        "date_to": "2025-07-17T23:59:59.999999999Z",
+        "order_by": 1,
+        "page_token": ""
+    },
+    "data": {
+        "races": [
+            {
+                "id": "ad4131bd-d118-4e11-82a8-d431a2d883b2",
+                "name": "GREYHOUNDS NORTH DISTANCE",
+                "number": 1,
+                "meeting_id": "0274bcea-2819-4855-a51e-b77074dc6af0",
+                "advertised_start": "2025-07-17T00:00:00Z",
+                "actual_start": "2025-07-17T00:00:22Z"
+            },
+            {
+                "id": "b5a2ca27-62c2-4a12-a5cf-f7c28c903e71",
+                "name": "5F Stakes",
+                "number": 7,
+                "meeting_id": "e02e4153-1eed-400c-a08c-eee8f66009c4",
+                "advertised_start": "2025-07-17T00:01:00Z",
+                "actual_start": "2025-07-17T00:02:26Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI0NzAx_SPRITE_64x64.png"
+            },
+            {
+                "id": "852f64c5-633d-4d57-9b79-295db8d06554",
+                "name": "5 1/2F Hcap",
+                "number": 14,
+                "meeting_id": "062bbc1f-e118-41c0-a57f-f4077930cb1c",
+                "advertised_start": "2025-07-17T00:05:00Z",
+                "actual_start": "2025-07-17T00:07:49Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3Njcx_SPRITE_64x64.png"
+            },
+            {
+                "id": "7cc8201e-8bc5-499f-9918-4689bd3d61c4",
+                "name": "Race 6",
+                "number": 6,
+                "meeting_id": "e68acc95-2887-4a87-888f-b3b8af39a608",
+                "advertised_start": "2025-07-17T00:07:00Z",
+                "actual_start": "2025-07-17T00:11:53Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2Nzky_SPRITE_64x64.png"
+            },
+            {
+                "id": "d5a60f79-85e9-4756-b751-da4b05abf6e7",
+                "name": "MARSHALL INDUSTRIES MOBILE PACE",
+                "number": 2,
+                "meeting_id": "85fc0c65-6b71-4aaf-a879-51aaefe4b746",
+                "advertised_start": "2025-07-17T00:08:00Z",
+                "actual_start": "2025-07-17T00:09:08Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3NDMx_SPRITE_64x64.png"
+            },
+            {
+                "id": "07c7d53a-a62f-4cb0-a0cb-64ad1391fbb4",
+                "name": "Race 3 - Claiming",
+                "number": 3,
+                "meeting_id": "8c0018d7-c3e1-47fa-9758-10b749b51d3a",
+                "advertised_start": "2025-07-17T00:09:00Z",
+                "actual_start": "2025-07-17T00:11:16Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2MDY2_SPRITE_64x64.png"
+            },
+            {
+                "id": "dcbac494-8d59-4f2c-af72-90938dff3dd1",
+                "name": "Race 5 - 1609M",
+                "number": 5,
+                "meeting_id": "02debefa-9cef-40f3-8433-22901f961012",
+                "advertised_start": "2025-07-17T00:16:00Z",
+                "actual_start": "2025-07-17T00:19:24Z"
+            },
+            {
+                "id": "3c716825-0318-413c-80dd-43b98e14ca2b",
+                "name": "Race 6 - Claiming",
+                "number": 6,
+                "meeting_id": "b706323a-c723-4f2c-80e6-34f2e0d54622",
+                "advertised_start": "2025-07-17T00:16:00Z",
+                "actual_start": "2025-07-17T00:17:54Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzIzNTU4_SPRITE_64x64.png"
+            },
+            {
+                "id": "7ee512be-702e-418c-9277-0fac54effe4f",
+                "name": "FOLLOW WAIKATO GREYHOUNDS ON FACEBOOK SPRINT PBD",
+                "number": 2,
+                "meeting_id": "0274bcea-2819-4855-a51e-b77074dc6af0",
+                "advertised_start": "2025-07-17T00:24:00Z",
+                "actual_start": "2025-07-17T00:24:31Z"
+            },
+            {
+                "id": "c9592f05-2f82-4d89-8b61-8a410ba3f1af",
+                "name": "Race 3 - Claiming",
+                "number": 3,
+                "meeting_id": "60809757-2272-4b15-baed-a848ea8ba56c",
+                "advertised_start": "2025-07-17T00:25:00Z",
+                "actual_start": "2025-07-17T00:26:36Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3OTY3_SPRITE_64x64.png"
+            },
+            {
+                "id": "ca77df95-9975-4e80-96ef-6815bc91a5ca",
+                "name": "Race 5",
+                "number": 5,
+                "meeting_id": "7dc56995-cf86-4e52-8fa6-e4b8c8d70ade",
+                "advertised_start": "2025-07-17T00:26:00Z",
+                "actual_start": "2025-07-17T00:26:05Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3MDM0_SPRITE_64x64.png"
+            },
+            {
+                "id": "6fb37b11-b1fc-40a4-8bb5-3977ca54f16e",
+                "name": "13 Races Today (300+ Rank)",
+                "number": 1,
+                "meeting_id": "7bfb3fa2-13c6-45a2-8127-ab9d3e8289b7",
+                "advertised_start": "2025-07-17T00:28:00Z",
+                "actual_start": "2025-07-17T00:29:02Z"
+            },
+            {
+                "id": "4ce6c8ba-9fc0-4030-ae46-efde55257b8b",
+                "name": "Race 7",
+                "number": 7,
+                "meeting_id": "e68acc95-2887-4a87-888f-b3b8af39a608",
+                "advertised_start": "2025-07-17T00:28:00Z",
+                "actual_start": "2025-07-17T00:32:37Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2Nzkz_SPRITE_64x64.png"
+            },
+            {
+                "id": "52e4dcf7-36a4-4ac2-a99e-6fe637f47b7e",
+                "name": "UPPERCUTS BUTCHERY MOBILE PACE",
+                "number": 3,
+                "meeting_id": "85fc0c65-6b71-4aaf-a879-51aaefe4b746",
+                "advertised_start": "2025-07-17T00:33:00Z",
+                "actual_start": "2025-07-17T00:33:36Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3NDMy_SPRITE_64x64.png"
+            },
+            {
+                "id": "a497ab86-cfc1-4581-b111-a262130b85b2",
+                "name": "Race 1 - Claiming",
+                "number": 1,
+                "meeting_id": "cfe06392-0440-4f17-9c96-d62d5be8f95b",
+                "advertised_start": "2025-07-17T00:35:00Z",
+                "actual_start": "2025-07-17T00:35:44Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2NzQ2_SPRITE_64x64.png"
+            },
+            {
+                "id": "ac85ce29-7777-4076-9d43-7611b2391ddd",
+                "name": "5 1/2F Hcap",
+                "number": 15,
+                "meeting_id": "062bbc1f-e118-41c0-a57f-f4077930cb1c",
+                "advertised_start": "2025-07-17T00:35:00Z",
+                "actual_start": "2025-07-17T00:40:39Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3Njc0_SPRITE_64x64.png"
+            },
+            {
+                "id": "550f4ad6-e12b-4b4c-8cd6-ead264e2f060",
+                "name": "Race 4 - Maiden Claiming",
+                "number": 4,
+                "meeting_id": "8c0018d7-c3e1-47fa-9758-10b749b51d3a",
+                "advertised_start": "2025-07-17T00:36:00Z",
+                "actual_start": "2025-07-17T00:38:06Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2MDY3_SPRITE_64x64.png"
+            },
+            {
+                "id": "de163897-4d6b-4fee-8c31-cf3567a85675",
+                "name": "Race 6 - 1609M",
+                "number": 6,
+                "meeting_id": "02debefa-9cef-40f3-8433-22901f961012",
+                "advertised_start": "2025-07-17T00:39:00Z",
+                "actual_start": "2025-07-17T00:42:20Z"
+            },
+            {
+                "id": "e625e147-7aaf-478b-88e7-f8c6a3440b33",
+                "name": "OUR DOGS LOVE TO RACE SPRINT PBD",
+                "number": 3,
+                "meeting_id": "0274bcea-2819-4855-a51e-b77074dc6af0",
+                "advertised_start": "2025-07-17T00:41:00Z",
+                "actual_start": "2025-07-17T00:41:38Z"
+            },
+            {
+                "id": "ae32a5d0-f779-41d6-8ba8-2b830c44225d",
+                "name": "Shepp City Fencing (300+ Rank)",
+                "number": 2,
+                "meeting_id": "7bfb3fa2-13c6-45a2-8127-ab9d3e8289b7",
+                "advertised_start": "2025-07-17T00:46:00Z",
+                "actual_start": "2025-07-17T00:46:40Z"
+            },
+            {
+                "id": "bec1e2b2-3f58-49f5-b78a-29dfefc007c0",
+                "name": "Race 6",
+                "number": 6,
+                "meeting_id": "7dc56995-cf86-4e52-8fa6-e4b8c8d70ade",
+                "advertised_start": "2025-07-17T00:49:00Z",
+                "actual_start": "2025-07-17T00:49:26Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3MDQw_SPRITE_64x64.png"
+            },
+            {
+                "id": "e5086227-fb87-47b5-b2ce-944621853e45",
+                "name": "Race 7 - Claiming",
+                "number": 7,
+                "meeting_id": "b706323a-c723-4f2c-80e6-34f2e0d54622",
+                "advertised_start": "2025-07-17T00:49:00Z",
+                "actual_start": "2025-07-17T00:49:18Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzIzNTUy_SPRITE_64x64.png"
+            },
+            {
+                "id": "0f57e087-00d9-4c61-9549-835abe2ae2ed",
+                "name": "PRYDA HANDICAP 1700",
+                "number": 1,
+                "meeting_id": "e9f2039d-d489-4a7d-aae1-d66225f1a5f4",
+                "advertised_start": "2025-07-17T00:50:00Z",
+                "actual_start": "2025-07-17T00:52:46Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI4MjM0_SPRITE_64x64.png"
+            },
+            {
+                "id": "2033921e-9560-4a1c-b659-0acdfe01d929",
+                "name": "Race 4 - Maiden Special Weight",
+                "number": 4,
+                "meeting_id": "60809757-2272-4b15-baed-a848ea8ba56c",
+                "advertised_start": "2025-07-17T00:50:00Z",
+                "actual_start": "2025-07-17T00:51:11Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3OTY4_SPRITE_64x64.png"
+            },
+            {
+                "id": "47a025f7-1570-4735-9115-3f2fb71b59d4",
+                "name": "VIRKON'S DISINFECTANT STAKES PBD",
+                "number": 4,
+                "meeting_id": "0274bcea-2819-4855-a51e-b77074dc6af0",
+                "advertised_start": "2025-07-17T00:58:00Z",
+                "actual_start": "2025-07-17T00:58:58Z"
+            },
+            {
+                "id": "c5eeccc1-2a12-4d6d-a8d7-8a305d1a64be",
+                "name": "Race 2 - Maiden Special Weight",
+                "number": 2,
+                "meeting_id": "cfe06392-0440-4f17-9c96-d62d5be8f95b",
+                "advertised_start": "2025-07-17T01:00:00Z",
+                "actual_start": "2025-07-17T01:01:44Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2NzQ3_SPRITE_64x64.png"
+            },
+            {
+                "id": "d2f267d8-f086-4220-9c70-939bdaf9e7cd",
+                "name": "Race 8",
+                "number": 8,
+                "meeting_id": "e68acc95-2887-4a87-888f-b3b8af39a608",
+                "advertised_start": "2025-07-17T01:01:00Z",
+                "actual_start": "2025-07-17T01:03:12Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2Nzk0_SPRITE_64x64.png"
+            },
+            {
+                "id": "ad41770b-c6b0-4dc2-bcf5-7ecf5b379cc8",
+                "name": "Race 5 - Maiden Claiming",
+                "number": 5,
+                "meeting_id": "8c0018d7-c3e1-47fa-9758-10b749b51d3a",
+                "advertised_start": "2025-07-17T01:03:00Z",
+                "actual_start": "2025-07-17T01:05:32Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2MDcw_SPRITE_64x64.png"
+            },
+            {
+                "id": "a76ee688-573f-4329-94c3-e8727a9daf39",
+                "name": "Byers Electrical (300+ Rank)",
+                "number": 3,
+                "meeting_id": "7bfb3fa2-13c6-45a2-8127-ab9d3e8289b7",
+                "advertised_start": "2025-07-17T01:04:00Z",
+                "actual_start": "2025-07-17T01:04:42Z"
+            },
+            {
+                "id": "b92744c6-08d6-4862-a342-e14e2554d4aa",
+                "name": "Race 7 - 1609M",
+                "number": 7,
+                "meeting_id": "02debefa-9cef-40f3-8433-22901f961012",
+                "advertised_start": "2025-07-17T01:04:00Z",
+                "actual_start": "2025-07-17T01:04:27Z"
+            },
+            {
+                "id": "e4f6a064-2a9e-42cc-afd3-506b918d8d32",
+                "name": "KERRY HODGES MEMORIAL WINTER REWARDS TROT",
+                "number": 4,
+                "meeting_id": "85fc0c65-6b71-4aaf-a879-51aaefe4b746",
+                "advertised_start": "2025-07-17T01:06:00Z",
+                "actual_start": "2025-07-17T01:06:49Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3NDI3_SPRITE_64x64.png"
+            },
+            {
+                "id": "9e1b0a55-15e6-419a-8c9f-649be0f8738a",
+                "name": "Race 5 - Starter Allowance",
+                "number": 5,
+                "meeting_id": "60809757-2272-4b15-baed-a848ea8ba56c",
+                "advertised_start": "2025-07-17T01:11:00Z",
+                "actual_start": "2025-07-17T01:16:46Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3OTY5_SPRITE_64x64.png"
+            },
+            {
+                "id": "11bd761a-50d1-4e8f-875b-da43a36295e0",
+                "name": "Race 7",
+                "number": 7,
+                "meeting_id": "7dc56995-cf86-4e52-8fa6-e4b8c8d70ade",
+                "advertised_start": "2025-07-17T01:12:00Z",
+                "actual_start": "2025-07-17T01:12:26Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3MDM2_SPRITE_64x64.png"
+            },
+            {
+                "id": "07ead3b1-0e6e-4d56-9513-f0101d0e3c7d",
+                "name": "NIGHTRAVE REHOMING AGENCY FOR GREYHOUNDS SPRINT",
+                "number": 5,
+                "meeting_id": "0274bcea-2819-4855-a51e-b77074dc6af0",
+                "advertised_start": "2025-07-17T01:15:00Z",
+                "actual_start": "2025-07-17T01:16:00Z"
+            },
+            {
+                "id": "46bcf3c8-0927-4d2c-9061-5585e754e749",
+                "name": "Top Cat Video (300+ Rank)",
+                "number": 4,
+                "meeting_id": "7bfb3fa2-13c6-45a2-8127-ab9d3e8289b7",
+                "advertised_start": "2025-07-17T01:20:00Z",
+                "actual_start": "2025-07-17T01:20:38Z"
+            },
+            {
+                "id": "12ce2863-0e6d-4115-8d5e-0a8a6872dae8",
+                "name": "Race 9",
+                "number": 9,
+                "meeting_id": "e68acc95-2887-4a87-888f-b3b8af39a608",
+                "advertised_start": "2025-07-17T01:23:00Z",
+                "actual_start": "2025-07-17T01:25:49Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/395201422-9_SPRITE_64x64.png"
+            },
+            {
+                "id": "8cdd4f02-68e7-4b4e-96cd-a880c60ed6f0",
+                "name": "SEAHORSE SUPPLEMENTS CELEBRATING 10 YRS HCP 1700",
+                "number": 2,
+                "meeting_id": "e9f2039d-d489-4a7d-aae1-d66225f1a5f4",
+                "advertised_start": "2025-07-17T01:25:00Z",
+                "actual_start": "2025-07-17T01:25:38Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI4MjM1_SPRITE_64x64.png"
+            },
+            {
+                "id": "0826e890-19c5-4e0f-bee0-3bc7ebc45f81",
+                "name": "Race 3 - Claiming",
+                "number": 3,
+                "meeting_id": "cfe06392-0440-4f17-9c96-d62d5be8f95b",
+                "advertised_start": "2025-07-17T01:25:00Z",
+                "actual_start": "2025-07-17T01:27:08Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2NzQ0_SPRITE_64x64.png"
+            },
+            {
+                "id": "714ad095-7a6f-48f5-9d9d-a091f4bf8bad",
+                "name": "Race 8 - 1609M",
+                "number": 8,
+                "meeting_id": "02debefa-9cef-40f3-8433-22901f961012",
+                "advertised_start": "2025-07-17T01:25:00Z",
+                "actual_start": "2025-07-17T01:29:35Z"
+            },
+            {
+                "id": "8ca73399-9b40-4183-af2a-7d5c5e1bee61",
+                "name": "Race 6 - Maiden",
+                "number": 6,
+                "meeting_id": "8c0018d7-c3e1-47fa-9758-10b749b51d3a",
+                "advertised_start": "2025-07-17T01:30:00Z",
+                "actual_start": "2025-07-17T01:33:40Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2MDcy_SPRITE_64x64.png"
+            },
+            {
+                "id": "adb8f9c0-6250-4d1b-aa96-e839769cbb68",
+                "name": "COPRICE WORKING DOG BEEF SPRINT SERIES FINAL PBD",
+                "number": 6,
+                "meeting_id": "0274bcea-2819-4855-a51e-b77074dc6af0",
+                "advertised_start": "2025-07-17T01:33:00Z",
+                "actual_start": "2025-07-17T01:33:31Z"
+            },
+            {
+                "id": "072cff3b-16f4-45ca-9f99-11314d258163",
+                "name": "Race 8",
+                "number": 8,
+                "meeting_id": "7dc56995-cf86-4e52-8fa6-e4b8c8d70ade",
+                "advertised_start": "2025-07-17T01:35:00Z",
+                "actual_start": "2025-07-17T01:36:26Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3MDM1_SPRITE_64x64.png"
+            },
+            {
+                "id": "5e9e97ea-aa8e-482a-9f06-623e313d05f4",
+                "name": "Ckh Painting (300+ Rank)",
+                "number": 5,
+                "meeting_id": "7bfb3fa2-13c6-45a2-8127-ab9d3e8289b7",
+                "advertised_start": "2025-07-17T01:37:00Z",
+                "actual_start": "2025-07-17T01:37:51Z"
+            },
+            {
+                "id": "0c9e8dc7-584e-4426-9cc2-8b40c366f825",
+                "name": "Race 6 - Claiming",
+                "number": 6,
+                "meeting_id": "60809757-2272-4b15-baed-a848ea8ba56c",
+                "advertised_start": "2025-07-17T01:40:00Z",
+                "actual_start": "2025-07-17T01:42:07Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3OTYy_SPRITE_64x64.png"
+            },
+            {
+                "id": "477f99dc-ee67-4bfd-b09c-b7792ace4253",
+                "name": "BRECKON FARMS WINTER REWARDS MOBILE PACE",
+                "number": 5,
+                "meeting_id": "85fc0c65-6b71-4aaf-a879-51aaefe4b746",
+                "advertised_start": "2025-07-17T01:41:00Z",
+                "actual_start": "2025-07-17T01:41:18Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3NDI4_SPRITE_64x64.png"
+            },
+            {
+                "id": "588cbc4d-d186-44f4-b35f-41cea218dec7",
+                "name": "Race 10",
+                "number": 10,
+                "meeting_id": "e68acc95-2887-4a87-888f-b3b8af39a608",
+                "advertised_start": "2025-07-17T01:48:00Z",
+                "actual_start": "2025-07-17T01:50:34Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/395201422-10_SPRITE_64x64.png"
+            },
+            {
+                "id": "e391eacc-0ebf-49d6-8197-e9fd84f95803",
+                "name": "Race 4 - Claiming",
+                "number": 4,
+                "meeting_id": "cfe06392-0440-4f17-9c96-d62d5be8f95b",
+                "advertised_start": "2025-07-17T01:50:00Z",
+                "actual_start": "2025-07-17T01:55:33Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2NzQ1_SPRITE_64x64.png"
+            },
+            {
+                "id": "3e19ed3f-3653-48f4-adac-45fda854a1b4",
+                "name": "CLUBHOUSE CAMBRIDGE SPRINT PBD",
+                "number": 7,
+                "meeting_id": "0274bcea-2819-4855-a51e-b77074dc6af0",
+                "advertised_start": "2025-07-17T01:50:00Z",
+                "actual_start": "2025-07-17T01:50:43Z"
+            },
+            {
+                "id": "f99683c7-06d9-4cd1-8f94-464def5c1eea",
+                "name": "Race 9 - 1609M",
+                "number": 9,
+                "meeting_id": "02debefa-9cef-40f3-8433-22901f961012",
+                "advertised_start": "2025-07-17T01:53:00Z",
+                "actual_start": "2025-07-17T01:56:12Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/395209225-9_SPRITE_64x64.png"
+            },
+            {
+                "id": "e6af7252-6ded-45d3-95f6-e193e7a5ec8e",
+                "name": "Shepparton News (300+ Rank)",
+                "number": 6,
+                "meeting_id": "7bfb3fa2-13c6-45a2-8127-ab9d3e8289b7",
+                "advertised_start": "2025-07-17T01:54:00Z",
+                "actual_start": "2025-07-17T01:54:48Z"
+            },
+            {
+                "id": "289eabea-482a-4c87-85a9-6f4a54ef9142",
+                "name": "Ladbrokes Mates Mode Pots",
+                "number": 1,
+                "meeting_id": "ae166a49-cff6-4f57-83af-218ca6602069",
+                "advertised_start": "2025-07-17T01:57:00Z",
+                "actual_start": "2025-07-17T01:59:14Z"
+            },
+            {
+                "id": "915eba89-b328-40c4-a0ce-82b500640ce3",
+                "name": "Race 7 - Maiden",
+                "number": 7,
+                "meeting_id": "8c0018d7-c3e1-47fa-9758-10b749b51d3a",
+                "advertised_start": "2025-07-17T01:57:00Z",
+                "actual_start": "2025-07-17T01:59:58Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2MDcz_SPRITE_64x64.png"
+            },
+            {
+                "id": "057b3d3b-20a9-4567-adf4-01b40fdf7ae7",
+                "name": "Race 9",
+                "number": 9,
+                "meeting_id": "7dc56995-cf86-4e52-8fa6-e4b8c8d70ade",
+                "advertised_start": "2025-07-17T01:59:00Z",
+                "actual_start": "2025-07-17T02:00:14Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/395209229-9_SPRITE_64x64.png"
+            },
+            {
+                "id": "e81bc98a-4e6e-4214-8207-1f2ee6fa9094",
+                "name": "GARY DYER PAINTERS AND DECORATORS HANDICAP 2140",
+                "number": 3,
+                "meeting_id": "e9f2039d-d489-4a7d-aae1-d66225f1a5f4",
+                "advertised_start": "2025-07-17T02:00:00Z",
+                "actual_start": "2025-07-17T02:00:58Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI4MjM2_SPRITE_64x64.png"
+            },
+            {
+                "id": "a2408f49-c91d-4c5f-a36b-4fc5e151f2ba",
+                "name": "Race 7 - Starter Allowance",
+                "number": 7,
+                "meeting_id": "60809757-2272-4b15-baed-a848ea8ba56c",
+                "advertised_start": "2025-07-17T02:00:00Z",
+                "actual_start": "2025-07-17T02:06:47Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3OTYz_SPRITE_64x64.png"
+            },
+            {
+                "id": "9e63dc00-6996-4535-89a8-7e45d91ff804",
+                "name": "The Gong Spring Carnival Mdn Hcp",
+                "number": 1,
+                "meeting_id": "00c48b5a-e00e-4c5a-bf5c-8371bd9fc112",
+                "advertised_start": "2025-07-17T02:05:00Z",
+                "actual_start": "2025-07-17T02:05:34Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI4MjUw_SPRITE_64x64.png"
+            },
+            {
+                "id": "ccca4007-2cbe-4b90-9683-76d7485863cb",
+                "name": "ALL THE NEWS AT TRACKSIDE.CO.NZ SPRINT PBD",
+                "number": 8,
+                "meeting_id": "0274bcea-2819-4855-a51e-b77074dc6af0",
+                "advertised_start": "2025-07-17T02:07:00Z",
+                "actual_start": "2025-07-17T02:07:24Z"
+            },
+            {
+                "id": "605c887a-7e3b-4047-bf6a-f036dc57f185",
+                "name": "Williams Crane Hire Maiden Stake Pr2 Division1",
+                "number": 1,
+                "meeting_id": "26234dd3-1390-427e-b01d-8ee569c036e6",
+                "advertised_start": "2025-07-17T02:09:00Z",
+                "actual_start": "2025-07-17T02:09:48Z"
+            },
+            {
+                "id": "196bd5d5-8c53-4703-9df9-a2fe9117cffc",
+                "name": "Race 10 - 1609M",
+                "number": 10,
+                "meeting_id": "02debefa-9cef-40f3-8433-22901f961012",
+                "advertised_start": "2025-07-17T02:12:00Z",
+                "actual_start": "2025-07-17T02:13:46Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/395209225-10_SPRITE_64x64.png"
+            },
+            {
+                "id": "5c9f576e-fd41-45a9-86e6-6e2bc24abcd0",
+                "name": "Wick Coffee Maiden",
+                "number": 1,
+                "meeting_id": "ceadaf6b-5901-40ef-976b-839d22ed863b",
+                "advertised_start": "2025-07-17T02:13:00Z",
+                "actual_start": "2025-07-17T02:13:40Z"
+            },
+            {
+                "id": "067ef13c-9713-4d2e-ad37-cb04da6eba07",
+                "name": "Race 11",
+                "number": 11,
+                "meeting_id": "e68acc95-2887-4a87-888f-b3b8af39a608",
+                "advertised_start": "2025-07-17T02:13:00Z",
+                "actual_start": "2025-07-17T02:17:12Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/395201422-11_SPRITE_64x64.png"
+            },
+            {
+                "id": "72452aec-e5fa-4248-9bcf-13dc32aa3f06",
+                "name": "EH BALL ITM WINTER REWARDS MOBILE PACE",
+                "number": 6,
+                "meeting_id": "85fc0c65-6b71-4aaf-a879-51aaefe4b746",
+                "advertised_start": "2025-07-17T02:16:00Z",
+                "actual_start": "2025-07-17T02:16:32Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3NDI5_SPRITE_64x64.png"
+            },
+            {
+                "id": "c9fc015c-c893-46c8-b8b5-1fe93d2ce5db",
+                "name": "Race 10",
+                "number": 10,
+                "meeting_id": "7dc56995-cf86-4e52-8fa6-e4b8c8d70ade",
+                "advertised_start": "2025-07-17T02:16:00Z",
+                "actual_start": "2025-07-17T02:17:23Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/395209229-10_SPRITE_64x64.png"
+            },
+            {
+                "id": "e47184be-26d9-4883-b5a8-0d7dc93b79f6",
+                "name": "Race 5 - Claiming",
+                "number": 5,
+                "meeting_id": "cfe06392-0440-4f17-9c96-d62d5be8f95b",
+                "advertised_start": "2025-07-17T02:17:00Z",
+                "actual_start": "2025-07-17T02:22:00Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2NzQ4_SPRITE_64x64.png"
+            },
+            {
+                "id": "c662fe4c-4e4b-46f1-a6e4-1a79c32c9103",
+                "name": "Shepparton Workwear And Safety (300+)",
+                "number": 7,
+                "meeting_id": "7bfb3fa2-13c6-45a2-8127-ab9d3e8289b7",
+                "advertised_start": "2025-07-17T02:17:00Z",
+                "actual_start": "2025-07-17T02:17:56Z"
+            },
+            {
+                "id": "2c83b216-5779-49e0-846d-fbff4567d3f3",
+                "name": "Sky Racing",
+                "number": 2,
+                "meeting_id": "ae166a49-cff6-4f57-83af-218ca6602069",
+                "advertised_start": "2025-07-17T02:21:00Z",
+                "actual_start": "2025-07-17T02:21:35Z"
+            },
+            {
+                "id": "695163e8-d5fa-4afb-936e-87a06f294932",
+                "name": "Race 8 - Allowance",
+                "number": 8,
+                "meeting_id": "8c0018d7-c3e1-47fa-9758-10b749b51d3a",
+                "advertised_start": "2025-07-17T02:24:00Z",
+                "actual_start": "2025-07-17T02:26:31Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2MDcx_SPRITE_64x64.png"
+            },
+            {
+                "id": "98f31bd0-3b0f-40aa-b5b0-a939e4a00d7d",
+                "name": "Todd's Photographics Maiden Stake Pr2 Division1",
+                "number": 2,
+                "meeting_id": "26234dd3-1390-427e-b01d-8ee569c036e6",
+                "advertised_start": "2025-07-17T02:25:00Z",
+                "actual_start": "2025-07-17T02:25:49Z"
+            },
+            {
+                "id": "8d8c8e43-07d9-4d4e-879b-aa5fe70c0e10",
+                "name": "GARRARDS HORSE & HOUND SPRINT PBD",
+                "number": 9,
+                "meeting_id": "0274bcea-2819-4855-a51e-b77074dc6af0",
+                "advertised_start": "2025-07-17T02:25:00Z",
+                "actual_start": "2025-07-17T02:25:22Z"
+            },
+            {
+                "id": "71d594ff-ef01-40de-9a0a-47702e13fb09",
+                "name": "Gordon's Gin Mdn Plate",
+                "number": 1,
+                "meeting_id": "c919da74-facb-4d9f-ad15-3dc57811034f",
+                "advertised_start": "2025-07-17T02:28:00Z",
+                "actual_start": "2025-07-17T02:31:19Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI4MjQw_SPRITE_64x64.png"
+            },
+            {
+                "id": "7e63bf38-b6cf-4f92-a8ce-49ddd8c5d435",
+                "name": "Delta Rent A Car Maiden",
+                "number": 2,
+                "meeting_id": "ceadaf6b-5901-40ef-976b-839d22ed863b",
+                "advertised_start": "2025-07-17T02:29:00Z",
+                "actual_start": "2025-07-17T02:31:54Z"
+            },
+            {
+                "id": "427bc141-b75e-4e19-9197-db228c809359",
+                "name": "Race 8 - Claiming",
+                "number": 8,
+                "meeting_id": "60809757-2272-4b15-baed-a848ea8ba56c",
+                "advertised_start": "2025-07-17T02:30:00Z",
+                "actual_start": "2025-07-17T02:53:43Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3OTY0_SPRITE_64x64.png"
+            },
+            {
+                "id": "68459008-b0d8-4891-b716-2362506b4b14",
+                "name": "Green Tick (300+ Rank)",
+                "number": 8,
+                "meeting_id": "7bfb3fa2-13c6-45a2-8127-ab9d3e8289b7",
+                "advertised_start": "2025-07-17T02:32:00Z",
+                "actual_start": "2025-07-17T02:33:05Z"
+            },
+            {
+                "id": "8affc2d7-ee90-44bc-9ab2-bb31e0a4eef6",
+                "name": "SPRAY SPECIALIST LTD HANDICAP 2140",
+                "number": 4,
+                "meeting_id": "e9f2039d-d489-4a7d-aae1-d66225f1a5f4",
+                "advertised_start": "2025-07-17T02:34:00Z",
+                "actual_start": "2025-07-17T02:35:38Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI4MjMw_SPRITE_64x64.png"
+            },
+            {
+                "id": "a35c7736-c119-4bfc-bb4c-5a6b579e2201",
+                "name": "Hrnsw Guaranteed Ladyship Mobile Pace",
+                "number": 1,
+                "meeting_id": "202a8c51-b41f-4edc-ab34-8a67d29b5612",
+                "advertised_start": "2025-07-17T02:35:00Z",
+                "actual_start": "2025-07-17T02:35:48Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3NTgx_SPRITE_64x64.png"
+            },
+            {
+                "id": "5bc01bd9-ffa7-4597-aed9-49d43bcf1fcc",
+                "name": "Race 11 - 1609M",
+                "number": 11,
+                "meeting_id": "02debefa-9cef-40f3-8433-22901f961012",
+                "advertised_start": "2025-07-17T02:35:00Z",
+                "actual_start": "2025-07-17T02:35:22Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/395209225-11_SPRITE_64x64.png"
+            },
+            {
+                "id": "25cf1032-6183-452a-8ff9-50b17ae6ad21",
+                "name": "Ladbrokes Odds Surge",
+                "number": 3,
+                "meeting_id": "ae166a49-cff6-4f57-83af-218ca6602069",
+                "advertised_start": "2025-07-17T02:38:00Z",
+                "actual_start": "2025-07-17T02:38:46Z"
+            },
+            {
+                "id": "67de3b23-bfc4-4662-87bc-4561b050ae2e",
+                "name": "I98fm Super Mdn Plate",
+                "number": 2,
+                "meeting_id": "00c48b5a-e00e-4c5a-bf5c-8371bd9fc112",
+                "advertised_start": "2025-07-17T02:40:00Z",
+                "actual_start": "2025-07-17T02:43:13Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI4MjUx_SPRITE_64x64.png"
+            },
+            {
+                "id": "bd77d5e9-4258-4275-b3dc-712f83e8556b",
+                "name": "Race 12",
+                "number": 12,
+                "meeting_id": "e68acc95-2887-4a87-888f-b3b8af39a608",
+                "advertised_start": "2025-07-17T02:40:00Z",
+                "actual_start": "2025-07-17T02:42:30Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/395201422-12_SPRITE_64x64.png"
+            },
+            {
+                "id": "2a862302-6e24-427a-8470-77b59f3b59e4",
+                "name": "Sky Racing Mother's Gift",
+                "number": 1,
+                "meeting_id": "d3f82a25-7acb-4a07-a942-e5fb36a1e426",
+                "advertised_start": "2025-07-17T02:42:00Z",
+                "actual_start": "2025-07-17T02:46:59Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3Mjc3_SPRITE_64x64.png"
+            },
+            {
+                "id": "834fc8ef-9c5d-4825-888b-b73865af2744",
+                "name": "BLAZIN' MASTER STAKES",
+                "number": 10,
+                "meeting_id": "0274bcea-2819-4855-a51e-b77074dc6af0",
+                "advertised_start": "2025-07-17T02:43:00Z",
+                "actual_start": "2025-07-17T02:43:26Z"
+            },
+            {
+                "id": "1c9a1553-8daa-4033-9c00-c798170df379",
+                "name": "Jack Hardy S. Stakes",
+                "number": 6,
+                "meeting_id": "cfe06392-0440-4f17-9c96-d62d5be8f95b",
+                "advertised_start": "2025-07-17T02:47:00Z",
+                "actual_start": "2025-07-17T02:47:16Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2NzQ5_SPRITE_64x64.png"
+            },
+            {
+                "id": "e7b301d7-24d0-48e5-92c6-7476747f65b2",
+                "name": "Mark Hughes Foundation Maiden",
+                "number": 3,
+                "meeting_id": "ceadaf6b-5901-40ef-976b-839d22ed863b",
+                "advertised_start": "2025-07-17T02:48:00Z",
+                "actual_start": "2025-07-17T02:49:27Z"
+            },
+            {
+                "id": "95ee7c6f-7747-4af6-b9ee-59e9c7ac125e",
+                "name": "Race 9 - Allowance",
+                "number": 9,
+                "meeting_id": "8c0018d7-c3e1-47fa-9758-10b749b51d3a",
+                "advertised_start": "2025-07-17T02:51:00Z",
+                "actual_start": "2025-07-17T02:53:37Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2MDY4_SPRITE_64x64.png"
+            },
+            {
+                "id": "5ce5c10d-82c1-4209-b6be-a8260ef1ca50",
+                "name": "MICO PLUMBING MOBILE PACE",
+                "number": 7,
+                "meeting_id": "85fc0c65-6b71-4aaf-a879-51aaefe4b746",
+                "advertised_start": "2025-07-17T02:52:00Z",
+                "actual_start": "2025-07-17T02:52:54Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3NDMz_SPRITE_64x64.png"
+            },
+            {
+                "id": "f80077e1-5069-4804-99e1-4fdb1ea7becd",
+                "name": "Gvshelving.com.au (300+ Rank)",
+                "number": 9,
+                "meeting_id": "7bfb3fa2-13c6-45a2-8127-ab9d3e8289b7",
+                "advertised_start": "2025-07-17T02:52:00Z",
+                "actual_start": "2025-07-17T02:52:36Z"
+            },
+            {
+                "id": "03d500f0-3167-4a79-80e5-6c9d8e71f7fa",
+                "name": "Ladbrokes Same Race Multi",
+                "number": 4,
+                "meeting_id": "ae166a49-cff6-4f57-83af-218ca6602069",
+                "advertised_start": "2025-07-17T02:57:00Z",
+                "actual_start": "2025-07-17T02:57:38Z"
+            },
+            {
+                "id": "4c1df9b7-3a55-4949-b936-9bee70b2a23c",
+                "name": "Core Protective Group Mdn Plate",
+                "number": 1,
+                "meeting_id": "5d9ee8a1-e5de-4639-b8cf-665ee609ac6e",
+                "advertised_start": "2025-07-17T03:00:00Z",
+                "actual_start": "2025-07-17T03:00:32Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI4Mjk3_SPRITE_64x64.png"
+            },
+            {
+                "id": "63ca062e-9b60-4452-b79f-ebfd3c64785b",
+                "name": "VETORA CAMBRIDGE SPRINT SERIES FINAL PBD",
+                "number": 11,
+                "meeting_id": "0274bcea-2819-4855-a51e-b77074dc6af0",
+                "advertised_start": "2025-07-17T03:00:00Z",
+                "actual_start": "2025-07-17T03:00:51Z"
+            },
+            {
+                "id": "89b018b4-111b-48ee-a709-e9ce31e1d5be",
+                "name": "Klaassens Contractors (N/P) Stake Pr2 Division1",
+                "number": 3,
+                "meeting_id": "26234dd3-1390-427e-b01d-8ee569c036e6",
+                "advertised_start": "2025-07-17T03:03:00Z",
+                "actual_start": "2025-07-17T03:04:01Z"
+            },
+            {
+                "id": "833f7136-5f2f-4cb9-9d75-54246c06f60a",
+                "name": "The Industry School Mdn Plate",
+                "number": 2,
+                "meeting_id": "c919da74-facb-4d9f-ad15-3dc57811034f",
+                "advertised_start": "2025-07-17T03:04:00Z",
+                "actual_start": "2025-07-17T03:06:42Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI4MjQx_SPRITE_64x64.png"
+            },
+            {
+                "id": "740e1bf6-67af-4fa5-bc00-1e906f333807",
+                "name": "Race 13",
+                "number": 13,
+                "meeting_id": "e68acc95-2887-4a87-888f-b3b8af39a608",
+                "advertised_start": "2025-07-17T03:06:00Z",
+                "actual_start": "2025-07-17T03:07:17Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/395201422-13_SPRITE_64x64.png"
+            },
+            {
+                "id": "e34d7d46-467e-4ecb-b934-2fe27c393d3f",
+                "name": "The Tab App Mobile Pace",
+                "number": 2,
+                "meeting_id": "202a8c51-b41f-4edc-ab34-8a67d29b5612",
+                "advertised_start": "2025-07-17T03:07:00Z",
+                "actual_start": "2025-07-17T03:08:30Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI3NTc5_SPRITE_64x64.png"
+            },
+            {
+                "id": "a78ecae4-3e30-48b7-a247-49a7661220f0",
+                "name": "TOMO'S ALUMINIUM SERVICES HANDICAP 1000",
+                "number": 5,
+                "meeting_id": "e9f2039d-d489-4a7d-aae1-d66225f1a5f4",
+                "advertised_start": "2025-07-17T03:11:00Z",
+                "actual_start": "2025-07-17T03:11:25Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI4MjMx_SPRITE_64x64.png"
+            },
+            {
+                "id": "9e6a7bb7-ea5d-4b89-a482-ff1ad6017b2c",
+                "name": "Race 7 - Allowance Optional Claiming",
+                "number": 7,
+                "meeting_id": "cfe06392-0440-4f17-9c96-d62d5be8f95b",
+                "advertised_start": "2025-07-17T03:11:00Z",
+                "actual_start": "2025-07-17T03:13:56Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2NzUw_SPRITE_64x64.png"
+            },
+            {
+                "id": "6ea44859-4da4-4c63-8a05-4450baa67882",
+                "name": "Gapnsw.com.au Masters",
+                "number": 4,
+                "meeting_id": "ceadaf6b-5901-40ef-976b-839d22ed863b",
+                "advertised_start": "2025-07-17T03:12:00Z",
+                "actual_start": "2025-07-17T03:12:44Z"
+            },
+            {
+                "id": "5cbe6ef8-a6c3-4c2d-87af-efdecf19595d",
+                "name": "Happy Birthday Emily Kendall Mdn Plate",
+                "number": 3,
+                "meeting_id": "00c48b5a-e00e-4c5a-bf5c-8371bd9fc112",
+                "advertised_start": "2025-07-17T03:15:00Z",
+                "actual_start": "2025-07-17T03:15:45Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI4MjQ0_SPRITE_64x64.png"
+            },
+            {
+                "id": "4c82afe8-c6d3-489e-87ef-354fafdd7164",
+                "name": "Www.theq.au",
+                "number": 5,
+                "meeting_id": "ae166a49-cff6-4f57-83af-218ca6602069",
+                "advertised_start": "2025-07-17T03:16:00Z",
+                "actual_start": "2025-07-17T03:16:42Z"
+            },
+            {
+                "id": "dbbb7d2b-e2d8-4b97-8c15-f17c3f38d834",
+                "name": "Race 10 - Allowance",
+                "number": 10,
+                "meeting_id": "8c0018d7-c3e1-47fa-9758-10b749b51d3a",
+                "advertised_start": "2025-07-17T03:18:00Z",
+                "actual_start": "2025-07-17T03:19:56Z",
+                "silk_url": "https://cdn.prod.pricekinetics.com/silks/sprites/cerberus/betmakers-cmFjZToxNzI2MDY5_SPRITE_64x64.png"
+            },
+            {
+                "id": "3f65fef9-61cf-4187-a5d9-4968fb8bb7fd",
+                "name": "Cambridge (G)",
+                "meeting_id": "0274bcea-2819-4855-a51e-b77074dc6af0",
+                "advertised_start": "2025-07-17T03:19:00Z",
+                "actual_start": "2025-07-17T00:00:22Z"
+            }
+        ],
+        "next_page_token": "eyJwYWdlX251bWJlciI6MiwicGFnZV9yZXF1ZXN0X2hhc2giOiIyemduczN4NHVtcWF5In0"
+    }
+}
