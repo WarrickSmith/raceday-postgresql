@@ -1,0 +1,194 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>5</storyId>
+    <title>Bulk UPSERT Database Operations</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-12T12:32:45+13:00</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>/home/warrick/Dev/raceday-postgresql/docs/stories/story-2.5.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>backend developer</asA>
+    <iWant>bulk UPSERT operations using multi-row INSERT with ON CONFLICT and change detection</iWant>
+    <soThat>the pipeline can persist complete race snapshots in a single &lt;300 ms transaction without redundant writes</soThat>
+    <tasks>- [ ] Implement bulk UPSERT module in `server/src/database/bulk-upsert.ts` (AC1–AC6)
+  - [ ] Create typed helpers that accept `Meeting`, `Race`, `Entrant` arrays and serialize to parameterized value matrices
+  - [ ] Share a `withTransaction` wrapper that borrows a pooled client, opens `BEGIN`, executes writers, and guarantees `ROLLBACK` on error
+  - [ ] Encode change-detection `WHERE` clauses using `IS DISTINCT FROM` comparisons for each mutable column
+  - [ ] Normalize status enums and timestamp handling to match Epic 1 schema constraints (leveraging triggers for `updated_at`)
+- [ ] Integrate writers with race processor pipeline (AC2, AC3, AC6–AC8)
+  - [ ] Update `server/src/workers/transformWorker.ts` consumer to pass structured meeting/race/entrant payloads into the writers
+  - [ ] Ensure writer integration addresses Story 2.4 `[M2]` TODO by supplying previous snapshot identifiers for incremental delta queries [docs/stories/story-2.4.md:517](../stories/story-2.4.md#L517)
+  - [ ] Emit Pino logs including `raceId`, row counts, `write_ms`, and warning flag when duration ≥300 ms
+  - [ ] Bubble typed error objects so the race processor can classify retryable vs fatal failures
+- [ ] Add automated validation coverage (AC7–AC9)
+  - [ ] Unit-test SQL builders with seeded fixtures to prove unchanged payloads skip updates (restoring Story 2.4 `[H1]` regression coverage) [docs/stories/story-2.4.md:517](../stories/story-2.4.md#L517)
+  - [ ] Integration-test end-to-end write using a disposable PostgreSQL schema to measure timing and transactional rollback
+  - [ ] Extend benchmark/telemetry harness to persist UPSERT duration metrics consumed by Stories 2.13–2.15 [docs/tech-spec-epic-2.md:195](../tech-spec-epic-2.md#L195)
+- [ ] Document operational expectations (AC8–AC9)
+  - [ ] Update developer runbook with transaction/rollback workflow and logging fields
+  - [ ] Capture playbook steps for diagnosing slow UPSERTs (include log field descriptions and retry strategy)
+  - [ ] Coordinate with observability team to ingest `bulk_upsert` metrics into upcoming dashboards (aligning with solution architecture telemetry roadmap)</tasks>
+  </story>
+
+  <acceptanceCriteria>1. Implement `bulkUpsertMeetings(meetings: Meeting[])` that writes normalized meeting snapshots via multi-row `INSERT ... ON CONFLICT DO UPDATE` using the shared PG pool and returns when all rows persist [docs/epics.md:32](../epics.md#L32), [docs/tech-spec-epic-2.md:94](../tech-spec-epic-2.md#L94), [docs/architecture-specification.md:534](../architecture-specification.md#L534).
+2. Implement `bulkUpsertRaces(races: Race[])` mirroring meeting behavior, including enum validation and timestamp handling consistent with Epic 1 schema constraints [docs/epics.md:33](../epics.md#L33), [docs/tech-spec-epic-2.md:95](../tech-spec-epic-2.md#L95), [docs/architecture-specification.md:536](../architecture-specification.md#L536).
+3. Implement `bulkUpsertEntrants(entrants: Entrant[])` with identical transactional guarantees and mappings for odds/hold percentages produced by Story 2.4 transforms [docs/epics.md:34](../epics.md#L34), [docs/tech-spec-epic-2.md:95](../tech-spec-epic-2.md#L95), [docs/stories/story-2.4.md:423](../stories/story-2.4.md#L423).
+4. Each function issues a single multi-row statement per race using parameterized queries with `ON CONFLICT (primary_key) DO UPDATE` to avoid per-row chatter [docs/epics.md:35](../epics.md#L35), [docs/architecture-specification.md:536](../architecture-specification.md#L536).
+5. Conflict clauses include change-detection `WHERE` filters so existing rows untouched when values match, preventing `updated_at` churn and trimming write load by ≥30 % [docs/epics.md:36](../epics.md#L36), [docs/architecture-specification.md:552](../architecture-specification.md#L552), [docs/tech-spec-epic-2.md:94](../tech-spec-epic-2.md#L94).
+6. All race-level writes execute inside a single `BEGIN`/`COMMIT` using a pooled client to guarantee atomicity and release connections promptly for up to five concurrent races [docs/epics.md:37](../epics.md#L37), [docs/tech-spec-epic-2.md:107](../tech-spec-epic-2.md#L107), [docs/PRD-raceday-postgresql-2025-10-05.md:114](../PRD-raceday-postgresql-2025-10-05.md#L114).
+7. Failures roll back the transaction, emit structured error logs, and surface typed errors to the race processor without leaving partial data behind [docs/epics.md:38](../epics.md#L38), [docs/tech-spec-epic-2.md:107](../tech-spec-epic-2.md#L107), [docs/CODING-STANDARDS.md:171](../CODING-STANDARDS.md#L171).
+8. Write path logs include per-table row counts, duration metrics, and warn when operations exceed the &lt;300 ms budget mandated by architecture and PRD performance goals [docs/epics.md:39](../epics.md#L39), [docs/solution-architecture.md:35](../solution-architecture.md#L35), [docs/PRD-raceday-postgresql-2025-10-05.md:69](../PRD-raceday-postgresql-2025-10-05.md#L69), [docs/tech-spec-epic-2.md:115](../tech-spec-epic-2.md#L115).
+9. Automated tests and benchmark hooks validate that UPSERT calls remain under 300 ms per race and skip updates when data is unchanged, feeding metrics into Stories 2.13–2.15 [docs/epics.md:40](../epics.md#L40), [docs/tech-spec-epic-2.md:195](../tech-spec-epic-2.md#L195), [docs/PRD-raceday-postgresql-2025-10-05.md:337](../PRD-raceday-postgresql-2025-10-05.md#L337).</acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/epics.md</path>
+        <title>Epics Overview</title>
+        <section>Story 2.5: Bulk UPSERT Database Operations</section>
+        <snippet>Multi-row INSERT with `ON CONFLICT (primary_key) DO UPDATE`</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Epic 2 - High-Performance Data Pipeline</title>
+        <section>Service Interfaces</section>
+        <snippet>Performs single-transaction multi-row `INSERT ... ON CONFLICT DO UPDATE` with change detection `WHERE` clause; targets &lt;300 ms per race (Story 2.5).</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/architecture-specification.md</path>
+        <title>Architecture Specification</title>
+        <section>Performance Optimization - Bulk UPSERT Strategy</section>
+        <snippet>WHERE entrants.win_odds IS DISTINCT FROM EXCLUDED.win_odds OR entrants.place_odds IS DISTINCT FROM EXCLUDED.place_odds</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/PRD-raceday-postgresql-2025-10-05.md</path>
+        <title>Product Requirements Document</title>
+        <section>Primary Goals</section>
+        <snippet>Target: &lt;300ms database write per race</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/solution-architecture.md</path>
+        <title>Solution Architecture</title>
+        <section>Core Architecture Decisions (Pre-Validated)</section>
+        <snippet>✅ Bulk UPSERT - Multi-row INSERT with conditional WHERE clause</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/CODING-STANDARDS.md</path>
+        <title>Coding Standards</title>
+        <section>TypeScript Best Practices</section>
+        <snippet>Strict Typing - No Any</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/database/pool.ts</path>
+        <kind>database-module</kind>
+        <symbol>pool</symbol>
+        <lines>1-78</lines>
+        <reason>Shared PostgreSQL Pool configured for max connections = env.DB_POOL_MAX with termination handlers; bulk UPSERT helpers must borrow clients here to respect NFR003.</reason>
+      </file>
+      <file>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/database/query-validator.ts</path>
+        <kind>utility-module</kind>
+        <symbol>validateIndexUsage</symbol>
+        <lines>1-160</lines>
+        <reason>Existing EXPLAIN validator logs index usage for representative queries; extend with Story 2.5 writers to confirm UPSERT statements use indices and avoid seq scans.</reason>
+      </file>
+      <file>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/workers/transformWorker.ts</path>
+        <kind>worker-script</kind>
+        <symbol>transformRace</symbol>
+        <lines>1-200</lines>
+        <reason>Current transform emits normalized meetings/races/entrants plus TODO for Story 2.5 integration; new writers consume this payload for transactional persistence.</reason>
+      </file>
+      <file>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/workers/messages.ts</path>
+        <kind>type-definitions</kind>
+        <symbol>TransformedRace</symbol>
+        <lines>1-160</lines>
+        <reason>Zod schemas define meeting/race/entrant/money flow structures that UPSERT builders must honor when mapping to SQL columns.</reason>
+      </file>
+      <file>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/shared/logger.ts</path>
+        <kind>logging-module</kind>
+        <symbol>logger</symbol>
+        <lines>1-20</lines>
+        <reason>Pino logger configured with env LOG_LEVEL; Story 2.5 instrumentation should emit write metrics through this shared logger.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <pg>^8.16.3 - PostgreSQL client used for pooled connections and parameterized transactions.</pg>
+        <pg-format>^1.0.4 - Helper for assembling multi-row INSERT value lists safely.</pg-format>
+        <pino>^9.5.0 - Structured logger for write metrics (duration, row counts, warnings).</pino>
+        <zod>^3.25.76 - Runtime validation for transform inputs feeding the UPSERT pipeline.</zod>
+        <dotenv>^16.6.1 - Loads database credentials required for pool configuration.</dotenv>
+      </node>
+      <dev>
+        <typescript>^5.7.0 - Strict compiler enforcing zero `any` across writer modules.</typescript>
+        <vitest>^2.0.0 - Test runner for unit and integration coverage on SQL builders.</vitest>
+        <@types/pg>^8.11.10 - Type definitions for pg client interfaces.</@types/pg>
+        <eslint>^9.0.0 - Lint checks guaranteeing consistent module patterns and logging.</eslint>
+        <prettier>^3.3.0 - Formatting for SQL template strings and helper utilities.</prettier>
+      </dev>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="performance">Database writes per race must complete in &lt;300 ms to satisfy PRD primary goal and architecture budget (fetch 300ms + transform 700ms + write 300ms).</constraint>
+    <constraint type="transactional">All meeting/race/entrant writers execute inside a single BEGIN/COMMIT with rollback on error to avoid partial race snapshots.</constraint>
+    <constraint type="architecture">RaceProcessor consumes Story 2.4 transform output; Story 2.5 writers must accept the same normalized payload to keep pipeline sequencing intact.</constraint>
+    <constraint type="database">SQL statements use multi-row INSERT ... ON CONFLICT with IS DISTINCT FROM filters, leveraging primary keys and existing indexes to skip redundant updates.</constraint>
+    <constraint type="pooling">Writers borrow clients from server/src/database/pool.ts to respect env.DB_POOL_MAX (10 connections) and release promptly for concurrent races.</constraint>
+    <constraint type="logging">Structured logs emit raceId, table row counts, write_ms, and warning flag when duration ≥300 ms via shared Pino logger.</constraint>
+    <constraint type="type-safety">TypeScript strict mode and Zod schemas prohibit `any`; builder inputs/outputs must match TransformedRace contracts.</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>pool</name>
+      <kind>pg.Pool singleton</kind>
+      <signature>const pool = new Pool(poolConfig)</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/database/pool.ts</path>
+      <usage>Bulk UPSERT writers must call pool.connect() to execute multi-statement transactions while honoring the shared 10-connection limit.</usage>
+    </interface>
+    <interface>
+      <name>TransformedRace</name>
+      <kind>zod-schema</kind>
+      <signature>transformedRaceSchema.parse(payload)</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/workers/messages.ts</path>
+      <usage>Defines meeting, race, entrant, and moneyFlowRecords arrays produced by Story 2.4; writers map these fields into SQL parameter sets.</usage>
+    </interface>
+    <interface>
+      <name>validateIndexUsage</name>
+      <kind>async-function</kind>
+      <signature>validateIndexUsage(pool: Pool, query: string): Promise&lt;ExplainResult&gt;</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/database/query-validator.ts</path>
+      <usage>Use during Story 2.5 verification to ensure UPSERT statements hit indexes and avoid seq scans before promoting to production.</usage>
+    </interface>
+    <interface>
+      <name>logger</name>
+      <kind>Pino logger</kind>
+      <signature>logger.info(bindings, message)</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/shared/logger.ts</path>
+      <usage>Emit structured metrics (`raceId`, `table`, `rowCount`, `write_ms`, `overBudget`) for observability requirements.</usage>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards>Use Vitest with a disposable PostgreSQL schema to cover SQL builders (unit) and transaction flow (integration); measure write timings and assert &amp;lt;300 ms per race, with fixtures sourced from Story 2.4 transforms.</standards>
+    <locations>
+      - server/tests/unit/database/bulk-upsert.test.ts
+      - server/tests/integration/database/bulk-upsert.integration.test.ts
+      - server/tests/fixtures/money-flow-legacy/
+    </locations>
+    <ideas>
+      <idea ac="4">Unit test change-detection WHERE clause: identical payloads should yield zero UPDATE operations (assert using pg rowCount metadata).</idea>
+      <idea ac="6">Integration test wraps meeting/race/entrant writers in a transaction, purposely throws midway, and verifies rollback leaves tables unchanged.</idea>
+      <idea ac="8">Capture logger output to confirm row counts and warning flag set when simulated write_ms &amp;gt;= 300; ensures observability fields exist.</idea>
+      <idea ac="9">Benchmark test seeds large entrant arrays (~60 runners) and asserts write duration metrics recorded &amp;lt;300 ms on warmed database.</idea>
+      <idea ac="3">Fixture-driven test verifies entrants UPSERT preserves hold/bet percentages from Story 2.4 transform output without loss or null regressions.</idea>
+    </ideas>
+  </tests>
+</story-context>
