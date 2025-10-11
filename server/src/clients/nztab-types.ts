@@ -194,6 +194,28 @@ export const EntrantLiabilitySchema = z
 export type EntrantLiability = z.infer<typeof EntrantLiabilitySchema>
 
 /**
+ * Schema for money_tracker data from NZTAB API
+ *
+ * The money_tracker object contains an array of entrant liability snapshots
+ * showing hold_percentage and bet_percentage for each entrant over time.
+ *
+ * API Endpoint: /affiliates/v1/racing/events/{id}?with_money_tracker=true
+ *
+ * Multiple entries per entrant_id can exist (historical snapshots from polling).
+ * For current transform, use most recent entry per entrant.
+ *
+ * @see {@link docs/api/nztab-samples/money-pool-calculation-guide.md} for calculation details
+ * @see {@link server/tests/fixtures/money-flow-legacy/README.md} for fixture documentation
+ */
+export const MoneyTrackerSchema = z
+  .object({
+    entrants: z.array(EntrantLiabilitySchema),
+  })
+  .passthrough()
+
+export type MoneyTracker = z.infer<typeof MoneyTrackerSchema>
+
+/**
  * Comprehensive schema for race data including entrants, pools, and meeting info
  *
  * This is the primary schema for validating complete race information from
@@ -243,6 +265,7 @@ export const RaceDataSchema = z
     entrants: z.array(EntrantSchema).optional().nullable(),
     pools: PoolSchema.optional().nullable(),
     meeting: MeetingDataSchema.optional().nullable(),
+    money_tracker: MoneyTrackerSchema.optional().nullable(),
   })
   .passthrough()
 
