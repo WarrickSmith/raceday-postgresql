@@ -1,0 +1,291 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2.4</storyId>
+    <title>Money Flow Calculation Transform Logic</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-11</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>/home/warrick/Dev/raceday-postgresql/docs/stories/story-2.4.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>backend developer</asA>
+    <iWant>money flow calculation logic extracted from server-old and implemented in worker threads</iWant>
+    <soThat>I can transform raw NZ TAB race data into calculated money flow patterns that enable high-frequency betting analysis</soThat>
+    <tasks>
+- Locate and extract money flow calculation logic from `server-old` (AC: 1)
+  - Search `server-old` codebase for money flow calculation functions
+  - Identify calculation formulas for hold_percentage, bet_percentage, pool percentages
+  - Document legacy calculation logic and data dependencies
+  - Extract test fixtures or sample data from `server-old` for validation
+- Create money flow calculation utilities module (AC: 3, 4, 5, 10)
+  - Create `server/src/workers/money-flow.ts` with pure calculation functions
+  - Implement `calculateHoldPercentage(entrant, pool): number`
+  - Implement `calculateBetPercentage(entrant, pool): number`
+  - Implement `calculatePoolPercentages(entrant, winPool, placePool): {win_pool_percentage, place_pool_percentage}`
+  - Implement `calculateIncrementalDelta(current, previous): number` for money flow changes
+  - Implement `calculateTimeMetadata(raceStartTime, currentTime): {time_to_start, time_interval, interval_type}`
+  - All functions must be pure (no side effects, deterministic)
+  - Add TypeScript strict types for all parameters and return values
+- Define transform output types (AC: 6, 8)
+  - Create or enhance `TransformedRace` interface in `server/src/workers/messages.ts`
+  - Define `TransformedEntrant` interface with all calculated fields
+  - Define `MoneyFlowRecord` interface for time-series inserts
+  - Define Zod schemas for runtime validation of transform outputs
+  - Ensure zero `any` types in all type definitions
+- Implement transform worker logic (AC: 2, 6, 9, 11)
+  - Update `server/src/workers/transformWorker.ts` message handler
+  - Import money flow calculation utilities
+  - Implement per-race transform: extract meetings, races from RaceData
+  - Implement per-entrant transform: apply money flow calculations to each entrant
+  - Build time-series records for money_flow_history inserts
+  - Construct TransformedRace payload with all normalized data
+  - Add error handling for malformed data or calculation failures
+  - Ensure transform completes within performance budget (&lt;1s target)
+- Create regression test fixtures (AC: 7)
+  - Export sample RaceData from `server-old` (or capture from NZ TAB API)
+  - Export corresponding money flow calculation outputs from `server-old`
+  - Store fixtures in `server/tests/fixtures/money-flow-legacy/`
+  - Document fixture sources and expected values
+- Write unit tests for money flow calculations (AC: 3, 4, 5, 7, 10)
+  - Test `calculateHoldPercentage` with various pool scenarios
+  - Test `calculateBetPercentage` with edge cases (zero pools, scratched entrants)
+  - Test `calculatePoolPercentages` for win and place pool distributions
+  - Test `calculateIncrementalDelta` with increasing/decreasing pools
+  - Test `calculateTimeMetadata` for various time-to-start intervals
+  - Validate all calculations against legacy fixtures (regression tests)
+  - Ensure all tests pass with 100% coverage on calculation logic
+- Write integration tests for transform worker (AC: 6, 9, 11)
+  - Test worker receives RaceData message and returns TransformedRace
+  - Test transform produces correct structure (meetings, races, entrants, time-series)
+  - Test transform performance (measure duration, assert &lt;1s)
+  - Test error handling for invalid RaceData payloads
+  - Test worker integration with WorkerPool exec() method
+  - Validate Zod schemas successfully parse transform outputs
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+1. Transform logic extracted from `./server-old` codebase and refactored to TypeScript with strict types [docs/epic-stories-2025-10-05.md:308](../epic-stories-2025-10-05.md#L308).
+2. Money flow calculations implemented per-race, per-entrant, over time producing structured time-series records [docs/epic-stories-2025-10-05.md:309](../epic-stories-2025-10-05.md#L309).
+3. Calculations include: `hold_percentage`, `bet_percentage`, `win_pool_percentage`, `place_pool_percentage` derived from pool amounts and entrant odds [docs/epic-stories-2025-10-05.md:310](../epic-stories-2025-10-05.md#L310), [docs/tech-spec-epic-2.md:169](../tech-spec-epic-2.md#L169).
+4. Calculations include incremental amounts (change from previous poll) to track money flow deltas between polling cycles [docs/epic-stories-2025-10-05.md:311](../epic-stories-2025-10-05.md#L311), [docs/tech-spec-epic-2.md:169](../tech-spec-epic-2.md#L169).
+5. Calculations include: `time_to_start`, `time_interval`, `interval_type` metadata to enable interval-based analytics queries [docs/epic-stories-2025-10-05.md:312](../epic-stories-2025-10-05.md#L312), [docs/tech-spec-epic-2.md:169](../tech-spec-epic-2.md#L169).
+6. Transform accepts `RaceData` (validated via Zod from Story 2.1/2.2), returns `TransformedRace` payload containing normalized meetings, races, entrants, and time-series records [docs/epic-stories-2025-10-05.md:313](../epic-stories-2025-10-05.md#L313), [docs/tech-spec-epic-2.md:93](../tech-spec-epic-2.md#L93).
+7. Transform logic validated against `server-old` outputs using regression test fixtures to ensure calculation fidelity during migration [docs/epic-stories-2025-10-05.md:314](../epic-stories-2025-10-05.md#L314), [docs/tech-spec-epic-2.md:169](../tech-spec-epic-2.md#L169).
+8. Zero `any` types in transform logic; all calculations use explicit TypeScript types with Zod runtime validation [docs/epic-stories-2025-10-05.md:315](../epic-stories-2025-10-05.md#L315), [docs/CODING-STANDARDS.md:172](../CODING-STANDARDS.md#L172).
+9. Transform worker implementation updated in `server/src/workers/transformWorker.ts` to replace placeholder logic with production calculations [docs/stories/story-2.3.md:83](story-2.3.md#L83).
+10. Pure functions implemented for all calculations (no side effects, no external state mutation) following functional programming principles [docs/CODING-STANDARDS.md:108](../CODING-STANDARDS.md#L108).
+11. Money flow calculations execute within worker thread target duration budget (&lt;1s transform time per race contributing to &lt;2s total processing target) [docs/tech-spec-epic-2.md:117](../tech-spec-epic-2.md#L117), [docs/solution-architecture.md:616](../solution-architecture.md#L616).
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Epic 2 - High-Performance Data Pipeline</title>
+        <section>Acceptance Criteria (Authoritative)</section>
+        <snippet>AC6: Money-flow transform reproduces server-old calculations (hold/bet percentages, incremental deltas, interval metadata) and passes regression tests against legacy fixtures. This AC defines the core requirement that Story 2.4 must satisfy - extract proven business logic from server-old and wrap in worker threads with strict TypeScript types and validation.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Epic 2 - High-Performance Data Pipeline</title>
+        <section>APIs and Interfaces</section>
+        <snippet>workerPool.exec - Queues work on available worker, requeues if all busy, auto-restarts crashed workers and retries tasks up to 3 times. Transform must integrate with this interface from Story 2.3.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Epic 2 - High-Performance Data Pipeline</title>
+        <section>Non-Functional Requirements - Performance</section>
+        <snippet>Meet PRD NFR001 by sustaining &lt;15s total duration for five concurrent races and &lt;2s per individual race; enforced through integration tests (Stories 2.13/2.14) and benchmark tooling (Story 2.15) using architecture's baseline table (~6–9s expectation). Transform worker must execute in &lt;1s to stay within budget.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/solution-architecture.md</path>
+        <title>Solution Architecture - Performance Targets Summary</title>
+        <section>Performance Targets Summary</section>
+        <snippet>Transform (worker): &lt;1s - This is the performance ceiling for Story 2.4 money flow calculations. Worker must complete all entrant calculations, incremental deltas, and time metadata within this budget to enable overall &lt;2s single race target.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/PRD-raceday-postgresql-2025-10-05.md</path>
+        <title>Product Requirements Document</title>
+        <section>FR003 - Money Flow Patterns</section>
+        <snippet>System SHALL calculate money flow patterns per race, per entrant, over time using CPU-intensive algorithms executed in worker threads. This functional requirement drives the worker-based architecture for Story 2.4.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/PRD-raceday-postgresql-2025-10-05.md</path>
+        <title>Product Requirements Document</title>
+        <section>Context - Business Critical Problem</section>
+        <snippet>The Raceday application detects insider betting patterns by analyzing money flow changes in real-time. Critical insider patterns emerge in the final 30-60 seconds before race close. The money flow calculations implemented in Story 2.4 are the engine that enables this pattern detection - every second of delay in these calculations directly impacts user ability to capitalize on insider knowledge.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/CODING-STANDARDS.md</path>
+        <title>Coding Standards</title>
+        <section>Functional Programming Principles - Pure Functions</section>
+        <snippet>Pure Functions: Functions should be deterministic (same inputs → same outputs) with no side effects. Example: calculateMoneyFlow = (currentPool: number, previousPool: number): number =&gt; currentPool - previousPool. All Story 2.4 calculations must follow this pattern.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/CODING-STANDARDS.md</path>
+        <title>Coding Standards</title>
+        <section>TypeScript Best Practices - Strict Typing - No Any</section>
+        <snippet>Zero `any` types enforced by ESLint. All functions must have explicit types for parameters and return values. This is a non-negotiable requirement for Story 2.4 transform logic.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/CODING-STANDARDS.md</path>
+        <title>Coding Standards</title>
+        <section>ES Modules (ESM) - MANDATORY</section>
+        <snippet>All code must use ES modules exclusively. Import statements use .js extensions for TypeScript files. Example: import { RaceDataSchema } from '../clients/nztab-types.js'</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/stories/story-2.3.md</path>
+        <title>Story 2.3: Worker Thread Pool for CPU-Bound Transforms</title>
+        <section>Dev Notes - Worker Pool Infrastructure</section>
+        <snippet>Story 2.3 delivered WorkerPool infrastructure with placeholder transform hooks in transformWorker.ts. Story 2.4 populates those hooks with production-ready calculation logic extracted from server-old.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/stories/story-2.1.md</path>
+        <title>Story 2.1: NZ TAB API Client</title>
+        <section>Integration Point</section>
+        <snippet>Story 2.1 delivers validated RaceData from NZ TAB client. This is the input payload that Story 2.4 transform worker receives via workerPool.exec().</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/stories/story-2.2.md</path>
+        <title>Story 2.2: NZ TAB API Response Type Definitions</title>
+        <section>Type Dependencies</section>
+        <snippet>RaceDataSchema and type definitions from Story 2.2 provide the validated input types for Story 2.4 transform logic. Import from server/src/clients/nztab-types.ts.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <file>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/workers/transformWorker.ts</path>
+        <kind>worker-script</kind>
+        <symbol>transformRace</symbol>
+        <lines>18-34</lines>
+        <reason>Placeholder transform function that Story 2.4 will replace with production money flow calculations. Currently performs simple entrant counting; needs enhancement with hold_percentage, bet_percentage, pool calculations, incremental deltas, and time metadata.</reason>
+      </file>
+      <file>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/workers/messages.ts</path>
+        <kind>type-definitions</kind>
+        <symbol>TransformedRace</symbol>
+        <lines>11-23</lines>
+        <reason>Current TransformedRace schema is minimal. Story 2.4 must extend this to include normalized meetings, races, entrants with calculated fields, and time-series records for money_flow_history inserts.</reason>
+      </file>
+      <file>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/workers/worker-pool.ts</path>
+        <kind>infrastructure</kind>
+        <symbol>WorkerPool</symbol>
+        <lines>1-end</lines>
+        <reason>Story 2.3 WorkerPool that manages three worker threads. Story 2.4 transform logic executes within these workers via workerPool.exec(raceData). Performance constraint: transform must complete in &lt;1s.</reason>
+      </file>
+      <file>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/clients/nztab-types.ts</path>
+        <kind>type-definitions</kind>
+        <symbol>RaceDataSchema, EntrantSchema, PoolSchema</symbol>
+        <lines>1-100</lines>
+        <reason>Zod schemas defining input data structure from NZ TAB API. Story 2.4 calculations operate on RaceData, extracting entrant odds (fixedWinOdds, fixedPlaceOdds), pool amounts (winPool, placePool), and meeting metadata.</reason>
+      </file>
+      <file>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/clients/nztab-types.ts</path>
+        <kind>type-definitions</kind>
+        <symbol>EntrantLiabilitySchema</symbol>
+        <lines>186-194</lines>
+        <reason>Defines bet_percentage and hold_percentage structure from NZ TAB API. Story 2.4 may need to calculate these fields if not provided by API, or validate against API values for regression testing.</reason>
+      </file>
+    </code>
+    <dependencies>
+      <node>
+        <express>^4.21.2 - HTTP server (Epic 3 integration point for serving transformed data)</express>
+        <pg>^8.16.3 - PostgreSQL client (Story 2.5 will use transform output for bulk UPSERT)</pg>
+        <zod>^3.25.76 - Runtime validation for transform outputs and worker messages</zod>
+        <pino>^9.5.0 - Structured logging for transform performance metrics</pino>
+        <axios>^1.12.2 - Used by NZ TAB client to fetch RaceData (Story 2.1 input)</axios>
+        <dotenv>^16.6.1 - Environment configuration (inherited from Epic 1)</dotenv>
+        <helmet>^8.1.0 - Security headers (Epic 3 API layer)</helmet>
+        <compression>^1.8.1 - Response compression (Epic 3 API layer)</compression>
+        <pg-format>^1.0.4 - Safe SQL formatting (Story 2.5 bulk operations)</pg-format>
+      </node>
+      <dev>
+        <typescript>^5.7.0 - TypeScript compiler with strict mode enabled</typescript>
+        <tsx>^4.19.0 - TypeScript execution runtime for development</tsx>
+        <vitest>^2.0.0 - Unit and integration testing framework</vitest>
+        <@vitest/coverage-v8>^2.1.9 - Code coverage reporting (target 100% on calculation logic)</@vitest/coverage-v8>
+        <eslint>^9.0.0 - Linting with zero `any` types enforcement</eslint>
+        <prettier>^3.3.0 - Code formatting</prettier>
+        <husky>^9.1.7 - Pre-commit hooks</husky>
+        <lint-staged>^15.5.2 - Staged file validation</lint-staged>
+      </dev>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture">All money flow calculations must execute within worker threads (Story 2.3 WorkerPool) to avoid blocking the main event loop. Main thread handles orchestration, workers handle CPU-intensive computation.</constraint>
+    <constraint type="performance">Transform must complete in &lt;1s per race to meet overall &lt;2s single-race processing target (fetch 500ms + transform 1s + write 300ms). Validate with performance.now() timing in integration tests.</constraint>
+    <constraint type="type-safety">Zero `any` types enforced by TypeScript strict mode and ESLint rules. All calculations must have explicit parameter types and return types. Zod schemas validate runtime data from workers.</constraint>
+    <constraint type="functional">All calculation functions must be pure (deterministic, no side effects, no external state mutation). This enables testing, parallelization, and worker thread safety.</constraint>
+    <constraint type="compatibility">Transform must reproduce server-old calculation formulas exactly. Regression tests against legacy fixtures validate calculation fidelity during migration. Any discrepancies must be documented and approved.</constraint>
+    <constraint type="data-flow">Transform receives RaceData from Story 2.1 NZ TAB client (via Story 2.3 WorkerPool) and returns TransformedRace for Story 2.5 bulk UPSERT operations. Input and output schemas strictly validated with Zod.</constraint>
+    <constraint type="file-structure">Follow existing pattern from Story 2.3: worker script at server/src/workers/transformWorker.ts, message schemas at server/src/workers/messages.ts. Create new file server/src/workers/money-flow.ts for pure calculation utilities.</constraint>
+    <constraint type="testing">100% code coverage required on calculation logic (money-flow.ts). Integration tests validate worker receives RaceData and returns valid TransformedRace. Regression fixtures from server-old verify calculation correctness.</constraint>
+    <constraint type="module-system">ES modules (ESM) exclusively. Import statements must include .js extension for TypeScript files. No CommonJS require() allowed.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>workerPool.exec</name>
+      <kind>async-method</kind>
+      <signature>exec(payload: RacePayload): Promise&lt;TransformedRace&gt;</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/workers/worker-pool.ts</path>
+      <usage>Story 2.4 transform logic executes when WorkerPool dispatches RaceData to transformWorker. Must return TransformedRace within &lt;1s performance budget.</usage>
+    </interface>
+    <interface>
+      <name>RaceDataSchema</name>
+      <kind>zod-schema</kind>
+      <signature>z.object({ id, name, status, entrants, pools, meeting, ... })</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/clients/nztab-types.ts</path>
+      <usage>Input schema for transform worker. Validated by Story 2.1 NZ TAB client before dispatch to worker pool. Transform extracts entrant odds, pool amounts, meeting metadata.</usage>
+    </interface>
+    <interface>
+      <name>transformedRaceSchema</name>
+      <kind>zod-schema</kind>
+      <signature>z.object({ raceId, raceName, status, transformedAt, metrics, payload })</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/workers/messages.ts</path>
+      <usage>Current output schema from transformWorker. Story 2.4 must extend this to include normalized entities (meetings, races, entrants) and time-series records (money_flow_history) for Story 2.5 bulk UPSERT.</usage>
+    </interface>
+    <interface>
+      <name>workerRequestSchema</name>
+      <kind>zod-schema</kind>
+      <signature>z.object({ taskId: uuid, payload: RaceDataSchema })</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/workers/messages.ts</path>
+      <usage>Worker thread message format. WorkerPool wraps RaceData in this envelope with taskId for tracking. transformWorker validates on receipt.</usage>
+    </interface>
+    <interface>
+      <name>createWorkerSuccessMessage / createWorkerErrorMessage</name>
+      <kind>factory-function</kind>
+      <signature>(taskId: string, durationMs: number, result|error) =&gt; WorkerResult</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/workers/messages.ts</path>
+      <usage>Transform worker must use these factories to return results. Success includes TransformedRace payload and duration for performance metrics. Error captures exception details for retry logic.</usage>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Story 2.4 follows vitest testing framework established in Epic 1. Unit tests validate individual calculation functions in isolation with mocked inputs. Integration tests validate end-to-end worker behavior: receive RaceData message, execute transform, return TransformedRace within performance budget. Regression tests compare transform outputs against server-old fixtures to ensure calculation fidelity. Coverage target: 100% on money-flow.ts calculation utilities, &gt;90% on transformWorker.ts integration logic.
+    </standards>
+    <locations>
+      - server/tests/unit/workers/money-flow.test.ts - Unit tests for pure calculation functions
+      - server/tests/integration/workers/transform-worker.integration.test.ts - Integration tests for worker message handling
+      - server/tests/fixtures/money-flow-legacy/ - Regression test fixtures from server-old
+    </locations>
+    <ideas>
+      <idea ac="3">Unit test calculateHoldPercentage with various pool scenarios: zero pool, negative pool (invalid), normal pool, edge case with scratched entrant (hold should be zero).</idea>
+      <idea ac="3">Unit test calculateBetPercentage with pool distribution scenarios: even distribution, skewed distribution, single entrant dominating pool.</idea>
+      <idea ac="4">Unit test calculateIncrementalDelta with increasing pools (positive delta), decreasing pools (negative delta), unchanged pools (zero delta), first poll (no previous - return current as delta).</idea>
+      <idea ac="5">Unit test calculateTimeMetadata for time-to-start intervals: &lt;5 min (15s interval), 5-15 min (30s interval), &gt;15 min (60s interval), negative time (race started - edge case).</idea>
+      <idea ac="6,9">Integration test: Send valid RaceData to transformWorker via WorkerPool.exec(), validate returned TransformedRace structure contains meetings array, races array, entrants with calculated fields, time-series records.</idea>
+      <idea ac="7">Regression test: Load server-old fixture (sample RaceData + expected money flow outputs), run through new transform, compare calculated values (tolerance for floating point precision).</idea>
+      <idea ac="8">Type validation test: Attempt to create money flow functions with `any` types, verify TypeScript compiler errors. Use tsc --noEmit in pre-commit hook.</idea>
+      <idea ac="10">Purity test: Call calculation functions multiple times with same inputs, assert identical outputs (determinism). Mock Date.now() to ensure time-based functions are pure with injected timestamps.</idea>
+      <idea ac="11">Performance test: Measure transform duration for race with 1 entrant, 10 entrants, 20 entrants (realistic maximum). Assert all scenarios complete &lt;1s. Identify performance cliff if calculations scale poorly.</idea>
+    </ideas>
+  </tests>
+</story-context>
