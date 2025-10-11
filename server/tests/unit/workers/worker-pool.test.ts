@@ -131,8 +131,11 @@ const createTransformedRace = (payload: RaceData) =>
       entrantCount: Array.isArray(payload.entrants) ? payload.entrants.length : 0,
       poolFieldCount:
         payload.pools == null ? 0 : Object.values(payload.pools).filter((value) => value != null).length,
+      moneyFlowRecordCount: 0,
     },
-    payload,
+    entrants: [],
+    moneyFlowRecords: [],
+    originalPayload: payload,
   })
 
 beforeEach(async () => {
