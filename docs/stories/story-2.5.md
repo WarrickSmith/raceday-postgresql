@@ -1,6 +1,6 @@
 # Story 2.5: Bulk UPSERT Database Operations
 
-Status: ContextReadyDraft
+Status: Draft
 
 ## Story
 
@@ -10,80 +10,92 @@ so that the pipeline can persist complete race snapshots in a single <300 ms t
 
 ## Acceptance Criteria
 
-1. Implement `bulkUpsertMeetings(meetings: Meeting[])` that writes normalized meeting snapshots via multi-row `INSERT ... ON CONFLICT DO UPDATE` using the shared PG pool and returns when all rows persist [docs/epics.md:32](../epics.md#L32), [docs/tech-spec-epic-2.md:94](../tech-spec-epic-2.md#L94), [docs/architecture-specification.md:534](../architecture-specification.md#L534).
-2. Implement `bulkUpsertRaces(races: Race[])` mirroring meeting behavior, including enum validation and timestamp handling consistent with Epic 1 schema constraints [docs/epics.md:33](../epics.md#L33), [docs/tech-spec-epic-2.md:95](../tech-spec-epic-2.md#L95), [docs/architecture-specification.md:536](../architecture-specification.md#L536).
-3. Implement `bulkUpsertEntrants(entrants: Entrant[])` with identical transactional guarantees and mappings for odds/hold percentages produced by Story 2.4 transforms [docs/epics.md:34](../epics.md#L34), [docs/tech-spec-epic-2.md:95](../tech-spec-epic-2.md#L95), [docs/stories/story-2.4.md:423](../stories/story-2.4.md#L423).
-4. Each function issues a single multi-row statement per race using parameterized queries with `ON CONFLICT (primary_key) DO UPDATE` to avoid per-row chatter [docs/epics.md:35](../epics.md#L35), [docs/architecture-specification.md:536](../architecture-specification.md#L536).
-5. Conflict clauses include change-detection `WHERE` filters so existing rows untouched when values match, preventing `updated_at` churn and trimming write load by ≥30 % [docs/epics.md:36](../epics.md#L36), [docs/architecture-specification.md:552](../architecture-specification.md#L552), [docs/tech-spec-epic-2.md:94](../tech-spec-epic-2.md#L94).
-6. All race-level writes execute inside a single `BEGIN`/`COMMIT` using a pooled client to guarantee atomicity and release connections promptly for up to five concurrent races [docs/epics.md:37](../epics.md#L37), [docs/tech-spec-epic-2.md:107](../tech-spec-epic-2.md#L107), [docs/PRD-raceday-postgresql-2025-10-05.md:114](../PRD-raceday-postgresql-2025-10-05.md#L114).
-7. Failures roll back the transaction, emit structured error logs, and surface typed errors to the race processor without leaving partial data behind [docs/epics.md:38](../epics.md#L38), [docs/tech-spec-epic-2.md:107](../tech-spec-epic-2.md#L107), [docs/CODING-STANDARDS.md:171](../CODING-STANDARDS.md#L171).
-8. Write path logs include per-table row counts, duration metrics, and warn when operations exceed the <300 ms budget mandated by architecture and PRD performance goals [docs/epics.md:39](../epics.md#L39), [docs/solution-architecture.md:35](../solution-architecture.md#L35), [docs/PRD-raceday-postgresql-2025-10-05.md:69](../PRD-raceday-postgresql-2025-10-05.md#L69), [docs/tech-spec-epic-2.md:115](../tech-spec-epic-2.md#L115).
-9. Automated tests and benchmark hooks validate that UPSERT calls remain under 300 ms per race and skip updates when data is unchanged, feeding metrics into Stories 2.13–2.15 [docs/epics.md:40](../epics.md#L40), [docs/tech-spec-epic-2.md:195](../tech-spec-epic-2.md#L195), [docs/PRD-raceday-postgresql-2025-10-05.md:337](../PRD-raceday-postgresql-2025-10-05.md#L337).
+1. Deliver `bulkUpsertMeetings(meetings: Meeting[])` that persists normalized meeting snapshots via a single multi-row `INSERT ... ON CONFLICT DO UPDATE` and returns only after the transaction commits [docs/epics.md:32](../epics.md#L32), [docs/tech-spec-epic-2.md:94](../tech-spec-epic-2.md#L94).
+2. Deliver `bulkUpsertRaces(races: Race[])` mirroring meeting behaviour, including enum normalization and timestamp handling aligned with Epic 1 schema requirements [docs/epics.md:33](../epics.md#L33), [docs/tech-spec-epic-2.md:95](../tech-spec-epic-2.md#L95).
+3. Deliver `bulkUpsertEntrants(entrants: Entrant[])` that writes Story 2.4 money-flow fields without loss while keeping transactional guarantees [docs/epics.md:34](../epics.md#L34), [docs/stories/story-2.4.md:373-429](story-2.4.md#L373), [docs/tech-spec-epic-2.md:95](../tech-spec-epic-2.md#L95).
+4. Each writer issues a single statement per race using parameterized `ON CONFLICT (primary_key) DO UPDATE` clauses with `IS DISTINCT FROM` predicates to skip unchanged rows [docs/epics.md:35-36](../epics.md#L35), [docs/architecture-specification.md:534-560](../architecture-specification.md#L534).
+5. Writers borrow a pooled client, wrap all table updates in `BEGIN`/`COMMIT`, and release the connection to stay within the 10-connection budget [docs/epics.md:37](../epics.md#L37), [docs/tech-spec-epic-2.md:104-108](../tech-spec-epic-2.md#L104), [docs/architecture-specification.md:562-575](../architecture-specification.md#L562).
+6. Failures roll back the race transaction, emit structured error logs with race identifiers, and surface typed errors to the race processor [docs/epics.md:38](../epics.md#L38), [docs/tech-spec-epic-2.md:107-115](../tech-spec-epic-2.md#L107), [docs/CODING-STANDARDS.md:395-454](../CODING-STANDARDS.md#L395).
+7. Writers log per-table row counts, `write_ms`, and warn when duration ≥300 ms, feeding the performance metrics pipeline [docs/epics.md:39-40](../epics.md#L39), [docs/PRD-raceday-postgresql-2025-10-05.md:69-132](../PRD-raceday-postgresql-2025-10-05.md#L69), [docs/solution-architecture.md:26-38](../solution-architecture.md#L26), [docs/tech-spec-epic-2.md:133-135](../tech-spec-epic-2.md#L133).
+8. Automated unit, integration, and benchmark tests prove UPSERTs stay under 300 ms, skip unchanged payloads, and leverage Story 2.4 regression fixtures once populated [docs/epics.md:40](../epics.md#L40), [docs/tech-spec-epic-2.md:115-119](../tech-spec-epic-2.md#L115), [docs/stories/story-2.4.md:345-517](story-2.4.md#L345).
+9. Implementation maintains strict TypeScript typing (zero `any`) and uses parameterized queries exclusively per coding standards [docs/CODING-STANDARDS.md:167-260](../CODING-STANDARDS.md#L167), [docs/tech-spec-epic-2.md:120-134](../tech-spec-epic-2.md#L120).
 
 ## Tasks / Subtasks
 
-- [ ] Implement bulk UPSERT module in `server/src/database/bulk-upsert.ts` (AC1–AC6)
-  - [ ] Create typed helpers that accept `Meeting`, `Race`, `Entrant` arrays and serialize to parameterized value matrices
-  - [ ] Share a `withTransaction` wrapper that borrows a pooled client, opens `BEGIN`, executes writers, and guarantees `ROLLBACK` on error
-  - [ ] Encode change-detection `WHERE` clauses using `IS DISTINCT FROM` comparisons for each mutable column
-  - [ ] Normalize status enums and timestamp handling to match Epic 1 schema constraints (leveraging triggers for `updated_at`)
-- [ ] Integrate writers with race processor pipeline (AC2, AC3, AC6–AC8)
-  - [ ] Update `server/src/workers/transformWorker.ts` consumer to pass structured meeting/race/entrant payloads into the writers
-  - [ ] Ensure writer integration addresses Story 2.4 `[M2]` TODO by supplying previous snapshot identifiers for incremental delta queries [docs/stories/story-2.4.md:517](../stories/story-2.4.md#L517)
-  - [ ] Emit Pino logs including `raceId`, row counts, `write_ms`, and warning flag when duration ≥300 ms
-  - [ ] Bubble typed error objects so the race processor can classify retryable vs fatal failures
-- [ ] Add automated validation coverage (AC7–AC9)
-  - [ ] Unit-test SQL builders with seeded fixtures to prove unchanged payloads skip updates (restoring Story 2.4 `[H1]` regression coverage) [docs/stories/story-2.4.md:517](../stories/story-2.4.md#L517)
-  - [ ] Integration-test end-to-end write using a disposable PostgreSQL schema to measure timing and transactional rollback
-  - [ ] Extend benchmark/telemetry harness to persist UPSERT duration metrics consumed by Stories 2.13–2.15 [docs/tech-spec-epic-2.md:195](../tech-spec-epic-2.md#L195)
-- [ ] Document operational expectations (AC8–AC9)
-  - [ ] Update developer runbook with transaction/rollback workflow and logging fields
-  - [ ] Capture playbook steps for diagnosing slow UPSERTs (include log field descriptions and retry strategy)
-  - [ ] Coordinate with observability team to ingest `bulk_upsert` metrics into upcoming dashboards (aligning with solution architecture telemetry roadmap)
+- [ ] Implement transactional bulk UPSERT module (AC1-5)
+  - [ ] Scaffold `server/src/database/bulk-upsert.ts` with typed builders that accept meetings, races, and entrants payloads [docs/tech-spec-epic-2.md:94-108](../tech-spec-epic-2.md#L94).
+  - [ ] Add shared `withTransaction` helper that acquires `pool.connect()`, wraps `BEGIN`/`COMMIT`, and ensures `ROLLBACK` on error [server/src/database/pool.ts#L1](../server/src/database/pool.ts#L1), [docs/architecture-specification.md:562-575](../architecture-specification.md#L562).
+  - [ ] Encode multi-row parameter sets and `IS DISTINCT FROM` change-detection filters for each table [docs/architecture-specification.md:534-560](../architecture-specification.md#L534).
+  - [ ] Map Story 2.4 transform entities to column order with strict typing [docs/stories/story-2.4.md:373-429](story-2.4.md#L373).
+- [ ] Integrate writers with race pipeline and observability (AC3,5-7)
+  - [ ] Wire race processor to invoke the new writers after transform completion, sharing pooled clients and returning typed results [docs/tech-spec-epic-2.md:104-108](../tech-spec-epic-2.md#L104).
+  - [ ] Provide transform worker with APIs to resolve previous snapshots, unblocking `[M2]` incremental delta calculations [docs/stories/story-2.4.md:373-429](story-2.4.md#L373).
+  - [ ] Emit structured Pino logs with `raceId`, per-table row counts, `write_ms`, and `overBudget` flags when ≥300 ms [docs/solution-architecture.md:26-38](../solution-architecture.md#L26), [docs/PRD-raceday-postgresql-2025-10-05.md:69-132](../PRD-raceday-postgresql-2025-10-05.md#L69).
+  - [ ] Propagate typed error classes so the race processor can classify retryable vs fatal failures [docs/CODING-STANDARDS.md:395-454](../CODING-STANDARDS.md#L395).
+- [ ] Add test coverage and benchmarks (AC4,8-9)
+  - [ ] Unit test SQL builders with unchanged payloads to assert zero UPDATE operations and correct parameter binding [docs/epics.md:35-36](../epics.md#L35).
+  - [ ] Integration test full transaction rollback by simulating failures inside the writers using a disposable schema [docs/tech-spec-epic-2.md:107-115](../tech-spec-epic-2.md#L107).
+  - [ ] Load Story 2.4 regression fixtures once `[H1]` lands to validate entrant field preservation [docs/stories/story-2.4.md:345-517](story-2.4.md#L345).
+  - [ ] Extend benchmark/telemetry harness to persist UPSERT duration metrics for Stories 2.13–2.15 [docs/tech-spec-epic-2.md:115-119](../tech-spec-epic-2.md#L115).
+- [ ] Document operational playbook (AC7-8)
+  - [ ] Update runbook with transaction workflow, logging fields, and slow-write troubleshooting steps [docs/architecture-specification.md:562-575](../architecture-specification.md#L562).
+  - [ ] Coordinate with observability roadmap to ingest `bulk_upsert` metrics into upcoming dashboards [docs/solution-architecture.md:33-38](../solution-architecture.md#L33).
 
 ## Dev Notes
 
 ### Requirements Context Summary
 
-This story delivers the database persistence layer that the solution architecture earmarks as one of the project’s core differentiators: multi-row UPSERTs with conditional `WHERE` clauses to shave redundant writes and keep each race commit under 300 ms [docs/solution-architecture.md:26](../solution-architecture.md#L26), [docs/solution-architecture.md:32](../solution-architecture.md#L32). PRD performance goals demand <300 ms database writes as part of the overall <2 s single-race and <15 s five-race targets, so this implementation must produce measurable timing metrics and warnings when budgets slip [docs/PRD-raceday-postgresql-2025-10-05.md:69](../PRD-raceday-postgresql-2025-10-05.md#L69), [docs/PRD-raceday-postgresql-2025-10-05.md:337](../PRD-raceday-postgresql-2025-10-05.md#L337). The tech spec assigns Story 2.5 responsibility for `bulkUpsertMeetings/Races/Entrants`, ensuring data stays consistent with Epic 1 schema constraints and freeing later stories to focus on history tables and API layers [docs/tech-spec-epic-2.md:94](../tech-spec-epic-2.md#L94), [docs/tech-spec-epic-2.md:107](../tech-spec-epic-2.md#L107).
+- Story definition locks bulk UPSERT functions for meetings, races, and entrants with single-transaction, <300 ms objectives [docs/epics.md:24-40](../epics.md#L24).
+- Tech spec mandates the `bulkUpsert*` interfaces deliver multi-row `INSERT ... ON CONFLICT DO UPDATE` with change-detection filters and shared instrumentation across the race pipeline [docs/tech-spec-epic-2.md:94-108](../tech-spec-epic-2.md#L94).
+- PRD performance goals cap database writes at <300 ms inside the 2 s single-race budget and require structured metrics to prove the 2× improvement [docs/PRD-raceday-postgresql-2025-10-05.md:69-132](../PRD-raceday-postgresql-2025-10-05.md#L69).
+- Solution architecture already approved bulk UPSERT with conditional WHERE clauses as a core decision supporting the pipeline timing targets [docs/solution-architecture.md:26-38](../solution-architecture.md#L26).
+- Architecture specification provides the exact SQL shape with `IS DISTINCT FROM` guards to avoid redundant updates while keeping the race commit atomic [docs/architecture-specification.md:534-560](../architecture-specification.md#L534).
 
-Story 2.4 highlighted outstanding dependencies: regression fixtures from `server-old` remain missing (`[H1]`), and the transform worker still emits TODO comments for previous-bucket lookups (`[M2]`) that rely on this story’s database access to complete incremental delta calculations [docs/stories/story-2.4.md:517](../stories/story-2.4.md#L517). Resolving those blockers while implementing the UPSERT pipeline keeps deltas accurate and unblocks downstream history inserts (Story 2.6) and performance telemetry (Stories 2.13–2.15).
+### Architecture & Constraints
 
-### Project Structure Notes
-
-- New writer module should live in `server/src/database/bulk-upsert.ts`, exporting pure async functions with named exports per coding standards (ESM, strict typing, zero `any`) [docs/CODING-STANDARDS.md:169](../CODING-STANDARDS.md#L169).
-- Reuse the existing pooled client from `server/src/database/pool.ts` to respect the 10-connection budget (PRD NFR003) and ensure transactions release promptly [docs/PRD-raceday-postgresql-2025-10-05.md:173](../PRD-raceday-postgresql-2025-10-05.md#L173).
-- Shared SQL fragments (column lists, placeholders) can live alongside existing query utilities (e.g., `server/src/database/query-validator.ts`) to keep builders testable.
-- Race processor integration occurs in `server/src/workers/transformWorker.ts` or a new orchestration helper so that worker outputs flow directly into the database layer without mixing persistence logic into worker threads.
-- No unified project structure doc exists yet, so follow the established `server/src/database` layout and align logging fields with prior stories (worker pool, money-flow transform).
-
-### Carry-Over & Dependencies
-
-- Address Story 2.4 `[H1]` by generating server-old regression fixtures as part of UPSERT unit tests, ensuring delta calculations compare against legacy outputs once the database layer is wired [docs/stories/story-2.4.md:517](../stories/story-2.4.md#L517).
-- Resolve Story 2.4 `[M2]` by providing prior snapshot lookup hooks once UPSERTs persist data, unblocking incremental delta accuracy [docs/stories/story-2.4.md:517](../stories/story-2.4.md#L517).
-- Monitor `[M1]` (placeholder money flow values) during integration so UPSERT payloads carry real calculations when the transform story is updated [docs/stories/story-2.4.md:519](../stories/story-2.4.md#L519).
+- Use the architecture-spec multi-row UPSERT shape with `IS DISTINCT FROM` filters to avoid redundant updates while keeping operations atomic [docs/architecture-specification.md:534-560](../architecture-specification.md#L534).
+- Borrow connections from the shared `pool` and release them promptly to respect the 10-connection ceiling mandated for concurrent race writes [docs/tech-spec-epic-2.md:104-108](../tech-spec-epic-2.md#L104), [server/src/database/pool.ts#L1](../server/src/database/pool.ts#L1).
+- Keep all SQL parameterized and maintain strict TypeScript definitions, following the zero-`any` policy [docs/CODING-STANDARDS.md:167-260](../CODING-STANDARDS.md#L167).
+- Surface structured logs and typed errors so the race processor can classify retryable vs fatal failures [docs/tech-spec-epic-2.md:107-115](../tech-spec-epic-2.md#L107).
 
 ### Testing Strategy
 
-- Unit tests validate SQL builders and change-detection filters using seeded payloads that include unchanged rows, proving `IS DISTINCT FROM` skips redundant updates [docs/tech-spec-epic-2.md:195](../tech-spec-epic-2.md#L195).
-- Integration tests exercise the full transaction path against PostgreSQL, asserting rollback semantics and recording `write_ms` metrics under the <300 ms target [docs/tech-spec-epic-2.md:195](../tech-spec-epic-2.md#L195), [docs/PRD-raceday-postgresql-2025-10-05.md:389](../PRD-raceday-postgresql-2025-10-05.md#L389).
-- Benchmark hooks feed Story 2.15 telemetry by persisting UPSERT durations and row counts, enabling trend analysis referenced in the solution architecture [docs/solution-architecture.md:35](../solution-architecture.md#L35), [docs/tech-spec-epic-2.md:216](../tech-spec-epic-2.md#L216).
+- Use Vitest unit tests to assert builder SQL and change-detection branches, leveraging Story 2.4 fixtures once `[H1]` lands [docs/stories/story-2.4.md:345-517](story-2.4.md#L345).
+- Run integration tests against a disposable PostgreSQL schema to verify transaction rollback and connection release [docs/tech-spec-epic-2.md:107-115](../tech-spec-epic-2.md#L107).
+- Extend benchmark/telemetry harness to record <300 ms write timings and warning logs for observability [docs/solution-architecture.md:26-38](../solution-architecture.md#L26), [docs/PRD-raceday-postgresql-2025-10-05.md:69-132](../PRD-raceday-postgresql-2025-10-05.md#L69).
+
+### Project Structure Notes
+
+- Create `server/src/database/bulk-upsert.ts` for the new writers and export typed helpers per project pattern [docs/tech-spec-epic-2.md:94-108](../tech-spec-epic-2.md#L94).
+- Reuse `server/src/database/query-validator.ts` to EXPLAIN the statements and document index coverage before completion [server/src/database/query-validator.ts#L1](../server/src/database/query-validator.ts#L1).
+- Integrate with `server/src/workers/transformWorker.ts` and `server/src/workers/messages.ts` to consume normalized Story 2.4 payloads [server/src/workers/transformWorker.ts#L1](../server/src/workers/transformWorker.ts#L1), [server/src/workers/messages.ts#L1](../server/src/workers/messages.ts#L1).
+- Place integration tests under `server/tests/integration/database/` and reuse `server/tests/fixtures/money-flow-legacy/` for regression coverage [docs/stories/story-2.4.md:345-517](story-2.4.md#L345).
 
 ### References
 
-- [docs/epics.md:32-40](../epics.md#L32) – Story definition and acceptance criteria.
-- [docs/solution-architecture.md:26-39](../solution-architecture.md#L26) – Performance vision, bulk UPSERT mandate, and write budget.
-- [docs/PRD-raceday-postgresql-2025-10-05.md:69-174](../PRD-raceday-postgresql-2025-10-05.md#L69) – Performance goals, functional requirements FR004–FR007, and NFR003 pool limits.
-- [docs/tech-spec-epic-2.md:94-116](../tech-spec-epic-2.md#L94) – Interface definitions, workflow sequencing, and non-functional requirements tied to Story 2.5.
-- [docs/architecture-specification.md:534-560](../architecture-specification.md#L534) – Conditional UPSERT pattern and performance impact.
-- [docs/stories/story-2.4.md:423-522](../stories/story-2.4.md#L423) – Upstream action items and dependencies from money-flow transform.
-- [docs/CODING-STANDARDS.md:169-214](../CODING-STANDARDS.md#L169) – Strict typing and module export guidance.
+- [docs/epics.md](../epics.md)
+- [docs/tech-spec-epic-2.md](../tech-spec-epic-2.md)
+- [docs/PRD-raceday-postgresql-2025-10-05.md](../PRD-raceday-postgresql-2025-10-05.md)
+- [docs/solution-architecture.md](../solution-architecture.md)
+- [docs/architecture-specification.md](../architecture-specification.md)
+- [docs/CODING-STANDARDS.md](../CODING-STANDARDS.md)
+- [docs/stories/story-2.4.md](story-2.4.md)
+- [server/src/database/pool.ts](../server/src/database/pool.ts)
+- [server/src/database/query-validator.ts](../server/src/database/query-validator.ts)
+- [server/src/workers/transformWorker.ts](../server/src/workers/transformWorker.ts)
+- [server/src/workers/messages.ts](../server/src/workers/messages.ts)
+
+## Change Log
+
+| Date | Change | Author |
+| --- | --- | --- |
+| 2025-10-12 | Initial draft generated by create-story workflow | Bob (Scrum Master agent) |
 
 ## Dev Agent Record
 
 ### Context Reference
 
-- docs/stories/story-context-2.5.xml (generated 2025-10-12T12:32:45+13:00)
+- docs/stories/story-context-2.5.xml (pending refresh)
 
 ### Agent Model Used
 
@@ -91,25 +103,17 @@ codex-gpt-5 (Scrum Master persona)
 
 ### Debug Log References
 
-- **2025-10-10 – Story draft created:** Captured epics, PRD, solution architecture, and tech-spec mandates; enumerated tasks for transactional writers, instrumentation, testing, and documentation; mapped Story 2.4 dependencies and telemetry requirements.
+- 2025-10-12 – create-story workflow executed (Scrum Master)
 
 ### Completion Notes List
 
-- _None yet – implementation pending._
+- Implementation pending.
 
 ### File List
 
-- docs/stories/story-2.5.md (this specification)
-- server/src/database/bulk-upsert.ts (planned)
-- server/src/workers/transformWorker.ts (integration touchpoint)
-- server/tests/unit/database/bulk-upsert.test.ts (planned)
-- server/tests/integration/database/bulk-upsert.integration.test.ts (planned)
-
-## Change Log
-
-**2025-10-10** – Story 2.5 drafted by Bob (Scrum Master agent)
-
-- Initial story specification generated from Epic 2 planning artifacts and architecture docs.
-- Acceptance criteria mapped with canonical citations and performance expectations.
-- Task breakdown aligned with transactional persistence, logging, and testing deliverables.
-- Dev notes capture upstream dependencies (Story 2.4) and telemetry obligations for future stories.
+- docs/stories/story-2.5.md
+- docs/stories/story-context-2.5.xml
+- server/src/database/bulk-upsert.ts
+- server/src/database/query-validator.ts
+- server/src/workers/transformWorker.ts
+- server/src/workers/messages.ts
