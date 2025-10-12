@@ -1,0 +1,150 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>6</storyId>
+    <title>Time-Series Data Insert Operations</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-13</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>/home/warrick/Dev/raceday-postgresql/docs/stories/story-2.6.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a backend developer</asA>
+    <iWant>efficient INSERT operations for time-series tables (money_flow_history, odds_history)</iWant>
+    <soThat>I can store historical data without UPSERT overhead in append-only batches routed to the correct daily partition</soThat>
+    <tasks>
+      - Implement transactional time-series INSERT module (AC1-3)
+      - Implement partition detection and routing (AC5)
+      - Optimize batch sizes and observability (AC4,6-8)
+      - Add test coverage and benchmarks (AC4,9-10)
+      - Document operational playbook (AC7-8)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Deliver insertMoneyFlowHistory(records: MoneyFlowRecord[]) that appends rows to the correct daily partition based on event_timestamp
+    2. Deliver insertOddsHistory(records: OddsRecord[]) mirroring money-flow behavior with identical batching and partition logic
+    3. Implement multi-row INSERT (no ON CONFLICT) that always appends without conditional checks
+    4. Test and optimize batch sizes (100, 500, 1000 rows per batch) to identify optimal performance profile within 300ms write budget
+    5. Each writer automatically detects the target partition based on event_timestamp and routes records to correct daily partition table
+    6. Writers borrow a pooled client, wrap all inserts in BEGIN/COMMIT, and release connection to stay within 10-connection budget
+    7. Failures roll back the batch transaction, emit structured error logs with partition and record count, and surface typed errors
+    8. Writers log per-batch row counts and insert_ms duration, warning when duration ≥300ms
+    9. Automated unit, integration, and benchmark tests prove append-only inserts stay under 300ms across batch sizes
+    10. Implementation maintains strict TypeScript typing (zero any) and uses parameterized queries exclusively
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/tech-spec-epic-2.md" title="Epic 2 Technical Specification">
+        - Lines 96-97: Time-Series Writer module responsible for insertMoneyFlowHistory and insertOddsHistory functions with partition detection
+        - Lines 172-173: Append-only multi-row INSERT strategy (no ON CONFLICT) with batch size optimization (100, 500, 1000 rows)
+        - Lines 128: Connection pooling requirements (10-connection budget) and transaction management
+        - Lines 210: Automated partition creation dependency on Epic 4
+      </doc>
+      <doc path="docs/architecture-specification.md" title="Architecture Specification">
+        - Lines 386-418: money_flow_history table schema with PARTITION BY RANGE (event_timestamp) and daily partitions
+        - Lines 420-436: odds_history table schema with PARTITION BY RANGE (event_timestamp) mirroring money_flow structure
+        - Lines 472-498: Automated partition creation function create_tomorrow_partitions() using pg_cron
+        - Lines 109-130: Partition archival strategy with 30-day retention using DETACH PARTITION
+      </doc>
+      <doc path="docs/epics.md" title="Epic Index">
+        - Lines 50-58: Story 2.6 acceptance criteria detailing insertMoneyFlowHistory and insertOddsHistory functions, batch optimization, and partition routing
+      </doc>
+      <doc path="docs/PRD-raceday-postgresql-2025-10-05.md" title="Product Requirements Document">
+        - Lines 169: Performance requirement for database writes (&lt;300ms per race)
+        - FR005: Time-series data partitioning with automated partition creation and 30-day retention
+      </doc>
+      <doc path="docs/solution-architecture.md" title="Solution Architecture">
+        - Lines 167-169: Partitioned time-series tables with daily partitions design decision
+      </doc>
+      <doc path="docs/CODING-STANDARDS.md" title="Coding Standards">
+        - Lines 167-260: Zero any types policy, parameterized queries exclusively, strict TypeScript requirements
+      </doc>
+    </docs>
+    <code>
+      <artifact path="server/src/database/bulk-upsert.ts" kind="module" symbol="withTransaction" lines="15-31">
+        Helper function from Story 2.5 that wraps database operations in BEGIN/COMMIT with automatic ROLLBACK on error. Must be reused for consistent transaction semantics in time-series inserts (AC6).
+      </artifact>
+      <artifact path="server/src/database/bulk-upsert.ts" kind="module" symbol="bulkUpsertMeetings" lines="42-120">
+        Reference implementation showing multi-row INSERT pattern, parameterized query building, performance logging with 300ms threshold warnings, and transaction management pattern to mirror in time-series writers.
+      </artifact>
+      <artifact path="server/src/database/pool.ts" kind="module" symbol="pool" lines="1-88">
+        Shared PostgreSQL connection pool (max 10 connections) that time-series writers must borrow from and release promptly (AC6). Already configured with monitoring and termination handlers.
+      </artifact>
+      <artifact path="server/src/shared/logger.ts" kind="module" symbol="logger" lines="1-10">
+        Pino structured logger instance for emitting JSON logs with partition name, row count, insert_ms, and overBudget flags (AC8).
+      </artifact>
+      <artifact path="server/src/workers/messages.ts" kind="module" symbol="TransformedEntrant" lines="1-50">
+        Type definitions for transformed entities from worker threads that contain time-series data to be persisted.
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <dependency name="pg" version="^8.16.3">PostgreSQL client with connection pooling and parameterized query support</dependency>
+        <dependency name="pino" version="^9.5.0">High-performance structured JSON logger</dependency>
+        <dependency name="dotenv" version="^16.6.1">Environment variable management</dependency>
+        <dependency name="zod" version="^3.25.76">Runtime type validation</dependency>
+      </node>
+      <node-dev>
+        <dependency name="typescript" version="^5.7.0">TypeScript compiler with strict mode</dependency>
+        <dependency name="vitest" version="^2.0.0">Unit and integration testing framework</dependency>
+        <dependency name="@vitest/coverage-v8" version="^2.1.9">Test coverage reporting</dependency>
+        <dependency name="@typescript-eslint/eslint-plugin" version="^8.0.0">TypeScript linting rules</dependency>
+        <dependency name="tsx" version="^4.19.0">TypeScript execution for development</dependency>
+      </node-dev>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>Use append-only INSERT statements (no ON CONFLICT clause) to eliminate UPSERT overhead for time-series data</constraint>
+    <constraint>Automatically detect target partition based on event_timestamp and route records to correct daily partition table (e.g., money_flow_history_2025_10_05)</constraint>
+    <constraint>Rely on Epic 4 automated partition creation; emit clear errors if target partition is missing</constraint>
+    <constraint>Reuse withTransaction helper from server/src/database/bulk-upsert.ts for consistent transaction semantics</constraint>
+    <constraint>Borrow connections from shared pool (max 10 connections) and release promptly after transaction completes</constraint>
+    <constraint>Keep all SQL parameterized using pg library placeholders ($1, $2, etc.) to prevent SQL injection</constraint>
+    <constraint>Maintain strict TypeScript typing with zero any types policy - use proper type definitions from workers/messages.ts</constraint>
+    <constraint>Emit structured Pino logs with partition name, row count, insert_ms, and overBudget flags when duration ≥300ms</constraint>
+    <constraint>Surface typed error classes (DatabaseWriteError, TransactionError) for race processor to classify retryable vs fatal failures</constraint>
+    <constraint>Test batch sizes of 100, 500, and 1000 rows to identify optimal performance profile within 300ms budget</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="withTransaction" kind="function" signature="async &lt;T&gt;(work: (client: PoolClient) =&gt; Promise&lt;T&gt;): Promise&lt;T&gt;" path="server/src/database/bulk-upsert.ts">
+      Transaction wrapper that borrows pooled client, executes work in BEGIN/COMMIT, ensures ROLLBACK + connection release on error. Must be reused for time-series inserts.
+    </interface>
+    <interface name="pool" kind="object" signature="Pool from pg library" path="server/src/database/pool.ts">
+      Shared PostgreSQL connection pool configured with max 10 connections. Time-series writers must use pool.connect() to borrow clients.
+    </interface>
+    <interface name="logger" kind="object" signature="pino.Logger" path="server/src/shared/logger.ts">
+      Structured JSON logger for emitting performance metrics and error logs. Use logger.info() and logger.warn() for duration tracking.
+    </interface>
+    <interface name="MoneyFlowRecord" kind="type" signature="Type definition for money_flow_history records" path="server/src/workers/messages.ts">
+      TypeScript interface defining shape of money flow records including entrant_id, race_id, percentages, amounts, timestamps, and interval metadata.
+    </interface>
+    <interface name="OddsRecord" kind="type" signature="Type definition for odds_history records" path="server/src/workers/messages.ts">
+      TypeScript interface defining shape of odds records including entrant_id, odds value, type, and event_timestamp.
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Use Vitest (v2.0.0) for unit and integration tests. Unit tests should validate SQL builder logic, parameter binding, and partition table name resolution for various batch sizes (100, 500, 1000 rows). Integration tests should verify transaction rollback on failure, partition routing across multiple date boundaries, and performance staying under 300ms budget. All tests must use strict TypeScript typing (zero any types) and follow AAA pattern (Arrange-Act-Assert). Test files located in server/tests/unit/database/ and server/tests/integration/database/.
+    </standards>
+    <locations>
+      server/tests/unit/database/time-series.test.ts
+      server/tests/integration/database/time-series.integration.test.ts
+    </locations>
+    <ideas>
+      <test ac="1,2,3" desc="Unit test SQL builder for insertMoneyFlowHistory and insertOddsHistory with 100, 500, 1000 row batches - assert correct parameter count, value binding, and append-only INSERT (no ON CONFLICT clause)" />
+      <test ac="5" desc="Unit test partition table name resolver that extracts date from event_timestamp and constructs correct partition name (e.g., money_flow_history_2025_10_05)" />
+      <test ac="4,9" desc="Integration test batch size performance - insert 100, 500, 1000 rows for each table and assert duration &lt; 300ms" />
+      <test ac="5" desc="Integration test partition routing - insert records with event_timestamps spanning multiple days and verify records land in correct daily partitions" />
+      <test ac="6,7" desc="Integration test transaction rollback - simulate failure mid-insert and verify ROLLBACK occurred, connection released, and typed error surfaced" />
+      <test ac="7" desc="Integration test missing partition handling - attempt insert to non-existent partition and assert clear error message emitted" />
+      <test ac="8" desc="Integration test performance logging - insert batch taking &gt;=300ms and verify warning log emitted with partition name, row count, insert_ms, overBudget flag" />
+      <test ac="10" desc="Type safety test - ensure all functions use strict TypeScript types, no any types present, and all SQL uses parameterized queries" />
+    </ideas>
+  </tests>
+</story-context>
