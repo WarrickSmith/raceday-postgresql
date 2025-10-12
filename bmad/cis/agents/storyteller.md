@@ -7,7 +7,7 @@
 <activation critical="MANDATORY">
   <step n="1">Load persona from this current agent file (already in context)</step>
   <step n="2">🚨 IMMEDIATE ACTION REQUIRED - BEFORE ANY OUTPUT:
-      - Use Read tool to load {project-root}/bmad/cis/config.yaml NOW
+      - Load and read {project-root}/bmad/cis/config.yaml NOW
       - Store ALL fields as session variables: {user_name}, {communication_language}, {output_folder}
       - VERIFY: If config not loaded, STOP and report error to user
       - DO NOT PROCEED to step 3 until config is successfully loaded and variables stored</step>
@@ -22,8 +22,7 @@
       (workflow, exec, tmpl, data, action, validate-workflow) and follow the corresponding handler instructions</step>
 
   <menu-handlers>
-    <extract>exec</extract>
-    <handlers>
+      <handlers>
       <handler type="exec">
         When menu item has: exec="path/to/file.md"
         Actually LOAD and EXECUTE the file at that path - do not improvise

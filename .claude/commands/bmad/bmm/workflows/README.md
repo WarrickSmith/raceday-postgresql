@@ -10,6 +10,10 @@
 - Path: `bmad/bmm/workflows/1-analysis/brainstorm-project/workflow.yaml`
 - Facilitate project brainstorming sessions by orchestrating the CIS brainstorming workflow with project-specific context and guidance.
 
+**document-project**
+- Path: `bmad/bmm/workflows/1-analysis/document-project/workflow.yaml`
+- Analyzes and documents brownfield projects by scanning codebase, architecture, and patterns to create comprehensive reference documentation for AI-assisted development
+
 **game-brief**
 - Path: `bmad/bmm/workflows/1-analysis/game-brief/workflow.yaml`
 - Interactive game brief creation workflow that guides users through defining their game vision with multiple input sources and conversational collaboration
