@@ -1,34 +1,195 @@
 <story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
   <metadata>
     <epicId>2</epicId>
-    <storyId>5</storyId>
+    <storyId>2.5</storyId>
     <title>Bulk UPSERT Database Operations</title>
-    <status>Draft</status>
-    <generatedAt>2025-10-12T13:01:20.042576+13:00</generatedAt>
+    <status>Approved</status>
+    <generatedAt>2025-10-12</generatedAt>
     <generator>BMAD Story Context Workflow</generator>
     <sourceStoryPath>/home/warrick/Dev/raceday-postgresql/docs/stories/story-2.5.md</sourceStoryPath>
   </metadata>
 
   <story>
-    <asA>backend developer</asA>
-    <iWant>{{i_want}}</iWant>
-    <soThat>{{so_that}}</soThat>
-    <tasks>{{story_tasks}}</tasks>
+    <asA>a backend developer</asA>
+    <iWant>bulk UPSERT operations using multi-row INSERT with ON CONFLICT and change detection</iWant>
+    <soThat>the pipeline can persist complete race snapshots in a single &lt;300 ms transaction without redundant writes</soThat>
+    <tasks>
+      <task id="T1">Implement transactional bulk UPSERT module (AC1-5): Scaffold server/src/database/bulk-upsert.ts with typed builders for meetings/races/entrants; add shared withTransaction helper; encode multi-row parameters and IS DISTINCT FROM filters; map Story 2.4 transform entities to column order</task>
+      <task id="T2">Integrate writers with race pipeline and observability (AC3,5-7): Wire race processor to invoke writers after transform, share pooled clients; provide transform worker APIs to resolve previous snapshots for incremental delta; emit structured Pino logs with raceId, per-table row counts, write_ms, overBudget flags; propagate typed error classes</task>
+      <task id="T3">Add test coverage and benchmarks (AC4,8-9): Unit test SQL builders with unchanged payloads; integration test transaction rollback with disposable schema; load Story 2.4 regression fixtures once [H1] lands; extend benchmark/telemetry harness for UPSERT duration metrics</task>
+      <task id="T4">Document operational playbook (AC7-8): Update runbook with transaction workflow, logging fields, slow-write troubleshooting; coordinate with observability roadmap for bulk_upsert metrics dashboards</task>
+    </tasks>
   </story>
 
-  <acceptanceCriteria>{{acceptance_criteria}}</acceptanceCriteria>
+  <acceptanceCriteria>
+    <criterion id="AC1">Deliver bulkUpsertMeetings(meetings: Meeting[]) that persists normalized meeting snapshots via single multi-row INSERT...ON CONFLICT DO UPDATE and returns only after transaction commits</criterion>
+    <criterion id="AC2">Deliver bulkUpsertRaces(races: Race[]) mirroring meeting behaviour, including enum normalization and timestamp handling aligned with Epic 1 schema requirements</criterion>
+    <criterion id="AC3">Deliver bulkUpsertEntrants(entrants: Entrant[]) that writes Story 2.4 money-flow fields without loss while keeping transactional guarantees</criterion>
+    <criterion id="AC4">Each writer issues single statement per race using parameterized ON CONFLICT (primary_key) DO UPDATE clauses with IS DISTINCT FROM predicates to skip unchanged rows</criterion>
+    <criterion id="AC5">Writers borrow pooled client, wrap all table updates in BEGIN/COMMIT, and release connection to stay within 10-connection budget</criterion>
+    <criterion id="AC6">Failures roll back race transaction, emit structured error logs with race identifiers, and surface typed errors to race processor</criterion>
+    <criterion id="AC7">Writers log per-table row counts, write_ms, and warn when duration ≥300 ms, feeding performance metrics pipeline</criterion>
+    <criterion id="AC8">Automated unit, integration, and benchmark tests prove UPSERTs stay under 300 ms, skip unchanged payloads, and leverage Story 2.4 regression fixtures once populated</criterion>
+    <criterion id="AC9">Implementation maintains strict TypeScript typing (zero 'any') and uses parameterized queries exclusively per coding standards</criterion>
+  </acceptanceCriteria>
 
   <artifacts>
-    <docs>{{docs_artifacts}}</docs>
-    <code>{{code_artifacts}}</code>
-    <dependencies>{{dependencies_artifacts}}</dependencies>
+    <docs>
+      <doc>
+        <path>docs/architecture-specification.md</path>
+        <title>Bulk UPSERT Strategy</title>
+        <section>Performance Optimization § 1</section>
+        <snippet>Multi-row UPSERT with conditional updates using INSERT...ON CONFLICT DO UPDATE with IS DISTINCT FROM predicates to skip unchanged rows. Single DB round trip for entire race with WHERE clause preventing unnecessary writes (30-50% reduction). Atomic transaction ensures data consistency. Target: &lt;300ms per race.</snippet>
+      </doc>
+      <doc>
+        <path>docs/architecture-specification.md</path>
+        <title>Connection Pooling Configuration</title>
+        <section>Performance Optimization § 2</section>
+        <snippet>PostgreSQL pool configured with max: 10 connections (5 for concurrent race writes, 3 for API queries, 1 for scheduler, 1 spare). Uses idleTimeoutMillis: 30000 and connectionTimeoutMillis: 2000 for fail-fast behavior when pool exhausted.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Bulk UPSERT APIs and Workflows</title>
+        <section>APIs and Interfaces</section>
+        <snippet>bulkUpsertMeetings/Races/Entrants perform single-transaction multi-row INSERT...ON CONFLICT DO UPDATE with change detection WHERE clause, targeting &lt;300ms per race. All use parameterized queries exclusively. Scheduler invokes race processor which coordinates fetch → transform → write pipeline, then PerfLogger captures timing metrics.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Performance and Reliability NFRs</title>
+        <section>Non-Functional Requirements</section>
+        <snippet>Database operations must complete in &lt;300ms via multi-row UPSERTs and partition-aware inserts. PostgreSQL connection utilization must stay within 10-connection pool budget by sharing pooled clients and releasing them promptly. Every race write occurs in a single BEGIN/COMMIT block with rollback on failure.</snippet>
+      </doc>
+      <doc>
+        <path>docs/CODING-STANDARDS.md</path>
+        <title>TypeScript Strict Typing and Parameterized Queries</title>
+        <section>§3 TypeScript Best Practices, §5 Error Handling</section>
+        <snippet>Zero 'any' types allowed - use strict typing with interfaces for object shapes. All database writes must use parameterized queries via pg bindings (no dynamic string concatenation). Implement explicit error types extending Error class with structured properties for classification.</snippet>
+      </doc>
+      <doc>
+        <path>docs/CODING-STANDARDS.md</path>
+        <title>ES Modules and Functional Programming Standards</title>
+        <section>§1 Modern ES6+ Standards, §2 Functional Programming</section>
+        <snippet>MANDATORY: ES modules (import/export only, no require). Use arrow functions, async/await, const/let (never var), destructuring, template literals. Prefer pure functions, immutability, array methods (.map/.filter/.reduce) over loops. No classes for business logic.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>server/src/database/pool.ts</path>
+        <kind>module</kind>
+        <symbol>pool, closePool, poolConfig</symbol>
+        <lines>1-78</lines>
+        <reason>Existing connection pool with 10-connection limit (max: env.DB_POOL_MAX). Bulk UPSERT must borrow connections via pool.connect(), wrap in BEGIN/COMMIT, and release promptly to respect connection budget.</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/workers/transformWorker.ts</path>
+        <kind>worker-thread</kind>
+        <symbol>transformRace, TransformedRace</symbol>
+        <lines>45-215</lines>
+        <reason>Story 2.4 transform worker that produces TransformedMeeting, TransformedRace, TransformedEntrant entities with calculated money-flow fields. Story 2.5 bulk UPSERT consumes these normalized entities.</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/workers/messages.ts</path>
+        <kind>types</kind>
+        <symbol>TransformedMeeting, TransformedEntrant, MoneyFlowRecord</symbol>
+        <lines>12-133</lines>
+        <reason>Zod schemas define strict types for entities to be persisted. TransformedEntrant includes hold_percentage, bet_percentage, win_pool_amount, place_pool_amount fields that must map to entrants table columns without loss.</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/database/query-validator.ts</path>
+        <kind>utility</kind>
+        <symbol>validateIndexUsage, validateAllIndexes</symbol>
+        <lines>1-183</lines>
+        <reason>EXPLAIN validator to confirm UPSERT statements use appropriate indexes. Run validation before story completion to document index coverage and scan types.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package>pg</package>
+        <version>^8.16.3</version>
+        <purpose>PostgreSQL client for parameterized queries and connection pooling</purpose>
+      </node>
+      <node>
+        <package>pg-format</package>
+        <version>^1.0.4</version>
+        <purpose>Safe SQL identifier formatting (optional for dynamic column names)</purpose>
+      </node>
+      <node>
+        <package>pino</package>
+        <version>^9.5.0</version>
+        <purpose>Structured JSON logging for duration metrics and warning thresholds</purpose>
+      </node>
+      <node>
+        <package>zod</package>
+        <version>^3.25.76</version>
+        <purpose>Runtime validation ensuring zero 'any' types in persisted data</purpose>
+      </node>
+      <node>
+        <package>vitest</package>
+        <version>^2.0.0</version>
+        <purpose>Unit and integration test framework with disposable schema support</purpose>
+      </node>
+    </dependencies>
   </artifacts>
 
-  <constraints>{{constraints}}</constraints>
-  <interfaces>{{interfaces}}</interfaces>
+  <constraints>
+    <constraint id="C1">Use multi-row INSERT...ON CONFLICT DO UPDATE with IS DISTINCT FROM predicates in WHERE clause to skip unchanged rows per architecture-specification.md:534-560</constraint>
+    <constraint id="C2">Borrow connections from shared pool via pool.connect(), release after transaction commit/rollback to respect 10-connection ceiling (server/src/database/pool.ts:12)</constraint>
+    <constraint id="C3">Wrap all table updates in single BEGIN/COMMIT block per race; rollback on any failure to prevent partial persistence (tech-spec-epic-2.md:107-115)</constraint>
+    <constraint id="C4">Target &lt;300ms per race for all UPSERT operations combined; emit warning logs when duration ≥300ms (tech-spec-epic-2.md:116)</constraint>
+    <constraint id="C5">Use parameterized queries exclusively ($1, $2, ...) - no dynamic string concatenation (CODING-STANDARDS.md:167-260, tech-spec-epic-2.md:122)</constraint>
+    <constraint id="C6">Maintain strict TypeScript typing with zero 'any' types; leverage Zod schemas from server/src/workers/messages.ts for entity validation</constraint>
+    <constraint id="C7">Surface structured error logs with raceId and failure causes; propagate typed error classes for retryable vs fatal classification (CODING-STANDARDS.md:395-454)</constraint>
+    <constraint id="C8">Map Story 2.4 TransformedEntrant fields (hold_percentage, bet_percentage, win_pool_amount, place_pool_amount, pool percentages) to entrants table columns without data loss</constraint>
+  </constraints>
+  <interfaces>
+    <interface>
+      <name>pool.connect()</name>
+      <kind>PostgreSQL PoolClient</kind>
+      <signature>async (): Promise&lt;PoolClient&gt;</signature>
+      <path>server/src/database/pool.ts:18</path>
+      <notes>Borrow pooled client for transaction scope; must call client.release() after BEGIN/COMMIT or ROLLBACK</notes>
+    </interface>
+    <interface>
+      <name>TransformedMeeting</name>
+      <kind>Zod Type</kind>
+      <signature>{ meeting_id: string, name: string, date: string, country: string, category: string, track_condition?: string | null, tote_status?: string | null }</signature>
+      <path>server/src/workers/messages.ts:15-23</path>
+      <notes>Normalized meeting entity from Story 2.4 transform worker; maps to meetings table via bulkUpsertMeetings</notes>
+    </interface>
+    <interface>
+      <name>TransformedEntrant</name>
+      <kind>Zod Type</kind>
+      <signature>{ entrant_id, race_id, runner_number, name, barrier?, is_scratched, fixed_win_odds?, fixed_place_odds?, hold_percentage?, bet_percentage?, win_pool_percentage?, place_pool_percentage?, win_pool_amount?, place_pool_amount?, jockey?, trainer_name?, ... }</signature>
+      <path>server/src/workers/messages.ts:32-59</path>
+      <notes>Includes calculated money-flow fields from Story 2.4; all fields must persist to entrants table without loss per AC3</notes>
+    </interface>
+    <interface>
+      <name>MoneyFlowRecord</name>
+      <kind>Zod Type</kind>
+      <signature>{ entrant_id, race_id, time_to_start, time_interval, interval_type, polling_timestamp, hold_percentage, bet_percentage, win_pool_percentage?, place_pool_percentage?, win_pool_amount, place_pool_amount, total_pool_amount, incremental_win_amount, incremental_place_amount, fixed_win_odds?, fixed_place_odds?, ... }</signature>
+      <path>server/src/workers/messages.ts:68-93</path>
+      <notes>Time-series records for money_flow_history table; Story 2.6 will handle batch inserts to partitioned tables</notes>
+    </interface>
+  </interfaces>
   <tests>
-    <standards>{{test_standards}}</standards>
-    <locations>{{test_locations}}</locations>
-    <ideas>{{test_ideas}}</ideas>
+    <standards>Vitest framework with describe/it blocks. Unit tests use mocked pg clients and validate SQL builder logic. Integration tests hit disposable PostgreSQL schema seeded via fixtures. Benchmark tests measure duration metrics (min/max/avg/p95/p99) and persist results to JSON/CSV. All tests must achieve zero TypeScript errors and zero ESLint warnings per CODING-STANDARDS.md. Use .toBeCloseTo() for floating-point assertions, .toBe() for exact matches.</standards>
+    <locations>
+      <location>server/tests/unit/database/ - Unit tests for SQL builders and change-detection logic</location>
+      <location>server/tests/integration/database/ - Integration tests with disposable schema and transaction rollback validation</location>
+      <location>server/tests/fixtures/money-flow-legacy/ - Story 2.4 regression fixtures for entrant field preservation</location>
+      <location>server/tests/benchmarks/ - Benchmark harness for UPSERT duration metrics</location>
+    </locations>
+    <ideas>
+      <idea ac="AC1,AC2,AC3">Unit test: bulkUpsertMeetings/Races/Entrants SQL generation with 5 entities; assert parameterized query ($1...$N) and column order matches schema</idea>
+      <idea ac="AC4">Unit test: Feed unchanged payload twice; assert second UPSERT skips UPDATE via IS DISTINCT FROM WHERE clause (zero affected rows)</idea>
+      <idea ac="AC4">Unit test: Feed partially changed payload (2 of 5 entrants modified); assert only 2 UPDATE operations executed (query IS DISTINCT FROM logic)</idea>
+      <idea ac="AC5">Integration test: Simulate writer crash mid-transaction; assert rollback leaves no partial data and connection returns to pool</idea>
+      <idea ac="AC5">Integration test: Run 5 concurrent UPSERT operations; assert pool utilization stays ≤10 connections via pg pool metrics</idea>
+      <idea ac="AC6">Integration test: Force database constraint violation (e.g., foreign key); assert transaction rolls back, error logged with raceId, and typed error surfaced</idea>
+      <idea ac="AC7">Unit test: Mock performance.now() to simulate 250ms and 350ms durations; assert warning log emitted only when ≥300ms</idea>
+      <idea ac="AC8">Benchmark test: UPSERT 10, 50, 100 entrants with unchanged payloads; assert p95 duration &lt;300ms and log per-table row counts</idea>
+      <idea ac="AC8">Integration test: Load Story 2.4 fixture with money-flow fields (hold_percentage, win_pool_amount, etc.); UPSERT to entrants table; query and assert no data loss</idea>
+      <idea ac="AC9">Build test: Run 'npm run build' and 'npm run lint' as pre-test step; fail suite if any TypeScript errors or ESLint warnings detected</idea>
+    </ideas>
   </tests>
 </story-context>

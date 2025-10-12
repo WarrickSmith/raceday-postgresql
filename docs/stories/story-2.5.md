@@ -1,6 +1,6 @@
 # Story 2.5: Bulk UPSERT Database Operations
 
-Status: Draft
+Status: Approved
 
 ## Story
 
@@ -95,7 +95,7 @@ so that the pipeline can persist complete race snapshots in a single <300 ms t
 
 ### Context Reference
 
-- docs/stories/story-context-2.5.xml (pending refresh)
+- [docs/stories/story-context-2.5.xml](story-context-2.5.xml) (generated 2025-10-12, validated ✓)
 
 ### Agent Model Used
 
@@ -104,6 +104,7 @@ codex-gpt-5 (Scrum Master persona)
 ### Debug Log References
 
 - 2025-10-12 – create-story workflow executed (Scrum Master)
+- 2025-10-12 – story-context workflow executed, XML validated 10/10 passed (Scrum Master)
 
 ### Completion Notes List
 
