@@ -219,3 +219,17 @@ The solution architecture prescribes a monolithic Node.js server with an adaptiv
 - **Schema Compatibility Audit:** Automated check comparing PostgreSQL column metadata with Appwrite attribute definitions (type, nullability, length) using migration scripts; fails CI when mismatches arise.
 - **Timezone Normalization Tests:** Unit tests validating conversions to `Pacific/Auckland` and ensuring stored records include both local time and UTC reference.
 - **Observability Checks:** Automated assertions ensuring metrics logs include race IDs, durations, warning escalations, and timezone context; integrate with log-based tests or linting to catch missing fields early.
+
+## Post-Review Follow-ups
+
+**From Story 2.5 Senior Developer Review (2025-10-12):**
+- **[High]** Fix 68 ESLint template literal errors in [server/src/database/bulk-upsert.ts](../server/src/database/bulk-upsert.ts) - Convert `paramIndex` to `String(paramIndex)` before template interpolation (AC9, lines 58, 160, 249)
+- **[High]** Fix 26 ESLint unsafe `any` value access errors in [server/tests/integration/database/bulk-upsert.integration.test.ts](../server/tests/integration/database/bulk-upsert.integration.test.ts) - Add type assertions to `persisted.rows[0]` (AC9, lines 166-342)
+- **[High]** Fix failing unit test in [server/tests/unit/database/bulk-upsert.test.ts:143-144](../server/tests/unit/database/bulk-upsert.test.ts#L143-L144) - Update parameter index expectations to match 8-field meeting schema (AC8)
+- **[High]** Unskip transaction rollback integration test - Refactor [server/src/database/bulk-upsert.ts](../server/src/database/bulk-upsert.ts) to accept table name parameter (AC5/AC6)
+- **[Med]** Document UPSERT query plans with `EXPLAIN ANALYZE` using [server/src/database/query-validator.ts](../server/src/database/query-validator.ts) - Validate INDEX SCAN on primary key and confirm UPDATE skipped when WHERE clause false (AC4)
+- **[Med]** Add foreign key constraint violation test for AC6 error handling - Simulate entrant UPSERT with nonexistent race_id
+- **[Med]** Evaluate parallel UPSERT execution for independent tables (meetings + races concurrently before entrants) - Performance optimization
+- **[Low]** Add inline comment documenting all 22 entrant fields in [server/src/database/bulk-upsert.ts:280-286](../server/src/database/bulk-upsert.ts#L280-L286) - Maintainability
+- **[Low]** Integrate `pg-pool-monitor` for connection pool metrics in production - Observability
+- **[Low]** Load Story 2.4 regression fixtures once [H1] lands - Blocked dependency

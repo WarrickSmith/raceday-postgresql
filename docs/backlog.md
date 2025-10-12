@@ -21,3 +21,13 @@ Routing guidance:
 | 2025-10-08 | 1.9 | 1 | TechDebt | Low | Claude | Resolved | Standardized error logging to use `err` property consistently (server/src/api/routes/health.ts:14) per Pino convention |
 | 2025-10-08 | 1.9 | 1 | Testing | Low | Claude | Resolved | Added 503 failure path integration test simulating database unavailability using Vitest mock (server/tests/integration/health-endpoint.test.ts:84-109) - All 99 tests passing |
 | 2025-10-08 | 1.10 | 1 | Enhancement | Low | Claude | Resolved | Added generic `npm test` command documentation in Testing Strategy section (docs/developer-quick-start.md:440-445) - Story 1.10 fully complete |
+| 2025-10-12 | 2.5 | 2 | Bug | High | Amelia | Resolved | Fixed 68 ESLint template literal errors in server/src/database/bulk-upsert.ts - Converted paramIndex to String(paramIndex) at lines 58, 160, 249 |
+| 2025-10-12 | 2.5 | 2 | Bug | High | Amelia | Resolved | Fixed 26 ESLint unsafe any value access errors - Added MeetingRow/EntrantRow/ConnectionCountRow type definitions and proper type assertions |
+| 2025-10-12 | 2.5 | 2 | Bug | High | Amelia | Resolved | Fixed failing unit test - Updated parameter index expectations to $1-$8, $9-$16 matching 8-field meeting schema |
+| 2025-10-12 | 2.5 | 2 | TechDebt | High | TBD | Deferred | Unskip transaction rollback integration test - Requires architecture changes to support table name parameters (moved to Epic 2 follow-ups) |
+| 2025-10-12 | 2.5 | 2 | Enhancement | Med | Amelia | Resolved | Documented UPSERT query plans - Created server/src/database/document-query-plans.ts with EXPLAIN ANALYZE for all tables |
+| 2025-10-12 | 2.5 | 2 | Testing | Med | Amelia | Resolved | Added foreign key constraint violation test - server/tests/integration/database/bulk-upsert.integration.test.ts:469-494 |
+| 2025-10-12 | 2.5 | 2 | Enhancement | Med | Amelia | Resolved | Evaluated parallel UPSERT execution - Created docs/parallel-upsert-evaluation.md - Recommendation: maintain sequential (premature optimization) |
+| 2025-10-12 | 2.5 | 2 | TechDebt | Low | Amelia | Resolved | Added 22-field documentation comment in server/src/database/bulk-upsert.ts:279-285 with field groupings |
+| 2025-10-12 | 2.5 | 2 | Enhancement | Low | Amelia | Resolved | Integrated custom pool monitoring - Created server/src/database/pool-monitor.ts (no external deps), integrated into pool.ts |
+| 2025-10-12 | 2.5 | 2 | Testing | Low | TBD | Blocked | Load Story 2.4 regression fixtures once [H1] lands - Upstream dependency not yet available |
