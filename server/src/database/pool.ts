@@ -33,6 +33,16 @@ logger.info(
   'PostgreSQL pool configured',
 )
 
+// Start connection pool monitoring in production (Story 2.5 observability enhancement)
+// Monitors pool usage patterns to detect exhaustion and validate concurrency limits
+import { monitorPool } from './pool-monitor.js'
+
+const stopMonitoring = monitorPool(pool, {
+  refreshInterval: 5000, // Check every 5 seconds
+  logThreshold: 70, // Warn when >70% pool utilization
+  enabled: process.env.NODE_ENV === 'production',
+})
+
 let isClosing = false
 let closePromise: Promise<void> | null = null
 
@@ -45,6 +55,7 @@ const closePool = async (reason = 'manual'): Promise<void> => {
   isClosing = true
   closePromise = (async () => {
     try {
+      stopMonitoring() // Stop monitoring before closing pool
       await pool.end()
       logger.info({ reason }, 'PostgreSQL pool closed')
     } catch (err) {
