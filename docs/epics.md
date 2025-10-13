@@ -41,8 +41,8 @@ This index mirrors the canonical planning document `docs/epic-stories-2025-10-05
 
 ### Story 2.6: Time-Series Data Insert Operations
 
-**As a** developer  
-**I want** efficient INSERT operations for time-series tables (money_flow_history, odds_history)  
+**As a** developer
+**I want** efficient INSERT operations for time-series tables (money_flow_history, odds_history)
 **So that** I can store historical data without UPSERT overhead
 
 **Acceptance Criteria:**
@@ -55,6 +55,148 @@ This index mirrors the canonical planning document `docs/epic-stories-2025-10-05
 6. Single transaction per batch
 7. Error handling with rollback
 8. Performance logging (rows inserted, duration)
+
+### Story 2.7: Race Processor Orchestrator
+
+**As a** developer
+**I want** race processor that orchestrates fetch → transform → write pipeline
+**So that** I can process a complete race in <2s end-to-end
+
+**Acceptance Criteria:**
+
+1. `processRace(raceId: string)` function implemented
+2. Pipeline steps: fetch → transform (worker) → write (bulk UPSERT)
+3. Steps executed sequentially (await each step)
+4. Performance tracking: measure duration for fetch, transform, write, total
+5. Error handling: retry fetch on failure, log transform errors, rollback DB writes on failure
+6. Logging for: pipeline start, each step completion, pipeline end
+7. Return processing duration for metrics
+8. Target: <2s total processing time per race
+
+### Story 2.8: Parallel Race Processing with Promise.all()
+
+**As a** developer
+**I want** parallel processing of up to 5 concurrent races
+**So that** I can process multiple races within a single 15-second window
+
+**Acceptance Criteria:**
+
+1. `processRaces(raceIds: string[])` function implemented
+2. Uses `Promise.allSettled()` to process all races in parallel
+3. Each race processed independently (no shared state except connection pool)
+4. Failed races logged but don't block other races
+5. Performance tracking: measure max duration across all races
+6. Logging for: batch start, individual race completion, batch end
+7. Return processing results for all races (success/failure, durations)
+8. Target: 5 races processed in <15s
+
+### Story 2.9: Dynamic Scheduler with Time-Based Intervals
+
+**As a** developer
+**I want** scheduler that adjusts polling frequency based on time-to-start
+**So that** I can poll at 15s intervals during critical 5-minute window
+
+**Acceptance Criteria:**
+
+1. Scheduler queries database for upcoming races
+2. For each race, calculates time-to-start
+3. Determines polling interval: ≤5 minutes: 15 seconds / 5-15 minutes: 30 seconds / >15 minutes: 60 seconds
+4. Schedules race processing using setInterval per race
+5. Clears interval when race completes or is abandoned
+6. Scheduler runs continuously, re-evaluating intervals every minute
+7. Logging for: interval changes, race scheduling, race completion
+
+### Story 2.10: Performance Metrics Tracking
+
+**As a** developer
+**I want** detailed performance metrics logged for every processing cycle
+**So that** I can monitor and optimize system performance
+
+**Acceptance Criteria:**
+
+1. Metrics logged for each race: fetch_duration, transform_duration, write_duration, total_duration
+2. Metrics logged for batch: max_duration, race_count, success_count, failure_count
+3. Metrics include raceId for correlation
+4. Slow processing warnings: log warning if total_duration >2s (single race) or >15s (batch)
+5. Metrics formatted as structured JSON (Pino)
+
+### Story 2.11: Worker Thread Error Handling and Restart
+
+**As a** developer
+**I want** worker threads to restart automatically on crash
+**So that** temporary failures don't cause permanent system degradation
+
+**Acceptance Criteria:**
+
+1. Worker pool listens for worker 'error' and 'exit' events
+2. On worker crash: log error details, create new worker, add to pool
+3. Crashed worker's pending task requeued for retry
+4. Max retry attempts per task: 3 (fail task after 3 worker crashes)
+5. Worker restart doesn't impact other workers or main event loop
+6. Logging for: worker crash, worker restart, task retry, task failure
+
+### Story 2.12: Fetch Timeout and Error Handling
+
+**As a** developer
+**I want** robust timeout and error handling for NZ TAB API fetches
+**So that** transient network issues don't cause processing failures
+
+**Acceptance Criteria:**
+
+1. Fetch timeout: 5 seconds (configurable via environment variable)
+2. Network errors caught and logged with details
+3. HTTP 4xx errors (client errors) logged but not retried
+4. HTTP 5xx errors (server errors) retried with exponential backoff
+5. Timeout errors retried with exponential backoff
+6. Max retries: 3 attempts
+7. Final failure logged with full context (raceId, attempt count, error details)
+8. Failed fetches return null (gracefully handled by race processor)
+
+### Story 2.13: Integration Test - Single Race End-to-End
+
+**As a** developer
+**I want** integration test for single race fetch → transform → write
+**So that** I can validate the complete pipeline works correctly
+
+**Acceptance Criteria:**
+
+1. Test fetches real or mocked NZ TAB data for single race
+2. Test validates data transformation (money flow calculations correct)
+3. Test validates database writes (data appears in all tables)
+4. Test measures processing time (asserts <2s)
+5. Test validates data consistency (no missing entrants, correct relationships)
+6. Test cleans up database after completion (transaction rollback or test database)
+
+### Story 2.14: Integration Test - 5 Concurrent Races
+
+**As a** developer
+**I want** integration test for 5 concurrent races processed in parallel
+**So that** I can validate performance target (<15s)
+
+**Acceptance Criteria:**
+
+1. Test processes 5 races in parallel using `Promise.allSettled()`
+2. Test validates all 5 races complete successfully
+3. Test measures total processing time (asserts <15s)
+4. Test validates database writes for all 5 races
+5. Test validates worker pool handles concurrent load
+6. Test validates connection pool doesn't saturate (max 10 connections)
+
+### Story 2.15: Performance Benchmarking Tool
+
+**As a** developer
+**I want** standalone benchmarking tool to measure pipeline performance
+**So that** I can validate 2x improvement target and identify bottlenecks
+
+**Acceptance Criteria:**
+
+1. Benchmark script runs independent of main application
+2. Benchmark tests: 1 race, 5 races, 10 races (stress test)
+3. Benchmark reports: min, max, avg, p95, p99 durations
+4. Benchmark reports: fetch, transform, write breakdown
+5. Benchmark saves results to file (JSON or CSV)
+6. Benchmark can use real NZ TAB data or synthetic test data
+7. Benchmark validates target: 5 races <15s (pass/fail)
 
 ---
 
