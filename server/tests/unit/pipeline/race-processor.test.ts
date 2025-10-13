@@ -79,11 +79,13 @@ const { PartitionNotFoundError } = await timeSeriesModulePromise
 
 const {
   processRace,
+  processRaces,
   FetchError,
   TransformError,
   WriteError,
 } = await import('../../../src/pipeline/race-processor.js')
 const { logger } = await import('../../../src/shared/logger.js')
+const { env } = await import('../../../src/shared/env.js')
 
 describe('processRace', () => {
   const raceId = 'race-123'
@@ -531,5 +533,185 @@ const transformedRace: TransformedRace = {
     expect(typed.result.error).toMatchObject({ retryable: false, type: 'write' })
 
     perfSpy.mockRestore()
+  })
+})
+
+describe('processRaces', () => {
+  const buildRaceData = (id: string): RaceData => ({
+    id,
+    name: `Race ${id}`,
+    status: 'open',
+    race_date_nz: '2025-10-13',
+    start_time_nz: '12:00',
+  })
+
+  const buildTransformedRace = (id: string): TransformedRace => ({
+    raceId: id,
+    raceName: `Race ${id}`,
+    status: 'open',
+    transformedAt: '2025-10-13T00:00:00.000Z',
+    metrics: {
+      entrantCount: 1,
+      poolFieldCount: 1,
+      moneyFlowRecordCount: 1,
+    },
+    meeting: {
+      meeting_id: `meeting-${id}`,
+      name: `Meeting ${id}`,
+      date: '2025-10-13',
+      country: 'NZ',
+      category: 'R',
+      track_condition: 'GOOD',
+      tote_status: 'open',
+    },
+    race: {
+      race_id: id,
+      name: `Race ${id}`,
+      status: 'open',
+      race_number: 1,
+      race_date_nz: '2025-10-13',
+      start_time_nz: '12:00',
+      meeting_id: `meeting-${id}`,
+    },
+    entrants: [
+      {
+        entrant_id: `entrant-${id}`,
+        race_id: id,
+        runner_number: 1,
+        name: `Runner ${id}`,
+        barrier: null,
+        is_scratched: false,
+        is_late_scratched: null,
+        fixed_win_odds: 2.5,
+        fixed_place_odds: null,
+        pool_win_odds: 3.1,
+        pool_place_odds: null,
+        hold_percentage: 0.5,
+        bet_percentage: null,
+        win_pool_percentage: null,
+        place_pool_percentage: null,
+        win_pool_amount: 1000,
+        place_pool_amount: 500,
+        favourite: false,
+        mover: false,
+        jockey: null,
+        trainer_name: null,
+        silk_colours: null,
+      },
+    ],
+    moneyFlowRecords: [
+      {
+        entrant_id: `entrant-${id}`,
+        race_id: id,
+        time_to_start: 10,
+        time_interval: 5,
+        interval_type: '5m',
+        polling_timestamp: '2025-10-13T11:50:00.000Z',
+        hold_percentage: 0.5,
+        bet_percentage: null,
+        win_pool_percentage: null,
+        place_pool_percentage: null,
+        win_pool_amount: 1000,
+        place_pool_amount: 500,
+        total_pool_amount: 1500,
+        incremental_win_amount: 100,
+        incremental_place_amount: 50,
+        fixed_win_odds: 2.5,
+        fixed_place_odds: null,
+        pool_win_odds: 3.1,
+        pool_place_odds: null,
+      },
+    ],
+    originalPayload: buildRaceData(id),
+  })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    fetchRaceDataMock.mockReset()
+    workerExecMock.mockReset()
+    bulkUpsertMeetingsMock.mockReset()
+    bulkUpsertRacesMock.mockReset()
+    bulkUpsertEntrantsMock.mockReset()
+    insertMoneyFlowHistoryMock.mockReset()
+    insertOddsHistoryMock.mockReset()
+  })
+
+  it('aggregates metrics and caps concurrency at the pool limit', async () => {
+    const raceIds = ['race-a', 'race-b', 'race-c', 'race-d']
+    fetchRaceDataMock.mockImplementation((id) => Promise.resolve(buildRaceData(id)))
+    workerExecMock.mockImplementation((data) =>
+      Promise.resolve(buildTransformedRace(data.id))
+    )
+    bulkUpsertMeetingsMock.mockResolvedValue({ rowCount: 1, duration: 45 })
+    bulkUpsertRacesMock.mockResolvedValue({ rowCount: 1, duration: 55 })
+    bulkUpsertEntrantsMock.mockResolvedValue({ rowCount: 3, duration: 65 })
+    insertMoneyFlowHistoryMock.mockResolvedValue({ rowCount: 1, duration: 35 })
+    insertOddsHistoryMock.mockResolvedValue({ rowCount: 2, duration: 20 })
+
+    const contextId = 'ctx-aggregate'
+    const { results, errors, metrics } = await processRaces(
+      raceIds,
+      env.DB_POOL_MAX + 5,
+      { contextId }
+    )
+
+    expect(errors).toHaveLength(0)
+    expect(results).toHaveLength(raceIds.length)
+    expect(metrics.totalRaces).toBe(raceIds.length)
+    expect(metrics.requestedConcurrency).toBe(env.DB_POOL_MAX + 5)
+    expect(metrics.effectiveConcurrency).toBeLessThanOrEqual(env.DB_POOL_MAX)
+    expect(metrics.successes).toBe(raceIds.length)
+    expect(metrics.failures).toBe(0)
+    expect(metrics.retryableFailures).toBe(0)
+    expect(metrics.maxDuration_ms).toBeGreaterThanOrEqual(0)
+
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'pipeline_batch_start',
+        requestedConcurrency: env.DB_POOL_MAX + 5,
+        effectiveConcurrency: metrics.effectiveConcurrency,
+        contextId,
+      }),
+      expect.any(String)
+    )
+  })
+
+  it('increments failure metrics and retryable counts for batch errors', async () => {
+    const [successId, failureId] = ['race-success', 'race-failure']
+    fetchRaceDataMock.mockImplementation((id) => Promise.resolve(buildRaceData(id)))
+    workerExecMock.mockImplementation((data) =>
+      Promise.resolve(buildTransformedRace(data.id))
+    )
+    bulkUpsertMeetingsMock.mockResolvedValue({ rowCount: 1, duration: 10 })
+    bulkUpsertRacesMock.mockResolvedValue({ rowCount: 1, duration: 10 })
+    bulkUpsertEntrantsMock.mockResolvedValue({ rowCount: 1, duration: 10 })
+    insertMoneyFlowHistoryMock.mockResolvedValueOnce({ rowCount: 1, duration: 10 })
+    insertMoneyFlowHistoryMock.mockImplementationOnce(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 5)
+      })
+      throw new PartitionNotFoundError(
+        'money_flow_history',
+        'money_flow_history_missing',
+        '2035-01-01T00:00:00.000Z'
+      )
+    })
+    insertOddsHistoryMock.mockResolvedValue({ rowCount: 2, duration: 10 })
+
+    const { results, errors, metrics } = await processRaces([successId, failureId], 3)
+
+    expect(results).toHaveLength(1)
+    expect(results[0]?.raceId).toBe(successId)
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(WriteError)
+    expect(metrics.successes).toBe(1)
+    expect(metrics.failures).toBe(1)
+    expect(metrics.retryableFailures).toBe(0)
+    const successDuration = results[0]?.timings.total_ms ?? 0
+    const failureDuration =
+      errors[0] instanceof WriteError ? errors[0].result.timings.total_ms : 0
+
+    expect(failureDuration).toBeGreaterThanOrEqual(successDuration)
+    expect(metrics.maxDuration_ms).toBe(Math.max(successDuration, failureDuration))
   })
 })

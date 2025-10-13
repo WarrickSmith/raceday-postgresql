@@ -17,6 +17,7 @@ import {
 import type { TransformedRace } from '../workers/messages.js'
 import { logger } from '../shared/logger.js'
 import { buildOddsRecords } from './odds-utils.js'
+import { env } from '../shared/env.js'
 
 /**
  * Pipeline stage identifier used when classifying structured process errors.
@@ -609,12 +610,58 @@ export const processRaces = async (
 ): Promise<{
   results: ProcessResult[]
   errors: PipelineStageError[]
+  metrics: {
+    requestedConcurrency: number
+    effectiveConcurrency: number
+    totalRaces: number
+    successes: number
+    failures: number
+    retryableFailures: number
+    maxDuration_ms: number
+  }
 }> => {
   const results: ProcessResult[] = []
   const errors: PipelineStageError[] = []
 
-  for (let index = 0; index < raceIds.length; index += maxConcurrency) {
-    const batch = raceIds.slice(index, index + maxConcurrency)
+  const poolLimit = Math.max(1, env.DB_POOL_MAX)
+  const effectiveConcurrency = Math.max(1, Math.min(maxConcurrency, poolLimit))
+
+  if (effectiveConcurrency < maxConcurrency) {
+    logger.warn(
+      {
+        event: 'pipeline_batch_concurrency_adjusted',
+        requestedConcurrency: maxConcurrency,
+        effectiveConcurrency,
+        poolLimit,
+        contextId: options.contextId,
+      },
+      'Adjusted batch concurrency to respect connection pool limit'
+    )
+  }
+
+  const metrics = {
+    requestedConcurrency: maxConcurrency,
+    effectiveConcurrency,
+    totalRaces: raceIds.length,
+    successes: 0,
+    failures: 0,
+    retryableFailures: 0,
+    maxDuration_ms: 0,
+  }
+
+  logger.info(
+    {
+      event: 'pipeline_batch_start',
+      total: raceIds.length,
+      requestedConcurrency: maxConcurrency,
+      effectiveConcurrency,
+      contextId: options.contextId,
+    },
+    'Batch race processing started'
+  )
+
+  for (let index = 0; index < raceIds.length; index += effectiveConcurrency) {
+    const batch = raceIds.slice(index, index + effectiveConcurrency)
     const settled = await Promise.allSettled(
       batch.map((raceId) => processRace(raceId, options))
     )
@@ -633,6 +680,11 @@ export const processRaces = async (
 
       if (outcome.status === 'fulfilled') {
         results.push(outcome.value)
+        metrics.successes += 1
+        metrics.maxDuration_ms = Math.max(
+          metrics.maxDuration_ms,
+          outcome.value.timings.total_ms
+        )
         continue
       }
 
@@ -645,6 +697,16 @@ export const processRaces = async (
         reason instanceof WriteError
       ) {
         errors.push(reason)
+        metrics.failures += 1
+        const failureDuration = reason.result.timings.total_ms
+        if (failureDuration > metrics.maxDuration_ms) {
+          metrics.maxDuration_ms = failureDuration
+        }
+
+        if (reason.retryable) {
+          metrics.retryableFailures += 1
+        }
+
         continue
       }
 
@@ -673,6 +735,12 @@ export const processRaces = async (
           reason
         )
       )
+
+      metrics.failures += 1
+      metrics.maxDuration_ms = Math.max(
+        metrics.maxDuration_ms,
+        fallbackResult.timings.total_ms
+      )
     }
   }
 
@@ -683,10 +751,12 @@ export const processRaces = async (
       successful: results.length,
       failed: errors.length,
       retryable: errors.filter((error) => error.retryable).length,
+      maxDuration_ms: metrics.maxDuration_ms,
+      effectiveConcurrency,
       contextId: options.contextId,
     },
     'Batch race processing completed'
   )
 
-  return { results, errors }
+  return { results, errors, metrics }
 }
