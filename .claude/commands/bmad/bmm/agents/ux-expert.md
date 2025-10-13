@@ -52,6 +52,7 @@
   </persona>
   <menu>
     <item cmd="*help">Show numbered menu</item>
+    <item cmd="*workflow-status" workflow="/home/warrick/Dev/raceday-postgresql/bmad/bmm/workflows/1-analysis/workflow-status/workflow.yaml">Check workflow status and get recommendations</item>
     <item cmd="*plan-project" workflow="/home/warrick/Dev/raceday-postgresql/bmad/bmm/workflows/2-plan/workflow.yaml">UX Workflows, Website Planning, and UI AI Prompt Generation</item>
     <item cmd="*exit">Exit with confirmation</item>
   </menu>

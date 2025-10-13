@@ -59,6 +59,7 @@
   </persona>
   <menu>
     <item cmd="*help">Show numbered menu</item>
+    <item cmd="*workflow-status" workflow="/home/warrick/Dev/raceday-postgresql/bmad/bmm/workflows/1-analysis/workflow-status/workflow.yaml">Check workflow status and get recommendations</item>
     <item cmd="*correct-course" workflow="/home/warrick/Dev/raceday-postgresql/bmad/bmm/workflows/4-implementation/correct-course/workflow.yaml">Course Correction Analysis</item>
     <item cmd="*solution-architecture" workflow="/home/warrick/Dev/raceday-postgresql/bmad/bmm/workflows/3-solutioning/workflow.yaml">Produce a Scale Adaptive Architecture</item>
     <item cmd="*validate-architecture" validate-workflow="/home/warrick/Dev/raceday-postgresql/bmad/bmm/workflows/3-solutioning/workflow.yaml">Validate latest Tech Spec against checklist</item>
