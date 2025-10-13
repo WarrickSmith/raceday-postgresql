@@ -1,0 +1,327 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>7</storyId>
+    <title>Race Processor Orchestrator</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-13</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>/home/warrick/Dev/raceday-postgresql/docs/stories/story-2.7.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>a developer</asA>
+    <iWant>a race processor that orchestrates the fetch → transform → write pipeline</iWant>
+    <soThat>I can process a complete race in &lt;2s end-to-end with structured error handling and performance tracking</soThat>
+    <tasks>
+      - Implement core race processor module (AC1-3)
+        - Create `server/src/pipeline/race-processor.ts` with `processRace` function
+        - Define `ProcessResult` type with timings, status, and error details
+        - Wire fetch stage: invoke `fetchRaceData` from Story 2.1, handle null responses
+        - Wire transform stage: dispatch to worker pool from Story 2.3, await result
+        - Wire write stage: invoke bulk UPSERT (Story 2.5) and time-series inserts (Story 2.6)
+      - Implement timing and observability (AC4, AC8-9)
+        - Add `performance.now()` instrumentation at each pipeline boundary
+        - Calculate and store fetch_ms, transform_ms, write_ms, total_ms
+        - Emit structured Pino logs for pipeline start, step completions, end
+        - Log warnings when total_ms exceeds 2000ms threshold
+        - Return `ProcessResult` with all timing metrics for scheduler aggregation
+      - Implement error handling and resilience (AC5-7)
+        - Short-circuit pipeline when fetch returns null (transient failure)
+        - Catch and log transform errors with raceId and worker context
+        - Wrap database writes in try-catch; log rollback details on failure
+        - Surface typed errors (`FetchError`, `TransformError`, `WriteError`) to caller
+        - Ensure connection pool resources released on all exit paths
+      - Add unit and integration tests (AC10)
+        - Unit test: Mock fetch/transform/write stages, verify sequential execution
+        - Unit test: Verify timing calculations and log emission
+        - Unit test: Null fetch response short-circuits without errors
+        - Integration test: End-to-end pipeline with real database, verify &lt;2s
+        - Integration test: Verify rollback behavior on write failure
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Deliver `processRace(raceId: string)` function that coordinates the complete pipeline and returns `ProcessResult` with timings and status [[docs/epics.md:66](../epics.md#L66), [docs/tech-spec-epic-2.md:98](../tech-spec-epic-2.md#L98)]
+    2. Execute pipeline steps sequentially: fetch → transform (worker) → write (bulk UPSERT + time-series) [[docs/epics.md:67](../epics.md#L67), [docs/tech-spec-epic-2.md:106-108](../tech-spec-epic-2.md#L106)]
+    3. Each step awaited before proceeding to next; no parallel execution within a single race [[docs/epics.md:68](../epics.md#L68)]
+    4. Track and return durations for: fetch_ms, transform_ms, write_ms, total_ms [[docs/epics.md:69](../epics.md#L69), [docs/tech-spec-epic-2.md:174](../tech-spec-epic-2.md#L174)]
+    5. Retry fetch failures according to Story 2.12 retry policy; null fetch results short-circuit pipeline [[docs/epics.md:70](../epics.md#L70), [docs/tech-spec-epic-2.md:176](../tech-spec-epic-2.md#L176)]
+    6. Log transform errors with structured context; surface typed errors to caller [[docs/epics.md:70](../epics.md#L70)]
+    7. Rollback database writes on failure; maintain transaction integrity [[docs/epics.md:70](../epics.md#L70), [docs/tech-spec-epic-2.md:129](../tech-spec-epic-2.md#L129)]
+    8. Emit structured logs for: pipeline start, each step completion, pipeline end [[docs/epics.md:71](../epics.md#L71), [docs/tech-spec-epic-2.md:133-135](../tech-spec-epic-2.md#L133)]
+    9. Return processing duration for metrics aggregation by scheduler [[docs/epics.md:72](../epics.md#L72)]
+    10. Achieve &lt;2s total processing time under nominal load (single race, fresh data) [[docs/epics.md:73](../epics.md#L73), [docs/PRD-raceday-postgresql-2025-10-05.md:169](../PRD-raceday-postgresql-2025-10-05.md#L169)]
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/epics.md</path>
+        <title>Epic 2: High-Performance Data Pipeline - Story 2.7</title>
+        <section>Story 2.7: Race Processor Orchestrator</section>
+        <snippet>Lines 59-73: Story 2.7 defines the orchestrator that composes fetch, transform, and write stages into a cohesive pipeline with sub-2s latency. Pipeline steps: fetch → transform (worker) → write (bulk UPSERT). Steps executed sequentially (await each step). Performance tracking: measure duration for fetch, transform, write, total. Error handling: retry fetch on failure, log transform errors, rollback DB writes on failure.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Epic 2 - Race Processor Interface</title>
+        <section>APIs and Interfaces - RaceProcessor.process</section>
+        <snippet>Lines 98-99: `process(raceId: string): Promise&lt;ProcessResult&gt;` - Composes fetch → transform → write pipeline, returns timings, surfaces failure causes, invoked via scheduler tick. Sequential execution with performance tracking at each boundary and structured error handling.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Epic 2 - Workflows and Sequencing</title>
+        <section>Workflows and Sequencing</section>
+        <snippet>Lines 103-109: On each interval tick, `RaceProcessor.process` triggers `fetchRaceData`, which issues Axios request with retry/timeout guards; null response short-circuits downstream writes. Successful fetch payloads are validated via `RaceDataSchema` and dispatched to `workerPool.exec`; worker threads transform entrants and pool aggregates, emitting incremental deltas and metadata. The processor awaits worker resolution and invokes bulk UPSERT services to persist normalized tables within a single transaction, then appends time-series batches to partitioned history tables. After persistence, `PerfLogger` captures fetch/transform/write totals, logs JSON metrics, and emits warnings if thresholds exceeded.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/PRD-raceday-postgresql-2025-10-05.md</path>
+        <title>PRD: Performance Requirements - Single Race Target</title>
+        <section>Non-Functional Requirements - Performance</section>
+        <snippet>Lines 165-169: NFR001: System SHALL process 5 concurrent races in &lt;15 seconds end-to-end (2x improvement requirement). Single race: &lt;2s (fetch + transform + write). Fetch from NZ TAB: &lt;500ms. Transform (worker): &lt;1s. Bulk write to DB: &lt;300ms.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/solution-architecture.md</path>
+        <title>Solution Architecture: Race Processor Component</title>
+        <section>Epic 2 Components - Race Processor &amp; Parallel Processing</section>
+        <snippet>Lines 310-335: Race Processor orchestrates fetch → transform → write pipeline. Pattern: for each race in batch: rawData = await fetch(race), transformed = await transformInWorker(rawData), await bulkUpsert(transformed). Parallelization: Promise.all() for I/O-bound operations. Performance Tracking: Measure and log duration per race.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/architecture-specification.md</path>
+        <title>Architecture Specification: Component Responsibilities</title>
+        <section>System Architecture - Component Responsibilities</section>
+        <snippet>Lines 293-303: Race Processor (Orchestrator) - Purpose: Coordinate fetch → transform → write pipeline. Pattern: for each race in batch: rawData = await fetch(race), transformed = await transformInWorker(rawData), await bulkUpsert(transformed). Parallelization: Promise.all() for I/O-bound operations. Performance Tracking: Measure and log duration per race.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/architecture-specification.md</path>
+        <title>Architecture Specification: Parallel Processing Pattern</title>
+        <section>Performance Optimization - Parallel Processing Pattern</section>
+        <snippet>Lines 622-654: Process 5 races concurrently using Promise.allSettled. For each race: 1. Fetch (I/O-bound - async), 2. Transform (CPU-bound - worker thread), 3. Write (I/O-bound - async). Measure duration per race and total batch duration. Log race durations and total processing time.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/architecture-specification.md</path>
+        <title>Architecture Specification: Performance Targets</title>
+        <section>Performance Optimization - Performance Targets</section>
+        <snippet>Lines 676-685: Performance Targets - Fetch from NZ TAB: &lt;500ms (expected ~300ms). Transform (worker): &lt;1s (expected ~700ms). Bulk write to DB: &lt;300ms (expected ~200ms). Single Race Total: &lt;2s (expected ~1.2s). 5 Races Parallel: &lt;15s (expected ~6-9s).</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Epic 2 - Error Handling</title>
+        <section>Acceptance Criteria - Retry and Error Handling</section>
+        <snippet>Lines 173-176: Retry strategy treats irrecoverable fetch errors as `null` results so the race processor can safely skip downstream writes and still log the failure. Pipeline filters and stores only fixed win/place odds; unit tests fail if tote/pool odds sneak into transformed records.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Epic 2 - Metrics Logging</title>
+        <section>Acceptance Criteria - Metrics and Performance</section>
+        <snippet>Lines 174-180: `processRace` runs fetch → transform → write sequentially, logs step timings, and returns &lt;2s total processing duration under nominal load. Metrics logger produces structured JSON with `raceId`, `fetch_ms`, `transform_ms`, `write_ms`, `total_ms`, success/failure counts, and warning logs beyond &lt;2s/&lt;15s thresholds. Log warnings when total_ms exceeds 2000ms threshold.</snippet>
+      </doc>
+      <doc>
+        <path>/home/warrick/Dev/raceday-postgresql/docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Epic 2 - Transaction Integrity</title>
+        <section>Acceptance Criteria - Database Operations</section>
+        <snippet>Lines 129: Rollback database writes on failure; maintain transaction integrity. Wrap database writes in try-catch; log rollback details on failure. All database writes occur in a single BEGIN/COMMIT block with rollback on failure.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/pipeline/race-processor.ts</path>
+        <kind>module</kind>
+        <symbol>processRace</symbol>
+        <lines>53-224</lines>
+        <reason>Existing race processor implementation for Story 2.7. Demonstrates sequential pipeline execution (transform → write), timing instrumentation with performance.now(), error handling with typed errors (DatabaseWriteError, TransactionError), structured logging with raceId context, and integration with worker pool (Story 2.3), bulk UPSERT (Story 2.5), and time-series inserts (Story 2.6). Note: Currently implements transform → write; fetch stage needs to be added upstream.</reason>
+      </artifact>
+      <artifact>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/pipeline/race-processor.ts</path>
+        <kind>module</kind>
+        <symbol>processRaces</symbol>
+        <lines>226-281</lines>
+        <reason>Parallel race processing implementation using Promise.allSettled pattern for concurrent execution. Demonstrates concurrency control (maxConcurrency parameter), error isolation per race, and batch metrics aggregation. Relevant for understanding how single race processor integrates with parallel execution patterns (Story 2.8).</reason>
+      </artifact>
+      <artifact>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/clients/nztab.ts</path>
+        <kind>module</kind>
+        <symbol>fetchRaceData</symbol>
+        <lines>143-289</lines>
+        <reason>NZ TAB fetch implementation (Story 2.1) that race processor depends on. Implements retry logic with exponential backoff (3 attempts, 100ms/200ms/400ms delays), 5s timeout, Zod validation, structured logging with attempt/duration metrics, and typed error handling (NzTabError). Race processor should invoke this function as first pipeline stage.</reason>
+      </artifact>
+      <artifact>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/workers/worker-pool.ts</path>
+        <kind>module</kind>
+        <symbol>WorkerPool.exec</symbol>
+        <lines>143-172</lines>
+        <reason>Worker pool exec method (Story 2.3) that race processor uses for CPU-intensive transform stage. Returns Promise&lt;TransformedRace&gt; after worker processes race data. Demonstrates task queuing, worker dispatch, and error propagation patterns that race processor relies on.</reason>
+      </artifact>
+      <artifact>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/database/bulk-upsert.ts</path>
+        <kind>module</kind>
+        <symbol>bulkUpsertMeetings, bulkUpsertRaces, bulkUpsertEntrants</symbol>
+        <lines>42-364</lines>
+        <reason>Bulk UPSERT operations (Story 2.5) invoked by race processor write stage. Demonstrates transactional guarantees (withTransaction wrapper), multi-row INSERT with ON CONFLICT, IS DISTINCT FROM change detection, performance logging with 300ms threshold warnings, and typed error handling (DatabaseWriteError, TransactionError). Race processor sequences these calls: meetings → races → entrants.</reason>
+      </artifact>
+      <artifact>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/database/time-series.ts</path>
+        <kind>module</kind>
+        <symbol>insertMoneyFlowHistory, insertOddsHistory</symbol>
+        <lines>83-330</lines>
+        <reason>Time-series insert operations (Story 2.6) invoked by race processor after bulk UPSERT. Demonstrates append-only inserts with partition routing, transaction wrapping, batch processing, and PartitionNotFoundError handling. Race processor calls these after entrant UPSERT completes to persist historical money flow and odds data.</reason>
+      </artifact>
+      <artifact>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/workers/messages.ts</path>
+        <kind>interface</kind>
+        <symbol>TransformedRace</symbol>
+        <lines>111-142</lines>
+        <reason>TransformedRace interface defines worker output structure that race processor receives from worker pool. Contains normalized entities (meeting, race, entrants) for bulk UPSERT and moneyFlowRecords for time-series inserts. Race processor extracts these fields to pass to database operations.</reason>
+      </artifact>
+      <artifact>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/shared/logger.ts</path>
+        <kind>module</kind>
+        <symbol>logger</symbol>
+        <lines>1-20</lines>
+        <reason>Pino logger instance used throughout race processor for structured logging. Race processor emits logs with raceId, phase (transform/write), duration metrics, and error contexts. All logs follow structured JSON format with consistent field naming.</reason>
+      </artifact>
+      <artifact>
+        <path>/home/warrick/Dev/raceday-postgresql/server/src/database/bulk-upsert.ts</path>
+        <kind>function</kind>
+        <symbol>withTransaction</symbol>
+        <lines>15-31</lines>
+        <reason>Transaction wrapper that ensures BEGIN/COMMIT/ROLLBACK semantics for all database writes. Race processor relies on this pattern to maintain transaction integrity (AC7). Automatically handles connection pool borrowing, transaction lifecycle, and connection release on both success and error paths.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <express>^4.21.2</express>
+        <pg>^8.16.3</pg>
+        <pg-format>^1.0.4</pg-format>
+        <axios>^1.12.2</axios>
+        <pino>^9.5.0</pino>
+        <zod>^3.25.76</zod>
+        <dotenv>^16.6.1</dotenv>
+        <helmet>^8.1.0</helmet>
+        <compression>^1.8.1</compression>
+      </node>
+      <devNode>
+        <typescript>^5.7.0</typescript>
+        <tsx>^4.19.0</tsx>
+        <vitest>^2.0.0</vitest>
+        <eslint>^9.0.0</eslint>
+        <prettier>^3.3.0</prettier>
+      </devNode>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    1. Sequential pipeline execution ensures clear timing attribution and simplifies debugging; each step must be awaited before proceeding to next [[docs/epics.md:68](../epics.md#L68)]
+    2. Null fetch responses (from retry exhaustion) should gracefully skip downstream processing without throwing [[docs/tech-spec-epic-2.md:176](../tech-spec-epic-2.md#L176)]
+    3. Database writes must execute within single transaction for rollback integrity [[docs/tech-spec-epic-2.md:129](../tech-spec-epic-2.md#L129)]
+    4. All timing measurements use `performance.now()` for microsecond precision [[docs/tech-spec-epic-2.md:174](../tech-spec-epic-2.md#L174)]
+    5. Emit warning logs when total_ms ≥ 2000ms to feed performance monitoring pipeline [[docs/tech-spec-epic-2.md:179](../tech-spec-epic-2.md#L179)]
+    6. Reuse existing Pino logger with structured fields (raceId, stage, duration) [[docs/tech-spec-epic-2.md:133-135](../tech-spec-epic-2.md#L133)]
+    7. Zero `any` types policy - use TypeScript strict mode with Zod validation for external data [[docs/architecture-specification.md:84-89](../architecture-specification.md#L84)]
+    8. ES Modules (ESM) - use import/export syntax, not require/module.exports [[docs/architecture-specification.md:93-95](../architecture-specification.md#L93)]
+    9. Functional programming patterns - prefer pure functions, immutability, and functional composition over classes [[docs/architecture-specification.md:104-109](../architecture-specification.md#L104)]
+    10. Ensure connection pool resources released on all exit paths to prevent pool exhaustion [[docs/tech-spec-epic-2.md:128](../tech-spec-epic-2.md#L128)]
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>fetchRaceData</name>
+      <kind>function</kind>
+      <signature>fetchRaceData(raceId: string, status?: string, clientOverride?: AxiosInstance): Promise&lt;RaceData&gt;</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/clients/nztab.ts</path>
+      <description>NZ TAB API client with retry logic and Zod validation (Story 2.1). Race processor invokes as first pipeline stage. Returns validated RaceData or throws NzTabError on terminal failure. Implements 3 retry attempts with exponential backoff (100ms, 200ms, 400ms). 5s timeout per attempt. Structured logging with attempt, duration, and error metrics.</description>
+    </interface>
+    <interface>
+      <name>WorkerPool.exec</name>
+      <kind>method</kind>
+      <signature>exec(data: RaceData): Promise&lt;TransformedRace&gt;</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/workers/worker-pool.ts</path>
+      <description>Worker pool execution method (Story 2.3). Race processor dispatches fetch result to worker pool for CPU-intensive money flow calculations. Returns TransformedRace with normalized entities (meeting, race, entrants) and moneyFlowRecords. Handles task queuing when all workers busy. Automatic worker restart on crash with task retry (max 2 attempts).</description>
+    </interface>
+    <interface>
+      <name>bulkUpsertMeetings</name>
+      <kind>function</kind>
+      <signature>bulkUpsertMeetings(meetings: TransformedMeeting[]): Promise&lt;{ rowCount: number; duration: number }&gt;</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/database/bulk-upsert.ts</path>
+      <description>Bulk UPSERT for meetings table (Story 2.5). Race processor invokes first in write stage. Multi-row INSERT with ON CONFLICT DO UPDATE. IS DISTINCT FROM change detection prevents unnecessary writes. Single transaction with automatic rollback on error. Target: &lt;300ms per race. Structured logging with rowCount and duration metrics.</description>
+    </interface>
+    <interface>
+      <name>bulkUpsertRaces</name>
+      <kind>function</kind>
+      <signature>bulkUpsertRaces(races: TransformedRace[]): Promise&lt;{ rowCount: number; duration: number }&gt;</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/database/bulk-upsert.ts</path>
+      <description>Bulk UPSERT for races table (Story 2.5). Race processor invokes after meetings UPSERT. Mirrors meeting behavior with status enum validation and timestamp normalization. Single transaction with change detection WHERE clause.</description>
+    </interface>
+    <interface>
+      <name>bulkUpsertEntrants</name>
+      <kind>function</kind>
+      <signature>bulkUpsertEntrants(entrants: TransformedEntrant[]): Promise&lt;{ rowCount: number; duration: number }&gt;</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/database/bulk-upsert.ts</path>
+      <description>Bulk UPSERT for entrants table with money flow fields (Story 2.5). Race processor invokes after races UPSERT. Persists 22 entrant fields including hold_percentage, bet_percentage, pool percentages/amounts, odds, and metadata. Single transaction with IS DISTINCT FROM predicates on all fields.</description>
+    </interface>
+    <interface>
+      <name>insertMoneyFlowHistory</name>
+      <kind>function</kind>
+      <signature>insertMoneyFlowHistory(records: MoneyFlowRecord[], options?: { tableName?: string }): Promise&lt;{ rowCount: number; duration: number }&gt;</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/database/time-series.ts</path>
+      <description>Append-only insert for money_flow_history partitioned table (Story 2.6). Race processor invokes after entrant UPSERT. Routes records to correct daily partition based on polling_timestamp. Verifies partition exists before insert. Single transaction with rollback on failure. Throws PartitionNotFoundError if partition missing (Epic 4 dependency).</description>
+    </interface>
+    <interface>
+      <name>insertOddsHistory</name>
+      <kind>function</kind>
+      <signature>insertOddsHistory(records: OddsRecord[], options?: { tableName?: string }): Promise&lt;{ rowCount: number; duration: number }&gt;</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/database/time-series.ts</path>
+      <description>Append-only insert for odds_history partitioned table (Story 2.6). Race processor extracts odds from entrants and invokes after money flow insert. Routes records to correct daily partition based on event_timestamp. Mirrors money flow behavior with partition verification and transaction wrapping.</description>
+    </interface>
+    <interface>
+      <name>withTransaction</name>
+      <kind>function</kind>
+      <signature>withTransaction&lt;T&gt;(work: (client: PoolClient) =&gt; Promise&lt;T&gt;): Promise&lt;T&gt;</signature>
+      <path>/home/warrick/Dev/raceday-postgresql/server/src/database/bulk-upsert.ts</path>
+      <description>Transaction wrapper for database operations. Ensures BEGIN/COMMIT/ROLLBACK semantics with automatic connection pool management. Race processor relies on this pattern (via bulk UPSERT and time-series functions) to maintain transaction integrity (AC7). Releases connection on both success and error paths.</description>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing framework: Vitest 2.0+ with @vitest/coverage-v8 for unit and integration tests. Unit tests located under `server/tests/unit/pipeline/`, integration tests under `server/tests/integration/pipeline/`. Use mocking for external dependencies (NZ TAB client, worker pool, database pool). Integration tests execute against real test database with seeded data. All tests must pass TypeScript strict type checking with zero `any` types. Performance assertions: single race &lt;2s, transform &lt;1s, write &lt;300ms. Test structure: Arrange-Act-Assert pattern with descriptive test names. Use `describe` blocks to group related tests by AC or feature. Mock structured logger to verify log emission without noise during tests.
+    </standards>
+    <locations>
+      server/tests/unit/pipeline/race-processor.test.ts
+      server/tests/integration/pipeline/race-processor.integration.test.ts
+      server/tests/integration/pipeline/end-to-end.test.ts
+    </locations>
+    <ideas>
+      <test acId="1,2,3">
+        Unit test: Mock fetchRaceData, workerPool.exec, bulk UPSERT functions, and time-series inserts. Verify processRace invokes stages sequentially (fetch → transform → write) with correct data flow. Assert each stage is awaited before next begins. Verify ProcessResult returned with success=true and correct structure.
+      </test>
+      <test acId="4,8">
+        Unit test: Mock all dependencies with artificial delays (fetch: 300ms, transform: 700ms, write: 200ms). Verify timing calculations: fetch_ms ~300, transform_ms ~700, write_ms ~200, total_ms ~1200. Assert structured logs emitted for pipeline start, each step completion, and pipeline end with correct raceId and duration fields.
+      </test>
+      <test acId="5">
+        Unit test: Mock fetchRaceData to return null (simulating retry exhaustion). Verify processRace short-circuits without calling worker pool or database operations. Assert no errors thrown. Verify structured log emitted indicating null fetch result with raceId context.
+      </test>
+      <test acId="6">
+        Unit test: Mock workerPool.exec to throw Error. Verify processRace catches transform error, logs with structured context (raceId, error details), and surfaces typed error to caller. Assert database operations not invoked after transform failure.
+      </test>
+      <test acId="7">
+        Unit test: Mock bulkUpsertEntrants to throw DatabaseWriteError. Verify processRace catches error, logs rollback details with raceId, and re-throws typed error. Verify withTransaction rollback semantics preserve transaction integrity.
+      </test>
+      <test acId="10">
+        Integration test: Execute full pipeline (fetch → transform → write) with real NZ TAB mock data and test database. Seed partitions before test. Measure actual total_ms and assert &lt;2000ms. Verify all data persisted correctly: meetings, races, entrants, money_flow_history, odds_history. Verify row counts match expected. Clean up test data after completion.
+      </test>
+      <test acId="7">
+        Integration test: Execute pipeline with real database. Force failure by violating foreign key constraint (entrant with nonexistent race_id). Verify transaction rollback: no partial writes to meetings, races, or entrants tables. Assert DatabaseWriteError thrown with correct raceId and cause.
+      </test>
+      <test acId="9">
+        Unit test: Verify ProcessResult structure includes all required fields: raceId, success, transformDuration, writeDuration, totalDuration, rowCounts (meetings, races, entrants, moneyFlowHistory, oddsHistory). Mock dependencies and assert result matches expected shape for scheduler consumption.
+      </test>
+      <test acId="4,10">
+        Unit test: Mock dependencies to simulate slow processing (total_ms = 2500ms). Verify warning log emitted when total_ms ≥ 2000ms with structured fields: raceId, totalDuration, target (2000). Assert overBudget flag set to true in log output.
+      </test>
+      <test acId="10">
+        Integration test: Execute processRaces (parallel batch) with 5 mock races. Verify all races processed concurrently using Promise.allSettled. Measure max duration across batch. Assert batch completes in &lt;15s. Verify per-race results returned with success/failure status and durations.
+      </test>
+    </ideas>
+  </tests>
+</story-context>
