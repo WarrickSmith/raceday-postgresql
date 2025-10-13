@@ -31,3 +31,5 @@ Routing guidance:
 | 2025-10-12 | 2.5 | 2 | TechDebt | Low | Amelia | Resolved | Added 22-field documentation comment in server/src/database/bulk-upsert.ts:279-285 with field groupings |
 | 2025-10-12 | 2.5 | 2 | Enhancement | Low | Amelia | Resolved | Integrated custom pool monitoring - Created server/src/database/pool-monitor.ts (no external deps), integrated into pool.ts |
 | 2025-10-12 | 2.5 | 2 | Testing | Low | TBD | Blocked | Load Story 2.4 regression fixtures once [H1] lands - Upstream dependency not yet available |
+| 2025-10-13 | 2.6 | 2 | Documentation | Low | TBD | Open | Update runbook with time-series insert workflow, partition routing logic, and troubleshooting steps for missing partitions - Deferred to separate documentation story |
+| 2025-10-13 | 2.6 | 2 | Coordination | Low | TBD | Blocked | Coordinate with Epic 4 partition automation to ensure daily partitions exist before writes - Dependency on Epic 4 (Stories 4.1-4.2) |

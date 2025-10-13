@@ -233,3 +233,8 @@ The solution architecture prescribes a monolithic Node.js server with an adaptiv
 - **[Low]** Add inline comment documenting all 22 entrant fields in [server/src/database/bulk-upsert.ts:280-286](../server/src/database/bulk-upsert.ts#L280-L286) - Maintainability
 - **[Low]** Integrate `pg-pool-monitor` for connection pool metrics in production - Observability
 - **[Low]** Load Story 2.4 regression fixtures once [H1] lands - Blocked dependency
+
+**From Story 2.6 Senior Developer Review (2025-10-13):**
+- **[Low]** Consider refactoring `insertMoneyFlowHistory` and `insertOddsHistory` to accept optional table name parameter for comprehensive integration testing (affects tests only, no production impact) - Story 2.6 follow-up
+- **[Low]** Update race processor to use `transformed.race.start_time_nz` or `polling_timestamp` for odds records instead of `new Date().toISOString()` in [server/src/pipeline/race-processor.ts:106](../server/src/pipeline/race-processor.ts#L106) - Data accuracy improvement (Story 2.6 follow-up)
+- **[Low]** Document semantic difference between `polling_timestamp` and `event_timestamp` in MoneyFlowRecord interface or align field usage - Maintainability (Story 2.6 follow-up)
