@@ -63,6 +63,15 @@ export type TransformedEntrant = z.infer<typeof transformedEntrantSchema>
 
 /**
  * Schema for money flow time-series record (AC2, AC4, AC5)
+ *
+ * **Timestamp Fields:**
+ * - `polling_timestamp`: When we polled/transformed the NZTAB API data (system clock, UTC).
+ *   Used for partition routing and represents the observation time.
+ * - `event_timestamp` (in DB): When the betting event actually occurred (race time context).
+ *   Currently set equal to polling_timestamp but semantically represents the race event time.
+ *
+ * **Note**: For production, consider aligning event_timestamp with race start time
+ * or actual betting activity timestamp if available from API for more accurate temporal tracking.
  */
 /* eslint-disable @typescript-eslint/naming-convention */
 export const moneyFlowRecordSchema = z.object({
@@ -72,7 +81,7 @@ export const moneyFlowRecordSchema = z.object({
   time_to_start: z.number(), // Minutes until start (negative = after start)
   time_interval: z.number(), // Bucketed interval for aggregation
   interval_type: z.enum(['5m', '2m', '30s', 'live', 'unknown']),
-  polling_timestamp: z.string().datetime(),
+  polling_timestamp: z.string().datetime(), // When we captured this data snapshot from API
   // Money flow data (AC3)
   hold_percentage: z.number(),
   bet_percentage: z.number().optional().nullable(),

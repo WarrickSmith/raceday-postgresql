@@ -7,6 +7,12 @@ import {
   DatabaseWriteError,
   TransactionError,
 } from '../database/bulk-upsert.js'
+import {
+  insertMoneyFlowHistory,
+  insertOddsHistory,
+  PartitionNotFoundError,
+  type OddsRecord,
+} from '../database/time-series.js'
 import { logger } from '../shared/logger.js'
 import type { TransformedRace } from '../workers/messages.js'
 
@@ -20,6 +26,8 @@ export interface RaceProcessResult {
     meetings: number
     races: number
     entrants: number
+    moneyFlowHistory: number
+    oddsHistory: number
   }
 }
 
@@ -91,6 +99,46 @@ export const processRace = async (
 
     const entrantResult = await bulkUpsertEntrants(transformed.entrants)
 
+    // Phase 3: Insert time-series data to partitioned tables (Story 2.6, AC1-2)
+    // Extract odds records from entrants for odds_history
+    // Use race start time for event timestamp (NZ local time from API)
+    // Format: race_date_nz (YYYY-MM-DD) + start_time_nz (HH:MM) = ISO timestamp
+    const raceStartDatetime =
+      transformed.race !== null && transformed.race !== undefined
+        ? `${transformed.race.race_date_nz}T${transformed.race.start_time_nz}:00Z`
+        : new Date().toISOString()
+
+    const oddsRecords: OddsRecord[] = []
+    for (const entrant of transformed.entrants) {
+      /* eslint-disable @typescript-eslint/naming-convention */
+      if (entrant.fixed_win_odds !== null && entrant.fixed_win_odds !== undefined) {
+        oddsRecords.push({
+          entrant_id: entrant.entrant_id,
+          odds: entrant.fixed_win_odds,
+          type: 'fixed_win',
+          event_timestamp: raceStartDatetime,
+        })
+      }
+
+      if (entrant.pool_win_odds !== null && entrant.pool_win_odds !== undefined) {
+        oddsRecords.push({
+          entrant_id: entrant.entrant_id,
+          odds: entrant.pool_win_odds,
+          type: 'pool_win',
+          event_timestamp: raceStartDatetime,
+        })
+      }
+      /* eslint-enable @typescript-eslint/naming-convention */
+    }
+
+    const moneyFlowResult = transformed.moneyFlowRecords.length > 0
+      ? await insertMoneyFlowHistory(transformed.moneyFlowRecords)
+      : { rowCount: 0, duration: 0 }
+
+    const oddsResult = oddsRecords.length > 0
+      ? await insertOddsHistory(oddsRecords)
+      : { rowCount: 0, duration: 0 }
+
     const writeDuration = performance.now() - writeStart
     const totalDuration = performance.now() - startTime
 
@@ -105,6 +153,8 @@ export const processRace = async (
         meetings: meetingResult.rowCount,
         races: raceResult.rowCount,
         entrants: entrantResult.rowCount,
+        moneyFlowHistory: moneyFlowResult.rowCount,
+        oddsHistory: oddsResult.rowCount,
       },
     }
 
@@ -138,7 +188,9 @@ export const processRace = async (
     // Classify error for retry logic (AC6)
     const isTransformError = error instanceof Error && error.message.includes('Worker')
     const isDatabaseError =
-      error instanceof DatabaseWriteError || error instanceof TransactionError
+      error instanceof DatabaseWriteError ||
+      error instanceof TransactionError ||
+      error instanceof PartitionNotFoundError
 
     const retryable = isTransformError || (error instanceof DatabaseWriteError && error.retryable)
 
