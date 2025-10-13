@@ -10,9 +10,9 @@
 ## Workflow Status Tracker
 
 **Current Phase:** 4-Implementation
-**Current Workflow:** story-approved (Story 2.8) - Complete
-**Current Agent:** DEV
-**Overall Progress:** 32%
+**Current Workflow:** story-context (Story 2.9) - Complete
+**Current Agent:** SM
+**Overall Progress:** 35%
 
 ### Phase Completion Status
 
@@ -35,8 +35,8 @@
 | 4-Implementation | review-story | DEV | Perform Senior Developer review for the active story | Complete (Story 2.8) |
 | 4-Implementation | story-approved | DEV | Confirm Definition of Done and move story to DONE | Complete (Story 2.8) |
 
-**Current Step:** story-approved (Story 2.8) ✓
-**Next Step:** create-story (SM agent) – draft Story 2.9
+**Current Step:** story-context (Story 2.9) ✓
+**Next Step:** dev-story (DEV agent) – implement Story 2.9
 
 **Instructions:**
 
@@ -73,11 +73,11 @@
 #### IN PROGRESS (Approved for Development)
 
 - **Story ID:** 2.9
-- **Story Title:** Parallel Race Processing with Promise.all() (implementation)
+- **Story Title:** Dynamic Scheduler with Time-Based Intervals
 - **Story File:** `docs/stories/story-2.9.md`
-- **Story Status:** Not created (needs drafting)
-- **Context File:** Context not yet generated
-- **Action:** SM should run `create-story` workflow to draft this story
+- **Story Status:** Ready
+- **Context File:** `docs/stories/story-context-2.9.xml`
+- **Action:** DEV should run `dev-story` workflow to implement this story
 
 #### DONE (Completed Stories)
 
@@ -130,11 +130,11 @@
 
 ### Next Action Required
 
-**What to do next:** Draft the next story (2.9 - Parallel Race Processing with Promise.all() (implementation))
+**What to do next:** Implement Story 2.9 (Dynamic Scheduler with Time-Based Intervals)
 
-**Command to run:** Load SM agent and run `create-story` workflow
+**Command to run:** Load DEV agent and run `dev-story` workflow
 
-**Agent to load:** bmad/bmm/agents/sm.md
+**Agent to load:** bmad/bmm/agents/dev.md
 
 ---
 
@@ -228,6 +228,9 @@
 - **2025-10-13**: Completed dev-story for Story 2.8; story marked Ready for Review with tests passing. Awaiting `story-approved`.
 - **2025-10-14**: Completed review-story for Story 2.8; outcome Changes Requested with 2 action items logged.
 - **2025-10-14**: Story 2.8 (Parallel Race Processing with Promise.all()) approved and marked done by DEV agent. Moved from IN PROGRESS → DONE. Story 2.9 moved from TODO → IN PROGRESS. Story 2.10 moved from BACKLOG → TODO.
+- **2025-10-14**: Completed create-story for Story 2.9 (Dynamic Scheduler with Time-Based Intervals). Story file: docs/stories/story-2.9.md. Status: Draft (needs review). Next: Review and approve story via story-ready.
+- **2025-10-14**: Story 2.9 (Dynamic Scheduler with Time-Based Intervals) marked ready for development by SM agent. Moved from TODO → IN PROGRESS. Next story 2.10 (Performance Metrics Tracking) moved from BACKLOG → TODO.
+- **2025-10-14**: Completed story-context for Story 2.9 (Dynamic Scheduler with Time-Based Intervals). Context file: docs/stories/story-context-2.9.xml. Next: DEV agent should run dev-story to implement.
 
 ---
 
