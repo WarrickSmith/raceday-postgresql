@@ -3,8 +3,8 @@
     <epicId>2</epicId>
     <storyId>2.8</storyId>
     <title>Parallel Race Processing</title>
-    <status>Ready</status>
-    <generatedAt>2025-10-13T20:32:39Z</generatedAt>
+    <status>Ready for Review</status>
+    <generatedAt>2025-10-13T21:35:16Z</generatedAt>
     <generator>BMAD Story Context Workflow</generator>
     <sourceStoryPath>docs/stories/story-2.8.md</sourceStoryPath>
   </metadata>
@@ -97,7 +97,7 @@
       <![CDATA[`ProcessOptions` adds optional `contextId`; `ProcessResult` reports raceId, success flag, timing metrics, row counts, and typed error metadata.]]>
     </interface>
     <interface path="server/src/pipeline/race-processor.ts#L605-L692" name="processRaces">
-      <![CDATA[async function processRaces(raceIds: string[], maxConcurrency = 5, options?: ProcessOptions): Promise<{ results: ProcessResult[]; errors: PipelineStageError[] }>]]>
+      <![CDATA[async function processRaces(raceIds: string[], maxConcurrency = 5, options?: ProcessOptions): Promise<{ results: ProcessResult[]; errors: PipelineStageError[]; metrics: { requestedConcurrency: number; effectiveConcurrency: number; totalRaces: number; successes: number; failures: number; retryableFailures: number; maxDuration_ms: number } }>]]>
     </interface>
     <interface path="server/src/pipeline/race-processor.ts#L185-L214" name="FetchError | TransformError | WriteError">
       <![CDATA[Typed error classes map to pipeline stages and carry the `ProcessResult`, enabling downstream retry policies and logging.]]>

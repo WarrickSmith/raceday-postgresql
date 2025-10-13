@@ -2,7 +2,7 @@
 
 **Project:** raceday-postgresql
 **Created:** 2025-10-13
-**Last Updated:** 2025-10-13
+**Last Updated:** 2025-10-14
 **Status File:** `project-workflow-status-2025-10-13.md`
 
 ---
@@ -10,9 +10,9 @@
 ## Workflow Status Tracker
 
 **Current Phase:** 4-Implementation
-**Current Workflow:** story-context (Story 2.8) - Complete
-**Current Agent:** SM
-**Overall Progress:** 24%
+**Current Workflow:** review-story (Story 2.8) - Complete (Changes Requested)
+**Current Agent:** DEV
+**Overall Progress:** 31%
 
 ### Phase Completion Status
 
@@ -29,13 +29,14 @@
 | ----- | ---- | ----- | ----------- | ------ |
 | 2-Plan | plan-project | PM | Create PRD/Tech Spec and finalize project level | Complete |
 | 4-Implementation | create-story | SM | Draft stories from backlog sequentially | Complete (Story 2.8) |
-| 4-Implementation | story-ready | SM | Review drafted story and approve for development | Planned |
-| 4-Implementation | story-context | SM | Generate implementation context XML for the active story | Planned |
-| 4-Implementation | dev-story | DEV | Implement approved story and capture completion details | Planned |
+| 4-Implementation | story-ready | SM | Review drafted story and approve for development | Complete (Story 2.8) |
+| 4-Implementation | story-context | SM | Generate implementation context XML for the active story | Complete (Story 2.8) |
+| 4-Implementation | dev-story | DEV | Implement approved story and capture completion details | Complete (Story 2.8) |
+| 4-Implementation | review-story | DEV | Perform Senior Developer review for the active story | Complete (Story 2.8) |
 | 4-Implementation | story-approved | DEV | Confirm Definition of Done and move story to DONE | Planned |
 
-**Current Step:** story-context (Story 2.8) ✓
-**Next Step:** dev-story (DEV agent)
+**Current Step:** review-story (Story 2.8) ✓
+**Next Step:** dev-story (DEV agent) – address review feedback
 
 **Instructions:**
 
@@ -75,9 +76,9 @@
 - **Story ID:** 2.8
 - **Story Title:** Parallel Race Processing with Promise.all()
 - **Story File:** `docs/stories/story-2.8.md`
-- **Story Status:** Ready
+- **Story Status:** InProgress
 - **Context File:** docs/stories/story-context-2.8.xml
-- **Action:** DEV should run `dev-story` workflow to implement this story
+- **Action:** Resolve review action items, rerun `dev-story`, then proceed to `story-approved`
 
 #### DONE (Completed Stories)
 
@@ -129,7 +130,7 @@
 
 ### Next Action Required
 
-**What to do next:** Implement Story 2.8 in code
+**What to do next:** Address Story 2.8 review findings
 
 **Command to run:** `dev-story`
 
@@ -224,6 +225,7 @@
 - **2025-10-13**: Completed create-story for Story 2.8 (Parallel Race Processing); story awaiting review via `story-ready`.
 - **2025-10-13**: Story 2.8 marked Ready; moved to IN PROGRESS and promoted Story 2.9 to TODO for drafting.
 - **2025-10-13**: Generated story-context for Story 2.8 and queued DEV handoff.
+- **2025-10-14**: Completed review-story for Story 2.8; outcome Changes Requested with 2 action items logged.
 
 ---
 
@@ -243,6 +245,11 @@
 
 - Phase: 4-Implementation
 - Changes: Drafted Story 2.8, marked it Ready, generated story context, and promoted Story 2.9 to TODO.
+
+### 2025-10-14 - Amelia (DEV)
+
+- Phase: 4-Implementation
+- Changes: Ran review-story on Story 2.8, documented Changes Requested outcome, and logged two action items for follow-up.
 
 ---
 

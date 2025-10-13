@@ -1,6 +1,6 @@
 # Story 2.8: Parallel Race Processing
 
-Status: Ready
+Status: Done
 
 ## Story
 
@@ -21,20 +21,20 @@ so that the scheduler can meet the 15-second update window without single-race f
 
 ## Tasks / Subtasks
 
-- [ ] Implement batch orchestration entry point (AC1)
-  - [ ] Add exported `processRaces` beside `processRace` in `server/src/pipeline/race-processor.ts`, reusing result builders and error types [[docs/epics.md:84](../epics.md#L84), [docs/tech-spec-epic-2.md:175](../tech-spec-epic-2.md#L175)]
-  - [ ] Support `maxConcurrency` and `ProcessOptions` parameters and ensure `Promise.allSettled` batches do not exceed pool limits [[docs/tech-spec-epic-2.md:175](../tech-spec-epic-2.md#L175)]
-- [ ] Enforce isolation and pool safety (AC2, AC5-6)
-  - [ ] Guard shared state by reusing worker pool APIs and ensuring connection usage never exceeds `env.DB_POOL_MAX` [[docs/tech-spec-epic-2.md:194](../tech-spec-epic-2.md#L194), [docs/PRD-raceday-postgresql-2025-10-05.md:173](../PRD-raceday-postgresql-2025-10-05.md#L173)]
-  - [ ] Surface fulfilled results plus typed pipeline errors separately so callers can react to individual failures [[docs/tech-spec-epic-2.md:175](../tech-spec-epic-2.md#L175)]
-  - [ ] Log pool utilization and worker telemetry instead of duplicating metrics [[docs/tech-spec-epic-2.md:206](../tech-spec-epic-2.md#L206)]
-- [ ] Capture batch metrics and logging (AC3-4, AC8)
-  - [ ] Emit structured JSON logs for batch start, per-race completion, and batch summary with timings and retryability flags [[docs/tech-spec-epic-2.md:179](../tech-spec-epic-2.md#L179)]
-  - [ ] Aggregate per-race timings and batch max duration; warn when approaching the 15 s SLA [[docs/PRD-raceday-postgresql-2025-10-05.md:165](../PRD-raceday-postgresql-2025-10-05.md#L165)]
-  - [ ] Expose success, failure, retryable counts, and durations for scheduler consumption [[docs/tech-spec-epic-2.md:198](../tech-spec-epic-2.md#L198)]
-- [ ] Extend automated testing (AC4, AC7)
-  - [ ] Add unit coverage in `server/tests/unit/pipeline/race-processor.test.ts` asserting Promise.allSettled outcomes, error isolation, and telemetry [[docs/tech-spec-epic-2.md:215](../tech-spec-epic-2.md#L215)]
-  - [ ] Add integration spec running five-race batches against PostgreSQL to confirm <15 s aggregate and ≤10 active connections [[docs/tech-spec-epic-2.md:181](../tech-spec-epic-2.md#L181), [docs/tech-spec-epic-2.md:197](../tech-spec-epic-2.md#L197)]
+- [x] Implement batch orchestration entry point (AC1)
+  - [x] Add exported `processRaces` beside `processRace` in `server/src/pipeline/race-processor.ts`, reusing result builders and error types [[docs/epics.md:84](../epics.md#L84), [docs/tech-spec-epic-2.md:175](../tech-spec-epic-2.md#L175)]
+  - [x] Support `maxConcurrency` and `ProcessOptions` parameters and ensure `Promise.allSettled` batches do not exceed pool limits [[docs/tech-spec-epic-2.md:175](../tech-spec-epic-2.md#L175)]
+- [x] Enforce isolation and pool safety (AC2, AC5-6)
+  - [x] Guard shared state by reusing worker pool APIs and ensuring connection usage never exceeds `env.DB_POOL_MAX` [[docs/tech-spec-epic-2.md:194](../tech-spec-epic-2.md#L194), [docs/PRD-raceday-postgresql-2025-10-05.md:173](../PRD-raceday-postgresql-2025-10-05.md#L173)]
+  - [x] Surface fulfilled results plus typed pipeline errors separately so callers can react to individual failures [[docs/tech-spec-epic-2.md:175](../tech-spec-epic-2.md#L175)]
+  - [x] Log pool utilization and worker telemetry instead of duplicating metrics [[docs/tech-spec-epic-2.md:206](../tech-spec-epic-2.md#L206)]
+- [x] Capture batch metrics and logging (AC3-4, AC8)
+  - [x] Emit structured JSON logs for batch start, per-race completion, and batch summary with timings and retryability flags [[docs/tech-spec-epic-2.md:179](../tech-spec-epic-2.md#L179)]
+  - [x] Aggregate per-race timings and batch max duration; warn when approaching the 15 s SLA [[docs/PRD-raceday-postgresql-2025-10-05.md:165](../PRD-raceday-postgresql-2025-10-05.md#L165)]
+  - [x] Expose success, failure, retryable counts, and durations for scheduler consumption [[docs/tech-spec-epic-2.md:198](../tech-spec-epic-2.md#L198)]
+- [x] Extend automated testing (AC4, AC7)
+  - [x] Add unit coverage in `server/tests/unit/pipeline/race-processor.test.ts` asserting Promise.allSettled outcomes, error isolation, and telemetry [[docs/tech-spec-epic-2.md:215](../tech-spec-epic-2.md#L215)]
+  - [x] Add integration spec running five-race batches against PostgreSQL to confirm <15 s aggregate and ≤10 active connections [[docs/tech-spec-epic-2.md:181](../tech-spec-epic-2.md#L181), [docs/tech-spec-epic-2.md:197](../tech-spec-epic-2.md#L197)]
 
 ## Dev Notes
 
@@ -83,12 +83,88 @@ claude-sonnet-4-5-20250929
 
 ### Debug Log References
 
+- Plan:
+  1. Re-read `server/src/pipeline/race-processor.ts` to confirm `processRaces` batches with `Promise.allSettled`, enforces pool limits, and surfaces structured logs/metrics for AC1-AC6.
+  2. Review existing unit and integration specs to ensure coverage for success/failure isolation, five-race batches, and metrics assertions (AC3-AC8); add gaps if discovered.
+  3. Execute unit and integration test suites (`npm run test:unit`, `npm run test:integration`) to prove the implementation meets acceptance thresholds without regressions.
+- Execution:
+  - Verified concurrency guardrails and metrics logging already in `processRaces`, updated integration fixtures to satisfy meeting schema while still forcing partition failures (AC2, AC5).
+  - Hardened integration cleanup to keep odds history FK-safe and added date-dependent fixtures so mixed batch runs produce the intended success/failure split (AC3, AC7).
+  - Re-ran unit (`npm run test:unit`) and integration (`npm run test:integration`) suites; both pass on Node 22 with PostgreSQL harness (AC4, AC7).
+- Follow-up Execution (2025-10-14):
+  - Patched `processRaces` to roll `PipelineStageError.result.timings.total_ms` into `metrics.maxDuration_ms`, restoring AC4/AC8 observability coverage.
+  - Augmented unit regression to assert batch metrics reflect failure durations and exercised cleanup helper to cover meeting prefix deletions.
+  - Updated integration cleanup to purge `raceId` and `meeting-${raceId}` meetings; reran `npm run test:unit` and `npm run test:integration` to confirm green suites.
+- Follow-up Plan (2025-10-14):
+  1. Update `processRaces` metrics aggregation to incorporate `PipelineStageError.result.timings.total_ms` so failure durations affect `maxDuration_ms`, keeping logs aligned with AC4/AC8.
+  2. Extend unit coverage to assert failure timings propagate into batch metrics and retain existing success paths.
+  3. Fix integration cleanup helpers to purge both `raceId` and `meeting-${raceId}` meeting rows, preventing fixture bleed between runs.
+
 ### Completion Notes List
+
+- Implementation reuses `processRaces` batching with `Promise.allSettled`, enforces `env.DB_POOL_MAX`, and logs start/complete telemetry plus max duration metrics, satisfying AC1-AC6.
+- Integration suite now seeds valid `thoroughbred` meetings, exercises mixed-success batches, and cleans fixtures to keep odds history counts deterministic while covering AC7-AC8.
+- Unit coverage continues to assert concurrency adjustment, metrics aggregation, and retryable error accounting for Promise.allSettled flows.
+- Failure metrics now aggregate both success and error durations, and integration cleanup removes prefixed meeting identifiers so review action items are resolved.
+
+### Completion Notes
+**Completed:** 2025-10-14
+**Definition of Done:** All acceptance criteria met, code reviewed, tests passing, deployed
 
 ### File List
 
+- docs/stories/story-2.8.md
+- server/src/pipeline/race-processor.ts
+- server/tests/unit/pipeline/race-processor.test.ts
+- server/tests/integration/pipeline/race-processor.integration.test.ts
+
 ## Change Log
 
-| Date | Change | Author |
-|------|--------|--------|
+| Date       | Change                                 | Author                   |
+| ---------- | -------------------------------------- | ------------------------ |
 | 2025-10-13 | Story drafted by create-story workflow | Bob (Scrum Master agent) |
+| 2025-10-13 | Validated batch processor, extended unit/integration coverage, and marked story Ready for Review | Amelia (Developer agent) |
+| 2025-10-14 | Review flagged changes: batch metrics mis-report and integration cleanup gaps | Amelia (Developer agent) |
+| 2025-10-14 | Addressed review findings: failure metrics logging and meeting cleanup fixes, retested suites | Amelia (Developer agent) |
+| 2025-10-14 | Senior Developer review approved and notes appended | warrick |
+
+## Senior Developer Review (AI)
+
+Reviewer: warrick
+
+Date: 2025-10-14
+
+Outcome: Approved
+
+### Summary
+
+- Failure metrics now reflect both successful and failed races, integration cleanup removes prefixed meetings, and the story satisfies all acceptance criteria.
+
+### Key Findings
+
+- None.
+
+### Acceptance Criteria Coverage
+
+- **AC1-AC8:** Pass – Concurrency guardrails, structured telemetry, observability metrics, and coverage align with epic and PRD expectations.
+
+### Test Coverage and Gaps
+
+- `npm run test:unit` and `npm run test:integration` validate the updated metrics aggregation and cleanup helpers; no additional gaps observed.
+
+### Architectural Alignment
+
+- Batch orchestration continues to reuse `processRace`, respects pool limits, and emits structured logs consistent with the solution architecture.
+
+### Security Notes
+
+- No new security concerns; database writes stay parameterized and cleanup leaves no residual fixtures.
+
+### Best-Practices and References
+
+- [[docs/tech-spec-epic-2.md#L175-L204](../tech-spec-epic-2.md#L175-L204)] — Observability and batching requirements.
+- [[docs/PRD-raceday-postgresql-2025-10-05.md#L165-L173](../PRD-raceday-postgresql-2025-10-05.md#L165-L173)] — Performance targets and pool ceilings.
+
+### Action Items
+
+- None.
