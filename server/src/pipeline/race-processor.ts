@@ -13,13 +13,19 @@ import {
   insertMoneyFlowHistory,
   insertOddsHistory,
   PartitionNotFoundError,
-  type OddsRecord,
 } from '../database/time-series.js'
 import type { TransformedRace } from '../workers/messages.js'
 import { logger } from '../shared/logger.js'
+import { buildOddsRecords } from './odds-utils.js'
 
+/**
+ * Pipeline stage identifier used when classifying structured process errors.
+ */
 type ProcessErrorType = 'fetch' | 'transform' | 'write'
 
+/**
+ * Millisecond timings measured at each pipeline boundary.
+ */
 export interface ProcessTimings {
   fetch_ms: number
   transform_ms: number
@@ -27,6 +33,9 @@ export interface ProcessTimings {
   total_ms: number
 }
 
+/**
+ * Row counts persisted during the write stage for observability and auditing.
+ */
 export interface ProcessRowCounts {
   meetings: number
   races: number
@@ -37,10 +46,24 @@ export interface ProcessRowCounts {
 
 export type ProcessStatus = 'success' | 'skipped' | 'failed'
 
+/**
+ * Optional execution hints used by race processor callers.
+ */
+export interface ProcessOptions {
+  contextId?: string
+}
+
+/**
+ * Canonical result returned by race processor executions.
+ *
+ * Exposes per-stage timings, persistence row counts, and optional error metadata for
+ * downstream schedulers and monitoring pipelines.
+ */
 export interface ProcessResult {
   raceId: string
   status: ProcessStatus
   success: boolean
+  contextId?: string
   timings: ProcessTimings
   rowCounts: ProcessRowCounts
   error?: {
@@ -96,7 +119,8 @@ const createResult = (
   status: ProcessStatus,
   durations: { fetch: number; transform: number; write: number; total: number },
   rowCounts: ProcessRowCounts,
-  errorDetails?: ProcessErrorDetails
+  errorDetails?: ProcessErrorDetails,
+  options?: ProcessOptions
 ): ProcessResult => {
   const result: ProcessResult = {
     raceId,
@@ -111,6 +135,10 @@ const createResult = (
     rowCounts: {
       ...rowCounts,
     },
+  }
+
+  if (options?.contextId !== undefined) {
+    result.contextId = options.contextId
   }
 
   if (errorDetails !== undefined) {
@@ -155,6 +183,9 @@ abstract class PipelineErrorBase extends Error {
 }
 
 export class FetchError extends PipelineErrorBase {
+  /**
+   * Error thrown when the fetch stage fails or returns invalid data.
+   */
   constructor(
     raceId: string,
     message: string,
@@ -167,6 +198,9 @@ export class FetchError extends PipelineErrorBase {
 }
 
 export class TransformError extends PipelineErrorBase {
+  /**
+   * Error thrown when the transform worker fails to produce a normalized payload.
+   */
   constructor(
     raceId: string,
     message: string,
@@ -179,6 +213,9 @@ export class TransformError extends PipelineErrorBase {
 }
 
 export class WriteError extends PipelineErrorBase {
+  /**
+   * Error thrown when persistence logic fails, wrapping database/partition exceptions.
+   */
   constructor(
     raceId: string,
     message: string,
@@ -191,47 +228,6 @@ export class WriteError extends PipelineErrorBase {
 }
 
 export type PipelineStageError = FetchError | TransformError | WriteError
-
-const resolveOddsEventTimestamp = (transformed: TransformedRace): string => {
-  const raceMeta = transformed.race
-  if (raceMeta != null) {
-    return `${raceMeta.race_date_nz}T${raceMeta.start_time_nz}:00Z`
-  }
-
-  const [firstMoneyFlowRecord] = transformed.moneyFlowRecords
-  if (firstMoneyFlowRecord != null) {
-    return firstMoneyFlowRecord.polling_timestamp
-  }
-
-  return new Date().toISOString()
-}
-
-const buildOddsRecords = (transformed: TransformedRace): OddsRecord[] => {
-  const eventTimestamp = resolveOddsEventTimestamp(transformed)
-  const records: OddsRecord[] = []
-
-  for (const entrant of transformed.entrants) {
-    if (entrant.fixed_win_odds !== undefined && entrant.fixed_win_odds !== null) {
-      records.push({
-        entrant_id: entrant.entrant_id,
-        odds: entrant.fixed_win_odds,
-        type: 'fixed_win',
-        event_timestamp: eventTimestamp,
-      })
-    }
-
-    if (entrant.pool_win_odds !== undefined && entrant.pool_win_odds !== null) {
-      records.push({
-        entrant_id: entrant.entrant_id,
-        odds: entrant.pool_win_odds,
-        type: 'pool_win',
-        event_timestamp: eventTimestamp,
-      })
-    }
-  }
-
-  return records
-}
 
 const persistTransformedRace = async (
   transformed: TransformedRace
@@ -295,9 +291,21 @@ const persistTransformedRace = async (
   }
 }
 
-export const processRace = async (raceId: string): Promise<ProcessResult> => {
+/**
+ * Execute the race processing pipeline for a single race identifier.
+ *
+ * The pipeline executes sequential stages (fetch → transform → write), collecting timings,
+ * logging structured events, and surfacing typed failures with retry guidance.
+ */
+export const processRace = async (
+  raceId: string,
+  options: ProcessOptions = {}
+): Promise<ProcessResult> => {
   const pipelineStart = performance.now()
-  logger.info({ raceId, event: 'pipeline_start' }, 'Race pipeline started')
+  logger.info(
+    { raceId, event: 'pipeline_start', contextId: options.contextId },
+    'Race pipeline started'
+  )
 
   let fetchDuration = 0
   let transformDuration = 0
@@ -308,7 +316,10 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
   let transformedRace: TransformedRace | null = null
 
   // Fetch stage
-  logger.info({ raceId, event: 'fetch_start' }, 'Starting fetch stage')
+  logger.info(
+    { raceId, event: 'fetch_start', contextId: options.contextId },
+    'Starting fetch stage'
+  )
   const fetchStart = performance.now()
   try {
     raceData = await fetchRaceData(raceId)
@@ -319,6 +330,7 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
         raceId,
         event: 'fetch_complete',
         fetch_ms: Math.round(fetchDuration),
+        contextId: options.contextId,
       },
       'Fetch stage completed'
     )
@@ -343,7 +355,8 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
         type: 'fetch',
         message,
         retryable,
-      }
+      },
+      options
     )
 
     logger.error(
@@ -353,6 +366,7 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
         duration_ms: result.timings.fetch_ms,
         retryable,
         error: serializeError(error),
+        contextId: options.contextId,
       },
       'Fetch stage failed'
     )
@@ -377,7 +391,8 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
         type: 'fetch',
         message: 'Fetch returned null – pipeline short-circuited',
         retryable: false,
-      }
+      },
+      options
     )
 
     logger.warn(
@@ -396,6 +411,7 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
         status: result.status,
         timings: result.timings,
         rowCounts: result.rowCounts,
+        contextId: options.contextId,
       },
       'Race pipeline completed with skip status'
     )
@@ -404,7 +420,10 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
   }
 
   // Transform stage
-  logger.info({ raceId, event: 'transform_start' }, 'Starting transform stage')
+  logger.info(
+    { raceId, event: 'transform_start', contextId: options.contextId },
+    'Starting transform stage'
+  )
   const transformStart = performance.now()
   try {
     transformedRace = await workerPool.exec(raceData)
@@ -417,6 +436,7 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
         transform_ms: Math.round(transformDuration),
         entrants: transformedRace.entrants.length,
         moneyFlowRecords: transformedRace.moneyFlowRecords.length,
+        contextId: options.contextId,
       },
       'Transform stage completed'
     )
@@ -440,7 +460,8 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
         type: 'transform',
         message,
         retryable: false,
-      }
+      },
+      options
     )
 
     logger.error(
@@ -449,6 +470,7 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
         event: 'transform_failed',
         duration_ms: result.timings.transform_ms,
         error: serializeError(error),
+        contextId: options.contextId,
       },
       'Transform stage failed'
     )
@@ -457,7 +479,10 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
   }
 
   // Write stage
-  logger.info({ raceId, event: 'write_start' }, 'Starting write stage')
+  logger.info(
+    { raceId, event: 'write_start', contextId: options.contextId },
+    'Starting write stage'
+  )
   const writeStart = performance.now()
   try {
     const writeOutcome = await persistTransformedRace(transformedRace)
@@ -472,6 +497,7 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
         write_ms: Math.round(writeDuration),
         rowCounts,
         breakdown_ms: breakdown,
+        contextId: options.contextId,
       },
       'Write stage completed'
     )
@@ -504,7 +530,8 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
         type: 'write',
         message,
         retryable,
-      }
+      },
+      options
     )
 
     logger.error(
@@ -515,6 +542,7 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
         retryable,
         error: serializeError(error),
         isDatabaseError,
+        contextId: options.contextId,
       },
       'Write stage failed'
     )
@@ -532,7 +560,9 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
       write: writeDuration,
       total: totalDuration,
     },
-    rowCounts
+    rowCounts,
+    undefined,
+    options
   )
 
   const overBudget = result.timings.total_ms >= 2000
@@ -545,6 +575,7 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
       timings: result.timings,
       rowCounts: result.rowCounts,
       overBudget,
+      contextId: options.contextId,
     },
     'Race pipeline completed'
   )
@@ -556,6 +587,7 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
         event: 'pipeline_over_budget',
         total_ms: result.timings.total_ms,
         target_ms: 2000,
+        contextId: options.contextId,
       },
       'Race processing exceeded 2s budget'
     )
@@ -564,9 +596,16 @@ export const processRace = async (raceId: string): Promise<ProcessResult> => {
   return result
 }
 
+/**
+ * Execute the race processing pipeline for multiple races with bounded concurrency.
+ *
+ * Returns the per-race results alongside captured stage errors so callers can
+ * aggregate metrics while deciding on retries or alerting strategies.
+ */
 export const processRaces = async (
   raceIds: string[],
-  maxConcurrency = 5
+  maxConcurrency = 5,
+  options: ProcessOptions = {}
 ): Promise<{
   results: ProcessResult[]
   errors: PipelineStageError[]
@@ -577,7 +616,7 @@ export const processRaces = async (
   for (let index = 0; index < raceIds.length; index += maxConcurrency) {
     const batch = raceIds.slice(index, index + maxConcurrency)
     const settled = await Promise.allSettled(
-      batch.map((raceId) => processRace(raceId))
+      batch.map((raceId) => processRace(raceId, options))
     )
 
     for (let i = 0; i < settled.length; i += 1) {
@@ -621,7 +660,8 @@ export const processRaces = async (
               ? reason.message
               : 'Unknown pipeline batch error',
           retryable: false,
-        }
+        },
+        options
       )
 
       errors.push(
@@ -643,6 +683,7 @@ export const processRaces = async (
       successful: results.length,
       failed: errors.length,
       retryable: errors.filter((error) => error.retryable).length,
+      contextId: options.contextId,
     },
     'Batch race processing completed'
   )
