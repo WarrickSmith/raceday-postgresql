@@ -1,0 +1,119 @@
+<story-context id="story-2.8" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2.8</storyId>
+    <title>Parallel Race Processing</title>
+    <status>Ready</status>
+    <generatedAt>2025-10-13T20:32:39Z</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-2.8.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA><![CDATA[developer]]></asA>
+    <iWant><![CDATA[a `processRaces` batch orchestrator that runs up to five race pipelines in parallel]]></iWant>
+    <soThat><![CDATA[the scheduler can meet the 15-second update window without single-race failures blocking the rest of the batch.]]></soThat>
+    <tasks><![CDATA[
+- Implement batch orchestration entry point (AC1)
+  - Export `processRaces` beside `processRace` in `server/src/pipeline/race-processor.ts` and reuse shared result builders and typed errors
+  - Support `maxConcurrency` and `ProcessOptions` parameters while batching work with `Promise.allSettled`
+- Enforce isolation and pool safety (AC2, AC5-6)
+  - Guard shared state via worker pool APIs, cap active connections with `env.DB_POOL_MAX`, and surface fulfilled results plus typed errors
+  - Log pool utilization and worker telemetry instead of duplicating metrics
+- Capture batch metrics and logging (AC3-4, AC8)
+  - Emit structured logs for batch start/completion and warn when duration approaches the 15 s SLA
+  - Expose success, failure, retryable counts, and batch durations for scheduler dashboards
+- Extend automated testing (AC4, AC7)
+  - Add unit coverage for Promise.allSettled outcomes and telemetry aggregation
+  - Add integration spec that runs five-race batches against PostgreSQL to verify <15 s total time and ≤10 concurrent connections
+    ]]></tasks>
+  </story>
+
+  <acceptanceCriteria><![CDATA[
+1. Implement `processRaces(raceIds: string[], maxConcurrency?: number, options?: ProcessOptions)` beside `processRace`, batching with `Promise.allSettled` while reusing shared result builders and typed errors.
+2. Guarantee each race executes independently—shared state limited to the worker pool and PostgreSQL pool—so a single failure cannot corrupt parallel executions.
+3. Emit structured JSON logs for batch start, per-race completion, failures, and final batch summary with raceId, timings, and retryability flags.
+4. Capture per-race timings (fetch_ms, transform_ms, write_ms, total_ms) plus batch max duration, keeping single races <2 s and five-race batches <15 s.
+5. Return fulfilled results and typed pipeline errors separately so failed races are logged and surfaced without blocking successful completions.
+6. Honor the 10-connection PostgreSQL pool ceiling by respecting `env.DB_POOL_MAX`, logging utilization to surface saturation risks.
+7. Extend automated coverage with a five-race integration test hitting the PostgreSQL harness to assert performance thresholds and connection usage.
+8. Expose aggregated metrics (success count, failure count, retryable count, max duration) for downstream scheduler consumption.
+  ]]></acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/epics.md#L76-L91" title="Epic 2.8 Definition">
+        <![CDATA[Defines the user story and eight acceptance criteria for the parallel race processing batch orchestrator.]]>
+      </doc>
+      <doc path="docs/PRD-raceday-postgresql-2025-10-05.md#L165-L173" title="Performance & Pool Targets">
+        <![CDATA[NFR001 and NFR003 enforce <15 s turnaround for five races and limit PostgreSQL connections to ten concurrent sessions.]]>
+      </doc>
+      <doc path="docs/tech-spec-epic-2.md#L162-L186" title="Pipeline Acceptance Criteria">
+        <![CDATA[Tech spec mandates Promise.allSettled batching, structured metrics, and integration tests that validate five-race throughput.]]>
+      </doc>
+      <doc path="docs/architecture-specification.md#L621-L653" title="Parallel Processing Pattern">
+        <![CDATA[Architecture blueprint shows a Promise.allSettled orchestration that reuses fetch→transform→write stages across five concurrent races.]]>
+      </doc>
+      <doc path="docs/solution-architecture.md#L310-L334" title="Race Processor Reference">
+        <![CDATA[Solution architecture sketches the scheduler’s `processRaces` call, reinforcing reuse of the sequential pipeline per race.]]>
+      </doc>
+    </docs>
+    <code>
+      <artifact path="server/src/pipeline/race-processor.ts#L40-L692" kind="module">
+        <![CDATA[Hosts `ProcessOptions`, `ProcessResult`, error classes, and the `processRaces` implementation that batches calls with Promise.allSettled.]]>
+      </artifact>
+      <artifact path="server/tests/unit/pipeline/race-processor.test.ts#L1-L190" kind="unit-test">
+        <![CDATA[Vitest suite mocks fetch/transform/write stages to verify sequential timings and error propagation for the race processor.]]>
+      </artifact>
+      <artifact path="server/tests/integration/pipeline/race-processor.integration.test.ts#L200-L360" kind="integration-test">
+        <![CDATA[Exercises `processRaces` against PostgreSQL, confirming mixed-result batches, row persistence, and timing budgets.]]>
+      </artifact>
+      <artifact path="server/src/workers/worker-pool.ts#L47-L104" kind="service">
+        <![CDATA[Worker pool exposes size and queue metrics used to monitor parallel execution health for the batch processor.]]>
+      </artifact>
+      <artifact path="server/src/database/pool.ts#L10-L44" kind="infrastructure">
+        <![CDATA[Database pool configuration enforces `env.DB_POOL_MAX`, providing logging hooks for saturation warnings.]]>
+      </artifact>
+    </code>
+    <dependencies>
+      <ecosystem name="npm">
+        <package name="pg" version="^8.16.3" />
+        <package name="pino" version="^9.5.0" />
+        <package name="axios" version="^1.12.2" />
+        <package name="zod" version="^3.25.76" />
+        <package name="express" version="^4.21.2" />
+        <package name="vitest" version="^2.0.0" scope="dev" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints><![CDATA[
+- Maintain batch concurrency at or below `env.DB_POOL_MAX` to honor NFR003 and avoid saturating PostgreSQL connections (docs/PRD-raceday-postgresql-2025-10-05.md#L165-L173).
+- Reuse the sequential `processRace` pipeline for every race to preserve validated fetch/transform/write contracts (docs/solution-architecture.md#L310-L334).
+- Emit structured logs and timing metrics required by observability standards so schedulers can detect slow paths early (docs/tech-spec-epic-2.md#L179-L198).
+  ]]></constraints>
+  <interfaces>
+    <interface path="server/src/pipeline/race-processor.ts#L52-L74" name="ProcessOptions &amp; ProcessResult">
+      <![CDATA[`ProcessOptions` adds optional `contextId`; `ProcessResult` reports raceId, success flag, timing metrics, row counts, and typed error metadata.]]>
+    </interface>
+    <interface path="server/src/pipeline/race-processor.ts#L605-L692" name="processRaces">
+      <![CDATA[async function processRaces(raceIds: string[], maxConcurrency = 5, options?: ProcessOptions): Promise<{ results: ProcessResult[]; errors: PipelineStageError[] }>]]>
+    </interface>
+    <interface path="server/src/pipeline/race-processor.ts#L185-L214" name="FetchError | TransformError | WriteError">
+      <![CDATA[Typed error classes map to pipeline stages and carry the `ProcessResult`, enabling downstream retry policies and logging.]]>
+    </interface>
+  </interfaces>
+  <tests>
+    <standards><![CDATA[Follow Developer Quick Start testing strategy: `npm test` for full suite, `npm run test:unit` for unit coverage, `npm run test:integration` for full pipeline verification (docs/developer-quick-start.md#L438-L466).]]></standards>
+    <locations><![CDATA[
+- server/tests/unit
+- server/tests/integration
+    ]]></locations>
+    <ideas><![CDATA[
+- AC1/AC2: Unit test that mocks two raceIds with different outcomes to ensure `processRaces` respects `maxConcurrency` and isolates failures.
+- AC3/AC4/AC8: Integration test asserting batch logs include success/failure counts, retryable totals, and keep five-race run <15 s.
+- AC6: Add integration assertion that monitors pool metrics during a five-race batch to confirm open connections stay ≤ `env.DB_POOL_MAX`.
+- AC7: `npm run test:integration` scenario that loads five fixtures and measures total duration plus connection usage thresholds.
+    ]]></ideas>
+  </tests>
+</story-context>
