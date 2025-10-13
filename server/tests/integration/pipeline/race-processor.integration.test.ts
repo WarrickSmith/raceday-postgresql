@@ -24,7 +24,11 @@ vi.mock('../../../src/workers/worker-pool.js', () => ({
   },
 }))
 
-const { processRace, WriteError: PipelineWriteError } = await import('../../../src/pipeline/race-processor.js')
+const {
+  processRace,
+  processRaces,
+  WriteError: PipelineWriteError,
+} = await import('../../../src/pipeline/race-processor.js')
 
 const TEST_PREFIX = 'itest-race-processor'
 
@@ -317,5 +321,43 @@ const buildTransformed = (raceId: string): TransformedRace => {
       [failureRaceId]
     )
     expect(oddsRows.rowCount).toBe(0)
+  })
+
+  it('handles batch processing with mixed success and failure results', async () => {
+    fetchRaceDataMock.mockImplementation((raceId) =>
+      Promise.resolve(buildRaceData(raceId))
+    )
+    workerExecMock.mockImplementation((raceData) =>
+      Promise.resolve(buildTransformed(raceData.id))
+    )
+
+    const batchContext = 'batch-ctx-001'
+    const { results, errors } = await processRaces(
+      [successRaceId, failureRaceId],
+      2,
+      { contextId: batchContext }
+    )
+
+    expect(results).toHaveLength(1)
+    expect(results[0]?.raceId).toBe(successRaceId)
+    expect(results[0]?.status).toBe('success')
+    expect(results[0]?.contextId).toBe(batchContext)
+
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toBeInstanceOf(PipelineWriteError)
+    expect(errors[0]?.raceId).toBe(failureRaceId)
+    expect(errors[0]?.result.contextId).toBe(batchContext)
+
+    const successOddsRows = await pool.query(
+      'SELECT type, odds FROM odds_history WHERE entrant_id = $1',
+      [successRaceId]
+    )
+    expect(successOddsRows.rowCount).toBe(2)
+
+    const failureOddsRows = await pool.query(
+      'SELECT 1 FROM odds_history WHERE entrant_id = $1',
+      [failureRaceId]
+    )
+    expect(failureOddsRows.rowCount).toBe(0)
   })
 })

@@ -249,6 +249,30 @@ const transformedRace: TransformedRace = {
     perfSpy.mockRestore()
   })
 
+  it('propagates contextId through result and structured logs', async () => {
+    fetchRaceDataMock.mockResolvedValue(raceData)
+    workerExecMock.mockResolvedValue(transformedRace)
+    bulkUpsertMeetingsMock.mockResolvedValue({ rowCount: 0, duration: 10 })
+    bulkUpsertRacesMock.mockResolvedValue({ rowCount: 0, duration: 10 })
+    bulkUpsertEntrantsMock.mockResolvedValue({ rowCount: 0, duration: 10 })
+    insertMoneyFlowHistoryMock.mockResolvedValue({ rowCount: 0, duration: 10 })
+    insertOddsHistoryMock.mockResolvedValue({ rowCount: 0, duration: 10 })
+
+    const contextId = 'job-ctx-123'
+    const result = await processRace(raceId, { contextId })
+
+    expect(result.contextId).toBe(contextId)
+
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'pipeline_start',
+        raceId,
+        contextId,
+      }),
+      expect.any(String)
+    )
+  })
+
   it('marks pipeline over budget when total duration ≥ 2000ms', async () => {
     const perfSpy = vi.spyOn(performance, 'now')
     perfSpy
