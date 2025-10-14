@@ -10,9 +10,9 @@
 ## Workflow Status Tracker
 
 **Current Phase:** 4-Implementation
-**Current Workflow:** story-context (Story 2.9) - Complete
-**Current Agent:** SM
-**Overall Progress:** 35%
+**Current Workflow:** story-approved (Story 2.9) - Complete
+**Current Agent:** DEV
+**Overall Progress:** 43%
 
 ### Phase Completion Status
 
@@ -35,8 +35,8 @@
 | 4-Implementation | review-story | DEV | Perform Senior Developer review for the active story | Complete (Story 2.8) |
 | 4-Implementation | story-approved | DEV | Confirm Definition of Done and move story to DONE | Complete (Story 2.8) |
 
-**Current Step:** story-context (Story 2.9) ✓
-**Next Step:** dev-story (DEV agent) – implement Story 2.9
+**Current Step:** story-approved (Story 2.9) ✓
+**Next Step:** create-story (SM agent) – draft Story 2.11
 
 **Instructions:**
 
@@ -53,36 +53,36 @@
 
 | Epic | Story | ID | Title | File |
 | ---- | ----- | --- | ----- | ---- |
-| 2 | 11 | 2.11 | Worker Thread Error Handling and Restart | story-2.11.md (pending) |
 | 2 | 12 | 2.12 | Fetch Timeout and Error Handling | story-2.12.md (pending) |
 | 2 | 13 | 2.13 | Integration Test - Single Race End-to-End | story-2.13.md (pending) |
 | 2 | 14 | 2.14 | Integration Test - 5 Concurrent Races | story-2.14.md (pending) |
 | 2 | 15 | 2.15 | Performance Benchmarking Tool | story-2.15.md (pending) |
 | 3 | 1 | 3.1 | REST API Foundations | story-3.1.md (pending) |
 
-**Total in backlog:** 6 stories
+**Total in backlog:** 5 stories
 
 #### TODO (Needs Drafting)
 
-- **Story ID:** 2.10
-- **Story Title:** Performance Metrics Tracking
-- **Story File:** `docs/stories/story-2.10.md`
+- **Story ID:** 2.11
+- **Story Title:** Worker Thread Error Handling and Restart
+- **Story File:** `docs/stories/story-2.11.md`
 - **Status:** Not created (needs drafting)
 - **Action:** SM should run `create-story` to draft this story
 
 #### IN PROGRESS (Approved for Development)
 
-- **Story ID:** 2.9
-- **Story Title:** Dynamic Scheduler with Time-Based Intervals
-- **Story File:** `docs/stories/story-2.9.md`
-- **Story Status:** Ready
-- **Context File:** `docs/stories/story-context-2.9.xml`
-- **Action:** DEV should run `dev-story` workflow to implement this story
+- **Story ID:** 2.10
+- **Story Title:** Performance Metrics Tracking
+- **Story File:** `docs/stories/story-2.10.md`
+- **Story Status:** Draft (needs SM review)
+- **Context File:** _(context not yet generated)_
+- **Action:** SM should run `story-ready` workflow to approve this story
 
 #### DONE (Completed Stories)
 
 | Story ID | File | Completed Date | Points |
 | -------- | ---- | -------------- | ------ |
+| 2.9 | docs/stories/story-2.9.md | 2025-10-14 | — |
 | 2.8 | docs/stories/story-2.8.md | 2025-10-14 | — |
 | 1.1 | docs/stories/story-1.1.md | 2025-10-10 | — |
 | 1.2 | docs/stories/story-1.2.md | 2025-10-10 | — |
@@ -102,11 +102,11 @@
 | 2.6 | docs/stories/story-2.6.md | 2025-10-13 | — |
 | 2.7 | docs/stories/story-2.7.md | 2025-10-13 | — |
 
-**Total completed:** 18 stories
+**Total completed:** 19 stories
 **Total points completed:** N/A (not estimated)
 **Total Epics:** 5
 **Total Stories Planned:** 44
-**Stories in Backlog:** 6
+**Stories in Backlog:** 5
 **Stories in TODO:** 1
 **Stories in IN PROGRESS:** 1
 
@@ -130,11 +130,11 @@
 
 ### Next Action Required
 
-**What to do next:** Implement Story 2.9 (Dynamic Scheduler with Time-Based Intervals)
+**What to do next:** Review drafted Story 2.10 (Performance Metrics Tracking)
 
-**Command to run:** Load DEV agent and run `dev-story` workflow
+**Command to run:** Load SM agent and run `story-ready` workflow
 
-**Agent to load:** bmad/bmm/agents/dev.md
+**Agent to load:** bmad/bmm/agents/sm.md
 
 ---
 
@@ -231,6 +231,11 @@
 - **2025-10-14**: Completed create-story for Story 2.9 (Dynamic Scheduler with Time-Based Intervals). Story file: docs/stories/story-2.9.md. Status: Draft (needs review). Next: Review and approve story via story-ready.
 - **2025-10-14**: Story 2.9 (Dynamic Scheduler with Time-Based Intervals) marked ready for development by SM agent. Moved from TODO → IN PROGRESS. Next story 2.10 (Performance Metrics Tracking) moved from BACKLOG → TODO.
 - **2025-10-14**: Completed story-context for Story 2.9 (Dynamic Scheduler with Time-Based Intervals). Context file: docs/stories/story-context-2.9.xml. Next: DEV agent should run dev-story to implement.
+- **2025-10-14**: Completed dev-story for Story 2.9 (Dynamic Scheduler with Time-Based Intervals). All tasks complete, tests passing. Story status: Ready for Review. Next: User reviews and runs `story-approved` when satisfied with implementation.
+- **2025-10-14**: Completed review-story for Story 2.9 (Dynamic Scheduler with Time-Based Intervals). Outcome: Changes Requested. Action items captured in story; story status reverted to InProgress.
+- **2025-10-14**: Resolved review action items for Story 2.9, reran dev-story validations, and returned the story to Ready for Review ahead of the next review cycle.
+- **2025-10-14**: Completed review-story for Story 2.9 with outcome Review Passed; story ready for `story-approved`.
+- **2025-10-14**: Story 2.9 approved and marked done via story-approved. Story 2.10 moved from TODO → IN PROGRESS (needs SM review). Story 2.11 moved from BACKLOG → TODO.
 
 ---
 
