@@ -1,0 +1,335 @@
+<story-context id="story-2.9-daily-baseline-data-initialization" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2.9</storyId>
+    <title>Daily Baseline Data Initialization</title>
+    <status>Ready</status>
+    <generatedAt>2025-10-14</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-2.9.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>system operator</asA>
+    <iWant>automated daily fetching of meetings, races, and initial race data early in the race day</iWant>
+    <soThat>the scheduler has race times available and baseline data is pre-populated before real-time polling begins</soThat>
+    <tasks>
+      - Task 1: Implement daily initialization scheduler/cron job (AC: 1, 8)
+      - Task 2: Implement meetings fetch logic (AC: 2, 4)
+      - Task 3: Implement race details fetch logic (AC: 3, 4)
+      - Task 4: Implement database population logic (AC: 5, 6, 11)
+      - Task 5: Implement retry and error handling (AC: 7)
+      - Task 6: Implement completion statistics logging (AC: 9)
+      - Task 7: Verify scheduler integration (AC: 10)
+      - Task 8: Add unit tests for initialization logic (AC: All)
+      - Task 9: Add integration tests for end-to-end flow (AC: All)
+      - Task 10: Optional evening backfill job implementation (AC: 12)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Daily initialization function runs early morning (6:00 AM NZST) before scheduler activates</criterion>
+    <criterion id="AC2">Function fetches all meetings for current NZ race day from NZ TAB API</criterion>
+    <criterion id="AC3">Function fetches all race details (times, entrants, initial odds) for those meetings</criterion>
+    <criterion id="AC4">Function uses NZ timezone fields (race_date_nz, start_time_nz) from API - no UTC conversion needed</criterion>
+    <criterion id="AC5">Function populates database tables: meetings, races (with start_time), entrants (with initial data)</criterion>
+    <criterion id="AC6">Function uses bulk UPSERT operations for efficient data loading</criterion>
+    <criterion id="AC7">Function handles API failures gracefully with retry logic (max 3 retries)</criterion>
+    <criterion id="AC8">Function completes before dynamic scheduler starts (by 7:00 AM NZST)</criterion>
+    <criterion id="AC9">Function logs completion statistics: meetings fetched, races created, entrants populated, execution duration</criterion>
+    <criterion id="AC10">Scheduler queries database for races with start_time &gt;= NOW() to begin polling operations</criterion>
+    <criterion id="AC11">Database queries use race_date_nz field for partition key alignment (NZ racing day boundary)</criterion>
+    <criterion id="AC12">Optional: Second evening job (post-races, e.g., 9:00 PM NZST) for comprehensive historical backfill if needed</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/epic-stories-2025-10-05.md</path>
+        <title>Epic 2 Story 2.9 Requirements</title>
+        <section>Story 2.9: Daily Baseline Data Initialization</section>
+        <snippet>Automated daily fetching at 6:00 AM NZST, uses NZ timezone fields from API (race_date_nz, start_time_nz), populates meetings/races/entrants before scheduler activates</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Epic 2 Technical Specification</title>
+        <section>Services and Modules</section>
+        <snippet>Scheduler requires race metadata (start time, status) from database; NZ TAB Fetcher provides retry logic and Zod validation; Bulk UPSERT services handle transactional writes</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Data Models and Contracts</title>
+        <section>meetings, races, entrants schemas</section>
+        <snippet>meetings: meeting_id (PK), name, country, race_type, date, status. races: race_id (PK), meeting_id (FK), start_time, race_date_nz, start_time_nz. entrants: entrant_id (PK), race_id (FK), name, runner_number, odds fields</snippet>
+      </doc>
+      <doc>
+        <path>docs/PRD-raceday-postgresql-2025-10-05.md</path>
+        <title>Product Requirements Document</title>
+        <section>FR005.1, FR005.2, FR015</section>
+        <snippet>FR005.1: Daily baseline data initialization at 6:00 AM NZST. FR005.2: Use NZ timezone fields from API. FR015: Populate race schedule before scheduler activates</snippet>
+      </doc>
+      <doc>
+        <path>docs/api/README.md</path>
+        <title>NZ TAB API Documentation</title>
+        <section>NZ Timezone Fields</section>
+        <snippet>race_date_nz: Starting day in NZST/NZDT (YYYY-MM-DD). start_time_nz: Starting time in NZST/NZDT (HH:MM:SS NZST). No UTC conversion needed</snippet>
+      </doc>
+      <doc>
+        <path>docs/api/nztab-samples/race-event-full-response.json</path>
+        <title>NZ TAB API Sample Response</title>
+        <section>race_date_nz and start_time_nz fields</section>
+        <snippet>Line 32-33: "race_date_nz": "2025-07-17", "start_time_nz": "12:50:00 NZST"</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>server/src/clients/nztab.ts</path>
+        <kind>module</kind>
+        <symbol>fetchRaceData</symbol>
+        <lines>152-289</lines>
+        <reason>Existing NZ TAB API client with retry logic (AC2, AC3, AC7) - reuse for meetings/races fetch with 3 retry attempts and exponential backoff</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/clients/nztab.ts</path>
+        <kind>module</kind>
+        <symbol>createNzTabClient</symbol>
+        <lines>102-114</lines>
+        <reason>Creates Axios client with NZ TAB API base URL, 5s timeout, and partner headers - reuse for meetings endpoint</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/clients/nztab-types.ts</path>
+        <kind>type-definitions</kind>
+        <symbol>RaceDataSchema</symbol>
+        <lines>13-26</lines>
+        <reason>Zod schema includes race_date_nz and start_time_nz fields (AC4) - reference for validation</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/database/bulk-upsert.ts</path>
+        <kind>module</kind>
+        <symbol>bulkUpsertMeetings</symbol>
+        <lines>42-120</lines>
+        <reason>Existing bulk UPSERT for meetings table with transaction handling (AC5, AC6) - direct reuse</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/database/bulk-upsert.ts</path>
+        <kind>module</kind>
+        <symbol>bulkUpsertRaces</symbol>
+        <lines>141-222</lines>
+        <reason>Existing bulk UPSERT for races table with race_date_nz and start_time_nz fields (AC4, AC5, AC6) - direct reuse</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/database/bulk-upsert.ts</path>
+        <kind>module</kind>
+        <symbol>bulkUpsertEntrants</symbol>
+        <lines>233-364</lines>
+        <reason>Existing bulk UPSERT for entrants table with all 22 fields (AC5, AC6) - direct reuse</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/database/bulk-upsert.ts</path>
+        <kind>module</kind>
+        <symbol>withTransaction</symbol>
+        <lines>15-31</lines>
+        <reason>Transaction wrapper for atomic UPSERT operations with rollback on failure (AC6)</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/database/pool.ts</path>
+        <kind>module</kind>
+        <symbol>pool</symbol>
+        <reason>PostgreSQL connection pool for database operations (AC5)</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/shared/logger.ts</path>
+        <kind>module</kind>
+        <symbol>logger</symbol>
+        <reason>Pino structured logger for completion statistics (AC9)</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/scheduler/scheduler.ts</path>
+        <kind>module</kind>
+        <symbol>Scheduler</symbol>
+        <reason>Dynamic scheduler that queries races table for start_time >= NOW() (AC10) - integration dependency</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <pkg>axios</pkg>
+        <version>^4.21.2</version>
+        <reason>HTTP client for NZ TAB API requests</reason>
+      </node>
+      <node>
+        <pkg>zod</pkg>
+        <version>^3.25.76</version>
+        <reason>Runtime validation for API responses</reason>
+      </node>
+      <node>
+        <pkg>pg</pkg>
+        <version>^8.16.3</version>
+        <reason>PostgreSQL client for database operations</reason>
+      </node>
+      <node>
+        <pkg>pino</pkg>
+        <version>^9.5.0</version>
+        <reason>Structured logging for completion statistics</reason>
+      </node>
+      <node>
+        <pkg>node-cron</pkg>
+        <version>TBD</version>
+        <reason>Cron-like task scheduler for 6:00 AM NZST daily job (AC1)</reason>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint id="C1">Daily initialization MUST complete before scheduler activates (6:00 AM start, 7:00 AM deadline) (AC8)</constraint>
+    <constraint id="C2">Use NZ timezone fields (race_date_nz, start_time_nz) directly from API - NO UTC conversion (AC4)</constraint>
+    <constraint id="C3">Reuse existing NZ TAB API client from Story 2.1 with retry logic (AC7)</constraint>
+    <constraint id="C4">Reuse existing bulk UPSERT functions from Story 2.5 (AC6)</constraint>
+    <constraint id="C5">Use structured JSON logging (Pino) for all initialization events (AC9)</constraint>
+    <constraint id="C6">Handle partial success gracefully - failed meetings don't block entire initialization (AC7)</constraint>
+    <constraint id="C7">race_date_nz field used for partition key alignment in time-series tables (AC11)</constraint>
+    <constraint id="C8">Retry logic: max 3 attempts with exponential backoff (100ms, 200ms, 400ms) matching Story 2.1 (AC7)</constraint>
+    <constraint id="C9">Target execution time: &lt;10 minutes for typical racing day (30 meetings, 250 races)</constraint>
+    <constraint id="C10">Scheduler (Story 2.10) depends on this initialization providing race times (AC10)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>fetchRaceData</name>
+      <kind>function</kind>
+      <signature>async function fetchRaceData(raceId: string, status?: string): Promise&lt;RaceData&gt;</signature>
+      <path>server/src/clients/nztab.ts</path>
+      <reason>Reuse for fetching race details with retry logic (AC3, AC7)</reason>
+    </interface>
+    <interface>
+      <name>createNzTabClient</name>
+      <kind>function</kind>
+      <signature>function createNzTabClient(): AxiosInstance</signature>
+      <path>server/src/clients/nztab.ts</path>
+      <reason>Creates configured Axios client for meetings endpoint (AC2)</reason>
+    </interface>
+    <interface>
+      <name>bulkUpsertMeetings</name>
+      <kind>function</kind>
+      <signature>async function bulkUpsertMeetings(meetings: TransformedMeeting[]): Promise&lt;{rowCount: number, duration: number}&gt;</signature>
+      <path>server/src/database/bulk-upsert.ts</path>
+      <reason>Bulk UPSERT for meetings table (AC5, AC6)</reason>
+    </interface>
+    <interface>
+      <name>bulkUpsertRaces</name>
+      <kind>function</kind>
+      <signature>async function bulkUpsertRaces(races: TransformedRace[]): Promise&lt;{rowCount: number, duration: number}&gt;</signature>
+      <path>server/src/database/bulk-upsert.ts</path>
+      <reason>Bulk UPSERT for races table with race_date_nz and start_time_nz fields (AC4, AC5, AC6)</reason>
+    </interface>
+    <interface>
+      <name>bulkUpsertEntrants</name>
+      <kind>function</kind>
+      <signature>async function bulkUpsertEntrants(entrants: TransformedEntrant[]): Promise&lt;{rowCount: number, duration: number}&gt;</signature>
+      <path>server/src/database/bulk-upsert.ts</path>
+      <reason>Bulk UPSERT for entrants table (AC5, AC6)</reason>
+    </interface>
+    <interface>
+      <name>logger.info / logger.warn / logger.error</name>
+      <kind>function</kind>
+      <signature>logger.info(obj: object, msg: string): void</signature>
+      <path>server/src/shared/logger.ts</path>
+      <reason>Structured logging for completion statistics (AC9)</reason>
+    </interface>
+    <interface>
+      <name>pool.query</name>
+      <kind>function</kind>
+      <signature>async function query(sql: string, values?: any[]): Promise&lt;QueryResult&gt;</signature>
+      <path>server/src/database/pool.ts</path>
+      <reason>PostgreSQL query execution for scheduler queries (AC10)</reason>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Test framework: Vitest with @vitest/coverage-v8 for unit and integration tests. Unit tests use mocked dependencies (axios, pg pool) to isolate behavior. Integration tests use real test database with seeded fixtures. All tests must pass before story approval. Coverage target: &gt;80% for new code.
+    </standards>
+    <locations>
+      - server/tests/unit/initialization/ - Unit tests for initialization logic
+      - server/tests/integration/initialization/ - Integration tests for end-to-end flow
+      - server/tests/fixtures/ - Test fixtures for API responses and database data
+    </locations>
+    <ideas>
+      <idea ac="AC1, AC8">Test that initialization completes in &lt;10 minutes with typical racing day data (30 meetings, 250 races)</idea>
+      <idea ac="AC2">Test meetings fetch with mocked NZ TAB API response - verify correct endpoint and parameters</idea>
+      <idea ac="AC3">Test race details fetch for multiple meetings - verify batching and parallelization</idea>
+      <idea ac="AC4">Test that race_date_nz and start_time_nz fields are extracted directly from API without UTC conversion</idea>
+      <idea ac="AC5">Test database population - verify meetings, races (with start_time), entrants tables populated correctly</idea>
+      <idea ac="AC6">Test bulk UPSERT operations are used (verify function calls, not direct SQL)</idea>
+      <idea ac="AC7">Test retry logic with simulated API failures (network error, 5xx response) - verify 3 retries with exponential backoff</idea>
+      <idea ac="AC7">Test partial success - some meetings fail, others succeed, initialization continues</idea>
+      <idea ac="AC9">Test completion statistics logging - verify structured JSON logs include meetings fetched, races created, entrants populated, execution duration</idea>
+      <idea ac="AC10">Integration test: verify scheduler can query races table and find races with start_time &gt;= NOW() after initialization</idea>
+      <idea ac="AC11">Test that race_date_nz field is used for partition key alignment (verify correct partition queried)</idea>
+      <idea ac="AC12">Test optional evening backfill job (if implemented) - verify historical data backfill</idea>
+    </ideas>
+  </tests>
+
+  <implementation-notes>
+    <note>
+      <title>NZ Timezone Field Usage - Critical Design Decision</title>
+      <content>
+        The NZ TAB API provides race_date_nz (YYYY-MM-DD) and start_time_nz (HH:MM:SS NZST) fields that eliminate UTC conversion complexity. These fields align with NZ racing day boundaries and partition strategy. Store these fields directly in races table and use race_date_nz for partition key alignment. Reference: docs/api/README.md lines 14-20, docs/api/nztab-samples/race-event-full-response.json lines 32-33.
+      </content>
+    </note>
+    <note>
+      <title>Scheduler Dependency</title>
+      <content>
+        Story 2.10 (Dynamic Scheduler) depends on this initialization providing race times in the database. Without daily initialization, scheduler has no races to schedule and cannot calculate time-to-start intervals. The scheduler queries: SELECT * FROM races WHERE status IN ('open', 'upcoming') AND start_time &gt; NOW() ORDER BY start_time ASC. This query depends on start_time field being populated by initialization. Reference: server/src/scheduler/scheduler.ts.
+      </content>
+    </note>
+    <note>
+      <title>File Structure</title>
+      <content>
+        Create new initialization module at server/src/initialization/ with:
+        - daily-baseline.ts - Main initialization implementation
+        - types.ts - Initialization-specific types (InitializationResult, InitStats)
+        - scheduler.ts - Cron job/scheduled task setup (runs at 6:00 AM NZST)
+
+        Update server/src/index.ts to register daily initialization scheduled task on server startup.
+      </content>
+    </note>
+    <note>
+      <title>API Endpoints to Use</title>
+      <content>
+        - Meetings list: GET /affiliates/v1/racing/meetings?date_from={today}&amp;date_to={today}&amp;country=NZ
+        - Race details: GET /affiliates/v1/racing/events/{raceId} (reuse existing fetchRaceData function)
+
+        Note: Meetings endpoint may not exist in current nztab.ts - may need to add new function fetchMeetings() similar to fetchRaceData().
+      </content>
+    </note>
+    <note>
+      <title>Error Handling Strategy</title>
+      <content>
+        Graceful degradation: API failures for individual meetings/races don't block entire initialization. Partial success is acceptable (e.g., 25 of 30 meetings populated). Failed meetings logged for manual investigation. Scheduler can work with partial data (polls available races). Retry logic: transient failures (network errors, 5xx) retried up to 3 times with exponential backoff (100ms, 200ms, 400ms). Permanent failures (4xx) not retried.
+      </content>
+    </note>
+    <note>
+      <title>Performance Targets</title>
+      <content>
+        - Start: 6:00 AM NZST (scheduled task)
+        - Completion target: Before 7:00 AM NZST (scheduler activation)
+        - Max duration: 60 minutes (allows for large racing days with 50+ meetings)
+        - Typical execution: &lt;10 minutes for 30 meetings, 250 races
+        - Database writes: &lt;1 second total (using bulk UPSERT from Story 2.5)
+      </content>
+    </note>
+    <note>
+      <title>Reference Implementation</title>
+      <content>
+        Legacy daily functions in server-old for reference:
+        - server-old/daily-meetings (7:00 AM NZST) - Fetches meetings
+        - server-old/daily-races (8:00 AM NZST) - Fetches race details
+        - server-old/daily-initial-data (8:30 PM NZST) - Post-race backfill
+
+        Note: New implementation combines daily-meetings and daily-races into single 6:00 AM job. Evening backfill is optional (AC12).
+      </content>
+    </note>
+  </implementation-notes>
+</story-context>

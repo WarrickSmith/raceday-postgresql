@@ -1,6 +1,6 @@
 # Story 2.9: Daily Baseline Data Initialization
 
-Status: Draft
+Status: Ready
 
 ## Story
 
@@ -331,7 +331,7 @@ const upcomingRaces = await pool.query(`
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- docs/stories/story-context-2.9.xml
 
 ### Agent Model Used
 
