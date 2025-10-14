@@ -3,6 +3,7 @@ import { env } from './shared/env.js'
 import { logger } from './shared/logger.js'
 import { closePool } from './database/pool.js'
 import { workerPool } from './workers/worker-pool.js'
+import { startScheduler, stopScheduler } from './scheduler/index.js'
 import type { Server } from 'node:http'
 
 // Create and start Express server
@@ -18,6 +19,8 @@ const server: Server = app.listen(env.PORT, '0.0.0.0', () => {
     },
     'Worker pool ready at startup'
   )
+  startScheduler()
+  logger.info({ event: 'scheduler_started' }, 'Dynamic scheduler started')
 })
 
 // Graceful shutdown
@@ -47,6 +50,7 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
     logger.error({ err }, 'Error closing Express server')
   }
 
+  await stopScheduler()
   await closePool(signal)
   await workerPool.shutdown()
 
