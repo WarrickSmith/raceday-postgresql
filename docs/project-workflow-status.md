@@ -10,7 +10,7 @@
 ## Workflow Status Tracker
 
 **Current Phase:** 4-Implementation
-**Current Workflow:** story-approved (Story 2.9) - Complete
+**Current Workflow:** story-context (Story 2.9) - Complete
 **Current Agent:** DEV
 **Overall Progress:** 43%
 
@@ -36,7 +36,7 @@
 | 4-Implementation | story-approved | DEV | Confirm Definition of Done and move story to DONE | Complete (Story 2.8) |
 
 **Current Step:** story-approved (Story 2.9) ✓
-**Next Step:** story-ready (SM agent) – review Story 2.9
+**Next Step:** dev-story (DEV agent) – implement Story 2.9
 
 **Instructions:**
 
@@ -74,9 +74,9 @@
 - **Story ID:** 2.9
 - **Story Title:** Daily Baseline Data Initialization
 - **Story File:** `docs/stories/story-2.9.md`
-- **Story Status:** Draft (needs SM review)
-- **Context File:** _(context not yet generated)_
-- **Action:** SM should run `story-ready` workflow to approve this story
+- **Story Status:** Ready
+- **Context File:** `docs/stories/story-context-2.9.xml`
+- **Action:** DEV agent runs `dev-story` to implement
 
 #### DONE (Completed Stories)
 
@@ -130,11 +130,11 @@
 
 ### Next Action Required
 
-**What to do next:** Review drafted Story 2.9 (Daily Baseline Data Initialization)
+**What to do next:** Implement Story 2.9 (Daily Baseline Data Initialization)
 
-**Command to run:** Load SM agent and run `story-ready` workflow
+**Command to run:** Run `dev-story` workflow to implement the story
 
-**Agent to load:** bmad/bmm/agents/sm.md
+**Agent to load:** bmad/bmm/agents/dev.md
 
 ---
 
@@ -238,6 +238,8 @@
 - **2025-10-14**: Story 2.9 approved and marked done via story-approved. Story 2.10 moved from TODO → IN PROGRESS (needs SM review). Story 2.11 moved from BACKLOG → TODO.
 - **2025-10-14**: Epic stories document and PRD updated to include new Story 2.9 (Daily Baseline Data Initialization). Old Story 2.9 → 2.10, 2.10-2.15 → 2.11-2.16. Total stories: 44→45. Story numbering in workflow status updated to match.
 - **2025-10-14**: Completed create-story for new Story 2.9 (Daily Baseline Data Initialization). Renamed old story-2.9.md → story-2.10.md. Story file: docs/stories/story-2.9.md. Status: Draft (needs review via story-ready). Next: Review and approve story.
+- **2025-10-14**: Story 2.9 (Daily Baseline Data Initialization) marked ready for development by SM agent. Status updated from Draft → Ready. Next: Generate context via story-context, then implement via dev-story.
+- **2025-10-14**: Completed story-context for Story 2.9 (Daily Baseline Data Initialization). Context file: docs/stories/story-context-2.9.xml. Next: DEV agent should run dev-story to implement.
 
 ---
 
