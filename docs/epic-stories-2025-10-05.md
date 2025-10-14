@@ -17,7 +17,7 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 4. **Database Optimization & Partitioning** - Production scale (partitions, indexes, performance)
 5. **Migration & Deployment** - Safe deployment (shadow mode, gradual cutover, rollback)
 
-**Total Estimated Stories:** 44-55 across 5 epics
+**Total Estimated Stories:** 45-56 across 5 epics
 
 **Timeline:** 5 weeks (Week 1: Epic 1, Week 2-3: Epic 2-3, Week 4: Epic 4, Week 5: Epic 5)
 
@@ -239,7 +239,7 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 
 **Dependencies:** Epic 1 (Infrastructure)
 
-**Estimated Stories:** 12-15
+**Estimated Stories:** 13-16
 
 ### Story 2.1: NZ TAB API Client with Axios
 
@@ -393,7 +393,37 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 
 ---
 
-### Story 2.9: Dynamic Scheduler with Time-Based Intervals
+### Story 2.9: Daily Baseline Data Initialization
+
+**As a** system operator
+**I want** automated daily fetching of meetings, races, and initial race data early in the race day
+**So that** the scheduler has race times available and baseline data is pre-populated before real-time polling begins
+
+**Acceptance Criteria:**
+
+- Daily initialization function runs early morning (6:00 AM NZST) before scheduler activates
+- Function fetches all meetings for current NZ race day from NZ TAB API
+- Function fetches all race details (times, entrants, initial odds) for those meetings
+- Function uses NZ timezone fields (race_date_nz, start_time_nz) from API - no UTC conversion needed
+- Function populates database tables: meetings, races (with start_time), entrants (with initial data)
+- Function uses bulk UPSERT operations for efficient data loading
+- Function handles API failures gracefully with retry logic (max 3 retries)
+- Function completes before dynamic scheduler starts (by 7:00 AM NZST)
+- Function logs completion statistics: meetings fetched, races created, entrants populated, execution duration
+- Scheduler queries database for races with start_time >= NOW() to begin polling operations
+- Database queries use race_date_nz field for partition key alignment (NZ racing day boundary)
+- Optional: Second evening job (post-races, e.g., 9:00 PM NZST) for comprehensive historical backfill if needed
+
+**Technical Notes:**
+- Reuses NZ TAB API client from Story 2.1 (with retry logic)
+- Reuses bulk UPSERT operations from Story 2.5
+- Can reuse race processor orchestrator from Story 2.7 for data transformation
+- NZ TAB API provides race_date_nz (YYYY-MM-DD) and start_time_nz (HH:MM:SS NZST) eliminating timezone conversion complexity
+- Race day boundary aligns with NZ timezone (not UTC), matching business logic and partition strategy
+
+---
+
+### Story 2.10: Dynamic Scheduler with Time-Based Intervals
 
 **As a** developer
 **I want** scheduler that adjusts polling frequency based on time-to-start
@@ -401,8 +431,8 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 
 **Acceptance Criteria:**
 
-- Scheduler queries database for upcoming races
-- For each race, calculates time-to-start
+- Scheduler queries database for upcoming races (populated by Story 2.9 daily initialization)
+- For each race, calculates time-to-start using start_time from database
 - Determines polling interval:
   - ≤5 minutes: 15 seconds
   - 5-15 minutes: 30 seconds
@@ -410,11 +440,12 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 - Schedules race processing using setInterval per race
 - Clears interval when race completes or is abandoned
 - Scheduler runs continuously, re-evaluating intervals every minute
+- Scheduler activates after daily initialization completes (7:00 AM NZST or later)
 - Logging for: interval changes, race scheduling, race completion
 
 ---
 
-### Story 2.10: Performance Metrics Tracking
+### Story 2.11: Performance Metrics Tracking
 
 **As a** developer
 **I want** detailed performance metrics logged for every processing cycle
@@ -442,7 +473,7 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 
 ---
 
-### Story 2.11: Worker Thread Error Handling and Restart
+### Story 2.12: Worker Thread Error Handling and Restart
 
 **As a** developer
 **I want** worker threads to restart automatically on crash
@@ -459,7 +490,7 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 
 ---
 
-### Story 2.12: Fetch Timeout and Error Handling
+### Story 2.13: Fetch Timeout and Error Handling
 
 **As a** developer
 **I want** robust timeout and error handling for NZ TAB API fetches
@@ -478,7 +509,7 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 
 ---
 
-### Story 2.13: Integration Test - Single Race End-to-End
+### Story 2.14: Integration Test - Single Race End-to-End
 
 **As a** developer
 **I want** integration test for single race fetch → transform → write
@@ -495,7 +526,7 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 
 ---
 
-### Story 2.14: Integration Test - 5 Concurrent Races
+### Story 2.15: Integration Test - 5 Concurrent Races
 
 **As a** developer
 **I want** integration test for 5 concurrent races processed in parallel
@@ -512,7 +543,7 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 
 ---
 
-### Story 2.15: Performance Benchmarking Tool
+### Story 2.16: Performance Benchmarking Tool
 
 **As a** developer
 **I want** standalone benchmarking tool to measure pipeline performance
@@ -1157,11 +1188,11 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 | Epic                                         | Stories   | Estimated Points | Priority  |
 | -------------------------------------------- | --------- | ---------------- | --------- |
 | Epic 1: Core Infrastructure Setup            | 8-10      | 13-16            | Must Have |
-| Epic 2: High-Performance Data Pipeline       | 12-15     | 21-26            | Must Have |
+| Epic 2: High-Performance Data Pipeline       | 13-16     | 22-28            | Must Have |
 | Epic 3: REST API Layer                       | 8-10      | 13-16            | Must Have |
 | Epic 4: Database Optimization & Partitioning | 6-8       | 8-13             | Must Have |
 | Epic 5: Migration & Deployment               | 10-12     | 13-21            | Must Have |
-| **Total**                                    | **44-55** | **68-92**        | -         |
+| **Total**                                    | **45-56** | **69-94**        | -         |
 
 **Velocity Assumptions:**
 

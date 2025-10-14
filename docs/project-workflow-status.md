@@ -36,7 +36,7 @@
 | 4-Implementation | story-approved | DEV | Confirm Definition of Done and move story to DONE | Complete (Story 2.8) |
 
 **Current Step:** story-approved (Story 2.9) ✓
-**Next Step:** create-story (SM agent) – draft Story 2.11
+**Next Step:** create-story (SM agent) – draft Story 2.12
 
 **Instructions:**
 
@@ -53,27 +53,27 @@
 
 | Epic | Story | ID | Title | File |
 | ---- | ----- | --- | ----- | ---- |
-| 2 | 12 | 2.12 | Fetch Timeout and Error Handling | story-2.12.md (pending) |
-| 2 | 13 | 2.13 | Integration Test - Single Race End-to-End | story-2.13.md (pending) |
-| 2 | 14 | 2.14 | Integration Test - 5 Concurrent Races | story-2.14.md (pending) |
-| 2 | 15 | 2.15 | Performance Benchmarking Tool | story-2.15.md (pending) |
+| 2 | 13 | 2.13 | Fetch Timeout and Error Handling | story-2.13.md (pending) |
+| 2 | 14 | 2.14 | Integration Test - Single Race End-to-End | story-2.14.md (pending) |
+| 2 | 15 | 2.15 | Integration Test - 5 Concurrent Races | story-2.15.md (pending) |
+| 2 | 16 | 2.16 | Performance Benchmarking Tool | story-2.16.md (pending) |
 | 3 | 1 | 3.1 | REST API Foundations | story-3.1.md (pending) |
 
 **Total in backlog:** 5 stories
 
 #### TODO (Needs Drafting)
 
-- **Story ID:** 2.11
+- **Story ID:** 2.12
 - **Story Title:** Worker Thread Error Handling and Restart
-- **Story File:** `docs/stories/story-2.11.md`
+- **Story File:** `docs/stories/story-2.12.md`
 - **Status:** Not created (needs drafting)
 - **Action:** SM should run `create-story` to draft this story
 
 #### IN PROGRESS (Approved for Development)
 
-- **Story ID:** 2.10
+- **Story ID:** 2.11
 - **Story Title:** Performance Metrics Tracking
-- **Story File:** `docs/stories/story-2.10.md`
+- **Story File:** `docs/stories/story-2.11.md`
 - **Story Status:** Draft (needs SM review)
 - **Context File:** _(context not yet generated)_
 - **Action:** SM should run `story-ready` workflow to approve this story
@@ -82,6 +82,7 @@
 
 | Story ID | File | Completed Date | Points |
 | -------- | ---- | -------------- | ------ |
+| 2.10 | docs/stories/story-2.10.md | 2025-10-14 | — |
 | 2.9 | docs/stories/story-2.9.md | 2025-10-14 | — |
 | 2.8 | docs/stories/story-2.8.md | 2025-10-14 | — |
 | 1.1 | docs/stories/story-1.1.md | 2025-10-10 | — |
@@ -102,17 +103,17 @@
 | 2.6 | docs/stories/story-2.6.md | 2025-10-13 | — |
 | 2.7 | docs/stories/story-2.7.md | 2025-10-13 | — |
 
-**Total completed:** 19 stories
+**Total completed:** 20 stories
 **Total points completed:** N/A (not estimated)
 **Total Epics:** 5
-**Total Stories Planned:** 44
+**Total Stories Planned:** 45
 **Stories in Backlog:** 5
 **Stories in TODO:** 1
 **Stories in IN PROGRESS:** 1
 
 **Epic Breakdown:**
 - Epic 1: Core Infrastructure Setup — 10/10 stories complete
-- Epic 2: High-Performance Data Pipeline — 8/15 stories complete
+- Epic 2: High-Performance Data Pipeline — 9/16 stories complete
 - Epic 3: REST API Layer — 0/10 stories complete
 - Epic 4: Database Optimization & Partitioning — 0/8 stories complete
 - Epic 5: Migration & Deployment — 0/12 stories complete
@@ -130,7 +131,7 @@
 
 ### Next Action Required
 
-**What to do next:** Review drafted Story 2.10 (Performance Metrics Tracking)
+**What to do next:** Review drafted Story 2.11 (Performance Metrics Tracking)
 
 **Command to run:** Load SM agent and run `story-ready` workflow
 
@@ -150,7 +151,7 @@
 ### Scope Summary
 
 - **Brief Description:** Migrate the Raceday betting intelligence platform from Appwrite to a custom Node.js 22 + PostgreSQL 18 stack with 2× performance.
-- **Estimated Stories:** 44-55 across 5 epics
+- **Estimated Stories:** 45-56 across 5 epics
 - **Estimated Epics:** 5
 - **Timeline:** 5-week implementation cadence (Week 1 foundation → Week 5 migration)
 
@@ -236,6 +237,7 @@
 - **2025-10-14**: Resolved review action items for Story 2.9, reran dev-story validations, and returned the story to Ready for Review ahead of the next review cycle.
 - **2025-10-14**: Completed review-story for Story 2.9 with outcome Review Passed; story ready for `story-approved`.
 - **2025-10-14**: Story 2.9 approved and marked done via story-approved. Story 2.10 moved from TODO → IN PROGRESS (needs SM review). Story 2.11 moved from BACKLOG → TODO.
+- **2025-10-14**: Epic stories document and PRD updated to include new Story 2.9 (Daily Baseline Data Initialization). Old Story 2.9 → 2.10, 2.10-2.15 → 2.11-2.16. Total stories: 44→45. Story numbering in workflow status updated to match.
 
 ---
 

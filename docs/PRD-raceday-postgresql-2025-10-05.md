@@ -119,6 +119,10 @@ The existing ./server codebase contains proven business logic (polling algorithm
 
 **FR005:** System SHALL partition time-series data (money_flow_history, odds_history) by day with automated partition creation and 30-day retention
 
+**FR005.1:** System SHALL perform daily baseline data initialization each morning (6:00 AM NZST) to fetch meetings, races, and initial race data before real-time polling begins
+
+**FR005.2:** System SHALL use NZ timezone fields (race_date_nz, start_time_nz) from NZ TAB API responses for all race day calculations and partition key alignment, eliminating UTC conversion complexity
+
 **Database Operations:**
 
 **FR006:** System SHALL maintain the following core data entities:
@@ -152,11 +156,13 @@ The existing ./server codebase contains proven business logic (polling algorithm
 
 **FR014:** System SHALL validate all environment variables at startup using Zod schemas, failing fast if configuration is invalid
 
+**FR015:** System SHALL populate race schedule (meetings, races with start_time, entrants with initial odds) via daily initialization before dynamic scheduler activates, ensuring scheduler has race times available for interval calculations
+
 **Migration:**
 
-**FR015:** System SHALL support shadow mode deployment running alongside Appwrite for data consistency validation
+**FR016:** System SHALL support shadow mode deployment running alongside Appwrite for data consistency validation
 
-**FR016:** System SHALL support feature flag-based instant rollback to Appwrite backend (<5 minute cutover)
+**FR017:** System SHALL support feature flag-based instant rollback to Appwrite backend (<5 minute cutover)
 
 ### Non-Functional Requirements
 
@@ -324,11 +330,12 @@ This PRD defines **5 core epics** for the raceday-postgresql migration, sequence
 **Goal:** Implement fetch → transform → write pipeline achieving <15s processing target
 
 **Scope:**
-- NZ TAB API client with retry logic and timeout handling
+- Daily baseline data initialization (meetings, races, initial odds) before real-time polling
+- NZ TAB API client with retry logic and timeout handling using NZ timezone fields
 - Worker thread pool (3 workers) for CPU-bound money flow calculations
 - Bulk UPSERT database operations with conditional WHERE clauses
 - Race processor orchestrator coordinating parallel processing
-- Dynamic scheduler with time-based polling intervals
+- Dynamic scheduler with time-based polling intervals (requires race times from daily init)
 - Performance metrics tracking and logging
 
 **Success Criteria:**
@@ -340,7 +347,7 @@ This PRD defines **5 core epics** for the raceday-postgresql migration, sequence
 
 **Dependencies:** Epic 1 (Infrastructure)
 
-**Estimated Stories:** 12-15
+**Estimated Stories:** 13-16
 
 ---
 
@@ -424,7 +431,7 @@ This PRD defines **5 core epics** for the raceday-postgresql migration, sequence
 
 ---
 
-**Total Estimated Stories:** 44-55 stories across 5 epics
+**Total Estimated Stories:** 45-56 stories across 5 epics
 
 **Epic Sequencing Rationale:**
 1. Infrastructure first (foundation)
@@ -547,9 +554,9 @@ The following capabilities are explicitly deferred to future phases and NOT incl
 ## Document Status
 
 - [x] Goals and context validated with stakeholders
-- [x] All functional requirements reviewed (16 FRs defined)
+- [x] All functional requirements reviewed (17 FRs defined)
 - [x] User journeys cover primary persona (power bettor)
-- [x] Epic structure approved for phased delivery (5 epics, 44-55 stories)
+- [x] Epic structure approved for phased delivery (5 epics, 45-56 stories)
 - [ ] Ready for solutioning phase (generate solution-architecture.md)
 - [ ] Ready for detailed story generation (expand epics into acceptance criteria)
 
