@@ -14,10 +14,16 @@ import type { Server } from 'node:http'
 const app = createServer()
 const dailyInitializationScheduler = startDailyInitializationScheduler({
   runOnStartup: true,
+  eveningCronExpression: env.EVENING_BACKFILL_ENABLED
+    ? env.EVENING_BACKFILL_CRON
+    : null,
 })
 
 const server: Server = app.listen(env.PORT, '0.0.0.0', () => {
-  logger.info({ port: env.PORT }, `Server listening on port ${String(env.PORT)}`)
+  logger.info(
+    { port: env.PORT },
+    `Server listening on port ${String(env.PORT)}`
+  )
   logger.info('Health endpoint available at /health')
   logger.info(
     {

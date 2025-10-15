@@ -22,6 +22,12 @@ const envSchema = z.object({
   UV_THREADPOOL_SIZE: z.coerce.number().int().positive().default(8),
   MAX_WORKER_THREADS: z.coerce.number().int().positive().default(3),
   DB_POOL_MAX: z.coerce.number().int().positive().default(10),
+  // Evening backfill configuration
+  EVENING_BACKFILL_ENABLED: z
+    .enum(['true', 'false'])
+    .transform((val) => val === 'true')
+    .default('false'),
+  EVENING_BACKFILL_CRON: z.string().default('0 21 * * *'), // 9:00 PM NZST by default
 })
 /* eslint-enable @typescript-eslint/naming-convention */
 
