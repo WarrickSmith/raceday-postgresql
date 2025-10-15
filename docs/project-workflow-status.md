@@ -2,7 +2,7 @@
 
 **Project:** raceday-postgresql
 **Created:** 2025-10-13
-**Last Updated:** 2025-10-14
+**Last Updated:** 2025-10-16
 **Status File:** `project-workflow-status-2025-10-13.md`
 
 ---
@@ -10,9 +10,9 @@
 ## Workflow Status Tracker
 
 **Current Phase:** 4-Implementation
-**Current Workflow:** story-context (Story 2.9) - Complete
-**Current Agent:** DEV
-**Overall Progress:** 43%
+**Current Workflow:** create-story (Story 2.11) - Ready to start
+**Current Agent:** SM
+**Overall Progress:** 44%
 
 ### Phase Completion Status
 
@@ -35,8 +35,8 @@
 | 4-Implementation | review-story | DEV | Perform Senior Developer review for the active story | Complete (Story 2.8) |
 | 4-Implementation | story-approved | DEV | Confirm Definition of Done and move story to DONE | Complete (Story 2.8) |
 
-**Current Step:** story-approved (Story 2.9) ✓
-**Next Step:** dev-story (DEV agent) – implement Story 2.9
+**Current Step:** create-story (SM agent) – draft Story 2.11 ✓
+**Next Step:** story-ready (SM agent) – review Story 2.11 for development
 
 **Instructions:**
 
@@ -71,17 +71,18 @@
 
 #### IN PROGRESS (Approved for Development)
 
-- **Story ID:** 2.9
-- **Story Title:** Daily Baseline Data Initialization
-- **Story File:** `docs/stories/story-2.9.md`
-- **Story Status:** Ready
-- **Context File:** `docs/stories/story-context-2.9.xml`
-- **Action:** DEV agent runs `dev-story` to implement
+- **Story ID:** 2.11
+- **Story Title:** Performance Metrics Tracking
+- **Story File:** `docs/stories/story-2.11.md`
+- **Story Status:** Not created (needs drafting)
+- **Context File:** `docs/stories/story-context-2.11.xml`
+- **Action:** SM agent runs `create-story` to draft this story
 
 #### DONE (Completed Stories)
 
 | Story ID | File | Completed Date | Points |
 | -------- | ---- | -------------- | ------ |
+| 2.9 | docs/stories/story-2.9.md | 2025-10-16 | — |
 | 2.10 | docs/stories/story-2.10.md | 2025-10-14 | — |
 | 2.8 | docs/stories/story-2.8.md | 2025-10-14 | — |
 | 1.1 | docs/stories/story-1.1.md | 2025-10-10 | — |
@@ -102,7 +103,7 @@
 | 2.6 | docs/stories/story-2.6.md | 2025-10-13 | — |
 | 2.7 | docs/stories/story-2.7.md | 2025-10-13 | — |
 
-**Total completed:** 19 stories
+**Total completed:** 20 stories
 **Total points completed:** N/A (not estimated)
 **Total Epics:** 5
 **Total Stories Planned:** 45
@@ -112,7 +113,7 @@
 
 **Epic Breakdown:**
 - Epic 1: Core Infrastructure Setup — 10/10 stories complete
-- Epic 2: High-Performance Data Pipeline — 8/16 stories complete
+- Epic 2: High-Performance Data Pipeline — 9/16 stories complete
 - Epic 3: REST API Layer — 0/10 stories complete
 - Epic 4: Database Optimization & Partitioning — 0/8 stories complete
 - Epic 5: Migration & Deployment — 0/12 stories complete
@@ -130,11 +131,11 @@
 
 ### Next Action Required
 
-**What to do next:** Implement Story 2.9 (Daily Baseline Data Initialization)
+**What to do next:** Create Story 2.11 (Performance Metrics Tracking)
 
-**Command to run:** Run `dev-story` workflow to implement the story
+**Command to run:** Run `create-story` workflow to draft the next story
 
-**Agent to load:** bmad/bmm/agents/dev.md
+**Agent to load:** bmad/bmm/agents/sm.md
 
 ---
 
@@ -240,6 +241,7 @@
 - **2025-10-14**: Completed create-story for new Story 2.9 (Daily Baseline Data Initialization). Renamed old story-2.9.md → story-2.10.md. Story file: docs/stories/story-2.9.md. Status: Draft (needs review via story-ready). Next: Review and approve story.
 - **2025-10-14**: Story 2.9 (Daily Baseline Data Initialization) marked ready for development by SM agent. Status updated from Draft → Ready. Next: Generate context via story-context, then implement via dev-story.
 - **2025-10-14**: Completed story-context for Story 2.9 (Daily Baseline Data Initialization). Context file: docs/stories/story-context-2.9.xml. Next: DEV agent should run dev-story to implement.
+- **2025-10-16**: Story 2.9 (Daily Baseline Data Initialization) completed and marked Done. Senior Developer Review passed with no action items. Updated project workflow status and epic documentation to reflect completion. Next story to draft: Story 2.11 (Performance Metrics Tracking).
 
 ---
 
@@ -264,6 +266,11 @@
 
 - Phase: 4-Implementation
 - Changes: Ran review-story on Story 2.8, recorded Changes Requested outcome, and documented two action items for follow-up. Later marked Story 2.8 Done, moved Story 2.9 from TODO → IN PROGRESS, moved Story 2.10 from BACKLOG → TODO.
+
+### 2025-10-16 - Bob (SM)
+
+- Phase: 4-Implementation
+- Changes: Updated Story 2.9 status from Review Passed → Done after Senior Developer Review completion. Updated project workflow status documentation and epic documentation to reflect Story 2.9 completion. Updated progress metrics and next action recommendations.
 
 ---
 

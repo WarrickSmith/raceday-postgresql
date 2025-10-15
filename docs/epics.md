@@ -90,7 +90,30 @@ This index mirrors the canonical planning document `docs/epic-stories-2025-10-05
 7. Return processing results for all races (success/failure, durations)
 8. Target: 5 races processed in <15s
 
-### Story 2.9: Dynamic Scheduler with Time-Based Intervals
+### Story 2.9: Daily Baseline Data Initialization
+
+**As a** system operator
+**I want** automated daily fetching of meetings, races, and initial race data early in the race day
+**So that** the scheduler has race times available and baseline data is pre-populated before real-time polling begins
+
+**Status:** ✅ **COMPLETE** (2025-10-16)
+
+**Acceptance Criteria:**
+
+1. Daily initialization function runs early morning (6:00 AM NZST) before scheduler activates
+2. Function fetches all meetings for current NZ race day from NZ TAB API
+3. Function fetches all race details (times, entrants, initial odds) for those meetings
+4. Function uses NZ timezone fields (race_date_nz, start_time_nz) from API - no UTC conversion needed
+5. Function populates database tables: meetings, races (with start_time), entrants (with initial data)
+6. Function uses bulk UPSERT operations for efficient data loading
+7. Function handles API failures gracefully with retry logic (max 3 retries)
+8. Function completes before dynamic scheduler starts (by 7:00 AM NZST)
+9. Function logs completion statistics: meetings fetched, races created, entrants populated, execution duration
+10. Scheduler queries database for races with start_time >= NOW() to begin polling operations
+11. Database queries use race_date_nz field for partition key alignment (NZ racing day boundary)
+12. Optional: Second evening job (post-races, e.g., 9:00 PM NZST) for comprehensive historical backfill if needed
+
+### Story 2.10: Dynamic Scheduler with Time-Based Intervals
 
 **As a** developer
 **I want** scheduler that adjusts polling frequency based on time-to-start
@@ -106,7 +129,9 @@ This index mirrors the canonical planning document `docs/epic-stories-2025-10-05
 6. Scheduler runs continuously, re-evaluating intervals every minute
 7. Logging for: interval changes, race scheduling, race completion
 
-### Story 2.10: Performance Metrics Tracking
+**Status:** ✅ **COMPLETE** (2025-10-14)
+
+### Story 2.11: Performance Metrics Tracking
 
 **As a** developer
 **I want** detailed performance metrics logged for every processing cycle
@@ -120,7 +145,7 @@ This index mirrors the canonical planning document `docs/epic-stories-2025-10-05
 4. Slow processing warnings: log warning if total_duration >2s (single race) or >15s (batch)
 5. Metrics formatted as structured JSON (Pino)
 
-### Story 2.11: Worker Thread Error Handling and Restart
+### Story 2.12: Worker Thread Error Handling and Restart
 
 **As a** developer
 **I want** worker threads to restart automatically on crash
@@ -135,7 +160,7 @@ This index mirrors the canonical planning document `docs/epic-stories-2025-10-05
 5. Worker restart doesn't impact other workers or main event loop
 6. Logging for: worker crash, worker restart, task retry, task failure
 
-### Story 2.12: Fetch Timeout and Error Handling
+### Story 2.13: Fetch Timeout and Error Handling
 
 **As a** developer
 **I want** robust timeout and error handling for NZ TAB API fetches
@@ -152,7 +177,7 @@ This index mirrors the canonical planning document `docs/epic-stories-2025-10-05
 7. Final failure logged with full context (raceId, attempt count, error details)
 8. Failed fetches return null (gracefully handled by race processor)
 
-### Story 2.13: Integration Test - Single Race End-to-End
+### Story 2.14: Integration Test - Single Race End-to-End
 
 **As a** developer
 **I want** integration test for single race fetch → transform → write
@@ -167,7 +192,7 @@ This index mirrors the canonical planning document `docs/epic-stories-2025-10-05
 5. Test validates data consistency (no missing entrants, correct relationships)
 6. Test cleans up database after completion (transaction rollback or test database)
 
-### Story 2.14: Integration Test - 5 Concurrent Races
+### Story 2.15: Integration Test - 5 Concurrent Races
 
 **As a** developer
 **I want** integration test for 5 concurrent races processed in parallel
@@ -182,7 +207,7 @@ This index mirrors the canonical planning document `docs/epic-stories-2025-10-05
 5. Test validates worker pool handles concurrent load
 6. Test validates connection pool doesn't saturate (max 10 connections)
 
-### Story 2.15: Performance Benchmarking Tool
+### Story 2.16: Performance Benchmarking Tool
 
 **As a** developer
 **I want** standalone benchmarking tool to measure pipeline performance
