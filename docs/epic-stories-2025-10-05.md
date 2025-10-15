@@ -415,6 +415,7 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 - Optional: Second evening job (post-races, e.g., 9:00 PM NZST) for comprehensive historical backfill if needed
 
 **Technical Notes:**
+
 - Reuses NZ TAB API client from Story 2.1 (with retry logic)
 - Reuses bulk UPSERT operations from Story 2.5
 - Can reuse race processor orchestrator from Story 2.7 for data transformation
@@ -448,8 +449,8 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 ### Story 2.11: Performance Metrics Tracking
 
 **As a** developer
-**I want** detailed performance metrics logged for every processing cycle
-**So that** I can monitor and optimize system performance
+**I want** detailed performance metrics logged for every processing cycle and an api endpoint exposing performance metrics
+**So that** I can monitor and optimize system performance and monitor performance metrics from a future client application
 
 **Acceptance Criteria:**
 
