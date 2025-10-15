@@ -92,9 +92,127 @@ export const verifyPartitionExists = async (
  * @param options - Optional configuration (table name for testing, default: 'money_flow_history')
  * @returns Promise resolving to row count and duration metrics
  */
+/**
+ * Helper function to insert money flow history records using an existing client
+ */
+const insertMoneyFlowHistoryWithClient = async (
+  records: MoneyFlowRecord[],
+  tableName: string,
+  client: PoolClient
+): Promise<{ rowCount: number; duration: number }> => {
+  const startTime = performance.now()
+
+  // Group records by partition (event_timestamp date)
+  const recordsByPartition = new Map<string, MoneyFlowRecord[]>()
+
+  for (const record of records) {
+    const partitionName = getPartitionTableName(
+      tableName,
+      record.polling_timestamp
+    )
+    const existing = recordsByPartition.get(partitionName) ?? []
+    existing.push(record)
+    recordsByPartition.set(partitionName, existing)
+  }
+
+  let totalRowCount = 0
+
+  // Insert to each partition separately (AC5)
+  for (const [partitionName, partitionRecords] of recordsByPartition) {
+    // Verify partition exists before INSERT (AC5)
+    const exists = await verifyPartitionExists(client, partitionName)
+
+    if (!exists) {
+      const [firstRecord] = partitionRecords
+      if (firstRecord === undefined) {
+        throw new Error('No records found for partition')
+      }
+      throw new PartitionNotFoundError(
+        tableName,
+        partitionName,
+        firstRecord.polling_timestamp
+      )
+    }
+
+    // Build parameterized multi-row INSERT (AC3)
+    const values: unknown[] = []
+    const valueRows: string[] = []
+    let paramIndex = 1
+
+    for (const record of partitionRecords) {
+      valueRows.push(
+        `($${String(paramIndex)}, $${String(paramIndex + 1)}, $${String(paramIndex + 2)}, $${String(paramIndex + 3)}, $${String(paramIndex + 4)}, $${String(paramIndex + 5)}, $${String(paramIndex + 6)}, $${String(paramIndex + 7)}, $${String(paramIndex + 8)}, $${String(paramIndex + 9)}, $${String(paramIndex + 10)}, $${String(paramIndex + 11)}, $${String(paramIndex + 12)}, $${String(paramIndex + 13)}, $${String(paramIndex + 14)})`
+      )
+      values.push(
+        record.entrant_id,
+        record.race_id,
+        record.hold_percentage,
+        record.bet_percentage ?? null,
+        record.time_to_start,
+        record.time_interval,
+        record.interval_type,
+        record.polling_timestamp,
+        // event_timestamp: Semantically represents when betting event occurred.
+        // Currently set to polling_timestamp (when we observed the data).
+        // See messages.ts MoneyFlowRecord documentation for timestamp field semantics.
+        record.polling_timestamp,
+        record.win_pool_amount,
+        record.place_pool_amount,
+        record.win_pool_percentage ?? null,
+        record.place_pool_percentage ?? null,
+        record.incremental_win_amount,
+        record.incremental_place_amount
+      )
+      paramIndex += 15
+    }
+
+    // Append-only INSERT (no ON CONFLICT clause) - AC3
+    const sql = `
+      INSERT INTO ${partitionName} (
+        entrant_id, race_id, hold_percentage, bet_percentage,
+        time_to_start, time_interval, interval_type,
+        polling_timestamp, event_timestamp,
+        win_pool_amount, place_pool_amount,
+        win_pool_percentage, place_pool_percentage,
+        incremental_win_amount, incremental_place_amount
+      ) VALUES ${valueRows.join(', ')}
+    `
+
+    const result = await client.query(sql, values)
+    totalRowCount += result.rowCount ?? 0
+  }
+
+  const duration = performance.now() - startTime
+
+  // Structured logging with performance metrics (AC8)
+  logger.info(
+    {
+      table: tableName,
+      partitions: Array.from(recordsByPartition.keys()),
+      rowCount: totalRowCount,
+      insert_ms: Math.round(duration),
+      overBudget: duration >= 300,
+    },
+    'Money flow history INSERT completed'
+  )
+
+  if (duration >= 300) {
+    logger.warn(
+      {
+        duration: Math.round(duration),
+        rowCount: totalRowCount,
+        partitions: Array.from(recordsByPartition.keys()),
+      },
+      'Money flow INSERT exceeded 300ms threshold'
+    )
+  }
+
+  return { rowCount: totalRowCount, duration }
+}
+
 export const insertMoneyFlowHistory = async (
   records: MoneyFlowRecord[],
-  options: { tableName?: string } = {}
+  options: { tableName?: string; client?: PoolClient } = {}
 ): Promise<{ rowCount: number; duration: number }> => {
   const tableName = options.tableName ?? 'money_flow_history'
   if (records.length === 0) {
@@ -114,6 +232,15 @@ export const insertMoneyFlowHistory = async (
     const existing = recordsByPartition.get(partitionName) ?? []
     existing.push(record)
     recordsByPartition.set(partitionName, existing)
+  }
+
+  // If a client is provided, use it directly; otherwise create a new transaction
+  if (options.client !== undefined) {
+    return await insertMoneyFlowHistoryWithClient(
+      records,
+      options.tableName ?? 'money_flow_history',
+      options.client
+    )
   }
 
   return withTransaction(async (client) => {
@@ -227,15 +354,14 @@ export const insertMoneyFlowHistory = async (
  * @param options - Optional configuration (table name for testing, default: 'odds_history')
  * @returns Promise resolving to row count and duration metrics
  */
-export const insertOddsHistory = async (
+/**
+ * Helper function to insert odds history records using an existing client
+ */
+const insertOddsHistoryWithClient = async (
   records: OddsRecord[],
-  options: { tableName?: string } = {}
+  tableName: string,
+  client: PoolClient
 ): Promise<{ rowCount: number; duration: number }> => {
-  const tableName = options.tableName ?? 'odds_history'
-  if (records.length === 0) {
-    return { rowCount: 0, duration: 0 }
-  }
-
   const startTime = performance.now()
 
   // Group records by partition (event_timestamp date)
@@ -251,80 +377,107 @@ export const insertOddsHistory = async (
     recordsByPartition.set(partitionName, existing)
   }
 
-  return withTransaction(async (client) => {
-    let totalRowCount = 0
+  let totalRowCount = 0
 
-    // Insert to each partition separately (AC5)
-    for (const [partitionName, partitionRecords] of recordsByPartition) {
-      // Verify partition exists before INSERT (AC5)
-      const exists = await verifyPartitionExists(client, partitionName)
+  // Insert to each partition separately (AC5)
+  for (const [partitionName, partitionRecords] of recordsByPartition) {
+    // Verify partition exists before INSERT (AC5)
+    const exists = await verifyPartitionExists(client, partitionName)
 
-      if (!exists) {
-        const [firstRecord] = partitionRecords
-        if (firstRecord === undefined) {
-          throw new Error('No records found for partition')
-        }
-        throw new PartitionNotFoundError(
-          tableName,
-          partitionName,
-          firstRecord.event_timestamp
-        )
+    if (!exists) {
+      const [firstRecord] = partitionRecords
+      if (firstRecord === undefined) {
+        throw new Error('No records found for partition')
       }
-
-      // Build parameterized multi-row INSERT (AC3)
-      const values: unknown[] = []
-      const valueRows: string[] = []
-      let paramIndex = 1
-
-      for (const record of partitionRecords) {
-        valueRows.push(
-          `($${String(paramIndex)}, $${String(paramIndex + 1)}, $${String(paramIndex + 2)}, $${String(paramIndex + 3)})`
-        )
-        values.push(
-          record.entrant_id,
-          record.odds,
-          record.type,
-          record.event_timestamp
-        )
-        paramIndex += 4
-      }
-
-      // Append-only INSERT (no ON CONFLICT clause) - AC3
-      const sql = `
-        INSERT INTO ${partitionName} (
-          entrant_id, odds, type, event_timestamp
-        ) VALUES ${valueRows.join(', ')}
-      `
-
-      const result = await client.query(sql, values)
-      totalRowCount += result.rowCount ?? 0
-    }
-
-    const duration = performance.now() - startTime
-
-    // Structured logging with performance metrics (AC8)
-    logger.info(
-      {
-        table: tableName,
-        partitions: Array.from(recordsByPartition.keys()),
-        rowCount: totalRowCount,
-        insert_ms: Math.round(duration),
-        overBudget: duration >= 300,
-      },
-      'Odds history INSERT completed'
-    )
-
-    if (duration >= 300) {
-      logger.warn(
-        {
-          duration: Math.round(duration),
-          rowCount: totalRowCount,
-          partitions: Array.from(recordsByPartition.keys()),
-        },
-        'Odds INSERT exceeded 300ms threshold'
+      throw new PartitionNotFoundError(
+        tableName,
+        partitionName,
+        firstRecord.event_timestamp
       )
     }
 
-    return { rowCount: totalRowCount, duration }
-  })
+    // Build parameterized multi-row INSERT (AC3)
+    const values: unknown[] = []
+    const valueRows: string[] = []
+    let paramIndex = 1
+
+    for (const record of partitionRecords) {
+      valueRows.push(
+        `($${String(paramIndex)}, $${String(paramIndex + 1)}, $${String(paramIndex + 2)}, $${String(paramIndex + 3)})`
+      )
+      values.push(
+        record.entrant_id,
+        record.odds,
+        record.type,
+        record.event_timestamp
+      )
+      paramIndex += 4
+    }
+
+    // Append-only INSERT (no ON CONFLICT clause) - AC3
+    const sql = `
+      INSERT INTO ${partitionName} (
+        entrant_id, odds, type, event_timestamp
+      ) VALUES ${valueRows.join(', ')}
+    `
+
+    const result = await client.query(sql, values)
+    totalRowCount += result.rowCount ?? 0
+  }
+
+  const duration = performance.now() - startTime
+
+  // Structured logging with performance metrics (AC8)
+  logger.info(
+    {
+      table: tableName,
+      partitions: Array.from(recordsByPartition.keys()),
+      rowCount: totalRowCount,
+      insert_ms: Math.round(duration),
+      overBudget: duration >= 300,
+    },
+    'Odds history INSERT completed'
+  )
+
+  if (duration >= 300) {
+    logger.warn(
+      {
+        duration: Math.round(duration),
+        rowCount: totalRowCount,
+        partitions: Array.from(recordsByPartition.keys()),
+      },
+      'Odds INSERT exceeded 300ms threshold'
+    )
+  }
+
+  return { rowCount: totalRowCount, duration }
+}
+
+export const insertOddsHistory = async (
+  records: OddsRecord[],
+  options: { tableName?: string; client?: PoolClient } = {}
+): Promise<{ rowCount: number; duration: number }> => {
+  const tableName = options.tableName ?? 'odds_history'
+  if (records.length === 0) {
+    return { rowCount: 0, duration: 0 }
+  }
+
+  // Group records by partition (event_timestamp date)
+  const recordsByPartition = new Map<string, OddsRecord[]>()
+
+  for (const record of records) {
+    const partitionName = getPartitionTableName(
+      tableName,
+      record.event_timestamp
+    )
+    const existing = recordsByPartition.get(partitionName) ?? []
+    existing.push(record)
+    recordsByPartition.set(partitionName, existing)
+  }
+
+  return options.client !== undefined
+    ? insertOddsHistoryWithClient(records, tableName, options.client)
+    : withTransaction(async (client) =>
+        insertOddsHistoryWithClient(records, tableName, client)
+      )
 }

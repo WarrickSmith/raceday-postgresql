@@ -40,7 +40,8 @@ export const withTransaction = async <T>(
  * @returns Promise resolving to row count metrics
  */
 export const bulkUpsertMeetings = async (
-  meetings: TransformedMeeting[]
+  meetings: TransformedMeeting[],
+  client?: PoolClient
 ): Promise<{ rowCount: number; duration: number }> => {
   if (meetings.length === 0) {
     return { rowCount: 0, duration: 0 }
@@ -94,7 +95,8 @@ export const bulkUpsertMeetings = async (
       OR meetings.status IS DISTINCT FROM EXCLUDED.status
   `
 
-  return withTransaction(async (client) => {
+  if (client !== undefined) {
+    // Use provided client (already in a transaction)
     const result = await client.query(sql, values)
     const duration = performance.now() - startTime
 
@@ -116,7 +118,32 @@ export const bulkUpsertMeetings = async (
     }
 
     return { rowCount: result.rowCount ?? 0, duration }
-  })
+  } else {
+    // Create new transaction
+    return withTransaction(async (client) => {
+      const result = await client.query(sql, values)
+      const duration = performance.now() - startTime
+
+      logger.info(
+        {
+          table: 'meetings',
+          rowCount: result.rowCount ?? 0,
+          write_ms: Math.round(duration),
+          overBudget: duration >= 300,
+        },
+        'Bulk UPSERT meetings completed'
+      )
+
+      if (duration >= 300) {
+        logger.warn(
+          { duration: Math.round(duration), rowCount: result.rowCount ?? 0 },
+          'Meetings UPSERT exceeded 300ms threshold'
+        )
+      }
+
+      return { rowCount: result.rowCount ?? 0, duration }
+    })
+  }
 }
 
 interface TransformedRace {
@@ -139,7 +166,8 @@ interface TransformedRace {
  * @returns Promise resolving to row count metrics
  */
 export const bulkUpsertRaces = async (
-  races: TransformedRace[]
+  races: TransformedRace[],
+  client?: PoolClient
 ): Promise<{ rowCount: number; duration: number }> => {
   if (races.length === 0) {
     return { rowCount: 0, duration: 0 }
@@ -154,7 +182,9 @@ export const bulkUpsertRaces = async (
 
   for (const race of races) {
     // Combine race_date_nz and start_time_nz into start_time timestamp
-    const startTime = `${race.race_date_nz}T${race.start_time_nz}:00Z`
+    // start_time_nz already includes timezone info (e.g., "15:59:00 NZDT")
+    // so we just need to combine date and time without adding extra timezone info
+    const startTime = `${race.race_date_nz}T${race.start_time_nz}`
 
     valueRows.push(
       `($${String(paramIndex)}, $${String(paramIndex + 1)}, $${String(paramIndex + 2)}, $${String(paramIndex + 3)}, $${String(paramIndex + 4)}, $${String(paramIndex + 5)}, $${String(paramIndex + 6)}, $${String(paramIndex + 7)})`
@@ -196,7 +226,8 @@ export const bulkUpsertRaces = async (
       OR races.start_time_nz IS DISTINCT FROM EXCLUDED.start_time_nz
   `
 
-  return withTransaction(async (client) => {
+  if (client !== undefined) {
+    // Use provided client (already in a transaction)
     const result = await client.query(sql, values)
     const duration = performance.now() - startTime
 
@@ -218,7 +249,32 @@ export const bulkUpsertRaces = async (
     }
 
     return { rowCount: result.rowCount ?? 0, duration }
-  })
+  } else {
+    // Create new transaction
+    return withTransaction(async (client) => {
+      const result = await client.query(sql, values)
+      const duration = performance.now() - startTime
+
+      logger.info(
+        {
+          table: 'races',
+          rowCount: result.rowCount ?? 0,
+          write_ms: Math.round(duration),
+          overBudget: duration >= 300,
+        },
+        'Bulk UPSERT races completed'
+      )
+
+      if (duration >= 300) {
+        logger.warn(
+          { duration: Math.round(duration), rowCount: result.rowCount ?? 0 },
+          'Races UPSERT exceeded 300ms threshold'
+        )
+      }
+
+      return { rowCount: result.rowCount ?? 0, duration }
+    })
+  }
 }
 
 /**
@@ -231,7 +287,8 @@ export const bulkUpsertRaces = async (
  * @returns Promise resolving to row count metrics
  */
 export const bulkUpsertEntrants = async (
-  entrants: TransformedEntrant[]
+  entrants: TransformedEntrant[],
+  client?: PoolClient
 ): Promise<{ rowCount: number; duration: number }> => {
   if (entrants.length === 0) {
     return { rowCount: 0, duration: 0 }
@@ -338,7 +395,8 @@ export const bulkUpsertEntrants = async (
       OR entrants.mover IS DISTINCT FROM EXCLUDED.mover
   `
 
-  return withTransaction(async (client) => {
+  if (client !== undefined) {
+    // Use provided client (already in a transaction)
     const result = await client.query(sql, values)
     const duration = performance.now() - startTime
 
@@ -360,7 +418,32 @@ export const bulkUpsertEntrants = async (
     }
 
     return { rowCount: result.rowCount ?? 0, duration }
-  })
+  } else {
+    // Create new transaction
+    return withTransaction(async (client) => {
+      const result = await client.query(sql, values)
+      const duration = performance.now() - startTime
+
+      logger.info(
+        {
+          table: 'entrants',
+          rowCount: result.rowCount ?? 0,
+          write_ms: Math.round(duration),
+          overBudget: duration >= 300,
+        },
+        'Bulk UPSERT entrants completed'
+      )
+
+      if (duration >= 300) {
+        logger.warn(
+          { duration: Math.round(duration), rowCount: result.rowCount ?? 0 },
+          'Entrants UPSERT exceeded 300ms threshold'
+        )
+      }
+
+      return { rowCount: result.rowCount ?? 0, duration }
+    })
+  }
 }
 
 /**
