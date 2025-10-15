@@ -41,8 +41,8 @@ const MeetingsResponseSchema = z
   .passthrough()
 /* eslint-enable @typescript-eslint/naming-convention */
 
-const DEFAULT_MEETING_COUNTRIES = new Set(['NZ', 'AU'])
-const DEFAULT_MEETING_CATEGORIES = new Set(['R', 'H']) // R = thoroughbred, H = harness
+const DEFAULT_MEETING_COUNTRIES = new Set(['NZ', 'AUS'])
+const DEFAULT_MEETING_CATEGORIES = new Set(['T', 'H']) // T = thoroughbred, H = harness
 
 /**
  * Retry configuration following PRD NFR005 requirements
