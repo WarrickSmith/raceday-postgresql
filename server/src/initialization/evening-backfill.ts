@@ -1,18 +1,18 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { fetchMeetingsForDate, fetchRaceData } from '../clients/nztab.js'
+import { fetchRaceData } from '../clients/nztab.js'
 import {
   bulkUpsertEntrants,
   bulkUpsertMeetings,
   bulkUpsertRaces,
 } from '../database/bulk-upsert.js'
 import { logger } from '../shared/logger.js'
+import { pool } from '../database/pool.js'
 import type {
-  DailyInitializationDependencies,
   InitializationResult,
   InitializationRunOptions,
   InitializationStats,
 } from './types.js'
-import type { MeetingData, RaceData } from '../clients/nztab-types.js'
+import type { MeetingData } from '../clients/nztab-types.ts'
 import type {
   TransformedEntrant,
   TransformedMeeting,
@@ -26,23 +26,6 @@ const defaultWait = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms)
   })
-
-const defaultDependencies: DailyInitializationDependencies = {
-  logger,
-  now: () => new Date(),
-  wait: defaultWait,
-  fetchMeetingsForDate: async (date: string) => fetchMeetingsForDate(date),
-  fetchRacesForMeeting: async (meeting) =>
-    fetchRacesForMeetingDefault(meeting, logger),
-  transformMeetings: (meetings: MeetingData[]): TransformedMeeting[] =>
-    meetings
-      .map(transformMeeting)
-      .filter((meeting): meeting is TransformedMeeting => meeting !== null),
-  transformRaces: (payloads: RaceData[]) => transformRacesForBaseline(payloads),
-  upsertMeetings: bulkUpsertMeetings,
-  upsertRaces: bulkUpsertRaces,
-  upsertEntrants: bulkUpsertEntrants,
-}
 
 const getNzDateString = (reference: Date): string => {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -257,72 +240,6 @@ const transformEntrantForBaseline = (
   }
 }
 
-const fetchRacesForMeetingDefault = async (
-  meeting: MeetingData,
-  log: typeof logger
-): Promise<{
-  races: RacePayload[]
-  failedRaceIds: string[]
-}> => {
-  const raceSummaries = meeting.races ?? []
-
-  if (raceSummaries.length === 0) {
-    return { races: [], failedRaceIds: [] }
-  }
-
-  log.info({
-    event: 'fetch_meeting_races_start',
-    meetingId: meeting.meeting,
-    raceCount: raceSummaries.length,
-  })
-
-  const races: RacePayload[] = []
-  const failedRaceIds: string[] = []
-
-  for (
-    let index = 0;
-    index < raceSummaries.length;
-    index += MAX_RACE_CONCURRENCY
-  ) {
-    const batch = raceSummaries.slice(index, index + MAX_RACE_CONCURRENCY)
-    const results = await Promise.allSettled(
-      batch.map((race) => fetchRaceData(race.id, race.status ?? undefined))
-    )
-
-    results.forEach((result, batchIndex) => {
-      const raceId = batch[batchIndex]?.id ?? 'unknown-race-id'
-
-      if (result.status === 'fulfilled') {
-        races.push(result.value)
-        return
-      }
-
-      failedRaceIds.push(raceId)
-      log.warn(
-        {
-          event: 'fetch_meeting_race_failed',
-          meetingId: meeting.meeting,
-          raceId,
-          error:
-            result.reason instanceof Error
-              ? result.reason.message
-              : String(result.reason),
-        },
-        'Failed to fetch race data; continuing with remaining races'
-      )
-    })
-  }
-
-  log.info({
-    event: 'fetch_meeting_races_complete',
-    meetingId: meeting.meeting,
-    fetchedRaces: races.length,
-    failedRaceIds,
-  })
-
-  return { races, failedRaceIds }
-}
-
 const isMeetingData = (value: unknown): value is MeetingData => {
   if (value == null || typeof value !== 'object') {
     return false
@@ -417,139 +334,141 @@ const transformRacesForBaseline = (
   }
 }
 
-export const createDailyBaselineInitializer = (
-  dependencies: DailyInitializationDependencies
-) => {
-  const deps = dependencies
+/**
+ * Fetches races that have completed during the day for historical backfill
+ * @param nzDate The NZ date to fetch races for (YYYY-MM-DD format)
+ * @returns Array of completed race IDs
+ */
+const fetchCompletedRacesForDay = async (nzDate: string): Promise<string[]> => {
+  try {
+    const result = await pool.query(
+      `SELECT race_id
+       FROM races
+       WHERE race_date_nz = $1
+         AND status IN ('final', 'abandoned')
+       ORDER BY start_time_nz ASC`,
+      [nzDate]
+    )
 
-  const run = async (
-    options?: InitializationRunOptions
-  ): Promise<InitializationResult> => {
-    const startedAt = deps.now()
-    const referenceDate = options?.referenceDate ?? startedAt
-    const nzDate = getNzDateString(referenceDate)
+    return result.rows.map((row: { race_id: string }) => row.race_id)
+  } catch (error) {
+    logger.error(
+      {
+        event: 'evening_backfill_fetch_completed_races_failed',
+        nzDate,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Failed to fetch completed races for backfill'
+    )
+    return []
+  }
+}
 
-    deps.logger.info({
-      event: 'daily_initialization_run_start',
-      reason: options?.reason ?? 'unspecified',
+/**
+ * Fetches comprehensive historical race data for completed races
+ * @param raceIds Array of race IDs to fetch historical data for
+ * @returns Promise resolving to race data with comprehensive historical information
+ */
+const fetchHistoricalRaceData = async (
+  raceIds: string[]
+): Promise<RacePayload[]> => {
+  const races: RacePayload[] = []
+  const failedRaceIds: string[] = []
+
+  logger.info({
+    event: 'evening_backfill_fetch_historical_data_start',
+    raceCount: raceIds.length,
+  })
+
+  // Process in batches to avoid overwhelming the API
+  for (let i = 0; i < raceIds.length; i += MAX_RACE_CONCURRENCY) {
+    const batch = raceIds.slice(i, i + MAX_RACE_CONCURRENCY)
+
+    const results = await Promise.allSettled(
+      batch.map(async (raceId) => {
+        try {
+          // Fetch with comprehensive historical data parameters
+          return await fetchRaceData(raceId, 'final')
+        } catch (error) {
+          logger.warn(
+            {
+              event: 'evening_backfill_fetch_historical_race_failed',
+              raceId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            'Failed to fetch historical race data for backfill'
+          )
+          throw error
+        }
+      })
+    )
+
+    results.forEach((result, index) => {
+      const raceId = batch[index]
+
+      if (result.status === 'fulfilled') {
+        races.push(result.value)
+      } else {
+        if (raceId != null) {
+          failedRaceIds.push(raceId)
+        }
+      }
+    })
+
+    // Wait between batches to be respectful to the API
+    if (i + MAX_RACE_CONCURRENCY < raceIds.length) {
+      await defaultWait(500)
+    }
+  }
+
+  logger.info({
+    event: 'evening_backfill_fetch_historical_data_complete',
+    requestedRaces: raceIds.length,
+    fetchedRaces: races.length,
+    failedRaceIds,
+  })
+
+  return races
+}
+
+/**
+ * Runs evening backfill to fetch comprehensive historical data for completed races
+ * @param options Initialization options
+ * @returns Promise resolving to the initialization result
+ */
+export async function runEveningBackfill(
+  options?: InitializationRunOptions
+): Promise<InitializationResult> {
+  const startedAt = new Date()
+  const nzDate = getNzDateString(startedAt)
+
+  logger.info({
+    event: 'evening_backfill_start',
+    reason: options?.reason ?? 'unspecified',
+    nzDate,
+  })
+
+  try {
+    // Step 1: Fetch completed races for the day
+    logger.info({
+      event: 'evening_backfill_fetch_completed_races_start',
       nzDate,
     })
 
-    try {
-      deps.logger.info({
-        event: 'daily_initialization_fetch_meetings_start',
+    const completedRaceIds = await fetchCompletedRacesForDay(nzDate)
+
+    logger.info({
+      event: 'evening_backfill_fetch_completed_races_complete',
+      nzDate,
+      completedRacesCount: completedRaceIds.length,
+    })
+
+    if (completedRaceIds.length === 0) {
+      logger.info({
+        event: 'evening_backfill_no_completed_races',
         nzDate,
       })
 
-      const meetings = await deps.fetchMeetingsForDate(nzDate)
-
-      deps.logger.info({
-        event: 'daily_initialization_fetch_meetings_complete',
-        nzDate,
-        meetingsCount: meetings.length,
-      })
-
-      const transformedMeetings = deps.transformMeetings(meetings)
-
-      deps.logger.info({
-        event: 'daily_initialization_transform_meetings_complete',
-        nzDate,
-        transformedCount: transformedMeetings.length,
-        skippedCount: meetings.length - transformedMeetings.length,
-      })
-
-      const meetingWrite = await deps.upsertMeetings(transformedMeetings)
-
-      deps.logger.info({
-        event: 'daily_initialization_upsert_meetings_complete',
-        nzDate,
-        rowCount: meetingWrite.rowCount,
-        duration: meetingWrite.duration,
-      })
-
-      let totalRacesFetched = 0
-      let totalRetryCount = 0
-      const failedRaceIds: string[] = []
-      const failedMeetingIds = new Set<string>()
-      const racePayloads: RacePayload[] = []
-
-      for (const meeting of meetings) {
-        const { races, failedRaceIds: meetingFailures } =
-          await deps.fetchRacesForMeeting(meeting)
-        racePayloads.push(...races)
-        totalRacesFetched += races.length
-        failedRaceIds.push(...meetingFailures)
-
-        if (meetingFailures.length > 0) {
-          totalRetryCount += meetingFailures.length
-          failedMeetingIds.add(meeting.meeting)
-          await deps.wait(Math.min(1000, 100 * meetingFailures.length))
-        }
-      }
-
-      const { races: normalizedRaces, entrants: normalizedEntrants } =
-        deps.transformRaces(racePayloads as RaceData[])
-
-      deps.logger.info({
-        event: 'daily_initialization_transform_races_complete',
-        nzDate,
-        racesCount: normalizedRaces.length,
-        entrantsCount: normalizedEntrants.length,
-      })
-
-      let racesWritten = 0
-      if (normalizedRaces.length > 0) {
-        const raceWrite = await deps.upsertRaces(normalizedRaces)
-        racesWritten = raceWrite.rowCount
-
-        deps.logger.info({
-          event: 'daily_initialization_upsert_races_complete',
-          nzDate,
-          rowCount: raceWrite.rowCount,
-          duration: raceWrite.duration,
-        })
-      }
-
-      let entrantsWritten = 0
-      if (normalizedEntrants.length > 0) {
-        const entrantWrite = await deps.upsertEntrants(normalizedEntrants)
-        entrantsWritten = entrantWrite.rowCount
-
-        deps.logger.info({
-          event: 'daily_initialization_upsert_entrants_complete',
-          nzDate,
-          rowCount: entrantWrite.rowCount,
-          duration: entrantWrite.duration,
-        })
-      }
-
-      const completedAt = deps.now()
-      const stats: InitializationStats = {
-        meetingsFetched: meetings.length,
-        meetingsWritten: meetingWrite.rowCount,
-        racesFetched: totalRacesFetched,
-        racesCreated: racesWritten,
-        entrantsPopulated: entrantsWritten,
-        failedMeetings: Array.from(failedMeetingIds),
-        failedRaces: failedRaceIds,
-        retries: totalRetryCount,
-        durationMs: completedAt.getTime() - startedAt.getTime(),
-      }
-
-      deps.logger.info({
-        event: 'daily_initialization_run_complete',
-        reason: options?.reason ?? 'unspecified',
-        stats,
-      })
-
-      return {
-        success: true,
-        startedAt,
-        completedAt,
-        stats,
-      }
-    } catch (error: unknown) {
-      const completedAt = deps.now()
       const stats: InitializationStats = {
         meetingsFetched: 0,
         meetingsWritten: 0,
@@ -559,38 +478,141 @@ export const createDailyBaselineInitializer = (
         failedMeetings: [],
         failedRaces: [],
         retries: 0,
-        durationMs: completedAt.getTime() - startedAt.getTime(),
+        durationMs: new Date().getTime() - startedAt.getTime(),
       }
-
-      deps.logger.error(
-        {
-          event: 'daily_initialization_run_failed',
-          reason: options?.reason ?? 'unspecified',
-          error:
-            error instanceof Error
-              ? { name: error.name, message: error.message }
-              : { message: String(error) },
-          stats,
-        },
-        'Daily baseline initialization failed'
-      )
 
       return {
-        success: false,
+        success: true,
         startedAt,
-        completedAt,
+        completedAt: new Date(),
         stats,
-        error: error instanceof Error ? error : new Error(String(error)),
       }
     }
+
+    // Step 2: Fetch comprehensive historical race data
+    logger.info({
+      event: 'evening_backfill_fetch_historical_data_start',
+      nzDate,
+      raceCount: completedRaceIds.length,
+    })
+
+    const racePayloads = await fetchHistoricalRaceData(completedRaceIds)
+
+    logger.info({
+      event: 'evening_backfill_fetch_historical_data_complete',
+      nzDate,
+      racesFetched: racePayloads.length,
+    })
+
+    // Step 3: Transform and upsert data
+    const { meetings, races, entrants } =
+      transformRacesForBaseline(racePayloads)
+
+    logger.info({
+      event: 'evening_backfill_transform_complete',
+      nzDate,
+      meetingsCount: meetings.length,
+      racesCount: races.length,
+      entrantsCount: entrants.length,
+    })
+
+    let meetingsWritten = 0
+    if (meetings.length > 0) {
+      const meetingWrite = await bulkUpsertMeetings(meetings)
+      meetingsWritten = meetingWrite.rowCount
+
+      logger.info({
+        event: 'evening_backfill_upsert_meetings_complete',
+        nzDate,
+        rowCount: meetingWrite.rowCount,
+        duration: meetingWrite.duration,
+      })
+    }
+
+    let racesWritten = 0
+    if (races.length > 0) {
+      const raceWrite = await bulkUpsertRaces(races)
+      racesWritten = raceWrite.rowCount
+
+      logger.info({
+        event: 'evening_backfill_upsert_races_complete',
+        nzDate,
+        rowCount: raceWrite.rowCount,
+        duration: raceWrite.duration,
+      })
+    }
+
+    let entrantsWritten = 0
+    if (entrants.length > 0) {
+      const entrantWrite = await bulkUpsertEntrants(entrants)
+      entrantsWritten = entrantWrite.rowCount
+
+      logger.info({
+        event: 'evening_backfill_upsert_entrants_complete',
+        nzDate,
+        rowCount: entrantWrite.rowCount,
+        duration: entrantWrite.duration,
+      })
+    }
+
+    const completedAt = new Date()
+    const stats: InitializationStats = {
+      meetingsFetched: meetings.length,
+      meetingsWritten,
+      racesFetched: racePayloads.length,
+      racesCreated: racesWritten,
+      entrantsPopulated: entrantsWritten,
+      failedMeetings: [],
+      failedRaces: [],
+      retries: 0,
+      durationMs: completedAt.getTime() - startedAt.getTime(),
+    }
+
+    logger.info({
+      event: 'evening_backfill_complete',
+      reason: options?.reason ?? 'unspecified',
+      stats,
+    })
+
+    return {
+      success: true,
+      startedAt,
+      completedAt,
+      stats,
+    }
+  } catch (error: unknown) {
+    const completedAt = new Date()
+    const stats: InitializationStats = {
+      meetingsFetched: 0,
+      meetingsWritten: 0,
+      racesFetched: 0,
+      racesCreated: 0,
+      entrantsPopulated: 0,
+      failedMeetings: [],
+      failedRaces: [],
+      retries: 0,
+      durationMs: completedAt.getTime() - startedAt.getTime(),
+    }
+
+    logger.error(
+      {
+        event: 'evening_backfill_failed',
+        reason: options?.reason ?? 'unspecified',
+        error:
+          error instanceof Error
+            ? { name: error.name, message: error.message }
+            : { message: String(error) },
+        stats,
+      },
+      'Evening backfill failed'
+    )
+
+    return {
+      success: false,
+      startedAt,
+      completedAt,
+      stats,
+      error: error instanceof Error ? error : new Error(String(error)),
+    }
   }
-
-  return { run }
-}
-
-export async function runDailyBaselineInitialization(
-  options?: InitializationRunOptions
-): Promise<InitializationResult> {
-  const initializer = createDailyBaselineInitializer(defaultDependencies)
-  return initializer.run(options)
 }
