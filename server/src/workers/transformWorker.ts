@@ -46,19 +46,18 @@ const transformRace = (payload: RaceData): TransformedRace => {
   const transformedAt = new Date().toISOString()
 
   // Extract normalized meeting data (AC6)
-  const meeting: TransformedMeeting | null = payload.meeting != null
-    ? {
-        meeting_id: payload.meeting.meeting,
-        name: payload.meeting.name,
-        date: payload.meeting.date,
-        country: payload.meeting.country,
-        category: payload.meeting.category,
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        track_condition: payload.meeting.track_condition ?? null,
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        tote_status: payload.meeting.tote_status ?? null,
-      }
-    : null
+  const meeting: TransformedMeeting | null =
+    payload.meeting != null
+      ? {
+          meeting_id: payload.meeting.meeting,
+          name: payload.meeting.name,
+          date: payload.meeting.date,
+          country: payload.meeting.country,
+          category: payload.meeting.category,
+          track_condition: payload.meeting.track_condition,
+          tote_status: payload.meeting.tote_status ?? null,
+        }
+      : null
 
   // Extract normalized race data (AC6)
   const race = {
@@ -80,7 +79,9 @@ const transformRace = (payload: RaceData): TransformedRace => {
 
   // Calculate time metadata for this polling cycle (AC5)
   // Construct race start datetime from date and time fields
-  const raceStartDatetime = `${payload.race_date_nz}T${payload.start_time_nz}:00Z`
+  // start_time_nz already includes timezone info (e.g., "15:59:00 NZDT")
+  // so we just need to combine date and time without adding extra timezone info
+  const raceStartDatetime = `${payload.race_date_nz}T${payload.start_time_nz}`
   const timeMetadata = calculateTimeMetadata(raceStartDatetime, transformedAt)
 
   // Transform entrants with money flow calculations (AC2, AC3, AC6)
@@ -145,8 +146,10 @@ const transformRace = (payload: RaceData): TransformedRace => {
         // Update transformed entrant with calculated fields
         transformedEntrant.hold_percentage = holdPercentage
         transformedEntrant.bet_percentage = betPercentage
-        transformedEntrant.win_pool_percentage = poolPercentages.win_pool_percentage
-        transformedEntrant.place_pool_percentage = poolPercentages.place_pool_percentage
+        transformedEntrant.win_pool_percentage =
+          poolPercentages.win_pool_percentage
+        transformedEntrant.place_pool_percentage =
+          poolPercentages.place_pool_percentage
         transformedEntrant.win_pool_amount = poolAmounts.winPoolAmount
         transformedEntrant.place_pool_amount = poolAmounts.placePoolAmount
 
@@ -243,7 +246,9 @@ port.on('message', (rawMessage) => {
 
   try {
     const result = transformRace(payload)
-    port.postMessage(createWorkerSuccessMessage(taskId, performance.now() - startedAt, result))
+    port.postMessage(
+      createWorkerSuccessMessage(taskId, performance.now() - startedAt, result)
+    )
   } catch (error) {
     const err =
       error instanceof Error

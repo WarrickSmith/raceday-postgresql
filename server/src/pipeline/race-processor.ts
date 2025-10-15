@@ -8,7 +8,9 @@ import {
   bulkUpsertEntrants,
   DatabaseWriteError,
   TransactionError,
+  withTransaction,
 } from '../database/bulk-upsert.js'
+import type { PoolClient } from 'pg'
 import {
   insertMoneyFlowHistory,
   insertOddsHistory,
@@ -233,63 +235,69 @@ export type PipelineStageError = FetchError | TransformError | WriteError
 const persistTransformedRace = async (
   transformed: TransformedRace
 ): Promise<WriteStageOutcome> => {
-  const meetingResult =
-    transformed.meeting != null
-      ? await bulkUpsertMeetings([transformed.meeting])
-      : { rowCount: 0, duration: 0 }
+  const { raceId } = transformed
+  const log = logger.child({ raceId })
+  log.info('Persisting transformed race')
 
-  const racePayload =
-    transformed.race != null
-      ? [
-          {
-            race_id: transformed.race.race_id,
-            meeting_id: transformed.race.meeting_id ?? null,
-            name: transformed.race.name,
-            race_number: transformed.race.race_number ?? null,
-            start_time_nz: transformed.race.start_time_nz,
-            status: transformed.race.status,
-            race_date_nz: transformed.race.race_date_nz,
-          },
-        ]
-      : []
+  return await withTransaction(async (client: PoolClient) => {
+    const meetingResult =
+      transformed.meeting != null
+        ? await bulkUpsertMeetings([transformed.meeting], client)
+        : { rowCount: 0, duration: 0 }
 
-  const raceResult =
-    racePayload.length > 0
-      ? await bulkUpsertRaces(racePayload)
-      : { rowCount: 0, duration: 0 }
+    const racePayload =
+      transformed.race != null
+        ? [
+            {
+              race_id: transformed.race.race_id,
+              meeting_id: transformed.race.meeting_id ?? null,
+              name: transformed.race.name,
+              race_number: transformed.race.race_number ?? null,
+              start_time_nz: transformed.race.start_time_nz,
+              status: transformed.race.status,
+              race_date_nz: transformed.race.race_date_nz,
+            },
+          ]
+        : []
 
-  const entrantResult =
-    transformed.entrants.length > 0
-      ? await bulkUpsertEntrants(transformed.entrants)
-      : { rowCount: 0, duration: 0 }
+    const raceResult =
+      racePayload.length > 0
+        ? await bulkUpsertRaces(racePayload, client)
+        : { rowCount: 0, duration: 0 }
 
-  const moneyFlowResult =
-    transformed.moneyFlowRecords.length > 0
-      ? await insertMoneyFlowHistory(transformed.moneyFlowRecords)
-      : { rowCount: 0, duration: 0 }
+    const entrantResult =
+      transformed.entrants.length > 0
+        ? await bulkUpsertEntrants(transformed.entrants, client)
+        : { rowCount: 0, duration: 0 }
 
-  const oddsRecords = buildOddsRecords(transformed)
-  const oddsResult =
-    oddsRecords.length > 0
-      ? await insertOddsHistory(oddsRecords)
-      : { rowCount: 0, duration: 0 }
+    const moneyFlowResult =
+      transformed.moneyFlowRecords.length > 0
+        ? await insertMoneyFlowHistory(transformed.moneyFlowRecords, { client })
+        : { rowCount: 0, duration: 0 }
 
-  return {
-    rowCounts: {
-      meetings: meetingResult.rowCount,
-      races: raceResult.rowCount,
-      entrants: entrantResult.rowCount,
-      moneyFlowHistory: moneyFlowResult.rowCount,
-      oddsHistory: oddsResult.rowCount,
-    },
-    breakdown: {
-      meetings_ms: Math.round(meetingResult.duration),
-      races_ms: Math.round(raceResult.duration),
-      entrants_ms: Math.round(entrantResult.duration),
-      money_flow_ms: Math.round(moneyFlowResult.duration),
-      odds_ms: Math.round(oddsResult.duration),
-    },
-  }
+    const oddsRecords = buildOddsRecords(transformed)
+    const oddsResult =
+      oddsRecords.length > 0
+        ? await insertOddsHistory(oddsRecords, { client })
+        : { rowCount: 0, duration: 0 }
+
+    return {
+      rowCounts: {
+        meetings: meetingResult.rowCount,
+        races: raceResult.rowCount,
+        entrants: entrantResult.rowCount,
+        moneyFlowHistory: moneyFlowResult.rowCount,
+        oddsHistory: oddsResult.rowCount,
+      },
+      breakdown: {
+        meetings_ms: Math.round(meetingResult.duration),
+        races_ms: Math.round(raceResult.duration),
+        entrants_ms: Math.round(entrantResult.duration),
+        money_flow_ms: Math.round(moneyFlowResult.duration),
+        odds_ms: Math.round(oddsResult.duration),
+      },
+    }
+  })
 }
 
 /**

@@ -7,10 +7,15 @@ import type { TransformedRace } from '../workers/messages.js'
  * Prefers the normalized race metadata, then the first money flow polling timestamp,
  * and finally falls back to the current time when upstream data is incomplete.
  */
-export const resolveOddsEventTimestamp = (transformed: TransformedRace): string => {
+export const resolveOddsEventTimestamp = (
+  transformed: TransformedRace
+): string => {
   const raceMeta = transformed.race
   if (raceMeta != null) {
-    return `${raceMeta.race_date_nz}T${raceMeta.start_time_nz}:00Z`
+    // Create a timestamp at midnight NZ time for the race date
+    // This ensures odds records go into the correct NZ day partition
+    // Using midnight ensures the date is preserved regardless of UTC conversion
+    return `${raceMeta.race_date_nz}T00:00:00+13:00` // NZST (UTC+13) or NZDT (UTC+13)
   }
 
   const [firstMoneyFlowRecord] = transformed.moneyFlowRecords
@@ -25,12 +30,17 @@ export const resolveOddsEventTimestamp = (transformed: TransformedRace): string 
  * Build structured odds records for persistence based on transformed entrants.
  * Generates distinct entries for fixed and pool odds, aligned to the resolved event timestamp.
  */
-export const buildOddsRecords = (transformed: TransformedRace): OddsRecord[] => {
+export const buildOddsRecords = (
+  transformed: TransformedRace
+): OddsRecord[] => {
   const eventTimestamp = resolveOddsEventTimestamp(transformed)
   const records: OddsRecord[] = []
 
   for (const entrant of transformed.entrants) {
-    if (entrant.fixed_win_odds !== undefined && entrant.fixed_win_odds !== null) {
+    if (
+      entrant.fixed_win_odds !== undefined &&
+      entrant.fixed_win_odds !== null
+    ) {
       records.push({
         entrant_id: entrant.entrant_id,
         odds: entrant.fixed_win_odds,
