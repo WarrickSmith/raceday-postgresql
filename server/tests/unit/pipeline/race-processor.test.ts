@@ -12,10 +12,14 @@ type BulkResult = Promise<{ rowCount: number; duration: number }>
 
 const fetchRaceDataMock = vi.fn<(raceId: string) => Promise<RaceData | null>>()
 const workerExecMock = vi.fn<(data: RaceData) => Promise<TransformedRace>>()
-const bulkUpsertMeetingsMock = vi.fn<(meetings: TransformedMeeting[]) => BulkResult>()
-const bulkUpsertRacesMock = vi.fn<(races: NonNullable<TransformedRace['race']>[] ) => BulkResult>()
-const bulkUpsertEntrantsMock = vi.fn<(entrants: TransformedEntrant[]) => BulkResult>()
-const insertMoneyFlowHistoryMock = vi.fn<(records: TransformedRace['moneyFlowRecords']) => BulkResult>()
+const bulkUpsertMeetingsMock =
+  vi.fn<(meetings: TransformedMeeting[]) => BulkResult>()
+const bulkUpsertRacesMock =
+  vi.fn<(races: NonNullable<TransformedRace['race']>[]) => BulkResult>()
+const bulkUpsertEntrantsMock =
+  vi.fn<(entrants: TransformedEntrant[]) => BulkResult>()
+const insertMoneyFlowHistoryMock =
+  vi.fn<(records: TransformedRace['moneyFlowRecords']) => BulkResult>()
 const insertOddsHistoryMock = vi.fn<(records: OddsRecord[]) => BulkResult>()
 
 const clientsModulePromise = vi.importActual<
@@ -35,6 +39,11 @@ vi.mock('../../../src/shared/logger.js', () => ({
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
+    child: vi.fn(() => ({
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    })),
   },
 }))
 
@@ -77,13 +86,8 @@ const { NzTabError } = await clientsModulePromise
 const { DatabaseWriteError, TransactionError } = await bulkModulePromise
 const { PartitionNotFoundError } = await timeSeriesModulePromise
 
-const {
-  processRace,
-  processRaces,
-  FetchError,
-  TransformError,
-  WriteError,
-} = await import('../../../src/pipeline/race-processor.js')
+const { processRace, processRaces, FetchError, TransformError, WriteError } =
+  await import('../../../src/pipeline/race-processor.js')
 const { logger } = await import('../../../src/shared/logger.js')
 const { env } = await import('../../../src/shared/env.js')
 
@@ -97,7 +101,7 @@ describe('processRace', () => {
     start_time_nz: '12:00',
   }
 
-const transformedRace: TransformedRace = {
+  const transformedRace: TransformedRace = {
     raceId,
     raceName: 'Test Race',
     status: 'open',
@@ -241,7 +245,11 @@ const transformedRace: TransformedRace = {
     const [transformOrder] = workerExecMock.mock.invocationCallOrder
     const [writeOrder] = bulkUpsertEntrantsMock.mock.invocationCallOrder
 
-    if (fetchOrder === undefined || transformOrder === undefined || writeOrder === undefined) {
+    if (
+      fetchOrder === undefined ||
+      transformOrder === undefined ||
+      writeOrder === undefined
+    ) {
       throw new Error('Expected invocation order indices to be recorded')
     }
 
@@ -470,7 +478,11 @@ const transformedRace: TransformedRace = {
     bulkUpsertRacesMock.mockResolvedValue({ rowCount: 1, duration: 10 })
     bulkUpsertEntrantsMock.mockResolvedValue({ rowCount: 1, duration: 10 })
     insertMoneyFlowHistoryMock.mockRejectedValue(
-      new PartitionNotFoundError('money_flow_history', 'money_flow_history_2025_10_13', '2025-10-13T11:50:00.000Z')
+      new PartitionNotFoundError(
+        'money_flow_history',
+        'money_flow_history_2025_10_13',
+        '2025-10-13T11:50:00.000Z'
+      )
     )
 
     let captured: unknown
@@ -530,7 +542,10 @@ const transformedRace: TransformedRace = {
     }
     const typed = captured
     expect(typed.retryable).toBe(false)
-    expect(typed.result.error).toMatchObject({ retryable: false, type: 'write' })
+    expect(typed.result.error).toMatchObject({
+      retryable: false,
+      type: 'write',
+    })
 
     perfSpy.mockRestore()
   })
@@ -638,7 +653,9 @@ describe('processRaces', () => {
 
   it('aggregates metrics and caps concurrency at the pool limit', async () => {
     const raceIds = ['race-a', 'race-b', 'race-c', 'race-d']
-    fetchRaceDataMock.mockImplementation((id) => Promise.resolve(buildRaceData(id)))
+    fetchRaceDataMock.mockImplementation((id) =>
+      Promise.resolve(buildRaceData(id))
+    )
     workerExecMock.mockImplementation((data) =>
       Promise.resolve(buildTransformedRace(data.id))
     )
@@ -678,14 +695,19 @@ describe('processRaces', () => {
 
   it('increments failure metrics and retryable counts for batch errors', async () => {
     const [successId, failureId] = ['race-success', 'race-failure']
-    fetchRaceDataMock.mockImplementation((id) => Promise.resolve(buildRaceData(id)))
+    fetchRaceDataMock.mockImplementation((id) =>
+      Promise.resolve(buildRaceData(id))
+    )
     workerExecMock.mockImplementation((data) =>
       Promise.resolve(buildTransformedRace(data.id))
     )
     bulkUpsertMeetingsMock.mockResolvedValue({ rowCount: 1, duration: 10 })
     bulkUpsertRacesMock.mockResolvedValue({ rowCount: 1, duration: 10 })
     bulkUpsertEntrantsMock.mockResolvedValue({ rowCount: 1, duration: 10 })
-    insertMoneyFlowHistoryMock.mockResolvedValueOnce({ rowCount: 1, duration: 10 })
+    insertMoneyFlowHistoryMock.mockResolvedValueOnce({
+      rowCount: 1,
+      duration: 10,
+    })
     insertMoneyFlowHistoryMock.mockImplementationOnce(async () => {
       await new Promise((resolve) => {
         setTimeout(resolve, 5)
@@ -698,7 +720,10 @@ describe('processRaces', () => {
     })
     insertOddsHistoryMock.mockResolvedValue({ rowCount: 2, duration: 10 })
 
-    const { results, errors, metrics } = await processRaces([successId, failureId], 3)
+    const { results, errors, metrics } = await processRaces(
+      [successId, failureId],
+      3
+    )
 
     expect(results).toHaveLength(1)
     expect(results[0]?.raceId).toBe(successId)
@@ -712,6 +737,8 @@ describe('processRaces', () => {
       errors[0] instanceof WriteError ? errors[0].result.timings.total_ms : 0
 
     expect(failureDuration).toBeGreaterThanOrEqual(successDuration)
-    expect(metrics.maxDuration_ms).toBe(Math.max(successDuration, failureDuration))
+    expect(metrics.maxDuration_ms).toBe(
+      Math.max(successDuration, failureDuration)
+    )
   })
 })

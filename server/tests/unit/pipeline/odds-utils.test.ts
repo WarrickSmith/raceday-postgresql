@@ -1,9 +1,14 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { describe, expect, it, vi } from 'vitest'
 import type { TransformedRace } from '../../../src/workers/messages.js'
-import { buildOddsRecords, resolveOddsEventTimestamp } from '../../../src/pipeline/odds-utils.js'
+import {
+  buildOddsRecords,
+  resolveOddsEventTimestamp,
+} from '../../../src/pipeline/odds-utils.js'
 
-const buildTransformedRace = (overrides: Partial<TransformedRace> = {}): TransformedRace => ({
+const buildTransformedRace = (
+  overrides: Partial<TransformedRace> = {}
+): TransformedRace => ({
   raceId: 'race-1',
   raceName: 'Test Race',
   status: 'open',
@@ -87,7 +92,7 @@ const buildTransformedRace = (overrides: Partial<TransformedRace> = {}): Transfo
 describe('resolveOddsEventTimestamp', () => {
   it('uses race metadata when available', () => {
     const timestamp = resolveOddsEventTimestamp(buildTransformedRace())
-    expect(timestamp).toBe('2025-10-14T12:00:00Z')
+    expect(timestamp).toBe('2025-10-14T00:00:00+13:00')
   })
 
   it('falls back to money flow polling timestamp when race metadata missing', () => {
@@ -122,13 +127,13 @@ describe('buildOddsRecords', () => {
         entrant_id: 'entrant-1',
         odds: 2.5,
         type: 'fixed_win',
-        event_timestamp: '2025-10-14T12:00:00Z',
+        event_timestamp: '2025-10-14T00:00:00+13:00',
       },
       {
         entrant_id: 'entrant-1',
         odds: 3.1,
         type: 'pool_win',
-        event_timestamp: '2025-10-14T12:00:00Z',
+        event_timestamp: '2025-10-14T00:00:00+13:00',
       },
     ])
   })

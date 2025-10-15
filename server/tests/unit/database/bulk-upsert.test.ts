@@ -145,8 +145,22 @@ describe('bulk-upsert', () => {
 
       // Verify parameterized values (8 fields per meeting including status)
       expect(values).toEqual([
-        'M1', 'Ellerslie', 'NZ', 'thoroughbred', '2025-10-12', 'Good', 'open', 'active',
-        'M2', 'Addington', 'NZ', 'harness', '2025-10-12', null, null, 'active',
+        'M1',
+        'Ellerslie',
+        'NZ',
+        'thoroughbred',
+        '2025-10-12',
+        'Good',
+        'open',
+        'active',
+        'M2',
+        'Addington',
+        'NZ',
+        'harness',
+        '2025-10-12',
+        null,
+        null,
+        'active',
       ])
     })
 
@@ -174,9 +188,15 @@ describe('bulk-upsert', () => {
 
       // Verify WHERE clause with IS DISTINCT FROM predicates
       expect(sql).toContain('WHERE')
-      expect(sql).toContain('meetings.meeting_name IS DISTINCT FROM EXCLUDED.meeting_name')
-      expect(sql).toContain('meetings.country IS DISTINCT FROM EXCLUDED.country')
-      expect(sql).toContain('meetings.track_condition IS DISTINCT FROM EXCLUDED.track_condition')
+      expect(sql).toContain(
+        'meetings.meeting_name IS DISTINCT FROM EXCLUDED.meeting_name'
+      )
+      expect(sql).toContain(
+        'meetings.country IS DISTINCT FROM EXCLUDED.country'
+      )
+      expect(sql).toContain(
+        'meetings.track_condition IS DISTINCT FROM EXCLUDED.track_condition'
+      )
     })
 
     it('should return duration metrics and row count', async () => {
@@ -234,8 +254,8 @@ describe('bulk-upsert', () => {
       expect(sql).toContain('ON CONFLICT (race_id) DO UPDATE SET')
       expect(sql).toContain('IS DISTINCT FROM')
 
-      // Verify timestamp combination
-      expect(values).toContain('2025-10-12T14:30:00Z')
+      // Verify timestamp combination (without redundant :00Z since start_time_nz already includes timezone)
+      expect(values).toContain('2025-10-12T14:30')
     })
 
     it('should include IS DISTINCT FROM for all race fields (AC4)', async () => {
@@ -261,8 +281,12 @@ describe('bulk-upsert', () => {
       const [sql] = insertCall ?? []
 
       expect(sql).toContain('races.status IS DISTINCT FROM EXCLUDED.status')
-      expect(sql).toContain('races.race_number IS DISTINCT FROM EXCLUDED.race_number')
-      expect(sql).toContain('races.start_time IS DISTINCT FROM EXCLUDED.start_time')
+      expect(sql).toContain(
+        'races.race_number IS DISTINCT FROM EXCLUDED.race_number'
+      )
+      expect(sql).toContain(
+        'races.start_time IS DISTINCT FROM EXCLUDED.start_time'
+      )
     })
   })
 
@@ -284,8 +308,8 @@ describe('bulk-upsert', () => {
           barrier: 3,
           is_scratched: false,
           is_late_scratched: false,
-          fixed_win_odds: 3.50,
-          fixed_place_odds: 1.80,
+          fixed_win_odds: 3.5,
+          fixed_place_odds: 1.8,
           pool_win_odds: 3.45,
           pool_place_odds: 1.75,
           hold_percentage: 15.5,
@@ -380,9 +404,15 @@ describe('bulk-upsert', () => {
       const [sql] = insertCall ?? []
 
       // Verify comprehensive change detection
-      expect(sql).toContain('entrants.hold_percentage IS DISTINCT FROM EXCLUDED.hold_percentage')
-      expect(sql).toContain('entrants.win_pool_amount IS DISTINCT FROM EXCLUDED.win_pool_amount')
-      expect(sql).toContain('entrants.is_scratched IS DISTINCT FROM EXCLUDED.is_scratched')
+      expect(sql).toContain(
+        'entrants.hold_percentage IS DISTINCT FROM EXCLUDED.hold_percentage'
+      )
+      expect(sql).toContain(
+        'entrants.win_pool_amount IS DISTINCT FROM EXCLUDED.win_pool_amount'
+      )
+      expect(sql).toContain(
+        'entrants.is_scratched IS DISTINCT FROM EXCLUDED.is_scratched'
+      )
     })
 
     it('should build correct parameterized query for multiple entrants', async () => {

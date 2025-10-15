@@ -2,7 +2,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import type { Mock } from 'vitest'
 import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
-import { fetchRaceData, RaceDataSchema, NzTabError } from '../../src/clients/nztab.js'
+import {
+  fetchRaceData,
+  RaceDataSchema,
+  NzTabError,
+} from '../../src/clients/nztab.js'
 
 // Mock axios and logger
 vi.mock('axios')
@@ -89,22 +93,44 @@ describe('NZ TAB Client', () => {
 
   describe('fetchRaceData - Success path (AC7)', () => {
     it('should successfully fetch and validate race data on first attempt', async () => {
-      const mockRaceData = {
+      const mockApiResponse = {
+        data: {
+          race: {
+            event_id: 'race-456',
+            description: 'Auckland Cup',
+            status: 'Open',
+            race_date_nz: '2025-10-10',
+            start_time_nz: '15:00 NZDT',
+            meeting_id: 'meeting-123',
+            race_number: 1,
+            entrants: [],
+          },
+        },
+      }
+
+      const expectedTransformedData = {
         id: 'race-456',
         name: 'Auckland Cup',
         status: 'open',
         race_date_nz: '2025-10-10',
-        start_time_nz: '15:00',
+        start_time_nz: '15:00 NZDT',
+        meeting_id: 'meeting-123',
+        race_number: 1,
+        entrants: [],
       }
 
       mockAxiosGet.mockResolvedValueOnce({
-        data: mockRaceData,
+        data: mockApiResponse,
         status: 200,
       })
 
-      const result = await fetchRaceData('race-456', undefined, mockAxiosAsInstance)
+      const result = await fetchRaceData(
+        'race-456',
+        undefined,
+        mockAxiosAsInstance
+      )
 
-      expect(result).toEqual(mockRaceData)
+      expect(result).toEqual(expectedTransformedData)
       expect(mockAxiosGet).toHaveBeenCalledTimes(1)
       expect(mockAxiosGet).toHaveBeenCalledWith('/racing/events/race-456', {
         params: {
@@ -118,15 +144,24 @@ describe('NZ TAB Client', () => {
     })
 
     it('should use status-aware params for open races', async () => {
-      const mockRaceData = {
-        id: 'race-789',
-        name: 'Test Race',
-        status: 'open',
-        race_date_nz: '2025-10-10',
-        start_time_nz: '16:00',
+      const mockApiResponse = {
+        data: {
+          race: {
+            event_id: 'race-789',
+            description: 'Test Race',
+            status: 'Open',
+            race_date_nz: '2025-10-10',
+            start_time_nz: '16:00 NZDT',
+            meeting_id: 'meeting-123',
+            race_number: 1,
+            entrants: [],
+          },
+        },
       }
 
-      mockAxiosGet.mockResolvedValueOnce({ data: mockRaceData })
+      mockAxiosGet.mockResolvedValueOnce({
+        data: mockApiResponse,
+      })
 
       await fetchRaceData('race-789', 'open', mockAxiosAsInstance)
 
@@ -142,15 +177,24 @@ describe('NZ TAB Client', () => {
     })
 
     it('should use status-aware params for interim races', async () => {
-      const mockRaceData = {
-        id: 'race-interim',
-        name: 'Interim Race',
-        status: 'interim',
-        race_date_nz: '2025-10-10',
-        start_time_nz: '17:00',
+      const mockApiResponse = {
+        data: {
+          race: {
+            event_id: 'race-interim',
+            description: 'Interim Race',
+            status: 'Interim',
+            race_date_nz: '2025-10-10',
+            start_time_nz: '17:00 NZDT',
+            meeting_id: 'meeting-123',
+            race_number: 1,
+            entrants: [],
+          },
+        },
       }
 
-      mockAxiosGet.mockResolvedValueOnce({ data: mockRaceData })
+      mockAxiosGet.mockResolvedValueOnce({
+        data: mockApiResponse,
+      })
 
       await fetchRaceData('race-interim', 'interim', mockAxiosAsInstance)
 
@@ -162,15 +206,24 @@ describe('NZ TAB Client', () => {
     })
 
     it('should use status-aware params for closed races with dividends', async () => {
-      const mockRaceData = {
-        id: 'race-closed',
-        name: 'Closed Race',
-        status: 'closed',
-        race_date_nz: '2025-10-10',
-        start_time_nz: '18:00',
+      const mockApiResponse = {
+        data: {
+          race: {
+            event_id: 'race-closed',
+            description: 'Closed Race',
+            status: 'Closed',
+            race_date_nz: '2025-10-10',
+            start_time_nz: '18:00 NZDT',
+            meeting_id: 'meeting-123',
+            race_number: 1,
+            entrants: [],
+          },
+        },
       }
 
-      mockAxiosGet.mockResolvedValueOnce({ data: mockRaceData })
+      mockAxiosGet.mockResolvedValueOnce({
+        data: mockApiResponse,
+      })
 
       await fetchRaceData('race-closed', 'closed', mockAxiosAsInstance)
 
@@ -191,21 +244,43 @@ describe('NZ TAB Client', () => {
         message: 'Network timeout',
       }
 
-      const mockRaceData = {
+      const mockApiResponse = {
+        data: {
+          race: {
+            event_id: 'race-retry',
+            description: 'Retry Race',
+            status: 'Open',
+            race_date_nz: '2025-10-10',
+            start_time_nz: '19:00 NZDT',
+            meeting_id: 'meeting-123',
+            race_number: 1,
+            entrants: [],
+          },
+        },
+      }
+
+      const expectedTransformedData = {
         id: 'race-retry',
         name: 'Retry Race',
         status: 'open',
         race_date_nz: '2025-10-10',
-        start_time_nz: '19:00',
+        start_time_nz: '19:00 NZDT',
+        meeting_id: 'meeting-123',
+        race_number: 1,
+        entrants: [],
       }
 
-      mockAxiosGet
-        .mockRejectedValueOnce(networkError)
-        .mockResolvedValueOnce({ data: mockRaceData })
+      mockAxiosGet.mockRejectedValueOnce(networkError).mockResolvedValueOnce({
+        data: mockApiResponse,
+      })
 
-      const result = await fetchRaceData('race-retry', undefined, mockAxiosAsInstance)
+      const result = await fetchRaceData(
+        'race-retry',
+        undefined,
+        mockAxiosAsInstance
+      )
 
-      expect(result).toEqual(mockRaceData)
+      expect(result).toEqual(expectedTransformedData)
       expect(mockAxiosGet).toHaveBeenCalledTimes(2)
     })
 
@@ -216,22 +291,46 @@ describe('NZ TAB Client', () => {
         message: '503 error',
       }
 
-      const mockRaceData = {
+      const mockApiResponse = {
+        data: {
+          race: {
+            event_id: 'race-503',
+            description: '503 Race',
+            status: 'Open',
+            race_date_nz: '2025-10-10',
+            start_time_nz: '20:00 NZDT',
+            meeting_id: 'meeting-123',
+            race_number: 1,
+            entrants: [],
+          },
+        },
+      }
+
+      const expectedTransformedData = {
         id: 'race-503',
         name: '503 Race',
         status: 'open',
         race_date_nz: '2025-10-10',
-        start_time_nz: '20:00',
+        start_time_nz: '20:00 NZDT',
+        meeting_id: 'meeting-123',
+        race_number: 1,
+        entrants: [],
       }
 
       mockAxiosGet
         .mockRejectedValueOnce(serverError)
         .mockRejectedValueOnce(serverError)
-        .mockResolvedValueOnce({ data: mockRaceData })
+        .mockResolvedValueOnce({
+          data: mockApiResponse,
+        })
 
-      const result = await fetchRaceData('race-503', undefined, mockAxiosAsInstance)
+      const result = await fetchRaceData(
+        'race-503',
+        undefined,
+        mockAxiosAsInstance
+      )
 
-      expect(result).toEqual(mockRaceData)
+      expect(result).toEqual(expectedTransformedData)
       expect(mockAxiosGet).toHaveBeenCalledTimes(3)
     })
 
@@ -242,12 +341,19 @@ describe('NZ TAB Client', () => {
         message: 'Timeout',
       }
 
-      const mockRaceData = {
-        id: 'race-backoff',
-        name: 'Backoff Race',
-        status: 'open',
-        race_date_nz: '2025-10-10',
-        start_time_nz: '21:00',
+      const mockApiResponse = {
+        data: {
+          race: {
+            event_id: 'race-backoff',
+            description: 'Backoff Race',
+            status: 'Open',
+            race_date_nz: '2025-10-10',
+            start_time_nz: '21:00 NZDT',
+            meeting_id: 'meeting-123',
+            race_number: 1,
+            entrants: [],
+          },
+        },
       }
 
       const attemptTimestamps: number[] = []
@@ -258,7 +364,9 @@ describe('NZ TAB Client', () => {
           // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
           return Promise.reject(timeoutError)
         }
-        return Promise.resolve({ data: mockRaceData })
+        return Promise.resolve({
+          data: mockApiResponse,
+        })
       })
 
       await fetchRaceData('race-backoff', undefined, mockAxiosAsInstance)
@@ -297,7 +405,9 @@ describe('NZ TAB Client', () => {
 
       mockAxiosGet.mockRejectedValue(serverError)
 
-      await expect(fetchRaceData('race-500', undefined, mockAxiosAsInstance)).rejects.toThrow(NzTabError)
+      await expect(
+        fetchRaceData('race-500', undefined, mockAxiosAsInstance)
+      ).rejects.toThrow(NzTabError)
       expect(mockAxiosGet).toHaveBeenCalledTimes(3)
     })
   })
@@ -339,7 +449,9 @@ describe('NZ TAB Client', () => {
 
       mockAxiosGet.mockRejectedValueOnce(badRequestError)
 
-      await expect(fetchRaceData('race-400', undefined, mockAxiosAsInstance)).rejects.toThrow(NzTabError)
+      await expect(
+        fetchRaceData('race-400', undefined, mockAxiosAsInstance)
+      ).rejects.toThrow(NzTabError)
       expect(mockAxiosGet).toHaveBeenCalledTimes(1)
     })
 
@@ -369,14 +481,23 @@ describe('NZ TAB Client', () => {
   describe('fetchRaceData - Validation errors (AC3)', () => {
     it('should reject malformed payloads that fail schema validation', async () => {
       const invalidData = {
-        id: 'race-invalid',
-        name: 'Invalid Race',
-        status: 'invalid-status', // Invalid enum value
+        event_id: 'race-invalid',
+        description: 'Invalid Race',
+        status: 'Invalid-Status', // Invalid enum value (will be transformed to lowercase)
         race_date_nz: '2025-10-10',
-        start_time_nz: '22:00',
+        start_time_nz: '22:00 NZDT',
+        meeting_id: 'meeting-123',
+        race_number: 1,
+        entrants: [],
       }
 
-      mockAxiosGet.mockResolvedValueOnce({ data: invalidData })
+      mockAxiosGet.mockResolvedValueOnce({
+        data: {
+          data: {
+            race: invalidData,
+          },
+        },
+      })
 
       try {
         await fetchRaceData('race-invalid', undefined, mockAxiosAsInstance)
@@ -391,13 +512,21 @@ describe('NZ TAB Client', () => {
 
     it('should reject payloads missing required fields', async () => {
       const incompleteData = {
-        id: 'race-incomplete',
-        // Missing name, status, race_date_nz, start_time_nz
+        event_id: 'race-incomplete',
+        // Missing description, status, race_date_nz, start_time_nz
       }
 
-      mockAxiosGet.mockResolvedValueOnce({ data: incompleteData })
+      mockAxiosGet.mockResolvedValueOnce({
+        data: {
+          data: {
+            race: incompleteData,
+          },
+        },
+      })
 
-      await expect(fetchRaceData('race-incomplete', undefined, mockAxiosAsInstance)).rejects.toThrow(NzTabError)
+      await expect(
+        fetchRaceData('race-incomplete', undefined, mockAxiosAsInstance)
+      ).rejects.toThrow(NzTabError)
     })
   })
 
@@ -417,7 +546,9 @@ describe('NZ TAB Client', () => {
 
       mockAxiosGet.mockRejectedValue(genericError)
 
-      await expect(fetchRaceData('race-generic-error', undefined, mockAxiosAsInstance)).rejects.toThrow()
+      await expect(
+        fetchRaceData('race-generic-error', undefined, mockAxiosAsInstance)
+      ).rejects.toThrow()
       // Non-Axios errors are non-retriable, so only 1 attempt
       expect(mockAxiosGet).toHaveBeenCalledTimes(1)
     })
