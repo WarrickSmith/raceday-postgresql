@@ -39,7 +39,7 @@ const meetingFixture = {
   name: 'Ellerslie',
   date: '2025-10-14T18:00:00Z',
   track_condition: 'Good',
-  category: 'R',
+  category: 'T',
   category_name: 'Thoroughbred',
   country: 'NZ',
   state: 'NZ',

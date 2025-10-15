@@ -155,6 +155,12 @@ const transformEntrantForBaseline = (
   entrantRaw: unknown
 ): TransformedEntrant | null => {
   if (entrantRaw == null || typeof entrantRaw !== 'object') {
+    logger.debug({
+      raceId,
+      event: 'transform_entrant_invalid_input',
+      inputType: typeof entrantRaw,
+      input: entrantRaw,
+    })
     return null
   }
 
@@ -162,6 +168,19 @@ const transformEntrantForBaseline = (
   const entrantId = entrant.entrantId ?? entrant.entrant_id
   const runnerNumber = entrant.runnerNumber ?? entrant.runner_number
   const name = entrant.name ?? entrant.runner_name
+
+  // Log field availability for debugging
+  logger.debug({
+    raceId,
+    event: 'transform_entrant_fields',
+    availableFields: Object.keys(entrant),
+    hasEntrantId: typeof entrantId === 'string' && entrantId.trim() !== '',
+    hasRunnerNumber: typeof runnerNumber !== 'undefined',
+    hasName: typeof name === 'string' && name.trim() !== '',
+   entrantId,
+    runnerNumber,
+    name,
+  })
 
   // Generate fallback entrantId if missing or empty
   const finalEntrantId =
@@ -371,6 +390,10 @@ const transformRacesForBaseline = (
   const races: NormalizedRaceForUpsert[] = []
   const entrants: TransformedEntrant[] = []
 
+  let totalApiEntrants = 0
+  let transformedEntrants = 0
+  let failedTransformations = 0
+
   for (const race of racePayloads) {
     if (isMeetingData(race.meeting)) {
       const transformedMeeting = transformMeeting(race.meeting)
@@ -402,14 +425,41 @@ const transformRacesForBaseline = (
     })
 
     if (Array.isArray(race.entrants)) {
+      totalApiEntrants += race.entrants.length
+
+      logger.info({
+        raceId: race.id,
+        event: 'transform_race_entrants_start',
+        apiEntrantsCount: race.entrants.length,
+      })
+
       for (const entrant of race.entrants) {
         const transformedEntrant = transformEntrantForBaseline(race.id, entrant)
         if (transformedEntrant != null) {
           entrants.push(transformedEntrant)
+          transformedEntrants++
+        } else {
+          failedTransformations++
         }
       }
+    } else {
+      logger.warn({
+        raceId: race.id,
+        event: 'transform_race_no_entrants',
+        entrantsPresent: Array.isArray(race.entrants),
+        entrantsCount: Array.isArray(race.entrants) ? race.entrants.length : 0,
+      })
     }
   }
+
+  logger.info({
+    event: 'transform_races_complete',
+    totalRaces: racePayloads.length,
+    totalApiEntrants,
+    transformedEntrants,
+    failedTransformations,
+    successRate: totalApiEntrants > 0 ? `${(transformedEntrants / totalApiEntrants * 100).toFixed(1)}%` : '0%',
+  })
 
   return {
     meetings: Array.from(meetingsMap.values()),

@@ -205,7 +205,7 @@ export async function fetchRaceData(
       })
 
       // Extract race data from the nested structure
-      // The API returns data in the format: { data: { race: { ...raceFields } } }
+      // The API returns data in the format: { data: { race: { ...raceFields }, runners: [...] } }
       const responseData = response.data as Record<string, unknown>
       const dataSection = responseData.data as
         | Record<string, unknown>
@@ -221,6 +221,76 @@ export async function fetchRaceData(
 
       // Transform API response to match our schema
       const apiData = raceData
+
+      
+      // Check for both 'runners' and 'entrants' arrays - API uses 'runners' at data level, not race level
+      const runnersArray = dataSection?.runners ??
+                          dataSection?.entrants ??
+                          apiData.runners ??
+                          apiData.entrants
+      const sourceField = Array.isArray(apiData.runners) ? 'runners' :
+                         Array.isArray(apiData.entrants) ? 'entrants' : 'none'
+
+      // Log detailed runners/entrants structure for debugging
+      if (Array.isArray(runnersArray) && runnersArray.length > 0) {
+        logger.info({
+          raceId,
+          event: 'fetch_entrants_structure',
+          sourceField,
+          entrantsCount: runnersArray.length,
+          sampleEntrant: runnersArray[0] as Record<string, unknown>, // Log first entrant structure
+          availableFields: runnersArray.length > 0
+            ? Object.keys(runnersArray[0] as Record<string, never>)
+            : [],
+        })
+      } else {
+        logger.warn({
+          raceId,
+          event: 'fetch_no_entrants',
+          sourceField,
+          hasRunners: Array.isArray(apiData.runners),
+          hasEntrants: Array.isArray(apiData.entrants),
+          runnersCount: Array.isArray(apiData.runners) ? apiData.runners.length : 0,
+          entrantsCount: Array.isArray(apiData.entrants) ? apiData.entrants.length : 0,
+        })
+      }
+
+      // Transform runners to entrants if present
+      const transformedEntrants = Array.isArray(runnersArray)
+        ? runnersArray.map((runner: unknown) => {
+            const runnerData = runner as Record<string, unknown>
+            const oddsData = (runnerData.odds as Record<string, unknown> | undefined) ?? {}
+
+            return {
+              // Only include the fields we need with our naming convention
+              entrantId: runnerData.entrant_id,
+              runnerNumber: runnerData.runner_number,
+              // Extract name field - API uses 'name' field
+              name: runnerData.name,
+              // Handle barrier - API may use 'barrier' or 'barrier_position'
+              barrier: runnerData.barrier_position ?? runnerData.barrier,
+              // Normalize odds data - odds are nested under 'odds' object
+              fixedWinOdds: oddsData.fixed_win,
+              fixedPlaceOdds: oddsData.fixed_place,
+              poolWinOdds: oddsData.pool_win,
+              poolPlaceOdds: oddsData.pool_place,
+              // Normalize scratching status
+              isScratched: runnerData.is_scratched,
+              isLateScratched: runnerData.is_late_scratched,
+              // Map connection details
+              jockey: runnerData.jockey,
+              trainerName: runnerData.trainer_name,
+              // Map visual presentation
+              silkColours: runnerData.silk_colours,
+              silkUrl64: runnerData.silk_url_64x64,
+              silkUrl128: runnerData.silk_url_128x128,
+              // Additional fields that might be useful
+              favourite: runnerData.favourite,
+              mover: runnerData.mover,
+            }
+          })
+        : undefined
+
       /* eslint-disable @typescript-eslint/naming-convention */
       const transformedRaceData = {
         // Only include the fields we need with our naming convention
@@ -237,37 +307,8 @@ export async function fetchRaceData(
         // Use the NZ-specific date and time fields from the API
         race_date_nz: apiData.race_date_nz,
         start_time_nz: apiData.start_time_nz,
-        // Transform entrants if present
-        entrants: Array.isArray(apiData.entrants)
-          ? apiData.entrants.map((entrant: unknown) => {
-              const entrantData = entrant as Record<string, unknown>
-              return {
-                // Only include the fields we need with our naming convention
-                entrantId: entrantData.entrant_id,
-                runnerNumber: entrantData.runner_number,
-                barrier: entrantData.barrier_position ?? entrantData.barrier,
-                // Normalize odds data
-                fixedWinOdds: (entrantData.odds as Record<string, unknown>)
-                  .fixed_win,
-                fixedPlaceOdds: (entrantData.odds as Record<string, unknown>)
-                  .fixed_place,
-                poolWinOdds: (entrantData.odds as Record<string, unknown>)
-                  .pool_win,
-                poolPlaceOdds: (entrantData.odds as Record<string, unknown>)
-                  .pool_place,
-                // Normalize scratching status
-                isScratched: entrantData.is_scratched,
-                isLateScratched: entrantData.is_late_scratched,
-                // Map connection details
-                jockey: entrantData.jockey,
-                trainerName: entrantData.trainer_name,
-                // Map visual presentation
-                silkColours: entrantData.silk_colours,
-                silkUrl64: entrantData.silk_url_64x64,
-                silkUrl128: entrantData.silk_url_128x128,
-              }
-            })
-          : undefined,
+        // Use the transformed entrants
+        entrants: transformedEntrants,
       }
       /* eslint-enable @typescript-eslint/naming-convention */
 
