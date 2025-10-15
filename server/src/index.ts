@@ -3,11 +3,19 @@ import { env } from './shared/env.js'
 import { logger } from './shared/logger.js'
 import { closePool } from './database/pool.js'
 import { workerPool } from './workers/worker-pool.js'
-import { startScheduler, stopScheduler } from './scheduler/index.js'
+import {
+  startScheduler as startDynamicScheduler,
+  stopScheduler as stopDynamicScheduler,
+} from './scheduler/index.js'
+import { startDailyInitializationScheduler } from './initialization/scheduler.js'
 import type { Server } from 'node:http'
 
 // Create and start Express server
 const app = createServer()
+const dailyInitializationScheduler = startDailyInitializationScheduler({
+  runOnStartup: true,
+})
+
 const server: Server = app.listen(env.PORT, '0.0.0.0', () => {
   logger.info({ port: env.PORT }, `Server listening on port ${String(env.PORT)}`)
   logger.info('Health endpoint available at /health')
@@ -19,8 +27,30 @@ const server: Server = app.listen(env.PORT, '0.0.0.0', () => {
     },
     'Worker pool ready at startup'
   )
-  startScheduler()
-  logger.info({ event: 'scheduler_started' }, 'Dynamic scheduler started')
+  void (async () => {
+    try {
+      if (dailyInitializationScheduler.initialRunPromise !== undefined) {
+        await dailyInitializationScheduler.initialRunPromise
+        logger.info(
+          { event: 'daily_initialization_startup_complete' },
+          'Daily baseline initialization completed before starting dynamic scheduler'
+        )
+      } else {
+        logger.info(
+          { event: 'daily_initialization_startup_skipped' },
+          'Daily baseline initialization startup run skipped (runOnStartup disabled)'
+        )
+      }
+    } catch (err) {
+      logger.error(
+        { err },
+        'Daily baseline initialization failed during startup; starting dynamic scheduler anyway'
+      )
+    } finally {
+      startDynamicScheduler()
+      logger.info({ event: 'scheduler_started' }, 'Dynamic scheduler started')
+    }
+  })()
 })
 
 // Graceful shutdown
@@ -50,7 +80,8 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
     logger.error({ err }, 'Error closing Express server')
   }
 
-  await stopScheduler()
+  await dailyInitializationScheduler.stop()
+  await stopDynamicScheduler()
   await closePool(signal)
   await workerPool.shutdown()
 

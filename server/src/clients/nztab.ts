@@ -2,6 +2,7 @@ import axios, { AxiosError, type AxiosInstance } from 'axios'
 import { z } from 'zod'
 import { env } from '../shared/env.js'
 import { logger } from '../shared/logger.js'
+import { MeetingDataSchema, type MeetingData } from './nztab-types.js'
 
 /**
  * Zod schema for race data validation
@@ -23,9 +24,25 @@ export const RaceDataSchema = z
     // Using passthrough to allow additional fields while validating critical ones
   })
   .passthrough()
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export type RaceData = z.infer<typeof RaceDataSchema>
+
+const MeetingsResponseSchema = z
+  .object({
+    data: z.object({
+      meetings: z.array(MeetingDataSchema),
+    }),
+    header: z
+      .object({
+        generated_time: z.string().optional(),
+      })
+      .optional(),
+  })
+  .passthrough()
+/* eslint-enable @typescript-eslint/naming-convention */
+
+const DEFAULT_MEETING_COUNTRIES = new Set(['NZ', 'AU'])
+const DEFAULT_MEETING_CATEGORIES = new Set(['R', 'H']) // R = thoroughbred, H = harness
 
 /**
  * Retry configuration following PRD NFR005 requirements
@@ -286,4 +303,132 @@ export async function fetchRaceData(
 
   // Should never reach here due to throw in loop, but TypeScript needs this
   throw lastError ?? new Error('Unknown error during fetch')
+}
+
+interface FetchMeetingsOptions {
+  countries?: string[]
+  categories?: string[]
+  clientOverride?: AxiosInstance
+}
+
+export async function fetchMeetingsForDate(
+  date: string,
+  options: FetchMeetingsOptions = {}
+): Promise<MeetingData[]> {
+  const client = options.clientOverride ?? getNzTabClient()
+  const countries =
+    options.countries?.map((country) => country.toUpperCase()) ?? Array.from(DEFAULT_MEETING_COUNTRIES)
+  const categories =
+    options.categories?.map((category) => category.toUpperCase()) ??
+    Array.from(DEFAULT_MEETING_CATEGORIES)
+
+  const countriesSet = new Set(countries)
+  const categoriesSet = new Set(categories)
+
+  let lastError: Error | undefined
+
+  for (let attempt = 1; attempt <= RETRY_CONFIG.maxAttempts; attempt++) {
+    const attemptStartedAt = Date.now()
+
+    try {
+      logger.info({
+        event: 'fetch_meetings_start',
+        attempt,
+        date,
+      })
+
+      const response = await client.get<unknown>('/racing/meetings', {
+        params: {
+          ['date_from']: date,
+          ['date_to']: date,
+        },
+      })
+
+      const parsed = MeetingsResponseSchema.parse(response.data)
+      const meetings = parsed.data.meetings.filter((meeting) => {
+        const country =
+          typeof meeting.country === 'string' ? meeting.country.toUpperCase() : ''
+        const category =
+          typeof meeting.category === 'string' ? meeting.category.toUpperCase() : ''
+        return countriesSet.has(country) && categoriesSet.has(category)
+      })
+
+      const duration = Date.now() - attemptStartedAt
+
+      logger.info({
+        event: 'fetch_meetings_success',
+        attempt,
+        date,
+        totalMeetings: parsed.data.meetings.length,
+        filteredMeetings: meetings.length,
+        generatedTime: parsed.header?.generated_time,
+        duration,
+      })
+
+      return meetings
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      const duration = Date.now() - attemptStartedAt
+
+      if (error instanceof z.ZodError) {
+        logger.error({
+          event: 'fetch_meetings_validation_error',
+          attempt,
+          date,
+          duration,
+          errors: error.errors.map((err) => ({
+            path: err.path.join('.'),
+            message: err.message,
+            code: err.code,
+          })),
+        })
+
+        throw new NzTabError(
+          `Meetings data validation failed for date ${date}: ${error.message}`,
+          undefined,
+          undefined,
+          false
+        )
+      }
+
+      const retriable = isRetriableError(error)
+
+      logger.warn({
+        event: retriable ? 'fetch_meetings_retry' : 'fetch_meetings_failure',
+        attempt,
+        date,
+        duration,
+        error: serializeError(error),
+        retriable,
+      })
+
+      if (!retriable || attempt === RETRY_CONFIG.maxAttempts) {
+        throw new NzTabError(
+          `Failed to fetch meetings for date ${date} after ${String(attempt)} attempts: ${lastError.message}`,
+          axios.isAxiosError(error) ? error.response?.status : undefined,
+          undefined,
+          retriable
+        )
+      }
+
+      const delay = RETRY_CONFIG.delays[attempt - 1] ?? 400
+      await new Promise((resolve) => {
+        setTimeout(resolve, delay)
+      })
+    }
+  }
+
+  throw lastError ?? new Error('Unknown error fetching meetings')
+}
+
+const serializeError = (error: unknown): Record<string, unknown> => {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    }
+  }
+
+  return { message: String(error) }
 }

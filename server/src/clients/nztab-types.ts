@@ -49,6 +49,23 @@ export const MeetingDataSchema = z
     meeting_type: z.string().optional().nullable(),
     tote_meeting_number: z.number().int().optional(),
     tote_raceday_date: z.string().optional(),
+    races: z
+      .array(
+        z
+          .object({
+            id: z.string(),
+            race_number: z.number().int().optional().nullable(),
+            name: z.string().optional().nullable(),
+            start_time: z.string().optional().nullable(),
+            advertised_start: z.string().optional().nullable(),
+            race_date_nz: z.string().optional().nullable(),
+            start_time_nz: z.string().optional().nullable(),
+            meeting_id: z.string().optional().nullable(),
+            status: z.string().optional().nullable(),
+          })
+          .passthrough()
+      )
+      .optional(),
   })
   .passthrough()
 
