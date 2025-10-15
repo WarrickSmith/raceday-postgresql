@@ -121,10 +121,11 @@ export function createNzTabClient(): AxiosInstance {
     baseURL: env.NZTAB_API_URL,
     timeout: 5000,
     headers: {
-      'User-Agent': 'RaceDay-PostgreSQL/2.0.0',
+      Accept: 'application/json',
+      'User-Agent': 'RaceDay-Daily-Importer/2.0.0',
       From: env.NZTAB_FROM_EMAIL,
-      'X-Partner': env.NZTAB_PARTNER_NAME,
-      'X-Partner-ID': env.NZTAB_PARTNER_ID,
+      'X-Partner': env.NZTAB_PARTNER_NAME.replace(/_/g, ' '), // Replace underscores with spaces
+      'X-Partner-ID': env.NZTAB_PARTNER_ID.replace(/_/g, '-'), // Replace underscores with hyphens
     },
   })
 }
@@ -195,8 +196,83 @@ export async function fetchRaceData(
         params,
       })
 
+      // Log the raw response for debugging
+      logger.info({
+        raceId,
+        attempt,
+        responseData: response.data,
+        event: 'fetch_raw_response',
+      })
+
+      // Extract race data from the nested structure
+      // The API returns data in the format: { data: { race: { ...raceFields } } }
+      const responseData = response.data as Record<string, unknown>
+      const dataSection = responseData.data as
+        | Record<string, unknown>
+        | undefined
+      const raceData = dataSection?.race as Record<string, unknown> | undefined
+
+      if (raceData == null) {
+        throw new NzTabError(
+          `Invalid API response structure for race ${raceId}: missing data.race object`,
+          undefined
+        )
+      }
+
+      // Transform API response to match our schema
+      const apiData = raceData
+      /* eslint-disable @typescript-eslint/naming-convention */
+      const transformedRaceData = {
+        // Only include the fields we need with our naming convention
+        id: apiData.event_id ?? apiData.id,
+        name: apiData.description ?? apiData.name,
+        // Normalize status values from API (capitalized) to our schema (lowercase)
+        status:
+          typeof apiData.status === 'string'
+            ? apiData.status.toLowerCase()
+            : undefined,
+        // Map API field names to our expected field names
+        meeting_id: apiData.meeting_id,
+        race_number: apiData.race_number,
+        // Use the NZ-specific date and time fields from the API
+        race_date_nz: apiData.race_date_nz,
+        start_time_nz: apiData.start_time_nz,
+        // Transform entrants if present
+        entrants: Array.isArray(apiData.entrants)
+          ? apiData.entrants.map((entrant: unknown) => {
+              const entrantData = entrant as Record<string, unknown>
+              return {
+                // Only include the fields we need with our naming convention
+                entrantId: entrantData.entrant_id,
+                runnerNumber: entrantData.runner_number,
+                barrier: entrantData.barrier_position ?? entrantData.barrier,
+                // Normalize odds data
+                fixedWinOdds: (entrantData.odds as Record<string, unknown>)
+                  .fixed_win,
+                fixedPlaceOdds: (entrantData.odds as Record<string, unknown>)
+                  .fixed_place,
+                poolWinOdds: (entrantData.odds as Record<string, unknown>)
+                  .pool_win,
+                poolPlaceOdds: (entrantData.odds as Record<string, unknown>)
+                  .pool_place,
+                // Normalize scratching status
+                isScratched: entrantData.is_scratched,
+                isLateScratched: entrantData.is_late_scratched,
+                // Map connection details
+                jockey: entrantData.jockey,
+                trainerName: entrantData.trainer_name,
+                // Map visual presentation
+                silkColours: entrantData.silk_colours,
+                silkUrl64: entrantData.silk_url_64x64,
+                silkUrl128: entrantData.silk_url_128x128,
+              }
+            })
+          : undefined,
+      }
+      /* eslint-enable @typescript-eslint/naming-convention */
+
       // Validate response with Zod schema
-      const validatedData = RaceDataSchema.parse(response.data)
+      const validatedData = RaceDataSchema.parse(transformedRaceData)
 
       // Log success
       const duration = Date.now() - attemptStart
@@ -317,7 +393,8 @@ export async function fetchMeetingsForDate(
 ): Promise<MeetingData[]> {
   const client = options.clientOverride ?? getNzTabClient()
   const countries =
-    options.countries?.map((country) => country.toUpperCase()) ?? Array.from(DEFAULT_MEETING_COUNTRIES)
+    options.countries?.map((country) => country.toUpperCase()) ??
+    Array.from(DEFAULT_MEETING_COUNTRIES)
   const categories =
     options.categories?.map((category) => category.toUpperCase()) ??
     Array.from(DEFAULT_MEETING_CATEGORIES)
@@ -335,6 +412,11 @@ export async function fetchMeetingsForDate(
         event: 'fetch_meetings_start',
         attempt,
         date,
+        url: `${String(client.defaults.baseURL)}/racing/meetings`,
+        params: {
+          dateFrom: date,
+          dateTo: date,
+        },
       })
 
       const response = await client.get<unknown>('/racing/meetings', {
@@ -344,12 +426,25 @@ export async function fetchMeetingsForDate(
         },
       })
 
+      logger.debug({
+        event: 'fetch_meetings_response',
+        attempt,
+        date,
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      })
+
       const parsed = MeetingsResponseSchema.parse(response.data)
       const meetings = parsed.data.meetings.filter((meeting) => {
         const country =
-          typeof meeting.country === 'string' ? meeting.country.toUpperCase() : ''
+          typeof meeting.country === 'string'
+            ? meeting.country.toUpperCase()
+            : ''
         const category =
-          typeof meeting.category === 'string' ? meeting.category.toUpperCase() : ''
+          typeof meeting.category === 'string'
+            ? meeting.category.toUpperCase()
+            : ''
         return countriesSet.has(country) && categoriesSet.has(category)
       })
 

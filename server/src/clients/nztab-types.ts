@@ -44,7 +44,7 @@ export const MeetingDataSchema = z
     category_name: z.string(),
     state: z.string(),
     track_condition: z.string(),
-    tote_status: z.string(),
+    tote_status: z.string().optional(), // Made optional as it doesn't exist in API response
     meeting_date: z.string().optional().nullable(), // yyyymmdd format
     meeting_type: z.string().optional().nullable(),
     tote_meeting_number: z.number().int().optional(),
