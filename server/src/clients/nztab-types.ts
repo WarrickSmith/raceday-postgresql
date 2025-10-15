@@ -29,7 +29,7 @@ import { z } from 'zod'
  * - name: Display name of the meeting venue
  * - date: Meeting date in ISO 8601 format (datetime)
  * - country: Country code (e.g., 'NZ', 'AU')
- * - category: Race category/type ('R' = thoroughbred, 'H' = harness, 'G' = greyhounds)
+ * - category: Race category/type ('T' = thoroughbred, 'H' = harness, 'G' = greyhounds)
  * - tote_status: Meeting status for tote betting
  *
  * @see {@link docs/api/nztab-openapi.json#L2200} for full MeetingData schema
@@ -40,7 +40,7 @@ export const MeetingDataSchema = z
     name: z.string(),
     date: z.string().datetime(), // ISO 8601 format
     country: z.string(),
-    category: z.string(), // R = thoroughbred, H = harness, G = greyhounds
+    category: z.string(), // T = thoroughbred, H = harness, G = greyhounds
     category_name: z.string(),
     state: z.string(),
     track_condition: z.string(),

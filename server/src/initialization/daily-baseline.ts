@@ -68,10 +68,10 @@ const transformMeeting = (meeting: MeetingData): TransformedMeeting | null => {
       : null
 
   // Map NZ TAB category codes to database enum values
-  // R = thoroughbred, H = harness, G = greyhounds
+  // T = thoroughbred, H = harness, G = greyhounds
   // Currently only 'thoroughbred' and 'harness' are supported in the database
   const categoryMap: Record<string, 'thoroughbred' | 'harness'> = {
-    R: 'thoroughbred',
+    T: 'thoroughbred',
     H: 'harness',
     thoroughbred: 'thoroughbred',
     harness: 'harness',
@@ -163,9 +163,11 @@ const transformEntrantForBaseline = (
   const runnerNumber = entrant.runnerNumber ?? entrant.runner_number
   const name = entrant.name ?? entrant.runner_name
 
-  if (typeof entrantId !== 'string' || entrantId.trim() === '') {
-    return null
-  }
+  // Generate fallback entrantId if missing or empty
+  const finalEntrantId =
+    typeof entrantId === 'string' && entrantId.trim() !== ''
+      ? entrantId.trim()
+      : `${raceId}-entrant-${String(Date.now())}-${Math.random().toString(36).slice(2, 11)}`
 
   const runnerNumberValue =
     typeof runnerNumber === 'number'
@@ -174,18 +176,17 @@ const transformEntrantForBaseline = (
         ? Number.parseInt(runnerNumber, 10)
         : NaN
 
-  if (!Number.isFinite(runnerNumberValue)) {
-    return null
-  }
+  // Use fallback runner number if parsing fails
+  const finalRunnerNumber = Number.isFinite(runnerNumberValue) ? runnerNumberValue : 0
 
   return {
-    entrant_id: entrantId,
+    entrant_id: finalEntrantId,
     race_id: raceId,
-    runner_number: runnerNumberValue,
+    runner_number: finalRunnerNumber,
     name:
       typeof name === 'string' && name.trim() !== ''
         ? name
-        : `Runner ${String(runnerNumberValue)}`,
+        : `Runner ${String(finalRunnerNumber)}`,
     barrier: toNumberOrNull(entrant.barrier ?? entrant.barrier_number),
     is_scratched: Boolean(entrant.isScratched ?? entrant.is_scratched ?? false),
     is_late_scratched:
