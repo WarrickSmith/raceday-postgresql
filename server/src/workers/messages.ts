@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { RaceDataSchema } from '../clients/nztab-types.js'
+import type { RacePoolData } from '../utils/race-pools.js'
 
 export const workerRequestSchema = z.object({
   taskId: z.string().uuid(),
@@ -27,6 +28,7 @@ export type TransformedMeeting = z.infer<typeof transformedMeetingSchema>
 
 /**
  * Schema for transformed entrant with calculated money flow fields (AC3, AC4, AC6)
+ * Enhanced with Story 2.10 missing fields from NZTAB API
  */
 /* eslint-disable @typescript-eslint/naming-convention */
 export const transformedEntrantSchema = z.object({
@@ -56,6 +58,11 @@ export const transformedEntrantSchema = z.object({
   silk_colours: z.string().optional().nullable(),
   favourite: z.boolean().optional().nullable(),
   mover: z.boolean().optional().nullable(),
+  // Story 2.10: Additional fields from NZTAB API
+  silk_url_64x64: z.string().optional().nullable(),
+  silk_url_128x128: z.string().optional().nullable(),
+  scratch_time: z.number().int().optional().nullable(),
+  runner_change: z.string().optional().nullable(),
 })
 /* eslint-enable @typescript-eslint/naming-convention */
 
@@ -118,7 +125,7 @@ export const transformedRaceSchema = z.object({
     poolFieldCount: z.number().int().nonnegative(),
     moneyFlowRecordCount: z.number().int().nonnegative(),
   }),
-  // Normalized entities for bulk UPSERT (Story 2.5)
+  // Normalized entities for bulk UPSERT (Story 2.5 + Story 2.10)
   meeting: transformedMeetingSchema.optional().nullable(),
   race: z
     .object({
@@ -129,11 +136,40 @@ export const transformedRaceSchema = z.object({
       race_date_nz: z.string(), // YYYY-MM-DD
       start_time_nz: z.string(), // HH:MM
       meeting_id: z.string().optional().nullable(),
+      // Story 2.10: Additional race metadata from NZTAB API
+      actual_start: z.string().datetime().optional().nullable(),
+      tote_start_time: z.string().datetime().optional().nullable(),
+      distance: z.number().int().optional().nullable(),
+      track_condition: z.string().optional().nullable(),
+      track_surface: z.string().optional().nullable(),
+      weather: z.string().optional().nullable(),
+      type: z.string().optional().nullable(),
+      total_prize_money: z.number().optional().nullable(),
+      entrant_count: z.number().int().optional().nullable(),
+      field_size: z.number().int().optional().nullable(),
+      positions_paid: z.number().int().optional().nullable(),
+      silk_url: z.string().optional().nullable(),
+      silk_base_url: z.string().optional().nullable(),
+      video_channels: z.string().optional().nullable(), // JSON string
     })
     .optional()
     .nullable(),
   entrants: z.array(transformedEntrantSchema),
   moneyFlowRecords: z.array(moneyFlowRecordSchema),
+  // Story 2.10: Race pools data extracted from NZTAB API
+  racePools: z.array(z.object({
+    raceId: z.string().min(1),
+    winPoolTotal: z.number().int(),
+    placePoolTotal: z.number().int(),
+    quinellaPoolTotal: z.number().int(),
+    trifectaPoolTotal: z.number().int(),
+    exactaPoolTotal: z.number().int(),
+    first4PoolTotal: z.number().int(),
+    totalRacePool: z.number().int(),
+    currency: z.string(),
+    dataQualityScore: z.number().int(),
+    extractedPools: z.number().int(),
+  })).optional().nullable(),
   // Original payload for debugging/audit trail
   originalPayload: RaceDataSchema.optional(),
 })

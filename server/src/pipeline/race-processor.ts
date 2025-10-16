@@ -6,6 +6,7 @@ import {
   bulkUpsertMeetings,
   bulkUpsertRaces,
   bulkUpsertEntrants,
+  bulkUpsertRacePools,
   DatabaseWriteError,
   TransactionError,
   withTransaction,
@@ -19,6 +20,11 @@ import {
 import type { TransformedRace } from '../workers/messages.js'
 import { logger } from '../shared/logger.js'
 import { buildOddsRecords } from './odds-utils.js'
+import {
+  filterSignificantOddsChanges,
+  populateOddsSnapshotFromDatabase,
+  getOddsSnapshotStats
+} from '../utils/odds-change-detection.js'
 import { env } from '../shared/env.js'
 
 /**
@@ -45,6 +51,7 @@ export interface ProcessRowCounts {
   entrants: number
   moneyFlowHistory: number
   oddsHistory: number
+  racePools: number
 }
 
 export type ProcessStatus = 'success' | 'skipped' | 'failed'
@@ -90,6 +97,7 @@ interface WriteStageOutcome {
     entrants_ms: number
     money_flow_ms: number
     odds_ms: number
+    race_pools_ms: number
   }
 }
 
@@ -99,6 +107,7 @@ const ZERO_ROW_COUNTS: ProcessRowCounts = {
   entrants: 0,
   moneyFlowHistory: 0,
   oddsHistory: 0,
+  racePools: 0,
 }
 
 const zeroRowCounts = (): ProcessRowCounts => ({
@@ -256,6 +265,21 @@ const persistTransformedRace = async (
               start_time_nz: transformed.race.start_time_nz,
               status: transformed.race.status,
               race_date_nz: transformed.race.race_date_nz,
+              // Story 2.10: Additional race metadata
+              actual_start: transformed.race.actual_start ?? null,
+              tote_start_time: transformed.race.tote_start_time ?? null,
+              distance: transformed.race.distance ?? null,
+              track_condition: transformed.race.track_condition ?? null,
+              track_surface: transformed.race.track_surface ?? null,
+              weather: transformed.race.weather ?? null,
+              type: transformed.race.type ?? null,
+              total_prize_money: transformed.race.total_prize_money ?? null,
+              entrant_count: transformed.race.entrant_count ?? null,
+              field_size: transformed.race.field_size ?? null,
+              positions_paid: transformed.race.positions_paid ?? null,
+              silk_url: transformed.race.silk_url ?? null,
+              silk_base_url: transformed.race.silk_base_url ?? null,
+              video_channels: transformed.race.video_channels ?? null,
             },
           ]
         : []
@@ -275,10 +299,28 @@ const persistTransformedRace = async (
         ? await insertMoneyFlowHistory(transformed.moneyFlowRecords, { client })
         : { rowCount: 0, duration: 0 }
 
-    const oddsRecords = buildOddsRecords(transformed)
+    // Build odds records and filter for significant changes (Task 5.2)
+    const allOddsRecords = buildOddsRecords(transformed)
+
+    // Populate odds snapshot from database for enhanced change detection
+    if (allOddsRecords.length > 0) {
+      const entrantIds = [...new Set(allOddsRecords.map(r => r.entrant_id))]
+      const eventTimestamp = allOddsRecords[0]?.event_timestamp || new Date().toISOString()
+      await populateOddsSnapshotFromDatabase(client, entrantIds, eventTimestamp)
+    }
+
+    // Filter odds records to only include significant changes
+    const filteredOddsRecords = filterSignificantOddsChanges(allOddsRecords)
+
     const oddsResult =
-      oddsRecords.length > 0
-        ? await insertOddsHistory(oddsRecords, { client })
+      filteredOddsRecords.length > 0
+        ? await insertOddsHistory(filteredOddsRecords, { client })
+        : { rowCount: 0, duration: 0 }
+
+    // Story 2.10: Race pools processing
+    const racePoolsResult =
+      transformed.racePools && transformed.racePools.length > 0
+        ? await bulkUpsertRacePools(transformed.racePools, client)
         : { rowCount: 0, duration: 0 }
 
     return {
@@ -288,6 +330,7 @@ const persistTransformedRace = async (
         entrants: entrantResult.rowCount,
         moneyFlowHistory: moneyFlowResult.rowCount,
         oddsHistory: oddsResult.rowCount,
+        racePools: racePoolsResult.rowCount,
       },
       breakdown: {
         meetings_ms: Math.round(meetingResult.duration),
@@ -295,6 +338,7 @@ const persistTransformedRace = async (
         entrants_ms: Math.round(entrantResult.duration),
         money_flow_ms: Math.round(moneyFlowResult.duration),
         odds_ms: Math.round(oddsResult.duration),
+        race_pools_ms: Math.round(racePoolsResult.duration),
       },
     }
   })

@@ -21,6 +21,7 @@ import {
   calculateTimeMetadata,
   type PoolData,
 } from './money-flow.js'
+import { extractPoolTotals } from '../utils/race-pools.js'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 
@@ -192,6 +193,9 @@ const transformRace = (payload: RaceData): TransformedRace => {
     }
   }
 
+  // Extract comprehensive race pools data from NZTAB API (Task 3.2)
+  const racePools = extractPoolTotals(payload, payload.id)
+
   const entrantCount = transformedEntrants.length
   const poolFieldCount =
     payload.pools == null
@@ -213,6 +217,7 @@ const transformRace = (payload: RaceData): TransformedRace => {
     race,
     entrants: transformedEntrants,
     moneyFlowRecords,
+    racePools: racePools ? [racePools] : null, // Array to match schema
     originalPayload: payload,
   })
 }

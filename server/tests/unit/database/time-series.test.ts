@@ -6,6 +6,9 @@ import {
   insertOddsHistory,
   getPartitionTableName,
   verifyPartitionExists,
+  ensurePartition,
+  ensureUpcomingPartitions,
+  validatePartitionBeforeWrite,
   PartitionNotFoundError,
   type OddsRecord,
 } from '../../../src/database/time-series.js'
@@ -24,6 +27,7 @@ vi.mock('../../../src/shared/logger.js', () => ({
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
+    debug: vi.fn(),
   },
 }))
 
@@ -207,11 +211,13 @@ describe('time-series', () => {
       expect(params).toEqual(['money_flow_history_2025_10_13'])
     })
 
-    it('should throw PartitionNotFoundError if partition missing (AC7)', async () => {
+    it('should auto-create partition if missing (Task 1.2)', async () => {
       mockQuery
         .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // BEGIN
         .mockResolvedValueOnce({ rows: [{ exists: false }] }) // Partition check fails
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // ROLLBACK
+        .mockResolvedValueOnce({ rows: [] }) // Partition creation
+        .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // INSERT
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // COMMIT
 
       const records: MoneyFlowRecord[] = [
         {
@@ -230,12 +236,27 @@ describe('time-series', () => {
         },
       ]
 
-      await expect(insertMoneyFlowHistory(records)).rejects.toThrow(
-        PartitionNotFoundError
-      )
+      const result = await insertMoneyFlowHistory(records)
 
-      // Verify ROLLBACK was called
-      expect(mockQuery).toHaveBeenCalledWith('ROLLBACK')
+      // Verify partition existence check
+      const partitionCheckCall = mockQuery.mock.calls.find((call) =>
+        String(call[0]).includes('SELECT EXISTS')
+      )
+      expect(partitionCheckCall).toBeDefined()
+      const [, params] = partitionCheckCall ?? []
+      expect(params).toEqual(['money_flow_history_2025_10_13'])
+
+      // Verify partition creation call
+      const createCall = mockQuery.mock.calls.find((call) =>
+        String(call[0]).includes('CREATE TABLE money_flow_history_2025_10_13 PARTITION OF money_flow_history')
+      )
+      expect(createCall).toBeDefined()
+
+      // Verify INSERT was successful
+      expect(result.rowCount).toBe(1)
+
+      // Verify COMMIT was called (not ROLLBACK)
+      expect(mockQuery).toHaveBeenCalledWith('COMMIT')
     })
 
     it('should handle multiple partitions across date boundaries (AC5)', async () => {
@@ -416,11 +437,13 @@ describe('time-series', () => {
       expect(params).toEqual(['odds_history_2025_10_13'])
     })
 
-    it('should throw PartitionNotFoundError if partition missing (AC7)', async () => {
+    it('should auto-create partition if missing (Task 1.2)', async () => {
       mockQuery
         .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // BEGIN
         .mockResolvedValueOnce({ rows: [{ exists: false }] }) // Partition check fails
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // ROLLBACK
+        .mockResolvedValueOnce({ rows: [] }) // Partition creation
+        .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // INSERT
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // COMMIT
 
       const records: OddsRecord[] = [
         {
@@ -431,11 +454,25 @@ describe('time-series', () => {
         },
       ]
 
-      await expect(insertOddsHistory(records)).rejects.toThrow(
-        PartitionNotFoundError
-      )
+      const result = await insertOddsHistory(records)
 
-      expect(mockQuery).toHaveBeenCalledWith('ROLLBACK')
+      // Verify partition existence check
+      const partitionCheckCall = mockQuery.mock.calls.find((call) =>
+        String(call[0]).includes('SELECT EXISTS')
+      )
+      expect(partitionCheckCall).toBeDefined()
+
+      // Verify partition creation call
+      const createCall = mockQuery.mock.calls.find((call) =>
+        String(call[0]).includes('CREATE TABLE odds_history_2025_10_13 PARTITION OF odds_history')
+      )
+      expect(createCall).toBeDefined()
+
+      // Verify INSERT was successful
+      expect(result.rowCount).toBe(1)
+
+      // Verify COMMIT was called (not ROLLBACK)
+      expect(mockQuery).toHaveBeenCalledWith('COMMIT')
     })
 
     it('should handle all odds types correctly', async () => {
@@ -565,6 +602,203 @@ describe('time-series', () => {
         }),
         'Money flow INSERT exceeded 300ms threshold'
       )
+    })
+  })
+
+  describe('ensurePartition', () => {
+    it('should create partition if it does not exist (Task 1.1)', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ exists: false }] }) // Partition check
+        .mockResolvedValueOnce({ rows: [] }) // Partition creation
+
+      const tableName = 'money_flow_history'
+      const date = new Date('2025-10-13T00:00:00Z')
+
+      await ensurePartition(tableName, date)
+
+      // Verify partition existence check
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT EXISTS'),
+        ['money_flow_history_2025_10_13']
+      )
+
+      // Verify partition creation
+      const createCall = mockQuery.mock.calls.find((call) =>
+        String(call[0]).includes('CREATE TABLE money_flow_history_2025_10_13 PARTITION OF money_flow_history')
+      )
+      expect(createCall).toBeDefined()
+      expect(String(createCall?.[0])).toContain('FOR VALUES FROM (\'2025-10-13\') TO (\'2025-10-14\')')
+    })
+
+    it('should not create partition if it already exists (Task 1.1)', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ exists: true }] }) // Partition exists
+
+      const tableName = 'odds_history'
+      const date = new Date('2025-10-13T00:00:00Z')
+
+      await ensurePartition(tableName, date)
+
+      // Verify partition existence check only
+      expect(mockQuery).toHaveBeenCalledTimes(1)
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT EXISTS'),
+        ['odds_history_2025_10_13']
+      )
+
+      // Verify no creation call
+      const createCall = mockQuery.mock.calls.find((call) =>
+        String(call[0]).includes('CREATE TABLE')
+      )
+      expect(createCall).toBeUndefined()
+    })
+
+    it('should throw error when partition creation fails (Task 1.1)', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ exists: false }] }) // Partition check
+        .mockRejectedValueOnce(new Error('Database error')) // Creation fails
+
+      const tableName = 'money_flow_history'
+      const date = new Date('2025-10-13T00:00:00Z')
+
+      await expect(ensurePartition(tableName, date)).rejects.toThrow(
+        'Failed to create partition money_flow_history_2025_10_13: Database error'
+      )
+    })
+
+    it('should handle different date scenarios correctly (Task 1.1)', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ exists: false }] }) // Today
+        .mockResolvedValueOnce({ rows: [] }) // Create today
+        .mockResolvedValueOnce({ rows: [{ exists: false }] }) // Tomorrow
+        .mockResolvedValueOnce({ rows: [] }) // Create tomorrow
+
+      // Test today
+      const today = new Date('2025-10-13T14:30:00Z')
+      await ensurePartition('money_flow_history', today)
+
+      // Test tomorrow
+      const tomorrow = new Date('2025-10-14T00:00:00Z')
+      await ensurePartition('money_flow_history', tomorrow)
+
+      // Verify both partitions were created with correct date ranges
+      const createCalls = mockQuery.mock.calls.filter((call) =>
+        String(call[0]).includes('CREATE TABLE')
+      )
+      expect(createCalls.length).toBe(2)
+
+      expect(String(createCalls[0]?.[0])).toContain('FOR VALUES FROM (\'2025-10-13\') TO (\'2025-10-14\')')
+      expect(String(createCalls[1]?.[0])).toContain('FOR VALUES FROM (\'2025-10-14\') TO (\'2025-10-15\')')
+    })
+  })
+
+  describe('ensureUpcomingPartitions', () => {
+    it('should ensure both today and tomorrow partitions exist (Task 1.3)', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ exists: false }] }) // Today check
+        .mockResolvedValueOnce({ rows: [] }) // Today creation
+        .mockResolvedValueOnce({ rows: [{ exists: false }] }) // Tomorrow check
+        .mockResolvedValueOnce({ rows: [] }) // Tomorrow creation
+
+      await ensureUpcomingPartitions('money_flow_history')
+
+      // Verify 4 calls: 2 existence checks + 2 creation calls
+      expect(mockQuery).toHaveBeenCalledTimes(4)
+
+      // Verify partition creation calls
+      const createCalls = mockQuery.mock.calls.filter((call) =>
+        String(call[0]).includes('CREATE TABLE')
+      )
+      expect(createCalls.length).toBe(2)
+    })
+
+    it('should handle existing partitions gracefully (Task 1.3)', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ exists: true }] }) // Today exists
+        .mockResolvedValueOnce({ rows: [{ exists: true }] }) // Tomorrow exists
+
+      await ensureUpcomingPartitions('odds_history')
+
+      // Verify 2 calls: existence checks only
+      expect(mockQuery).toHaveBeenCalledTimes(2)
+
+      // Verify no creation calls
+      const createCalls = mockQuery.mock.calls.filter((call) =>
+        String(call[0]).includes('CREATE TABLE')
+      )
+      expect(createCalls.length).toBe(0)
+    })
+
+    it('should throw error when partition creation fails (Task 1.3)', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ exists: false }] }) // Today check
+        .mockRejectedValueOnce(new Error('Connection failed')) // Creation fails
+
+      await expect(ensureUpcomingPartitions('money_flow_history')).rejects.toThrow(
+        'Connection failed'
+      )
+    })
+  })
+
+  describe('validatePartitionBeforeWrite', () => {
+    it('should auto-create missing partition before write (Task 1.2)', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ exists: false }] }) // Partition check
+        .mockResolvedValueOnce({ rows: [] }) // Partition creation
+
+      const tableName = 'money_flow_history'
+      const eventTimestamp = '2025-10-13T14:30:00Z'
+
+      await validatePartitionBeforeWrite(tableName, eventTimestamp)
+
+      // Verify partition existence check
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT EXISTS'),
+        ['money_flow_history_2025_10_13']
+      )
+
+      // Verify partition creation call
+      const createCall = mockQuery.mock.calls.find((call) =>
+        String(call[0]).includes('CREATE TABLE')
+      )
+      expect(createCall).toBeDefined()
+    })
+
+    it('should skip creation if partition exists (Task 1.2)', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ exists: true }] }) // Partition exists
+
+      const tableName = 'odds_history'
+      const eventTimestamp = '2025-10-13T14:30:00Z'
+
+      await validatePartitionBeforeWrite(tableName, eventTimestamp)
+
+      // Verify single existence check only
+      expect(mockQuery).toHaveBeenCalledTimes(1)
+
+      // Verify no creation call
+      const createCall = mockQuery.mock.calls.find((call) =>
+        String(call[0]).includes('CREATE TABLE')
+      )
+      expect(createCall).toBeUndefined()
+    })
+
+    it('should handle edge case date scenarios (Task 1.2)', async () => {
+      mockQuery
+        .mockResolvedValueOnce({ rows: [{ exists: false }] }) // Partition check
+        .mockResolvedValueOnce({ rows: [] }) // Partition creation
+
+      // Test year boundary
+      const tableName = 'money_flow_history'
+      const eventTimestamp = '2025-12-31T23:59:59Z'
+
+      await validatePartitionBeforeWrite(tableName, eventTimestamp)
+
+      // Verify correct partition name and date range
+      const createCall = mockQuery.mock.calls.find((call) =>
+        String(call[0]).includes('CREATE TABLE')
+      )
+      expect(createCall).toBeDefined()
+      expect(String(createCall?.[0])).toContain('money_flow_history_2025_12_31')
+      expect(String(createCall?.[0])).toContain('FOR VALUES FROM (\'2025-12-31\') TO (\'2026-01-01\')')
     })
   })
 })

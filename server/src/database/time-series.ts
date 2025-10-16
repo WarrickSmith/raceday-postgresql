@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg'
 import { logger } from '../shared/logger.js'
 import { withTransaction, DatabaseWriteError } from './bulk-upsert.js'
 import type { MoneyFlowRecord } from '../workers/messages.js'
+import { pool } from './index.js'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 
@@ -10,8 +11,13 @@ import type { MoneyFlowRecord } from '../workers/messages.js'
  *
  * **Timestamp Field:**
  * - `event_timestamp`: Represents when the odds observation occurred.
- *   Set to race start time (from race_date_nz + start_time_nz) for accurate
- *   temporal tracking and partition routing. See race-processor.ts for implementation.
+ *   Set to race start time derived from NZTAB API fields (race_date_nz + start_time_nz)
+ *   for accurate temporal tracking and NZ-aligned partition routing.
+ *
+ * **IMPORTANT TIME ZONE NOTE:**
+ * NZTAB API provides race_date_nz and start_time_nz fields in New Zealand local time.
+ * These fields are already in NZ timezone and should NOT be converted to UTC.
+ * This ensures partitions align with NZ race days, not UTC calendar days.
  */
 export interface OddsRecord {
   entrant_id: string
@@ -43,15 +49,21 @@ export class PartitionNotFoundError extends DatabaseWriteError {
 /**
  * Extract date from event_timestamp and construct partition table name (AC5)
  * Format: {base_table}_{YYYY_MM_DD}
+ *
+ * IMPORTANT: Uses NZ local time instead of UTC for partition naming.
+ * NZTAB API provides race_date_nz and start_time_nz fields that are already
+ * in New Zealand local time and should NOT be converted to UTC.
+ * Races occur during NZ daylight hours, so partition alignment with NZ dates
+ * prevents data from going to wrong partition when race spans midnight UTC.
  */
 export const getPartitionTableName = (
   baseTable: string,
   eventTimestamp: string
 ): string => {
-  const date = new Date(eventTimestamp)
-  const year = String(date.getUTCFullYear())
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(date.getUTCDate()).padStart(2, '0')
+  // Extract date part from ISO timestamp to avoid timezone conversion issues
+  // This preserves the original date from the timestamp regardless of local timezone
+  const datePart = eventTimestamp.split('T')[0] // YYYY-MM-DD format
+  const [year, month, day] = datePart.split('-')
   return `${baseTable}_${year}_${month}_${day}`
 }
 
@@ -77,6 +89,142 @@ export const verifyPartitionExists = async (
   )
 
   return result.rows[0]?.exists ?? false
+}
+
+/**
+ * Ensure partition exists for time-series table on specified date (Task 1.1)
+ * Creates daily partition automatically if it doesn't exist
+ *
+ * @param tableName - Base table name (e.g., 'money_flow_history', 'odds_history')
+ * @param date - Date for which to create partition
+ * @returns Promise resolving when partition is verified/created
+ */
+export const ensurePartition = async (
+  tableName: string,
+  date: Date
+): Promise<void> => {
+  const partitionName = getPartitionTableName(tableName, date.toISOString())
+  const startDate = date.toISOString().split('T')[0] // YYYY-MM-DD
+  const endDate = new Date(date.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+  // Use a dedicated client from the pool for partition operations
+  const client = await pool.connect()
+
+  try {
+    // Check if partition exists
+    const exists = await verifyPartitionExists(client, partitionName)
+
+    if (exists) {
+      logger.debug(
+        { tableName, partitionName, date: startDate },
+        'Partition already exists'
+      )
+      return
+    }
+
+    // Create partition for the specified date
+    const createPartitionSQL = `
+      CREATE TABLE ${partitionName} PARTITION OF ${tableName}
+      FOR VALUES FROM ('${startDate}') TO ('${endDate}')
+    `
+
+    await client.query(createPartitionSQL)
+
+    logger.info(
+      {
+        tableName,
+        partitionName,
+        date: startDate,
+        duration_ms: performance.now()
+      },
+      'Created partition for time-series table'
+    )
+  } catch (error) {
+    logger.error(
+      {
+        tableName,
+        partitionName,
+        date: startDate,
+        error: error instanceof Error ? error.message : String(error)
+      },
+      'Failed to create partition'
+    )
+    throw new Error(`Failed to create partition ${partitionName}: ${error instanceof Error ? error.message : String(error)}`)
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Ensure partitions exist for today and tomorrow (Task 1.3)
+ * Creates proactive partitions for current and next day
+ */
+export const ensureUpcomingPartitions = async (
+  tableName: string
+): Promise<void> => {
+  const today = new Date()
+  const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000)
+
+  try {
+    // Ensure today's partition exists
+    await ensurePartition(tableName, today)
+
+    // Ensure tomorrow's partition exists
+    await ensurePartition(tableName, tomorrow)
+
+    logger.info(
+      {
+        tableName,
+        today: today.toISOString().split('T')[0],
+        tomorrow: tomorrow.toISOString().split('T')[0]
+      },
+      'Upcoming partitions ensured'
+    )
+  } catch (error) {
+    logger.error(
+      {
+        tableName,
+        error: error instanceof Error ? error.message : String(error)
+      },
+      'Failed to ensure upcoming partitions'
+    )
+    throw error
+  }
+}
+
+/**
+ * Check and ensure partitions exist before time-series writes (Task 1.2)
+ * Validates partition existence and creates if missing
+ */
+export const validatePartitionBeforeWrite = async (
+  tableName: string,
+  eventTimestamp: string
+): Promise<void> => {
+  const date = new Date(eventTimestamp)
+  const partitionName = getPartitionTableName(tableName, eventTimestamp)
+
+  // Quick check using existing verifyPartitionExists function
+  const client = await pool.connect()
+  try {
+    const exists = await verifyPartitionExists(client, partitionName)
+
+    if (!exists) {
+      logger.warn(
+        {
+          tableName,
+          partitionName,
+          eventTimestamp,
+          date: date.toISOString().split('T')[0]
+        },
+        'Partition missing before write, creating automatically'
+      )
+
+      // Create partition automatically
+      await ensurePartition(tableName, date)
+    }
+  } finally {
+    client.release()
+  }
 }
 
 /**
@@ -119,20 +267,8 @@ const insertMoneyFlowHistoryWithClient = async (
 
   // Insert to each partition separately (AC5)
   for (const [partitionName, partitionRecords] of recordsByPartition) {
-    // Verify partition exists before INSERT (AC5)
-    const exists = await verifyPartitionExists(client, partitionName)
-
-    if (!exists) {
-      const [firstRecord] = partitionRecords
-      if (firstRecord === undefined) {
-        throw new Error('No records found for partition')
-      }
-      throw new PartitionNotFoundError(
-        tableName,
-        partitionName,
-        firstRecord.polling_timestamp
-      )
-    }
+    // Auto-create partition if missing (Task 1.2)
+    await validatePartitionBeforeWrite(tableName, partitionRecords[0]!.polling_timestamp)
 
     // Build parameterized multi-row INSERT (AC3)
     const values: unknown[] = []
@@ -248,20 +384,8 @@ export const insertMoneyFlowHistory = async (
 
     // Insert to each partition separately (AC5)
     for (const [partitionName, partitionRecords] of recordsByPartition) {
-      // Verify partition exists before INSERT (AC5)
-      const exists = await verifyPartitionExists(client, partitionName)
-
-      if (!exists) {
-        const [firstRecord] = partitionRecords
-        if (firstRecord === undefined) {
-          throw new Error('No records found for partition')
-        }
-        throw new PartitionNotFoundError(
-          tableName,
-          partitionName,
-          firstRecord.polling_timestamp
-        )
-      }
+      // Auto-create partition if missing (Task 1.2)
+      await validatePartitionBeforeWrite(tableName, partitionRecords[0]!.polling_timestamp)
 
       // Build parameterized multi-row INSERT (AC3)
       const values: unknown[] = []
@@ -381,20 +505,8 @@ const insertOddsHistoryWithClient = async (
 
   // Insert to each partition separately (AC5)
   for (const [partitionName, partitionRecords] of recordsByPartition) {
-    // Verify partition exists before INSERT (AC5)
-    const exists = await verifyPartitionExists(client, partitionName)
-
-    if (!exists) {
-      const [firstRecord] = partitionRecords
-      if (firstRecord === undefined) {
-        throw new Error('No records found for partition')
-      }
-      throw new PartitionNotFoundError(
-        tableName,
-        partitionName,
-        firstRecord.event_timestamp
-      )
-    }
+    // Auto-create partition if missing (Task 1.2)
+    await validatePartitionBeforeWrite(tableName, partitionRecords[0]!.event_timestamp)
 
     // Build parameterized multi-row INSERT (AC3)
     const values: unknown[] = []
