@@ -31,28 +31,24 @@
 - Universal entry point for BMM workflows. Checks for existing workflow status, displays current state, suggests next actions, or helps plan new workflow. Can be invoked by any agent (bmad-master, analyst, pm) to understand where the project is and what to do next.
 
 **gdd**
-- Path: `bmad/bmm/workflows/2-plan/gdd/workflow.yaml`
+- Path: `bmad/bmm/workflows/2-plan-workflows/gdd/workflow.yaml`
 - Game Design Document workflow for all game project levels - from small prototypes to full AAA games. Generates comprehensive GDD with game mechanics, systems, progression, and implementation guidance.
 
 **narrative**
-- Path: `bmad/bmm/workflows/2-plan/narrative/workflow.yaml`
+- Path: `bmad/bmm/workflows/2-plan-workflows/narrative/workflow.yaml`
 - Narrative design workflow for story-driven games and applications. Creates comprehensive narrative documentation including story structure, character arcs, dialogue systems, and narrative implementation guidance.
 
 **prd**
-- Path: `bmad/bmm/workflows/2-plan/prd/workflow.yaml`
-- Scale-adaptive PRD workflow for project levels 1-4. Level 1-2: focused PRD + solutioning handoff. Level 3-4: full PRD with epics + architect handoff. Automatically adjusts scope based on project complexity.
+- Path: `bmad/bmm/workflows/2-plan-workflows/prd/workflow.yaml`
+- Unified PRD workflow for project levels 2-4. Produces strategic PRD and tactical epic breakdown. Hands off to solution-architecture workflow for technical design. Note: Level 0-1 use tech-spec workflow.
 
 **tech-spec-sm**
-- Path: `bmad/bmm/workflows/2-plan/tech-spec/workflow.yaml`
+- Path: `bmad/bmm/workflows/2-plan-workflows/tech-spec/workflow.yaml`
 - Technical specification workflow for Level 0 projects (single atomic changes). Creates focused tech spec for bug fixes, single endpoint additions, or small isolated changes. Tech-spec only - no PRD needed.
 
 **ux-spec**
-- Path: `bmad/bmm/workflows/2-plan/ux/workflow.yaml`
+- Path: `bmad/bmm/workflows/2-plan-workflows/ux/workflow.yaml`
 - UX/UI specification workflow for defining user experience and interface design. Creates comprehensive UX documentation including wireframes, user flows, component specifications, and design system guidelines.
-
-**plan-project**
-- Path: `bmad/bmm/workflows/2-plan/workflow.yaml`
-- Scale-adaptive project planning workflow for all project levels (0-4). Automatically adjusts outputs based on project scope - from single atomic changes (Level 0: tech-spec only) to enterprise platforms (Level 4: full PRD + epics). Level 2-4 route to 3-solutioning workflow for architecture and tech specs. Generates appropriate planning artifacts for each level.
 
 **tech-spec**
 - Path: `bmad/bmm/workflows/3-solutioning/tech-spec/workflow.yaml`
@@ -96,35 +92,35 @@
 
 **testarch-atdd**
 - Path: `bmad/bmm/workflows/testarch/atdd/workflow.yaml`
-- Generate failing acceptance tests before implementation.
+- Generate failing acceptance tests before implementation using TDD red-green-refactor cycle
 
 **testarch-automate**
 - Path: `bmad/bmm/workflows/testarch/automate/workflow.yaml`
-- Expand automation coverage after implementation.
+- Expand test automation coverage after implementation or analyze existing codebase to generate comprehensive test suite
 
 **testarch-ci**
 - Path: `bmad/bmm/workflows/testarch/ci/workflow.yaml`
-- Scaffold or update the CI/CD quality pipeline.
+- Scaffold CI/CD quality pipeline with test execution, burn-in loops, and artifact collection
 
 **testarch-framework**
 - Path: `bmad/bmm/workflows/testarch/framework/workflow.yaml`
-- Initialize or refresh the test framework harness.
-
-**testarch-gate**
-- Path: `bmad/bmm/workflows/testarch/gate/workflow.yaml`
-- Record the quality gate decision for the story.
+- Initialize production-ready test framework architecture (Playwright or Cypress) with fixtures, helpers, and configuration
 
 **testarch-nfr**
 - Path: `bmad/bmm/workflows/testarch/nfr-assess/workflow.yaml`
-- Assess non-functional requirements before release.
+- Assess non-functional requirements (performance, security, reliability, maintainability) before release with evidence-based validation
 
-**testarch-plan**
+**testarch-test-design**
 - Path: `bmad/bmm/workflows/testarch/test-design/workflow.yaml`
-- Plan risk mitigation and test coverage before development.
+- Plan risk mitigation and test coverage strategy before development with risk assessment and prioritization
+
+**testarch-test-review**
+- Path: `bmad/bmm/workflows/testarch/test-review/workflow.yaml`
+- Review test quality using comprehensive knowledge base and best practices validation
 
 **testarch-trace**
 - Path: `bmad/bmm/workflows/testarch/trace/workflow.yaml`
-- Trace requirements to implemented automated tests.
+- Generate requirements-to-tests traceability matrix, analyze coverage, and make quality gate decision (PASS/CONCERNS/FAIL/WAIVED)
 
 
 ## Execution

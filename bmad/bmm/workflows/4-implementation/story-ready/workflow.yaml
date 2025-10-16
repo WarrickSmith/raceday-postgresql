@@ -22,18 +22,3 @@ variables:
 
 # Output configuration - no output file, just status updates
 default_output_file: ""
-
-required_tools:
-  - read_file
-  - edit_file
-
-tags:
-  - story-management
-  - status-update
-  - sm-agent
-  - bmad-v6
-
-execution_hints:
-  interactive: false # Minimal prompts; quick status update
-  autonomous: true # Proceed without user input
-  iterative: false # Single-pass workflow

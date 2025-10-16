@@ -2,6 +2,10 @@
 
 ## Available Workflows in bmb
 
+**audit-workflow**
+- Path: `bmad/bmb/workflows/audit-workflow/workflow.yaml`
+- Comprehensive workflow quality audit - validates structure, config standards, variable usage, bloat detection, and web_bundle completeness. Performs deep analysis of workflow.yaml, instructions.md, template.md, and web_bundle configuration against BMAD v6 standards.
+
 **convert-legacy**
 - Path: `bmad/bmb/workflows/convert-legacy/workflow.yaml`
 - Converts legacy BMAD v4 or similar items (agents, workflows, modules) to BMad Core compliant format with proper structure and conventions

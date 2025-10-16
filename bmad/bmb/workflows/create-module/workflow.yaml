@@ -5,11 +5,9 @@ author: "BMad"
 
 # Critical variables load from config_source
 config_source: "{project-root}/bmad/bmb/config.yaml"
-output_folder: "{config_source}:output_folder"
 custom_module_location: "{config_source}:custom_module_location"
 communication_language: "{config_source}:communication_language"
 user_name: "{config_source}:user_name"
-date: system-generated
 
 # Reference guides for module building
 module_structure_guide: "{installed_path}/module-structure.md"
@@ -39,3 +37,5 @@ validation: "{installed_path}/checklist.md"
 # Output configuration - creates entire module structure
 # Save to custom_module_location/{{module_code}}
 installer_output_folder: "{custom_module_location}/{{module_code}}"
+
+# Web bundle configuration

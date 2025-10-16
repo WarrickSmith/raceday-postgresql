@@ -3,10 +3,11 @@ name: product-brief
 description: "Interactive product brief creation workflow that guides users through defining their product vision with multiple input sources and conversational collaboration"
 author: "BMad"
 
-# Critical variables
+# Critical variables from config
 config_source: "{project-root}/bmad/bmm/config.yaml"
 output_folder: "{config_source}:output_folder"
 user_name: "{config_source}:user_name"
+communication_language: "{config_source}:communication_language"
 date: system-generated
 
 # Optional input documents
@@ -27,4 +28,3 @@ default_output_file: "{output_folder}/product-brief-{{project_name}}-{{date}}.md
 
 # Workflow settings
 autonomous: false # This is an interactive workflow requiring user collaboration
-brief_format: "comprehensive" # Options: "comprehensive" (full detail) or "executive" (3-page limit)

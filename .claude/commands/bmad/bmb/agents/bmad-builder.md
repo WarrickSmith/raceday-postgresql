@@ -7,7 +7,7 @@
 <activation critical="MANDATORY">
   <step n="1">Load persona from this current agent file (already in context)</step>
   <step n="2">🚨 IMMEDIATE ACTION REQUIRED - BEFORE ANY OUTPUT:
-      - Load and read /home/warrick/Dev/raceday-postgresql/bmad/bmb/config.yaml NOW
+      - Load and read {project-root}/bmad/bmb/config.yaml NOW
       - Store ALL fields as session variables: {user_name}, {communication_language}, {output_folder}
       - VERIFY: If config not loaded, STOP and report error to user
       - DO NOT PROCEED to step 3 until config is successfully loaded and variables stored</step>
@@ -25,7 +25,7 @@
       <handlers>
   <handler type="workflow">
     When menu item has: workflow="path/to/workflow.yaml"
-    1. CRITICAL: Always LOAD /home/warrick/Dev/raceday-postgresql/bmad/core/tasks/workflow.xml
+    1. CRITICAL: Always LOAD {project-root}/bmad/core/tasks/workflow.xml
     2. Read the complete file - this is the CORE OS for executing BMAD workflows
     3. Pass the yaml path as 'workflow-config' parameter to those instructions
     4. Execute workflow.xml instructions precisely following all steps
@@ -52,12 +52,13 @@
   </persona>
   <menu>
     <item cmd="*help">Show numbered menu</item>
-    <item cmd="*convert" workflow="/home/warrick/Dev/raceday-postgresql/bmad/bmb/workflows/convert-legacy/workflow.yaml">Convert v4 or any other style task agent or template to a workflow</item>
-    <item cmd="*create-agent" workflow="/home/warrick/Dev/raceday-postgresql/bmad/bmb/workflows/create-agent/workflow.yaml">Create a new BMAD Core compliant agent</item>
-    <item cmd="*create-module" workflow="/home/warrick/Dev/raceday-postgresql/bmad/bmb/workflows/create-module/workflow.yaml">Create a complete BMAD module (brainstorm → brief → build with agents and workflows)</item>
-    <item cmd="*create-workflow" workflow="/home/warrick/Dev/raceday-postgresql/bmad/bmb/workflows/create-workflow/workflow.yaml">Create a new BMAD Core workflow with proper structure</item>
-    <item cmd="*edit-workflow" workflow="/home/warrick/Dev/raceday-postgresql/bmad/bmb/workflows/edit-workflow/workflow.yaml">Edit existing workflows while following best practices</item>
-    <item cmd="*redoc" workflow="/home/warrick/Dev/raceday-postgresql/bmad/bmb/workflows/redoc/workflow.yaml">Create or update module documentation</item>
+    <item cmd="*audit-workflow" workflow="{project-root}/bmad/bmb/workflows/audit-workflow/workflow.yaml">Audit existing workflows for BMAD Core compliance and best practices</item>
+    <item cmd="*convert" workflow="{project-root}/bmad/bmb/workflows/convert-legacy/workflow.yaml">Convert v4 or any other style task agent or template to a workflow</item>
+    <item cmd="*create-agent" workflow="{project-root}/bmad/bmb/workflows/create-agent/workflow.yaml">Create a new BMAD Core compliant agent</item>
+    <item cmd="*create-module" workflow="{project-root}/bmad/bmb/workflows/create-module/workflow.yaml">Create a complete BMAD module (brainstorm → brief → build with agents and workflows)</item>
+    <item cmd="*create-workflow" workflow="{project-root}/bmad/bmb/workflows/create-workflow/workflow.yaml">Create a new BMAD Core workflow with proper structure</item>
+    <item cmd="*edit-workflow" workflow="{project-root}/bmad/bmb/workflows/edit-workflow/workflow.yaml">Edit existing workflows while following best practices</item>
+    <item cmd="*redoc" workflow="{project-root}/bmad/bmb/workflows/redoc/workflow.yaml">Create or update module documentation</item>
     <item cmd="*exit">Exit with confirmation</item>
   </menu>
 </agent>

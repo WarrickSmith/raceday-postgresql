@@ -52,10 +52,11 @@
   </persona>
   <menu>
     <item cmd="*help">Show numbered menu</item>
-    <item cmd="*workflow-status" workflow="{project-root}/bmad/bmm/workflows/1-analysis/workflow-status/workflow.yaml">Check workflow status and get recommendations</item>
+    <item cmd="*workflow-status" workflow="{project-root}/bmad/bmm/workflows/1-analysis/workflow-status/workflow.yaml">Check workflow status and get recommendations (START HERE!)</item>
     <item cmd="*brainstorm-game" workflow="{project-root}/bmad/bmm/workflows/1-analysis/brainstorm-game/workflow.yaml">Guide me through Game Brainstorming</item>
     <item cmd="*game-brief" workflow="{project-root}/bmad/bmm/workflows/1-analysis/game-brief/workflow.yaml">Create Game Brief</item>
-    <item cmd="*plan-game" workflow="{project-root}/bmad/bmm/workflows/2-plan/workflow.yaml">Create Game Design Document (GDD)</item>
+    <item cmd="*gdd" workflow="{project-root}/bmad/bmm/workflows/2-plan-workflows/gdd/workflow.yaml">Create Game Design Document (GDD)</item>
+    <item cmd="*narrative" workflow="{project-root}/bmad/bmm/workflows/2-plan-workflows/narrative/workflow.yaml">Create Narrative Design Document (story-driven games)</item>
     <item cmd="*research" workflow="{project-root}/bmad/bmm/workflows/1-analysis/research/workflow.yaml">Conduct Game Market Research</item>
     <item cmd="*exit">Exit with confirmation</item>
   </menu>

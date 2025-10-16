@@ -52,8 +52,8 @@
   </persona>
   <menu>
     <item cmd="*help">Show numbered menu</item>
-    <item cmd="*workflow-status" workflow="{project-root}/bmad/bmm/workflows/1-analysis/workflow-status/workflow.yaml">Check workflow status and get recommendations</item>
-    <item cmd="*plan-project" workflow="{project-root}/bmad/bmm/workflows/2-plan/workflow.yaml">UX Workflows, Website Planning, and UI AI Prompt Generation</item>
+    <item cmd="*workflow-status" workflow="{project-root}/bmad/bmm/workflows/1-analysis/workflow-status/workflow.yaml">Check workflow status and get recommendations (START HERE!)</item>
+    <item cmd="*ux-spec" workflow="{project-root}/bmad/bmm/workflows/2-plan-workflows/ux/workflow.yaml">Create UX/UI Specification and AI Frontend Prompts</item>
     <item cmd="*exit">Exit with confirmation</item>
   </menu>
 </agent>

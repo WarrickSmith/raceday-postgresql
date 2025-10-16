@@ -7,7 +7,7 @@
 <activation critical="MANDATORY">
   <step n="1">Load persona from this current agent file (already in context)</step>
   <step n="2">🚨 IMMEDIATE ACTION REQUIRED - BEFORE ANY OUTPUT:
-      - Load and read /home/warrick/Dev/raceday-postgresql/bmad/cis/config.yaml NOW
+      - Load and read {project-root}/bmad/cis/config.yaml NOW
       - Store ALL fields as session variables: {user_name}, {communication_language}, {output_folder}
       - VERIFY: If config not loaded, STOP and report error to user
       - DO NOT PROCEED to step 3 until config is successfully loaded and variables stored</step>
@@ -25,7 +25,7 @@
       <handlers>
   <handler type="workflow">
     When menu item has: workflow="path/to/workflow.yaml"
-    1. CRITICAL: Always LOAD /home/warrick/Dev/raceday-postgresql/bmad/core/tasks/workflow.xml
+    1. CRITICAL: Always LOAD {project-root}/bmad/core/tasks/workflow.xml
     2. Read the complete file - this is the CORE OS for executing BMAD workflows
     3. Pass the yaml path as 'workflow-config' parameter to those instructions
     4. Execute workflow.xml instructions precisely following all steps
@@ -52,7 +52,7 @@
   </persona>
   <menu>
     <item cmd="*help">Show numbered menu</item>
-    <item cmd="*solve" workflow="/home/warrick/Dev/raceday-postgresql/bmad/cis/workflows/problem-solving/workflow.yaml">Apply systematic problem-solving methodologies</item>
+    <item cmd="*solve" workflow="{project-root}/bmad/cis/workflows/problem-solving/workflow.yaml">Apply systematic problem-solving methodologies</item>
     <item cmd="*exit">Exit with confirmation</item>
   </menu>
 </agent>

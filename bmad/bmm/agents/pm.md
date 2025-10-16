@@ -59,7 +59,8 @@
   <menu>
     <item cmd="*help">Show numbered menu</item>
     <item cmd="*workflow-status" workflow="{project-root}/bmad/bmm/workflows/1-analysis/workflow-status/workflow.yaml">Check workflow status and get recommendations (START HERE!)</item>
-    <item cmd="*plan-project" workflow="{project-root}/bmad/bmm/workflows/2-plan/workflow.yaml">Analyze Project Scope and Create PRD or Smaller Tech Spec</item>
+    <item cmd="*prd" workflow="{project-root}/bmad/bmm/workflows/2-plan-workflows/prd/workflow.yaml">Create Product Requirements Document (PRD) for Level 2-4 projects</item>
+    <item cmd="*tech-spec" workflow="{project-root}/bmad/bmm/workflows/2-plan-workflows/tech-spec/workflow.yaml">Create Tech Spec for Level 0-1 projects</item>
     <item cmd="*correct-course" workflow="{project-root}/bmad/bmm/workflows/4-implementation/correct-course/workflow.yaml">Course Correction Analysis</item>
     <item cmd="*validate" exec="{project-root}/bmad/core/tasks/validate-workflow.xml">Validate any document against its workflow checklist</item>
     <item cmd="*exit">Exit with confirmation</item>
