@@ -71,19 +71,25 @@
 
 #### IN PROGRESS (Approved for Development)
 
+- **Story ID:** 2.10
+- **Story Title:** Dynamic Scheduler with Time-Based Intervals
+- **Story File:** `docs/stories/story-2.10.md`
+- **Story Status:** In Progress (Data Population Investigation & Remediation)
+- **Context File:** `docs/stories/story-context-2.10.xml`
+- **Action:** DEV agent completing data population remediation plan
+
 - **Story ID:** 2.11
 - **Story Title:** Performance Metrics Tracking
 - **Story File:** `docs/stories/story-2.11.md`
 - **Story Status:** Not created (needs drafting)
 - **Context File:** `docs/stories/story-context-2.11.xml`
-- **Action:** SM agent runs `create-story` to draft this story
+- **Action:** SM agent runs `create-story` to draft this story (blocked until 2.10 complete)
 
 #### DONE (Completed Stories)
 
 | Story ID | File | Completed Date | Points |
 | -------- | ---- | -------------- | ------ |
 | 2.9 | docs/stories/story-2.9.md | 2025-10-16 | — |
-| 2.10 | docs/stories/story-2.10.md | 2025-10-14 | — |
 | 2.8 | docs/stories/story-2.8.md | 2025-10-14 | — |
 | 1.1 | docs/stories/story-1.1.md | 2025-10-10 | — |
 | 1.2 | docs/stories/story-1.2.md | 2025-10-10 | — |
@@ -103,17 +109,17 @@
 | 2.6 | docs/stories/story-2.6.md | 2025-10-13 | — |
 | 2.7 | docs/stories/story-2.7.md | 2025-10-13 | — |
 
-**Total completed:** 20 stories
+**Total completed:** 19 stories
 **Total points completed:** N/A (not estimated)
 **Total Epics:** 5
 **Total Stories Planned:** 45
 **Stories in Backlog:** 5
 **Stories in TODO:** 1
-**Stories in IN PROGRESS:** 1
+**Stories in IN PROGRESS:** 2
 
 **Epic Breakdown:**
 - Epic 1: Core Infrastructure Setup — 10/10 stories complete
-- Epic 2: High-Performance Data Pipeline — 9/16 stories complete
+- Epic 2: High-Performance Data Pipeline — 8/16 stories complete
 - Epic 3: REST API Layer — 0/10 stories complete
 - Epic 4: Database Optimization & Partitioning — 0/8 stories complete
 - Epic 5: Migration & Deployment — 0/12 stories complete
@@ -131,11 +137,13 @@
 
 ### Next Action Required
 
-**What to do next:** Create Story 2.11 (Performance Metrics Tracking)
+**What to do next:** Complete Story 2.10 data population remediation
 
-**Command to run:** Run `create-story` workflow to draft the next story
+**Current priority:** Fix Dynamic Scheduler data population issues in money_flow_history, odds_history, and race_pools tables
 
-**Agent to load:** bmad/bmm/agents/sm.md
+**Agent to load:** bmad/bmm/agents/dev.md
+
+**Next story (blocked):** Story 2.11 (Performance Metrics Tracking) - blocked until Story 2.10 completion
 
 ---
 
@@ -242,6 +250,8 @@
 - **2025-10-14**: Story 2.9 (Daily Baseline Data Initialization) marked ready for development by SM agent. Status updated from Draft → Ready. Next: Generate context via story-context, then implement via dev-story.
 - **2025-10-14**: Completed story-context for Story 2.9 (Daily Baseline Data Initialization). Context file: docs/stories/story-context-2.9.xml. Next: DEV agent should run dev-story to implement.
 - **2025-10-16**: Story 2.9 (Daily Baseline Data Initialization) completed and marked Done. Senior Developer Review passed with no action items. Updated project workflow status and epic documentation to reflect completion. Next story to draft: Story 2.11 (Performance Metrics Tracking).
+- **2025-10-16**: Story 2.10 status changed from Done to In Progress due to critical data population issues discovered in money_flow_history, odds_history, and race_pools tables. Investigation revealed missing database partitions, incomplete data processing logic, and schema discrepancies between Appwrite and PostgreSQL implementations.
+- **2025-10-16**: Comprehensive investigation and remediation plan added to Story 2.10 addressing database partitions, schema alignment (50+ missing fields), and data processing logic gaps. Plan includes 4 phases with 6-10 day implementation timeline and detailed SQL migration scripts.
 
 ---
 

@@ -129,7 +129,7 @@ This index mirrors the canonical planning document `docs/epic-stories-2025-10-05
 6. Scheduler runs continuously, re-evaluating intervals every minute
 7. Logging for: interval changes, race scheduling, race completion
 
-**Status:** ✅ **COMPLETE** (2025-10-14)
+**Status:** 🔄 **IN PROGRESS** (Data Population Investigation - 2025-10-16)
 
 ### Story 2.11: Performance Metrics Tracking
 

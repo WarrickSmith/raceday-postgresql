@@ -426,6 +426,8 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 
 ### Story 2.10: Dynamic Scheduler with Time-Based Intervals
 
+**Status:** 🔄 **IN PROGRESS** (Data Population Investigation & Remediation - 2025-10-16)
+
 **As a** developer
 **I want** scheduler that adjusts polling frequency based on time-to-start
 **So that** I can poll at 15s intervals during critical 5-minute window
@@ -443,6 +445,8 @@ This migration project consists of **5 core epics** sequenced for safe, incremen
 - Scheduler runs continuously, re-evaluating intervals every minute
 - Scheduler activates after daily initialization completes (7:00 AM NZST or later)
 - Logging for: interval changes, race scheduling, race completion
+
+**Note:** Critical data population issues discovered in money_flow_history, odds_history, and race_pools tables. Comprehensive remediation plan in progress with 4-phase implementation addressing database partitions, schema alignment, and data processing logic. See story-2.10.md for detailed investigation and remediation plan.
 
 ---
 

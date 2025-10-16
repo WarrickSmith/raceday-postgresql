@@ -3,6 +3,8 @@
 **Project:** raceday-postgresql
 **Created:** 2025-10-13
 **Last Updated:** 2025-10-14
+
+**Note:** This is a historical snapshot of project status as of 2025-10-13. For current project status, see project-workflow-status.md. Story numbering was updated on 2025-10-14 (old Story 2.9 → 2.10, 2.10-2.15 → 2.11-2.16).
 **Status File:** `project-workflow-status-2025-10-13.md`
 
 ---

@@ -1,6 +1,6 @@
 # Story 2.10: Dynamic Scheduler with Time-Based Intervals
 
-Status: Done
+Status: In Progress
 
 ## Story
 
@@ -416,3 +416,385 @@ claude-sonnet-4-5-20250929
 
 **Action Items**
 - None.
+
+## Data Population Investigation & Remediation Plan
+
+### Issue Summary
+The Dynamic Scheduler (Story 2.10) is **implemented and running correctly**, but **critical issues** prevent data population in three key tables:
+- `money_flow_history` - No records being created
+- `odds_history` - No records being created
+- `race_pools` - No records being created
+
+### Root Cause Analysis
+
+#### 🔴 **CRITICAL Issue 1: Missing Database Partitions**
+- **Problem**: Time-series tables require daily partitions that don't exist
+- **Impact**: `PartitionNotFoundError` causes all data writes to fail
+- **Evidence**: Error logs show missing partitions for current dates
+- **Status**: **IMMEDIATE BLOCKER** - Must resolve before any data can flow
+
+#### 🔴 **HIGH Issue 2: Missing Data Processing Logic**
+- **Race Pools**: No extraction of `tote_pools` data from NZTAB API response
+- **Money Flow**: Missing incremental delta calculations and time-bucketing logic
+- **Odds**: No change detection (creating duplicate records unnecessarily)
+- **Impact**: Even with partitions, data pipeline is incomplete
+
+#### 🔴 **HIGH Issue 3: Schema Discrepancies**
+- **Problem**: 50+ missing fields between Appwrite (server-old) and PostgreSQL implementations
+- **Impact**: Client applications will receive incomplete data or null values
+- **Critical Missing Fields**:
+  - **Entrants**: `jockey`, `trainer_name`, `barrier`, `silk_colours`, `favourite`, `mover`
+  - **Races**: `distance`, `total_prize_money`, `field_size`, `video_channels`, `silk_url`
+  - **Meetings**: `weather`, `track_condition`, `state`, `track_surface`, `category`
+  - **Money Flow**: Timeline fields, incremental calculations, data quality metrics
+
+### Comprehensive Remediation Plan
+
+#### **Phase 1: Database Infrastructure (IMMEDIATE - CRITICAL)**
+
+##### 1.1 Automatic Partition Management
+**File**: `/server/src/database/time-series.ts`
+**Action**: Add automatic daily partition creation logic
+**Implementation**:
+```typescript
+async function ensurePartition(tableName: string, date: Date): Promise<void> {
+  const partitionName = `${tableName}_${date.getFullYear()}_${String(date.getMonth() + 1).padStart(2, '0')}_${String(date.getDate()).padStart(2, '0')}`;
+
+  // Check if partition exists
+  const result = await pool.query(`
+    SELECT 1 FROM pg_tables
+    WHERE tablename = $1
+  `, [partitionName]);
+
+  if (result.rows.length === 0) {
+    // Create partition for today's date
+    await pool.query(`
+      CREATE TABLE ${partitionName} PARTITION OF ${tableName}
+      FOR VALUES FROM ('${date.toISOString().split('T')[0]}')
+      TO ('${new Date(date.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}')
+    `);
+  }
+}
+```
+
+##### 1.2 Partition Existence Validation
+- Add partition checks before all time-series writes
+- Graceful handling with proper error reporting
+- Automatic partition creation for today + tomorrow
+
+#### **Phase 2: Schema Alignment (HIGH PRIORITY)**
+
+##### 2.1 Critical Missing Field Additions
+
+**ENTRANTS Table** (Most Critical for Client Functionality):
+```sql
+ALTER TABLE entrants ADD COLUMN barrier INTEGER;
+ALTER TABLE entrants ADD COLUMN is_late_scratched BOOLEAN DEFAULT FALSE;
+ALTER TABLE entrants ADD COLUMN jockey VARCHAR(255);
+ALTER TABLE entrants ADD COLUMN trainer_name VARCHAR(255);
+ALTER TABLE entrants ADD COLUMN silk_colours VARCHAR(100);
+ALTER TABLE entrants ADD COLUMN favourite BOOLEAN DEFAULT FALSE;
+ALTER TABLE entrants ADD COLUMN mover BOOLEAN DEFAULT FALSE;
+ALTER TABLE entrants ADD COLUMN scratch_time BIGINT;
+ALTER TABLE entrants ADD COLUMN runner_change TEXT;
+ALTER TABLE entrants ADD COLUMN silk_url64 VARCHAR(500);
+ALTER TABLE entrants ADD COLUMN silk_url128 VARCHAR(500);
+ALTER TABLE entrants ADD COLUMN last_updated TIMESTAMP;
+ALTER TABLE entrants ADD COLUMN imported_at TIMESTAMP;
+```
+
+**RACES Table**:
+```sql
+ALTER TABLE races ADD COLUMN distance INTEGER;
+ALTER TABLE races ADD COLUMN total_prize_money INTEGER;
+ALTER TABLE races ADD COLUMN field_size INTEGER;
+ALTER TABLE races ADD COLUMN positions_paid INTEGER;
+ALTER TABLE races ADD COLUMN type VARCHAR(10);
+ALTER TABLE races ADD COLUMN video_channels TEXT;
+ALTER TABLE races ADD COLUMN silk_url VARCHAR(500);
+ALTER TABLE races ADD COLUMN silk_base_url VARCHAR(200);
+ALTER TABLE races ADD COLUMN tote_start_time VARCHAR(20);
+ALTER TABLE races ADD COLUMN last_status_change TIMESTAMP;
+ALTER TABLE races ADD COLUMN finalized_at TIMESTAMP;
+ALTER TABLE races ADD COLUMN abandoned_at TIMESTAMP;
+ALTER TABLE races ADD COLUMN last_poll_time TIMESTAMP;
+```
+
+**MEETINGS Table**:
+```sql
+ALTER TABLE meetings ADD COLUMN state VARCHAR(10);
+ALTER TABLE meetings ADD COLUMN track_direction VARCHAR(20);
+ALTER TABLE meetings ADD COLUMN track_surface VARCHAR(50);
+ALTER TABLE meetings ADD COLUMN rail_position VARCHAR(100);
+ALTER TABLE meetings ADD COLUMN weather VARCHAR(50);
+ALTER TABLE meetings ADD COLUMN category VARCHAR(10);
+ALTER TABLE meetings ADD COLUMN category_name VARCHAR(100);
+ALTER TABLE meetings ADD COLUMN last_updated TIMESTAMP;
+ALTER TABLE meetings ADD COLUMN imported_at TIMESTAMP;
+```
+
+**MONEY_FLOW_HISTORY Enhancement**:
+```sql
+ALTER TABLE money_flow_history ADD COLUMN polling_timestamp TIMESTAMP;
+ALTER TABLE money_flow_history ADD COLUMN time_to_start INTEGER;
+ALTER TABLE money_flow_history ADD COLUMN time_interval INTEGER;
+ALTER TABLE money_flow_history ADD COLUMN interval_type VARCHAR(10);
+ALTER TABLE money_flow_history ADD COLUMN incremental_amount INTEGER;
+ALTER TABLE money_flow_history ADD COLUMN incremental_win_amount INTEGER;
+ALTER TABLE money_flow_history ADD COLUMN incremental_place_amount INTEGER;
+ALTER TABLE money_flow_history ADD COLUMN pool_type VARCHAR(10);
+ALTER TABLE money_flow_history ADD COLUMN is_consolidated BOOLEAN DEFAULT FALSE;
+ALTER TABLE money_flow_history ADD COLUMN win_pool_percentage FLOAT;
+ALTER TABLE money_flow_history ADD COLUMN place_pool_percentage FLOAT;
+ALTER TABLE money_flow_history ADD COLUMN total_pool_amount INTEGER;
+ALTER TABLE money_flow_history ADD COLUMN data_quality_score INTEGER;
+ALTER TABLE money_flow_history ADD COLUMN mathematically_consistent BOOLEAN;
+ALTER TABLE money_flow_history ADD COLUMN polling_latency_ms INTEGER;
+ALTER TABLE money_flow_history ADD COLUMN is_stale BOOLEAN DEFAULT FALSE;
+```
+
+##### 2.2 Enhanced Performance Indexes
+```sql
+-- Entrants performance indexes
+CREATE INDEX idx_entrants_race_barrier ON entrants(race_id, barrier);
+CREATE INDEX idx_entrants_jockey ON entrants(jockey);
+CREATE INDEX idx_entrants_trainer ON entrants(trainer_name);
+
+-- Money flow timeline indexes
+CREATE INDEX idx_money_flow_time_interval ON money_flow_history(time_interval);
+CREATE INDEX idx_money_flow_polling_timestamp ON money_flow_history(polling_timestamp);
+CREATE INDEX idx_money_flow_race_entrant_time ON money_flow_history(race_id, entrant_id, time_interval);
+
+-- Race timeline indexes
+CREATE INDEX idx_races_last_status_change ON races(last_status_change);
+CREATE INDEX idx_races_start_time_status ON races(start_time, status);
+```
+
+#### **Phase 3: Data Processing Logic Enhancement (HIGH PRIORITY)**
+
+##### 3.1 Race Pools Population
+**File**: `/server/src/workers/transformWorker.ts`
+**Action**: Add `tote_pools` data extraction from NZTAB API
+**Implementation**:
+```typescript
+interface RacePoolData {
+  raceId: string;
+  winPoolTotal: number;
+  placePoolTotal: number;
+  quinellaPoolTotal: number;
+  trifectaPoolTotal: number;
+  exactaPoolTotal: number;
+  first4PoolTotal: number;
+  totalRacePool: number;
+  currency: string;
+  lastUpdated: Date;
+}
+
+function extractPoolTotals(apiData: any, raceId: string): RacePoolData | null {
+  try {
+    const pools = apiData.tote_pools || [];
+    const winPool = pools.find((p: any) => p.type === 'win');
+    const placePool = pools.find((p: any) => p.type === 'place');
+
+    if (!winPool || !placePool) {
+      return null;
+    }
+
+    return {
+      raceId,
+      winPoolTotal: Math.round(winPool.total * 100), // Convert to cents
+      placePoolTotal: Math.round(placePool.total * 100),
+      quinellaPoolTotal: Math.round(pools.find((p: any) => p.type === 'quinella')?.total * 100 || 0),
+      trifectaPoolTotal: Math.round(pools.find((p: any) => p.type === 'trifecta')?.total * 100 || 0),
+      exactaPoolTotal: Math.round(pools.find((p: any) => p.type === 'exacta')?.total * 100 || 0),
+      first4PoolTotal: Math.round(pools.find((p: any) => p.type === 'first4')?.total * 100 || 0),
+      totalRacePool: pools.reduce((sum: number, p: any) => sum + (p.total || 0), 0) * 100,
+      currency: winPool.currency || '$',
+      lastUpdated: new Date()
+    };
+  } catch (error) {
+    console.error('Error extracting pool totals:', error);
+    return null;
+  }
+}
+```
+
+##### 3.2 Enhanced Money Flow Processing
+**File**: `/server/src/workers/transformWorker.ts`
+**Action**: Implement incremental delta calculations and time-bucketing
+**Implementation**:
+```typescript
+interface MoneyFlowRecord {
+  raceId: string;
+  entrantId: string;
+  pollingTimestamp: Date;
+  timeToStart: number;
+  timeInterval: number;
+  intervalType: string;
+  winPoolAmount: number;
+  placePoolAmount: number;
+  incrementalWinAmount: number;
+  incrementalPlaceAmount: number;
+  poolType: string;
+  holdPercentage: number;
+  betPercentage: number;
+  // ... other fields
+}
+
+async function getPreviousMoneyFlowRecord(
+  pool: any,
+  raceId: string,
+  entrantId: string,
+  currentTimeInterval: number
+): Promise<MoneyFlowRecord | null> {
+  const result = await pool.query(`
+    SELECT * FROM money_flow_history
+    WHERE race_id = $1 AND entrant_id = $2 AND time_interval < $3
+    ORDER BY time_interval DESC
+    LIMIT 1
+  `, [raceId, entrantId, currentTimeInterval]);
+
+  return result.rows[0] || null;
+}
+
+function createTimeBucketedRecords(
+  raceData: any,
+  currentTime: Date
+): MoneyFlowRecord[] {
+  const timeToStart = Math.floor((new Date(raceData.start_time).getTime() - currentTime.getTime()) / 1000 / 60);
+
+  // Define time buckets (60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 4, 3, 2, 1, 0)
+  const timeBuckets = [60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 4, 3, 2, 1, 0];
+  const relevantBuckets = timeBuckets.filter(bucket => bucket >= timeToStart);
+
+  return relevantBuckets.map(bucket => ({
+    raceId: raceData.race_id,
+    entrantId: raceData.entrant_id,
+    pollingTimestamp: currentTime,
+    timeToStart: bucket,
+    timeInterval: bucket,
+    intervalType: bucket <= 5 ? '5m' : bucket <= 15 ? '1m' : '30s',
+    // ... other field calculations
+  }));
+}
+```
+
+##### 3.3 Odds Change Detection
+**File**: `/server/src/pipeline/race-processor.ts`
+**Action**: Add odds comparison with previous records
+**Implementation**:
+```typescript
+async function hasOddsChanged(
+  pool: any,
+  raceId: string,
+  entrantId: string,
+  newOdds: { fixedWin: number; fixedPlace: number; poolWin: number; poolPlace: number }
+): Promise<boolean> {
+  const result = await pool.query(`
+    SELECT fixed_win_odds, fixed_place_odds, pool_win_odds, pool_place_odds
+    FROM odds_history
+    WHERE race_id = $1 AND entrant_id = $2
+    ORDER BY event_timestamp DESC
+    LIMIT 1
+  `, [raceId, entrantId]);
+
+  if (result.rows.length === 0) {
+    return true; // First record
+  }
+
+  const lastOdds = result.rows[0];
+  return (
+    lastOdds.fixed_win_odds !== newOdds.fixedWin ||
+    lastOdds.fixed_place_odds !== newOdds.fixedPlace ||
+    lastOdds.pool_win_odds !== newOdds.poolWin ||
+    lastOdds.pool_place_odds !== newOdds.poolPlace
+  );
+}
+```
+
+#### **Phase 4: Testing & Validation (MEDIUM PRIORITY)**
+
+##### 4.1 End-to-End Data Flow Testing
+- Manually trigger race processing for active races
+- Validate data appears in all three tables
+- Monitor pipeline success/failure rates
+- Test with real NZTAB API responses
+
+##### 4.2 Data Quality Validation
+```sql
+-- Validate mathematical consistency between pool totals
+SELECT race_id,
+       SUM(win_pool_amount) as total_individual_win,
+       (SELECT win_pool_total FROM race_pools WHERE race_id = mh.race_id) as race_total_win,
+       ABS(SUM(win_pool_amount) - (SELECT win_pool_total FROM race_pools WHERE race_id = mh.race_id)) as discrepancy
+FROM money_flow_history mh
+GROUP BY race_id
+HAVING ABS(SUM(win_pool_amount) - (SELECT win_pool_total FROM race_pools WHERE race_id = mh.race_id)) > 0;
+```
+
+##### 4.3 Performance Monitoring
+- Add comprehensive logging for pipeline operations
+- Monitor partition creation and data insertion performance
+- Track data quality metrics over time
+
+### Files to Modify
+
+1. **Database Migrations**:
+   - `/server/database/migrations/008_add_missing_entrant_fields.sql`
+   - `/server/database/migrations/009_add_missing_race_fields.sql`
+   - `/server/database/migrations/010_add_missing_meeting_fields.sql`
+   - `/server/database/migrations/011_enhance_money_flow_history.sql`
+
+2. **Data Processing**:
+   - `/server/src/workers/transformWorker.ts` - Complete data processing logic
+   - `/server/src/pipeline/race-processor.ts` - Enhanced race coordination
+
+3. **Database Operations**:
+   - `/server/src/database/time-series.ts` - Add partition management
+   - `/server/src/database/race-pools.ts` - Implement race pools population
+
+4. **Scheduler Enhancement**:
+   - `/server/src/scheduler/scheduler.ts` - Add pipeline monitoring
+
+### Implementation Timeline
+
+- **Phase 1** (Immediate): 1-2 days - Partition management and data flow restoration
+- **Phase 2** (High): 2-3 days - Schema alignment and field additions
+- **Phase 3** (High): 2-3 days - Enhanced data processing logic
+- **Phase 4** (Medium): 1-2 days - Testing and validation
+
+### Success Criteria
+
+✅ **All three tables populated** with comprehensive, validated data
+✅ **Complete schema alignment** between Appwrite and PostgreSQL
+✅ **Enhanced data quality** with mathematical validation and consistency scoring
+✅ **Time-bucketed timeline data** for critical race periods
+✅ **Optimized performance** with proper indexing and partition management
+✅ **Client application compatibility** maintained with no breaking changes
+
+### Risk Mitigation
+
+- **Partition Failures**: Graceful degradation with error reporting
+- **Schema Migration**: Rollback capability for each migration phase
+- **Data Quality**: Validation checks before data insertion
+- **Performance**: Staged rollout with monitoring at each phase
+
+### Dependencies
+
+- **Story 2.7**: Race Processor (already completed)
+- **Story 2.6**: Time-Series Writer (already completed)
+- **Story 2.3**: Transform Worker (needs enhancement)
+- **Epic 4**: Partition automation (needs implementation)
+
+### Validation Checklist
+
+- [ ] Database partitions exist for current dates
+- [ ] Race data can be successfully written to time-series tables
+- [ ] Tote pools data is extracted and populated correctly
+- [ ] Money flow incremental calculations work properly
+- [ ] Odds change detection prevents duplicate records
+- [ ] All missing database fields are added and populated
+- [ ] Client applications can access complete data sets
+- [ ] Data quality validation passes mathematical consistency checks
+- [ ] Performance tests show acceptable query times
+- [ ] End-to-end pipeline functions correctly with live data
