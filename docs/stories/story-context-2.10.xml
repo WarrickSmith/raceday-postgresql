@@ -1,126 +1,137 @@
 <story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
   <metadata>
     <epicId>2</epicId>
-    <storyId>2.9</storyId>
-    <title>Dynamic Scheduler with Time-Based Intervals</title>
-    <status>Ready</status>
-    <generatedAt>2025-10-14</generatedAt>
+    <storyId>2.10</storyId>
+    <title>Dynamic Scheduler with Time-Based Intervals - Data Population Remediation</title>
+    <status>In Progress - Critical Blockers Found</status>
+    <generatedAt>2025-10-16</generatedAt>
     <generator>BMAD Story Context Workflow</generator>
-    <sourceStoryPath>/home/warrick/Dev/raceday-postgresql/docs/stories/story-2.9.md</sourceStoryPath>
+    <sourceStoryPath>/home/warrick/Dev/raceday-postgresql/docs/stories/story-2.10.md</sourceStoryPath>
   </metadata>
 
   <story>
     <asA>developer</asA>
-    <iWant>scheduler that adjusts polling frequency based on time-to-start</iWant>
-    <soThat>I can poll at 15s intervals during critical 5-minute window</soThat>
+    <iWant>comprehensive data population pipeline with proper partitions, schema alignment, and processing logic</iWant>
+    <soThat>scheduler can function with complete data flow and client applications receive full data sets</soThat>
     <tasks>
-      - Task 1: Implement interval calculation logic (AC: 2, 3)
-      - Task 2: Implement race query and scheduling logic (AC: 1, 4)
-      - Task 3: Implement interval cleanup (AC: 5)
-      - Task 4: Implement continuous re-evaluation loop (AC: 6)
-      - Task 5: Add structured logging (AC: 7)
-      - Task 6: Add unit tests for scheduler logic (AC: All)
-      - Task 7: Add integration tests for end-to-end scheduling (AC: All)
+      - Phase 1: Database Partition Automation (CRITICAL)
+      - Phase 2: Schema Alignment with Missing Fields (HIGH)
+      - Phase 3: Enhanced Data Processing Logic (HIGH)
+      - Phase 4: End-to-End Testing & Validation (MEDIUM)
     </tasks>
   </story>
 
   <acceptanceCriteria>
-    1. Scheduler queries database for upcoming races
-    2. For each race, calculates time-to-start (start_time - current time)
-    3. Determines polling interval based on time-to-start: ≤5 minutes: 15 seconds, 5-15 minutes: 30 seconds, >15 minutes: 60 seconds
-    4. Schedules race processing using setInterval per race
-    5. Clears interval when race completes or is abandoned
-    6. Scheduler runs continuously, re-evaluating intervals every minute
-    7. Logging for: interval changes, race scheduling, race completion
+    1. Daily partitions are automatically created for time-series tables (money_flow_history, odds_history)
+    2. All 50+ missing database fields are added and populated from NZTAB API data
+    3. Race pools data is extracted and stored in race_pools table
+    4. Money flow incremental calculations work properly with time-bucketing
+    5. Odds change detection prevents duplicate records
+    6. Integration tests pass with complete data flow
+    7. Client applications can access comprehensive data sets
   </acceptanceCriteria>
 
   <artifacts>
     <docs>
-      <doc path="docs/tech-spec-epic-2.md" title="Epic 2 Technical Specification" section="Scheduler Module" relevance="Defines scheduler architecture, dynamic polling intervals, and integration with race processor">
-        Technical specification for Epic 2 High-Performance Data Pipeline. Section on Scheduler (lines 41-42) describes dynamic polling cadence (15s, 30s, 60s) based on time-to-start. Scheduler queries database for upcoming races and applies adaptive intervals to meet 15s batch window requirement.
+      <doc path="docs/tech-spec-epic-2.md" title="Epic 2 Technical Specification" section="Time-Series Database Design" relevance="Defines partition strategy and time-series table structures">
+        Technical specification for Epic 2 data pipeline. Section on time-series design (lines 90-156) describes daily partitioning strategy for money_flow_history and odds_history tables. Critical for understanding partition automation requirements.
       </doc>
-      <doc path="docs/solution-architecture.md" title="Solution Architecture" section="Dynamic Scheduler" relevance="High-level scheduler design and integration points">
-        Solution architecture lines 338-344 describe dynamic scheduling patterns. Scheduler coordinates with race processor, maintains interval handles per race, and handles graceful cleanup when races complete.
+      <doc path="docs/story-context-2.10.xml" title="Original Story Context" section="Scheduler Requirements" relevance="Original scheduler implementation context and constraints">
+        Original story context defining scheduler behavior, database query constraints, and integration points. Provides baseline for remediation scope.
       </doc>
-      <doc path="docs/epic-stories-2025-10-05.md" title="Epic Stories Breakdown" section="Story 2.9" relevance="Original story definition and acceptance criteria">
-        Story 2.9 requirements (lines 396-414) specify scheduler behavior: query database, calculate time-to-start, determine intervals (≤5min=15s, 5-15min=30s, >15min=60s), use setInterval per race, clear on completion, re-evaluate every minute, structured logging.
+      <doc path="docs/CODING-STANDARDS.md" title="Coding Standards" section="Database Standards" relevance="Database migration and schema alignment standards">
+        Database schema standards and migration patterns for adding missing fields while maintaining compatibility.
       </doc>
-      <doc path="docs/PRD-raceday-postgresql-2025-10-05.md" title="Product Requirements Document" section="Performance Requirements" relevance="Performance targets and polling frequency requirements">
-        PRD defines performance targets: 5 races in <15s, single race in <2s. Scheduler must poll frequently enough during critical 5-minute window to capture money flow changes without overloading system.
+      <doc path="docs/stories/story-2.10.md" title="Story 2.10 Requirements" section="Complete Story Specification" relevance="Full story requirements with detailed task breakdown and acceptance criteria">
+        Source story document containing complete requirements, tasks/subtasks breakdown, and detailed acceptance criteria. Essential reference for implementation scope and validation criteria.
       </doc>
-      <doc path="docs/CODING-STANDARDS.md" title="Coding Standards" section="TypeScript Standards" relevance="Code quality standards for scheduler implementation">
-        TypeScript strict mode, no 'any' types, explicit return types, JSDoc comments for public APIs, consistent naming conventions (camelCase for functions, PascalCase for types).
+      <doc path="server-old/daily-races/src/data-processors.js" title="Original Data Processing Examples" section="Data Transformation Functions" relevance="Code examples for data processing and transformation from NZTAB API to database schema">
+        Original data processing implementation showing field mappings, validation logic, and transformation patterns. Critical for understanding entrant and race data processing requirements and field mappings.
+      </doc>
+      <doc path="server-old/enhanced-race-poller/src/database-utils.js" title="Enhanced Database Processing Examples" section="Advanced Data Processing and Validation" relevance="Comprehensive examples of pool processing, money flow calculations, and data validation">
+        Advanced data processing implementation showing race pools extraction, money flow incremental calculations, odds change detection, and mathematical validation logic. Essential for implementing enhanced data processing features.
       </doc>
     </docs>
     <code>
-      <artifact path="server/src/pipeline/race-processor.ts" kind="module" symbol="processRace" lines="301-598" relevance="Core function scheduler will call at each interval tick">
-        Exported function processRace(raceId: string, options?: ProcessOptions): Promise&lt;ProcessResult&gt;. Returns timings (fetch_ms, transform_ms, write_ms, total_ms), rowCounts, and status. Scheduler will call this function at calculated intervals.
+      <artifact path="server/src/database/time-series.ts" kind="module" symbol="insertMoneyFlowHistory" lines="120-140" relevance="Time-series partition management and money flow insertion logic">
+        Current time-series insertion functions that require partition existence. Shows partition validation logic and error handling for missing partitions.
       </artifact>
-      <artifact path="server/src/pipeline/race-processor.ts" kind="interface" symbol="ProcessResult" lines="63-75" relevance="Return type from processRace that scheduler should handle">
-        ProcessResult interface contains raceId, status, success, timings, rowCounts, optional error with type/message/retryable fields. Scheduler should log these results and handle failures.
+      <artifact path="server/src/pipeline/race-processor.ts" kind="module" symbol="persistTransformedRace" lines="240-290" relevance="Race data persistence and transformation logic">
+        Main race processing pipeline that needs enhancement for missing fields and data processing logic. Current implementation incomplete for race pools and money flow calculations.
       </artifact>
-      <artifact path="server/src/database/pool.ts" kind="module" symbol="pool" lines="18" relevance="Database connection pool for querying upcoming races">
-        PostgreSQL pool exported from database/pool.ts. Scheduler will use pool.query() to fetch upcoming races from database. Pool configured with max=10 connections, respects environment variables.
+      <artifact path="server/src/workers/transformWorker.ts" kind="module" symbol="transformRaceData" lines="1-50" relevance="Data transformation from NZTAB API to database schema">
+        Transform worker responsible for mapping API data to database schema. Missing logic for race pools, money flow incremental calculations, and odds change detection.
       </artifact>
-      <artifact path="server/src/shared/logger.ts" kind="module" symbol="logger" lines="4-13" relevance="Pino logger for structured JSON logging">
-        Pino logger configured with ISO timestamps, environment context, and log level from env.LOG_LEVEL. Scheduler must use logger.info() for scheduling events, logger.warn() for interval changes, logger.error() for failures.
+      <artifact path="server/tests/integration/initialization/daily-baseline.integration.test.ts" kind="test" symbol="daily baseline test" lines="210-225" relevance="Integration test revealing data population issues">
+        Failing integration test that exposes missing data population functionality. Expected race IDs not found in scheduler results, indicating broken data pipeline.
+      </artifact>
+      <artifact path="server-old/daily-races/src/data-processors.js" kind="module" symbol="transformEntrantData" lines="141-182" relevance="Complete entrant data transformation with all missing fields">
+        Reference implementation showing all required entrant fields (barrier, jockey, trainer, silk colours, odds) and transformation logic. Essential for understanding complete field mapping requirements.
+      </artifact>
+      <artifact path="server-old/enhanced-race-poller/src/database-utils.js" kind="module" symbol="extractPoolTotals" lines="136-205" relevance="Race pools extraction and validation implementation">
+        Reference implementation for extracting tote_pools data from NZTAB API with validation, currency conversion, and error handling. Critical for race pools population.
+      </artifact>
+      <artifact path="server-old/enhanced-race-poller/src/database-utils.js" kind="module" symbol="saveMoneyFlowHistory" lines="435-565" relevance="Money flow processing with timeline calculations and pool amount computations">
+        Reference implementation showing money flow processing, time-to-start calculations, pool amount computations, and enhanced metadata fields. Essential for money flow enhancement.
       </artifact>
     </code>
     <dependencies>
       <node>
-        <package name="pg" version="^8.16.3">PostgreSQL client for database queries (fetch upcoming races)</package>
-        <package name="pino" version="^9.5.0">Structured logging for scheduler events</package>
-        <package name="typescript" version="^5.7.0">TypeScript compiler with strict mode</package>
-        <package name="vitest" version="^2.0.0">Testing framework for unit and integration tests</package>
+        <package name="pg" version="^8.16.3">PostgreSQL client for partition management and database operations</package>
+        <package name="pino" version="^9.5.0">Structured logging for partition creation and data pipeline operations</package>
+        <package name="typescript" version="^5.7.0">TypeScript compiler with strict mode for type-safe schema operations</package>
+        <package name="vitest" version="^2.0.0">Testing framework for comprehensive integration test coverage</package>
       </node>
       <builtin>
-        <module name="setInterval / clearInterval">Node.js built-in timers for scheduling race polling at calculated intervals</module>
-        <module name="performance.now()">High-resolution timing for measuring operation duration</module>
+        <module name="PostgreSQL partitioning">Native PostgreSQL partition management for time-series tables</module>
+        <module name="Database migrations">Schema migration system for adding missing fields safely</module>
       </builtin>
     </dependencies>
   </artifacts>
 
   <constraints>
-    - Scheduler MUST NOT create duplicate intervals for the same raceId (use Map&lt;raceId, Timer&gt; to track active intervals)
-    - Database queries for upcoming races MUST use existing idx_races_start_time index (filter WHERE status IN ('open', 'upcoming') AND start_time &gt; NOW())
-    - Interval calculation MUST follow exact thresholds: ≤5min=15s, 5-15min=30s, &gt;15min=60s (no other values allowed)
-    - Scheduler MUST clear interval handles when races complete/abandon to prevent memory leaks
-    - Re-evaluation loop MUST run every 60 seconds (not faster to avoid database load, not slower to miss transitions)
-    - All logging MUST use Pino structured JSON format with raceId, timestamps, intervals, and context fields
-    - Scheduler MUST integrate with existing race processor from Story 2.7 (processRace function)
-    - Scheduler MUST NOT block the event loop (use async/await, avoid synchronous operations)
-    - TypeScript strict mode MUST be maintained (no 'any' types, explicit return types)
-    - Testing MUST include unit tests (calculatePollingInterval, race scheduling) and integration tests (database queries, end-to-end scheduling)
+    - Partition automation MUST create daily partitions for current and future dates automatically
+    - Schema alignment MUST maintain backward compatibility with existing client applications
+    - All missing fields MUST be mapped from NZTAB API response data where available
+    - Money flow calculations MUST be mathematically consistent and incrementally correct
+    - Odds processing MUST prevent duplicate records through change detection
+    - Race pools extraction MUST handle all pool types (win, place, quinella, trifecta, etc.)
+    - Database operations MUST maintain performance targets (5 races in &lt;15s, single race in &lt;2s)
+    - All modifications MUST follow existing TypeScript strict mode standards
+    - Integration tests MUST cover complete end-to-end data flow from API to database
   </constraints>
 
   <interfaces>
+    <interface name="ensurePartition" kind="function" signature="ensurePartition(tableName: string, date: Date): Promise&lt;void&gt;" path="server/src/database/time-series.ts">
+      Partition management function that creates daily partitions if they don't exist. Critical for preventing PartitionNotFoundError in production.
+    </interface>
+    <interface name="transformRaceData" kind="function" signature="transformRaceData(apiData: any, raceId: string): Promise&lt;TransformedRaceData&gt;" path="server/src/workers/transformWorker.ts">
+      Enhanced data transformation function that extracts all fields including race pools, calculates incremental money flow, and detects odds changes.
+    </interface>
     <interface name="processRace" kind="function" signature="processRace(raceId: string, options?: ProcessOptions): Promise&lt;ProcessResult&gt;" path="server/src/pipeline/race-processor.ts">
-      Main race processing function from Story 2.7. Scheduler calls this at each interval tick. Returns ProcessResult with timings, rowCounts, and status. Exported from race-processor module.
-    </interface>
-    <interface name="pool.query" kind="function" signature="pool.query(sql: string, params?: any[]): Promise&lt;QueryResult&gt;" path="server/src/database/pool.ts">
-      PostgreSQL query function. Scheduler uses this to query upcoming races from database. Returns query result with rows array.
-    </interface>
-    <interface name="logger.info" kind="function" signature="logger.info(obj: object, msg: string): void" path="server/src/shared/logger.ts">
-      Pino structured logging. Scheduler uses logger.info() for scheduling events, logger.warn() for warnings, logger.error() for failures.
+      Main race processing function that needs to handle complete data population including race pools and enhanced money flow processing.
     </interface>
   </interfaces>
 
   <tests>
     <standards>
-      Testing strategy uses Vitest for both unit and integration tests. Unit tests mock external dependencies (database, setInterval) and test pure logic in isolation. Integration tests use real PostgreSQL test database with seeded fixtures. All tests must pass before story approval. Coverage target: &gt;80% for scheduler module.
+      Testing strategy uses Vitest for both unit and integration tests. Unit tests mock external dependencies (database, APIs) and test individual components. Integration tests use real PostgreSQL test database with comprehensive fixtures. All tests must validate partition creation, schema alignment, and end-to-end data flow. Coverage target: &gt;90% for enhanced pipeline components.
     </standards>
     <locations>
-      - server/tests/unit/scheduler/ (unit tests for interval calculation, race scheduling logic)
-      - server/tests/integration/scheduler/ (integration tests with real database, end-to-end scheduling)
+      - server/tests/unit/database/time-series.test.ts (partition management tests)
+      - server/tests/unit/workers/transformWorker.test.ts (data transformation tests)
+      - server/tests/unit/pipeline/race-processor.test.ts (enhanced processing tests)
+      - server/tests/integration/pipeline/ (end-to-end data flow tests)
+      - server/tests/integration/initialization/ (daily baseline and scheduler tests)
     </locations>
     <ideas>
-      - AC1: Unit test for calculatePollingInterval() with boundary values (300s, 301s, 900s, 901s, negative values)
-      - AC2-3: Unit test for interval calculation logic returning correct milliseconds (15000, 30000, 60000)
-      - AC4: Unit test for scheduleRace() storing interval handle in Map and calling processRace at correct interval
-      - AC5: Unit test for unscheduleRace() clearing interval handle and removing from Map
-      - AC6: Integration test seeding database with races at different time-to-start values, verifying scheduler applies correct intervals
-      - AC7: Integration test verifying structured logs emitted for interval changes, race scheduling, race completion
-      - Edge cases: Test race starting during re-evaluation, database connection failure, duplicate raceId scheduling
+      - AC1: Unit test for ensurePartition() with various date scenarios (today, tomorrow, past dates)
+      - AC2: Integration test for schema migration validating all 50+ fields are populated correctly
+      - AC3: Unit test for race pools extraction from NZTAB API response with various pool types
+      - AC4: Integration test for money flow incremental calculations over time periods
+      - AC5: Unit test for odds change detection preventing duplicate records
+      - AC6: End-to-end integration test simulating complete data pipeline from API to database
+      - AC7: Integration test verifying client application data access patterns
     </ideas>
   </tests>
 </story-context>

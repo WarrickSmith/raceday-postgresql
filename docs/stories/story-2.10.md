@@ -1,116 +1,139 @@
 # Story 2.10: Dynamic Scheduler with Time-Based Intervals
 
-Status: In Progress
+Status: In Progress - Critical Blockers Found
 
 ## Story
 
 As a **developer**,
-I want **scheduler that adjusts polling frequency based on time-to-start**,
-so that **I can poll at 15s intervals during critical 5-minute window**.
+I want **comprehensive data population pipeline with automatic partitions, complete schema alignment, and enhanced data processing**,
+so that **the dynamic scheduler can function with full data flow and client applications receive complete race data**.
 
 ## Acceptance Criteria
 
-1. Scheduler queries database for upcoming races
-2. For each race, calculates time-to-start (start_time - current time)
-3. Determines polling interval based on time-to-start:
-   - ≤5 minutes: 15 seconds
-   - 5-15 minutes: 30 seconds
-   - >15 minutes: 60 seconds
-4. Schedules race processing using `setInterval` per race
-5. Clears interval when race completes or is abandoned
-6. Scheduler runs continuously, re-evaluating intervals every minute
-7. Logging for: interval changes, race scheduling, race completion
+1. **Database Partition Automation**: Daily partitions are automatically created for time-series tables (money_flow_history, odds_history) preventing PartitionNotFoundError
+2. **Complete Schema Alignment**: All 50+ missing database fields are added and populated from NZTAB API data, ensuring client compatibility
+3. **Race Pools Population**: Race pools data is extracted from NZTAB API and stored in race_pools table with all pool types (win, place, quinella, etc.)
+4. **Enhanced Money Flow Processing**: Money flow incremental calculations work properly with time-bucketing and mathematical consistency validation
+5. **Odds Change Detection**: Odds processing prevents duplicate records through proper change detection logic
+6. **End-to-End Data Flow**: Integration tests pass with complete data flow from API to database to scheduler
+7. **Performance Validation**: All database operations maintain performance targets (5 races in <15s, single race in <2s) with proper indexing
 
 ## Tasks / Subtasks
 
-- [x] Task 1: Implement interval calculation logic (AC: 2, 3)
-  - [x] Create `calculatePollingInterval(timeToStart: number): number` function
-  - [x] Implement time-based interval matrix (15s, 30s, 60s)
-  - [x] Add unit tests for boundary conditions (300s, 301s, 900s, 901s)
-  - [x] Ensure function handles edge cases (negative time, race already started)
+- [ ] Task 1: Implement database partition automation (AC: 1)
+  - [ ] Create `ensurePartition(tableName: string, date: Date): Promise<void>` function in time-series.ts
+  - [ ] Add partition existence validation before all time-series writes
+  - [ ] Implement automatic partition creation for today + tomorrow dates
+  - [ ] Add graceful error handling and structured logging for partition operations
+  - [ ] Create unit tests for partition management with various date scenarios
+  - [ ] Add integration tests validating partition creation and data insertion
 
-- [x] Task 2: Implement race query and scheduling logic (AC: 1, 4)
-  - [x] Query database for upcoming races (`status IN ('open', 'upcoming')`)
-  - [x] Filter races by start_time (next 24 hours)
-  - [x] Create `scheduleRace(raceId: string, interval: number)` function
-  - [x] Use `setInterval` to call `processRace()` at calculated interval
-  - [x] Store interval handles in Map keyed by raceId
+- [ ] Task 2: Add missing database schema fields (AC: 2)
+  - [ ] Create migration 008_add_missing_entrant_fields.sql (jockey, trainer, barrier, silk colours, etc.)
+  - [ ] Create migration 009_add_missing_race_fields.sql (distance, prize money, video channels, etc.)
+  - [ ] Create migration 010_add_missing_meeting_fields.sql (weather, track condition, state, etc.)
+  - [ ] Create migration 011_enhance_money_flow_history.sql (timeline fields, incremental calculations)
+  - [ ] Add performance indexes for new fields (entrant barrier, money flow timeline, race status)
+  - [ ] Update TypeScript interfaces to include all new fields
+  - [ ] Create unit tests for schema migrations and field validations
 
-- [x] Task 3: Implement interval cleanup (AC: 5)
-  - [x] Listen for race status changes (completed, abandoned, final)
-  - [x] Clear interval handle when race finishes
-  - [x] Remove race from active scheduling map
-  - [x] Log race completion and interval cleanup
+- [ ] Task 3: Enhance data processing logic for race pools (AC: 3)
+  - [ ] Add `extractPoolTotals(apiData: any, raceId: string): RacePoolData | null` function
+  - [ ] Implement RacePoolData interface with all pool types (win, place, quinella, trifecta, etc.)
+  - [ ] Create race-pools.ts module with `insertRacePoolData()` function
+  - [ ] Update transformWorker.ts to extract and process tote_pools from NZTAB API
+  - [ ] Add currency conversion and amount normalization (to cents)
+  - [ ] Implement race pools data validation and error handling
+  - [ ] Create unit tests for race pools extraction and insertion
 
-- [x] Task 4: Implement continuous re-evaluation loop (AC: 6)
-  - [x] Create main scheduler loop running every 60 seconds
-  - [x] Re-query database for race status updates
-  - [x] Recalculate intervals for active races
-  - [x] Update intervals if they changed (clear old, start new)
-  - [x] Add/remove races as they enter/exit scheduling window
+- [ ] Task 4: Implement enhanced money flow processing (AC: 4)
+  - [ ] Add `getPreviousMoneyFlowRecord()` function for incremental calculations
+  - [ ] Implement `createTimeBucketedRecords()` for time-bucketed timeline data
+  - [ ] Create MoneyFlowRecord interface with all timeline and calculation fields
+  - [ ] Add incremental delta calculations (win/place amounts, percentages)
+  - [ ] Implement mathematical consistency validation
+  - [ ] Add data quality scoring and stale data detection
+  - [ ] Update transformWorker.ts with enhanced money flow logic
+  - [ ] Create unit tests for incremental calculations and time-bucketing
 
-- [x] Task 5: Add structured logging (AC: 7)
-  - [x] Log interval changes with race context (raceId, old interval, new interval, reason)
-  - [x] Log race scheduling events (raceId, interval, start_time, time_to_start)
-  - [x] Log race completion events (raceId, final status, total polls)
-  - [x] Use Pino structured JSON format
+- [ ] Task 5: Add odds change detection logic (AC: 5)
+  - [ ] Implement `hasOddsChanged()` function comparing new odds with previous records
+  - [ ] Add odds comparison for fixed_win, fixed_place, pool_win, pool_place
+  - [ ] Update race-processor.ts to check for odds changes before insertion
+  - [ ] Add structured logging for odds change events
+  - [ ] Implement change detection tolerance for floating-point comparisons
+  - [ ] Create unit tests for odds change detection scenarios
+  - [ ] Add integration tests validating duplicate prevention
 
-- [x] Task 6: Add unit tests for scheduler logic (AC: All)
-  - [x] Test interval calculation with various time-to-start values
-  - [x] Test race scheduling and interval storage
-  - [x] Test interval cleanup on race completion
-  - [x] Test re-evaluation loop with mock database queries
-  - [x] Test edge cases (race starts during evaluation, database errors)
+- [ ] Task 6: Update data pipeline integration (AC: 6)
+  - [ ] Modify `persistTransformedRace()` to handle race pools and enhanced money flow
+  - [ ] Update race-processor.ts to call new data processing functions
+  - [ ] Add partition checks before all time-series data writes
+  - [ ] Implement proper error handling and rollback for data pipeline failures
+  - [ ] Add comprehensive structured logging for pipeline operations
+  - [ ] Update database transaction handling for multiple table writes
+  - [ ] Create end-to-end integration tests for complete data flow
 
-- [x] Task 7: Add integration tests for end-to-end scheduling (AC: All)
-  - [x] Seed test database with races at different time-to-start values
-  - [x] Start scheduler and verify correct intervals applied
-  - [x] Simulate time progression and verify interval updates
-  - [x] Verify race processor called at correct intervals
-  - [x] Verify cleanup when races complete
-  - [x] Ensure races remain scheduled after start_time until terminal status
+- [ ] Task 7: Add comprehensive testing and validation (AC: 7)
+  - [ ] Create end-to-end integration test for complete API-to-database flow
+  - [ ] Add performance tests validating 5 races in <15s, single race in <2s targets
+  - [ ] Implement data quality validation SQL queries for mathematical consistency
+  - [ ] Create tests for partition creation with various date scenarios
+  - [ ] Add load testing for concurrent race processing
+  - [ ] Validate client application data access patterns
+  - [ ] Create regression test suite to prevent future data pipeline breaks
 
 ## Dev Notes
 
-### Architecture Integration
+### Remediation Architecture Integration
 
-**Scheduler Module (`scheduler/index.ts`)**
-- Main entry point for dynamic scheduling logic
-- Manages active race intervals in memory (Map<raceId, NodeJS.Timer>)
-- Queries database every 60 seconds for race updates
-- Integrates with race processor from Story 2.7
+**Data Pipeline Enhancement Focus:**
+- The Dynamic Scheduler (Story 2.10) is implemented and working correctly
+- This story addresses critical data population blockers preventing end-to-end functionality
+- Focus shifts from scheduler logic to comprehensive data pipeline remediation
 
-**Key Functions:**
-- `calculatePollingInterval(timeToStart: number): number` - Time-based interval logic
-- `scheduleRace(raceId: string, interval: number): void` - Start polling for a race
-- `unscheduleRace(raceId: string): void` - Stop polling and cleanup
-- `startScheduler(): void` - Main loop, runs continuously
-- `stopScheduler(): void` - Graceful shutdown
+**Key Integration Points:**
+- **Database Layer**: Time-series partition management and schema alignment
+- **Data Processing**: Enhanced transformWorker.ts with race pools and money flow logic
+- **Pipeline Integration**: Updated race-processor.ts to handle complete data flow
+- **Testing**: Comprehensive validation of end-to-end data pipeline
 
-**Integration Points:**
-- Calls `processRace(raceId)` from Story 2.7 at each interval tick
-- Queries `races` table for active races
-- Uses Pino logger from Epic 1 for structured logging
-- Coordinates with batch processor from Story 2.8 for concurrent race handling
+### Critical Blocker Resolution
+
+**Phase 1 - Database Infrastructure (CRITICAL):**
+- Implement automatic daily partition creation for `money_flow_history` and `odds_history`
+- Prevent `PartitionNotFoundError` that blocks all data writes
+- Add graceful partition existence validation before time-series operations
+
+**Phase 2 - Schema Alignment (HIGH):**
+- Add 50+ missing fields identified in Appwrite vs PostgreSQL gap analysis
+- Focus on critical client-facing data: entrant details, race metadata, meeting information
+- Maintain backward compatibility during schema migrations
+
+**Phase 3 - Data Processing Logic (HIGH):**
+- Implement race pools extraction from NZTAB API `tote_pools` data
+- Add money flow incremental calculations with time-bucketing
+- Create odds change detection to prevent duplicate records
+
+**Phase 4 - Testing & Validation (MEDIUM):**
+- End-to-end integration tests for complete data flow
+- Performance validation maintaining target thresholds
+- Data quality validation and mathematical consistency checks
 
 ### Performance Requirements
 
-**Interval Thresholds (from PRD/Epics):**
-- Critical window (≤5 min to start): 15 second polling
-- Moderate window (5-15 min): 30 second polling
-- Low priority (>15 min): 60 second polling
+**Data Pipeline Performance Targets:**
+- **5 races in <15 seconds**: Batch processing performance requirement
+- **Single race in <2 seconds**: Individual race processing target
+- **Partition creation**: <100ms for automatic partition setup
+- **Database writes**: <50ms per time-series record with proper indexing
+- **Schema migrations**: Zero-downtime deployments with backward compatibility
 
-**Scheduler Performance:**
-- Database query for race list: <100ms (indexed on start_time)
-- Interval calculation: <1ms per race (simple math)
-- Re-evaluation loop: completes in <5 seconds for 100 races
-- Memory footprint: ~1KB per scheduled race (interval handle + metadata)
-
-**Edge Case Handling:**
-- Race starts during evaluation: immediate interval update
-- Race cancelled/abandoned: cleanup within 60 seconds
-- Database connection lost: retry with exponential backoff
-- System restart: rebuild scheduling state from database
+**Quality Requirements:**
+- **Mathematical consistency**: Money flow calculations must balance
+- **Data completeness**: All required fields populated from API data
+- **Change detection**: No duplicate odds or money flow records
+- **Performance monitoring**: Structured logging for pipeline health
 
 ### Time-Based Interval Logic
 
@@ -259,7 +282,8 @@ const upcomingRaces = await pool.query(`
 
 ### Context Reference
 
-- docs/stories/story-context-2.10.xml
+- docs/stories/story-context-2.10.xml (Original scheduler context)
+- docs/stories/story-context-2.10.xml (NEW: Comprehensive remediation scope - 2025-10-16)
 
 ### Agent Model Used
 
@@ -282,18 +306,44 @@ claude-sonnet-4-5-20250929
 - 2025-10-14: Realigned scheduler query with story context constraints, updated documentation, and revalidated via `npm run test:unit` and `npm run test:integration`.
 - 2025-10-14: Definition of Done confirmed post-review; story approved and marked done after `story-approved` workflow.
 
+### Critical Blockers Discovered (2025-10-16)
+
+- **🔴 CRITICAL: PartitionNotFoundError**: Test suite reveals missing daily partitions for time-series tables. Tests failing with `Partition money_flow_history_2035_01_01 not found`. This is blocking all data writes to critical tables.
+- **🔴 CRITICAL: Data Pipeline Broken**: Integration test failure shows `daily-baseline.integration.test.ts` failing because scheduler-ready data is not being created properly. Expected race ID `itest-daily-init-race-1` not found in scheduler results.
+- **🔴 HIGH: Schema Misalignment**: Investigation reveals 50+ missing fields between Appwrite (server-old) and PostgreSQL implementations, including critical entrant data (jockey, trainer, barrier), race metadata (distance, prize money), and meeting information (weather, track conditions).
+- **🔴 HIGH: Missing Data Processing Logic**: Race pools, money flow incremental calculations, and odds change detection are not implemented despite being critical for client functionality.
+
+**Assessment**: Story is NOT actually complete. While scheduler logic works, the broader data ecosystem is broken, preventing end-to-end functionality.
+
+**Recommendation**: Re-run `create-context` workflow to properly scope and task the comprehensive remediation work required across multiple phases (partition automation, schema alignment, data processing enhancements).
+
 ### File List
 
-- server/src/scheduler/interval.ts (new)
-- server/src/scheduler/index.ts (updated)
-- server/src/scheduler/scheduler.ts (new)
-- server/src/scheduler/types.ts (new)
-- server/src/index.ts (updated)
-- server/tests/unit/scheduler/interval.test.ts (updated)
-- server/tests/unit/scheduler/scheduler.test.ts (updated)
-- server/tests/integration/scheduler/scheduler.integration.test.ts (updated)
-- docs/stories/story-2.10.md (updated)
-- docs/project-workflow-status.md (updated)
+**Existing Scheduler Files (Already Completed):**
+- server/src/scheduler/interval.ts (completed)
+- server/src/scheduler/index.ts (completed)
+- server/src/scheduler/scheduler.ts (completed)
+- server/src/scheduler/types.ts (completed)
+
+**New Remediation Files to Create:**
+- server/database/migrations/008_add_missing_entrant_fields.sql (new)
+- server/database/migrations/009_add_missing_race_fields.sql (new)
+- server/database/migrations/010_add_missing_meeting_fields.sql (new)
+- server/database/migrations/011_enhance_money_flow_history.sql (new)
+- server/src/database/race-pools.ts (new)
+- server/tests/unit/database/time-series-partition.test.ts (new)
+- server/tests/unit/workers/race-pools.test.ts (new)
+- server/tests/integration/data-pipeline.e2e.test.ts (new)
+
+**Files to Modify for Remediation:**
+- server/src/database/time-series.ts (partition automation)
+- server/src/workers/transformWorker.ts (enhanced data processing)
+- server/src/pipeline/race-processor.ts (pipeline integration)
+- server/src/shared/types.ts (updated interfaces)
+
+**Documentation:**
+- docs/stories/story-2.10.md (restructured for remediation)
+- docs/stories/story-context-2.10.xml (comprehensive remediation scope)
 
 ## Change Log
 
@@ -307,6 +357,8 @@ claude-sonnet-4-5-20250929
 | 2025-10-14 | Senior Developer Review (Changes Requested) | warrick |
 | 2025-10-14 | Action items resolved; scheduler query realigned and docs updated | Amelia (Developer agent) |
 | 2025-10-14 | Senior Developer Review (Approved) | warrick |
+| 2025-10-16 | CRITICAL: Discovered data population blockers during regression testing; story halted | Amelia (Developer agent) |
+| 2025-10-16 | RESTRUCTURED: Converted to comprehensive data population remediation story with 7 actionable tasks and proper acceptance criteria | Amelia (Developer agent) |
 
 ## Senior Developer Review (AI)
 
