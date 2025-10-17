@@ -1,0 +1,218 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2.10A</storyId>
+    <title>Code Quality Foundation</title>
+    <status>Draft</status>
+    <generatedAt>2025-10-17</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-2.10A.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>all lint errors resolved, build passing, and tests working</iWant>
+    <soThat>the codebase has a solid foundation for data pipeline remediation</soThat>
+    <tasks>
+      - Task 1: Resolve all ESLint errors (245 errors across codebase)
+      - Task 2: Fix TypeScript build errors (45+ compilation errors)
+      - Task 3: Fix failing unit tests
+      - Task 4: Fix failing integration tests (partition date calculation, type assertions)
+      - Task 5: Enforce strict TypeScript configuration
+      - Task 6: Validate code quality standards
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">**Zero Lint Errors**: All 245 lint errors resolved across the codebase</criterion>
+    <criterion id="2">**Build Success**: TypeScript compilation completes without errors (45+ build errors resolved)</criterion>
+    <criterion id="3">**Test Suite Health**: All 14+ failing tests pass, test coverage maintained</criterion>
+    <criterion id="4">**Strict Typing**: No 'any' types remain, all TypeScript interfaces properly defined</criterion>
+    <criterion id="5">**Code Quality Standards**: Code follows established patterns and conventions</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/CODING-STANDARDS.md</path>
+        <title>Coding Standards</title>
+        <section>TypeScript and Testing Standards</section>
+        <snippet>Defines project-wide TypeScript coding standards, strict typing requirements, and testing conventions that must be followed.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Epic 2 - High-Performance Data Pipeline</title>
+        <section>Code Quality Requirements</section>
+        <snippet>Specifies NFR009 (runtime type validation), NFR007 (zero 'any' types), and NFR017 (strict TypeScript compilation) that apply to all Epic 2 work.</snippet>
+      </doc>
+      <doc>
+        <path>docs/typescript-eslint-config.md</path>
+        <title>TypeScript ESLint Configuration</title>
+        <section>Linting Rules and Configuration</section>
+        <snippet>Documents the strict ESLint configuration with type-checked rules, naming conventions, and code style requirements.</snippet>
+      </doc>
+      <doc>
+        <path>docs/DEFINITION-OF-DONE.md</path>
+        <title>Definition of Done</title>
+        <section>Quality Gates</section>
+        <snippet>Defines completion criteria including: code passes linting, builds successfully, all tests pass, and strict typing is enforced.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/story-2.10.md</path>
+        <title>Story 2.10: Dynamic Scheduler with Time-Based Intervals</title>
+        <section>Code Quality Assessment and Remediation Plan</section>
+        <snippet>Parent story documenting the discovery of 245 lint errors, 45+ build errors, and 14+ test failures during integration testing on 2025-10-16.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epic-stories-2025-10-05.md</path>
+        <title>Epic Stories Breakdown</title>
+        <section>Story 2.10A Definition</section>
+        <snippet>Defines Story 2.10A as the foundation for subsequent 2.10B-2.10D stories, blocking all data pipeline remediation work until code quality is resolved.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>server/src/database/bulk-upsert.ts</path>
+        <kind>database</kind>
+        <symbol>bulkUpsertMeetings, bulkUpsertRaces, bulkUpsertEntrants</symbol>
+        <lines>58, 160, 249</lines>
+        <reason>Contains 68 template literal interpolation errors where paramIndex needs String() conversion before template use</reason>
+      </artifact>
+      <artifact>
+        <path>server/tests/integration/database/bulk-upsert.integration.test.ts</path>
+        <kind>test</kind>
+        <symbol>integration test suite</symbol>
+        <lines>166-342</lines>
+        <reason>Contains 26 unsafe 'any' value access errors requiring type assertions on persisted.rows[0]</reason>
+      </artifact>
+      <artifact>
+        <path>server/tests/unit/database/bulk-upsert.test.ts</path>
+        <kind>test</kind>
+        <symbol>unit test suite</symbol>
+        <lines>143-144</lines>
+        <reason>Failing unit test with parameter index expectation mismatch - needs update to match 8-field meeting schema</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/database/time-series.ts</path>
+        <kind>database</kind>
+        <symbol>insertMoneyFlowHistory, insertOddsHistory</symbol>
+        <lines>all</lines>
+        <reason>Partition date calculation issue causing test failures (odds_history_2025_10_15 vs 2025_10_14 mismatch)</reason>
+      </artifact>
+      <artifact>
+        <path>server/eslint.config.js</path>
+        <kind>config</kind>
+        <symbol>ESLint configuration</symbol>
+        <lines>all</lines>
+        <reason>Defines strict linting rules including no-explicit-any, unsafe type access, naming conventions, and import rules</reason>
+      </artifact>
+      <artifact>
+        <path>server/tsconfig.json</path>
+        <kind>config</kind>
+        <symbol>TypeScript configuration</symbol>
+        <lines>all</lines>
+        <reason>Enforces strict type checking with noImplicitAny, strictNullChecks, noUnusedLocals, noUnusedParameters, and other strict flags</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <npm>
+        <devDependencies>
+          <package name="@typescript-eslint/eslint-plugin" version="^8.0.0"/>
+          <package name="@typescript-eslint/parser" version="^8.0.0"/>
+          <package name="typescript-eslint" version="^8.45.0"/>
+          <package name="eslint" version="^9.0.0"/>
+          <package name="eslint-plugin-import" version="^2.32.0"/>
+          <package name="typescript" version="^5.7.0"/>
+          <package name="prettier" version="^3.3.0"/>
+          <package name="vitest" version="^2.0.0"/>
+          <package name="@vitest/coverage-v8" version="^2.1.9"/>
+          <package name="tsx" version="^4.19.0"/>
+        </devDependencies>
+        <dependencies>
+          <package name="zod" version="^3.25.76"/>
+        </dependencies>
+      </npm>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - **Strict TypeScript Mode**: tsconfig.json enforces strict: true, noImplicitAny: true, strictNullChecks: true, noUnusedLocals: true
+    - **Zero 'any' Types**: ESLint rule @typescript-eslint/no-explicit-any set to 'error' - no any types permitted
+    - **Unsafe Type Access**: All unsafe-* rules (@typescript-eslint/no-unsafe-assignment, no-unsafe-call, no-unsafe-member-access) set to 'error'
+    - **Template Literals**: All template expressions must use String() conversion for non-string values
+    - **Type Assertions Required**: Database query results (persisted.rows[0]) must have explicit type assertions
+    - **Naming Conventions**: camelCase for variables/functions, PascalCase for types/classes, UPPER_CASE for constants
+    - **Import Style**: No default exports allowed (import/no-default-export: 'error')
+    - **Test Coverage**: Must maintain existing coverage levels during fixes
+    - **Build Must Pass**: npm run build must complete without errors before PR approval
+    - **All Tests Must Pass**: npm run test must pass 100% before PR approval
+    - **Sequential Dependency**: This story BLOCKS Stories 2.10B-2.10D - must be completed first
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>bulkUpsertMeetings</name>
+      <kind>function</kind>
+      <signature>async function bulkUpsertMeetings(meetings: Meeting[]): Promise&lt;void&gt;</signature>
+      <path>server/src/database/bulk-upsert.ts</path>
+    </interface>
+    <interface>
+      <name>bulkUpsertRaces</name>
+      <kind>function</kind>
+      <signature>async function bulkUpsertRaces(races: Race[]): Promise&lt;void&gt;</signature>
+      <path>server/src/database/bulk-upsert.ts</path>
+    </interface>
+    <interface>
+      <name>bulkUpsertEntrants</name>
+      <kind>function</kind>
+      <signature>async function bulkUpsertEntrants(entrants: Entrant[]): Promise&lt;void&gt;</signature>
+      <path>server/src/database/bulk-upsert.ts</path>
+    </interface>
+    <interface>
+      <name>insertMoneyFlowHistory</name>
+      <kind>function</kind>
+      <signature>async function insertMoneyFlowHistory(records: MoneyFlowRecord[]): Promise&lt;void&gt;</signature>
+      <path>server/src/database/time-series.ts</path>
+    </interface>
+    <interface>
+      <name>insertOddsHistory</name>
+      <kind>function</kind>
+      <signature>async function insertOddsHistory(records: OddsRecord[]): Promise&lt;void&gt;</signature>
+      <path>server/src/database/time-series.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Project uses Vitest for unit and integration testing with TypeScript strict mode. Tests must follow these standards:
+      - All test files use .test.ts extension
+      - Unit tests in tests/unit/ directory structure mirroring src/
+      - Integration tests in tests/integration/ for database and pipeline tests
+      - Type-safe test assertions - no 'any' types in test code
+      - Proper cleanup in afterEach/afterAll hooks
+      - Test descriptions follow pattern: "should [expected behavior] when [condition]"
+      - Coverage targets maintained via vitest --coverage
+      - Test scripts: npm run test:unit, npm run test:integration, npm run test (all)
+    </standards>
+    <locations>
+      - tests/unit/database/*.test.ts (unit tests for database operations)
+      - tests/integration/database/*.test.ts (integration tests with actual database)
+      - tests/unit/**/*.test.ts (all unit tests)
+      - tests/integration/**/*.test.ts (all integration tests)
+    </locations>
+    <ideas>
+      <test ac="1">Verify npm run lint exits with code 0 and reports 0 errors after all fixes applied</test>
+      <test ac="1">Test that all template literal interpolations use String() conversion for non-string values</test>
+      <test ac="1">Validate no @typescript-eslint errors remain in bulk-upsert.ts and integration tests</test>
+      <test ac="2">Run npm run build and assert exit code 0 with no compilation errors in stdout</test>
+      <test ac="2">Verify TypeScript strict mode flags are enabled in tsconfig.json</test>
+      <test ac="3">Execute npm run test:unit and assert all unit tests pass</test>
+      <test ac="3">Execute npm run test:integration and assert all integration tests pass including partition date calculation</test>
+      <test ac="3">Verify transaction rollback integration test is unskipped and passes after refactoring</test>
+      <test ac="4">Scan codebase for remaining 'any' types using grep or AST analysis - assert count is 0</test>
+      <test ac="4">Verify all database query results have proper type assertions (no implicit any)</test>
+      <test ac="5">Run full quality gate: lint + build + test in sequence - all must pass</test>
+      <test ac="5">Validate code follows naming conventions defined in eslint.config.js</test>
+    </ideas>
+  </tests>
+</story-context>

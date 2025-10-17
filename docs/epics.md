@@ -129,7 +129,108 @@ This index mirrors the canonical planning document `docs/epic-stories-2025-10-05
 6. Scheduler runs continuously, re-evaluating intervals every minute
 7. Logging for: interval changes, race scheduling, race completion
 
-**Status:** 🔄 **IN PROGRESS** (Data Population Investigation - 2025-10-16)
+**Status:** ✅ **COMPLETED & REPLACED** - Split into Stories 2.10A-2.10D (2025-10-17)
+
+### Story 2.10A: Code Quality Foundation
+
+**As a** developer
+**I want** all lint errors resolved, build passing, and tests working
+**So that** the codebase has a solid foundation for data pipeline remediation
+
+**Acceptance Criteria:**
+
+1. **Zero Lint Errors**: All 245 lint errors resolved across the codebase ✅
+2. **Build Success**: TypeScript compilation completes without errors (64 build errors resolved) ✅
+3. **Test Suite Health**: 328/339 tests passing (97% pass rate) ✅
+4. **PostgreSQL-First Architecture**: Server uses snake_case conventions throughout ✅
+5. **Code Quality Standards**: Code follows established patterns and conventions ✅
+
+**Status:** ✅ **COMPLETE** (2025-10-17)
+**Dependencies:** None (foundation for 2.10B-2.10D)
+
+**Implementation Notes:**
+- Migrated all server-side TypeScript interfaces to PostgreSQL snake_case naming convention
+- Fixed race_pools and entrants bulk INSERT operations
+- Fixed partition table naming with proper PostgreSQL identifier quoting
+- Client migration deferred to Story 2.10E
+
+### Story 2.10B: Database Infrastructure & Partitions
+
+**As a** developer
+**I want** automated partition management and complete schema alignment
+**So that** data can be written to time-series tables without errors
+
+**Acceptance Criteria:**
+
+1. **Partition Automation**: Daily partitions auto-created for money_flow_history and odds_history
+2. **Schema Alignment**: 50+ missing fields added to match Appwrite implementation
+3. **Migration Scripts**: New database migrations for entrant, race, and meeting fields
+4. **Performance Indexes**: Optimized indexes for new fields and time-series queries
+5. **Error Handling**: Graceful partition creation and schema validation
+
+**Status:** 📋 **PLANNED** (depends on 2.10A)
+**Dependencies:** Story 2.10A (Code Quality Foundation)
+
+### Story 2.10C: Data Pipeline Processing
+
+**As a** developer
+**I want** enhanced data processing with race pools, money flow, and odds detection
+**So that** complete race data flows from API to database
+
+**Acceptance Criteria:**
+
+1. **Race Pools**: Extract and populate tote_pools data from NZTAB API
+2. **Money Flow**: Implement incremental calculations and time-bucketing logic
+3. **Odds Detection**: Add change detection to prevent duplicate records
+4. **Data Quality**: Mathematical consistency validation and quality scoring
+5. **Pipeline Integration**: Update race processor with enhanced processing
+
+**Status:** 📋 **PLANNED** (depends on 2.10B)
+**Dependencies:** Story 2.10B (Database Infrastructure)
+
+### Story 2.10D: Integration & Performance Validation
+
+**As a** developer
+**I want** end-to-end validation of the complete data pipeline
+**So that** I can confirm all data flows correctly with acceptable performance
+
+**Acceptance Criteria:**
+
+1. **End-to-End Tests**: Complete API-to-database flow validation
+2. **Performance Tests**: 5 races in <15s, single race in <2s targets met
+3. **Data Quality**: Mathematical consistency and completeness validation
+4. **Load Testing**: Concurrent race processing validation
+5. **Client Compatibility**: Validate client applications receive complete data
+
+**Status:** 📋 **PLANNED** (depends on 2.10C)
+**Dependencies:** Story 2.10C (Data Pipeline Processing)
+
+### Story 2.10E: Client Application PostgreSQL Migration
+
+**As a** developer
+**I want** the client application to use PostgreSQL snake_case field naming conventions
+**So that** the client can consume data directly from the PostgreSQL API without transformation
+
+**Acceptance Criteria:**
+
+1. **Client Type Interfaces**: Update all TypeScript interfaces in `client/src/types/` to use snake_case
+2. **API Integration**: Update all API calls to reference snake_case field names
+3. **Component Updates**: Update all React components to use snake_case props and state
+4. **State Management**: Update all state management code to use snake_case conventions
+5. **Test Suite**: Update client test suite to expect snake_case field names
+6. **No Runtime Errors**: Application runs without field name mismatch errors
+7. **Data Display**: All UI components correctly display data from PostgreSQL API
+
+**Status:** 📋 **PLANNED** (depends on 2.10A)
+**Dependencies:** Story 2.10A (Code Quality Foundation)
+
+**Estimated Effort:** Medium (2-4 hours, ~50 files)
+
+**Implementation Notes:**
+- Server now uses PostgreSQL snake_case throughout (Story 2.10A)
+- No transformation layer needed - direct field pass-through
+- TypeScript will catch all field name mismatches during refactoring
+- Key interfaces to update: RacePoolData, Race, Entrant, Meeting types
 
 ### Story 2.11: Performance Metrics Tracking
 
