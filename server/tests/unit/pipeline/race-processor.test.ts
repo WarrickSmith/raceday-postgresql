@@ -39,10 +39,12 @@ vi.mock('../../../src/shared/logger.js', () => ({
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
+    debug: vi.fn(),
     child: vi.fn(() => ({
       info: vi.fn(),
       warn: vi.fn(),
       error: vi.fn(),
+      debug: vi.fn(),
     })),
   },
 }))
@@ -238,6 +240,7 @@ describe('processRace', () => {
         entrants: 3,
         moneyFlowHistory: 1,
         oddsHistory: 2,
+        racePools: 0,
       },
     })
 
@@ -337,6 +340,7 @@ describe('processRace', () => {
       entrants: 0,
       moneyFlowHistory: 0,
       oddsHistory: 0,
+      racePools: 0,
     })
     expect(workerExecMock).not.toHaveBeenCalled()
     expect(bulkUpsertEntrantsMock).not.toHaveBeenCalled()

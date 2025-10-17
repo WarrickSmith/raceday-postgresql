@@ -31,7 +31,7 @@ const lastOddsSnapshot = new Map<string, OddsSnapshot>()
  */
 export function shouldInsertOddsRecord(
   record: OddsRecord,
-  minimumChange: number = 0.01
+  minimumChange = 0.01
 ): boolean {
   const key = `${record.entrant_id}:${record.type}`
   const previous = lastOddsSnapshot.get(key)
@@ -53,26 +53,26 @@ export function shouldInsertOddsRecord(
       timestamp: record.event_timestamp
     })
 
-    logger.debug('Odds change detected', {
-      entrant_id: record.entrant_id,
-      odds_type: record.type,
-      previous_odds: previous.odds,
-      current_odds: record.odds,
+    logger.debug({
+      entrantId: record.entrant_id,
+      oddsType: record.type,
+      previousOdds: previous.odds,
+      currentOdds: record.odds,
       change: oddsDiff,
       threshold: minimumChange
-    })
+    }, 'Odds change detected')
 
     return true
   }
 
   // No significant change - skip insertion
-  logger.debug('Odds unchanged - skipping insertion', {
-    entrant_id: record.entrant_id,
-    odds_type: record.type,
+  logger.debug({
+    entrantId: record.entrant_id,
+    oddsType: record.type,
     odds: record.odds,
     change: oddsDiff,
     threshold: minimumChange
-  })
+  }, 'Odds unchanged - skipping insertion')
 
   return false
 }
@@ -86,18 +86,18 @@ export function shouldInsertOddsRecord(
  */
 export function filterSignificantOddsChanges(
   records: OddsRecord[],
-  minimumChange: number = 0.01
+  minimumChange = 0.01
 ): OddsRecord[] {
   const filtered = records.filter(record => shouldInsertOddsRecord(record, minimumChange))
 
   const skippedCount = records.length - filtered.length
   if (skippedCount > 0) {
-    logger.info('Filtered out unchanged odds records', {
-      total_records: records.length,
-      inserted_records: filtered.length,
-      skipped_records: skippedCount,
-      filter_rate: (skippedCount / records.length * 100).toFixed(1) + '%'
-    })
+    logger.info({
+      totalRecords: records.length,
+      insertedRecords: filtered.length,
+      skippedRecords: skippedCount,
+      filterRate: `${(skippedCount / records.length * 100).toFixed(1)}%`
+    }, 'Filtered out unchanged odds records')
   }
 
   return filtered
@@ -144,7 +144,16 @@ export async function populateOddsSnapshotFromDatabase(
     const result = await client.query(query, [entrantIds, eventTimestamp])
 
     // Populate the snapshot cache with query results
-    for (const row of result.rows) {
+    /* eslint-disable @typescript-eslint/naming-convention */
+    interface OddsRow {
+      entrant_id: string
+      odds: number
+      type: string
+      event_timestamp: string
+    }
+    /* eslint-enable @typescript-eslint/naming-convention */
+
+    for (const row of result.rows as OddsRow[]) {
       const key = `${row.entrant_id}:${row.type}`
       lastOddsSnapshot.set(key, {
         odds: row.odds,
@@ -152,19 +161,19 @@ export async function populateOddsSnapshotFromDatabase(
       })
     }
 
-    logger.debug('Populated odds snapshot from database', {
-      entrant_count: entrantIds.length,
-      cached_records: result.rows.length,
+    logger.debug({
+      entrantCount: entrantIds.length,
+      cachedRecords: result.rows.length,
       partition: partitionName,
-      event_timestamp: eventTimestamp
-    })
+      eventTimestamp
+    }, 'Populated odds snapshot from database')
 
   } catch (error) {
-    logger.warn('Failed to populate odds snapshot from database', {
-      entrant_count: entrantIds.length,
-      event_timestamp: eventTimestamp,
+    logger.warn({
+      entrantCount: entrantIds.length,
+      eventTimestamp,
       error: error instanceof Error ? error.message : String(error)
-    })
+    }, 'Failed to populate odds snapshot from database')
     // Continue without database snapshot - will work with in-memory cache only
   }
 }
@@ -174,7 +183,7 @@ export async function populateOddsSnapshotFromDatabase(
  */
 export function clearOddsSnapshot(): void {
   lastOddsSnapshot.clear()
-  logger.debug('Odds snapshot cache cleared')
+  logger.debug({}, 'Odds snapshot cache cleared')
 }
 
 /**
@@ -190,8 +199,8 @@ export function getOddsSnapshotStats(): {
 
   for (const [key] of lastOddsSnapshot.entries()) {
     const [entrantId, oddsType] = key.split(':')
-    entrantIds.add(entrantId)
-    oddsTypes.add(oddsType)
+    if (entrantId !== undefined) entrantIds.add(entrantId)
+    if (oddsType !== undefined) oddsTypes.add(oddsType)
   }
 
   return {

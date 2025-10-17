@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/naming-convention */
+/* eslint-disable @typescript-eslint/naming-convention, @typescript-eslint/unbound-method */
 import { describe, expect, it, beforeEach, vi } from 'vitest'
 import type { PoolClient } from 'pg'
 import {
