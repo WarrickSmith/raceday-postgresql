@@ -1,0 +1,184 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2.10B</storyId>
+    <title>Database Infrastructure & Partitions</title>
+    <status>Ready</status>
+    <generatedAt>2025-10-17</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-2.10B.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>automated partition management and complete schema alignment</iWant>
+    <soThat>data can be written to time-series tables without errors</soThat>
+    <tasks>
+      - Task 1: Implement automated partition creation (AC: 1, 5)
+      - Task 2: Identify and document schema gaps (AC: 2)
+      - Task 3: Create database migration scripts (AC: 3)
+      - Task 4: Create optimized indexes (AC: 4)
+      - Task 5: Update TypeScript interfaces (AC: 2, 5)
+      - Task 6: Integration testing and validation (AC: 1, 4, 5)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Partition Automation: Daily partitions auto-created for money_flow_history and odds_history tables
+    2. Schema Alignment: 50+ missing fields added to match Appwrite implementation
+    3. Migration Scripts: New database migrations created for entrant, race, and meeting field additions
+    4. Performance Indexes: Optimized indexes created for new fields and time-series queries
+    5. Error Handling: Graceful partition creation and schema validation with proper error logging
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Epic 2 - High-Performance Data Pipeline</title>
+        <section>Data Models and Contracts</section>
+        <snippet>Defines partition strategy for money_flow_history and odds_history tables with daily range partitions using YYYY_MM_DD naming convention. Specifies 22+ entrant fields, 10+ race fields, and meeting schema requirements aligned with PostgreSQL snake_case conventions.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Raceday PostgreSQL - Epic Index</title>
+        <section>Story 2.10B: Database Infrastructure & Partitions</section>
+        <snippet>Acceptance criteria for automated partition creation, schema alignment with 50+ missing fields, migration scripts, performance indexes, and error handling with proper logging.</snippet>
+      </doc>
+      <doc>
+        <path>docs/solution-architecture.md</path>
+        <title>Solution Architecture</title>
+        <section>Epic 4: Database Optimization & Partitioning</section>
+        <snippet>Describes automated partition creation function create_tomorrow_partitions() scheduled via pg_cron, with partition archival strategy for data older than 30 days.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/story-2.10A.md</path>
+        <title>Story 2.10A: Code Quality Foundation</title>
+        <section>Completion Notes</section>
+        <snippet>Establishes PostgreSQL snake_case naming convention throughout server codebase. Zero lint errors, successful builds, passing tests (183 unit + 97 integration), strict typing enforced. Foundation complete for database infrastructure work.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>server/src/database/bulk-upsert.ts</path>
+        <kind>database operations</kind>
+        <symbol>bulkUpsertMeetings, bulkUpsertRaces, bulkUpsertEntrants</symbol>
+        <lines>entire file</lines>
+        <reason>Existing bulk UPSERT operations that must be updated to include new schema fields from Task 5</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/database/time-series.ts</path>
+        <kind>database operations</kind>
+        <symbol>insertMoneyFlowHistory, insertOddsHistory</symbol>
+        <lines>entire file</lines>
+        <reason>Time-series insert operations that route to partitioned tables - partition logic must handle new automated partition scheme</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/types/database.ts</path>
+        <kind>type definitions</kind>
+        <symbol>Meeting, Race, Entrant, MoneyFlowRecord, OddsRecord</symbol>
+        <lines>entire file</lines>
+        <reason>TypeScript interfaces that must be updated with 50+ new fields to match complete Appwrite schema</reason>
+      </artifact>
+      <artifact>
+        <path>server/database/migrations/</path>
+        <kind>migration scripts</kind>
+        <symbol>various migration files</symbol>
+        <lines>all files</lines>
+        <reason>Existing migration pattern and structure to follow for new field addition migrations</reason>
+      </artifact>
+      <artifact>
+        <path>server-old/database-setup/</path>
+        <kind>legacy schema reference</kind>
+        <symbol>Appwrite attribute definitions</symbol>
+        <lines>all files</lines>
+        <reason>Source of truth for complete field list - must audit to identify all 50+ missing fields</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <pg>^8.16.3</pg>
+        <node-cron>^3.0.3</node-cron>
+        <zod>^3.25.76</zod>
+        <pino>^9.5.0</pino>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - All database fields must use PostgreSQL snake_case naming convention (established in Story 2.10A)
+    - Partition naming: {table}_YYYY_MM_DD format (e.g., money_flow_history_2025_10_17)
+    - Partitions must align with New Zealand racing day boundaries (not UTC)
+    - NZTAB API fields race_date_nz and start_time_nz require NO UTC conversion
+    - Partition creation scheduled at midnight NZST before 6:00 AM data initialization
+    - Database writes must maintain <300ms performance target per race
+    - All migrations must include rollback (DOWN) scripts
+    - Zero 'any' types permitted - strict TypeScript typing enforced
+    - All database operations must use parameterized queries (SQL injection defense)
+    - Time-series event_timestamp uses Pacific/Auckland timezone for consistency
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>create_daily_partitions</name>
+      <kind>PostgreSQL function</kind>
+      <signature>CREATE OR REPLACE FUNCTION create_daily_partitions() RETURNS void</signature>
+      <path>To be created in Task 1</path>
+    </interface>
+    <interface>
+      <name>PartitionManager</name>
+      <kind>TypeScript class</kind>
+      <signature>class PartitionManager { async createPartition(tableName: string, date: Date): Promise&lt;void&gt; }</signature>
+      <path>server/src/database/partition-manager.ts (new)</path>
+    </interface>
+    <interface>
+      <name>Meeting interface</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface Meeting { meeting_id: string; meeting_name: string; country: string; race_type: string; date: string; status: string; created_at: Date; updated_at: Date; /* +5-10 new fields */ }</signature>
+      <path>server/src/types/database.ts (update)</path>
+    </interface>
+    <interface>
+      <name>Race interface</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface Race { race_id: string; name: string; race_number: number; start_time: Date; status: string; actual_start?: Date; /* +10-15 new fields */ }</signature>
+      <path>server/src/types/database.ts (update)</path>
+    </interface>
+    <interface>
+      <name>Entrant interface</name>
+      <kind>TypeScript interface</kind>
+      <signature>interface Entrant { entrant_id: string; name: string; runner_number: number; fixed_win_odds: number; fixed_place_odds: number; barrier?: number; weight?: number; jockey?: string; /* +20-30 new fields */ }</signature>
+      <path>server/src/types/database.ts (update)</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Testing uses Vitest 2.0 framework with TypeScript 5.7. Unit tests validate isolated component behavior. Integration tests use real PostgreSQL test database with transaction rollback for cleanup. All tests must pass before merging. Performance tests use EXPLAIN ANALYZE to validate index usage. Code coverage maintained at current levels.
+    </standards>
+    <locations>
+      - server/tests/unit/database/ (unit tests for partition manager, schema validation)
+      - server/tests/integration/database/ (integration tests for migrations, partition creation, data routing)
+      - server/database/migrations/tests/ (migration test scripts)
+    </locations>
+    <ideas>
+      <test ac="1">Unit test: PartitionManager creates partition with correct naming convention {table}_YYYY_MM_DD</test>
+      <test ac="1">Unit test: PartitionManager handles existing partition gracefully (no duplicate error)</test>
+      <test ac="1">Integration test: Partition creation cron job runs at midnight NZST</test>
+      <test ac="1">Integration test: Data inserts route to correct partition based on race_date_nz</test>
+      <test ac="2">Integration test: All new meeting fields accept data correctly</test>
+      <test ac="2">Integration test: All new race fields accept data correctly</test>
+      <test ac="2">Integration test: All new entrant fields accept data correctly (22+ fields)</test>
+      <test ac="3">Migration test: Apply all new migrations in sequence - success</test>
+      <test ac="3">Migration test: Rollback all migrations - restores previous state</test>
+      <test ac="3">Migration test: Re-apply migrations after rollback - success</test>
+      <test ac="4">Performance test: EXPLAIN ANALYZE shows INDEX SCAN on new indexes</test>
+      <test ac="4">Performance test: Partition pruning - queries only scan relevant partitions</test>
+      <test ac="4">Performance test: Database write performance <300ms per race with new fields</test>
+      <test ac="5">Unit test: Partition creation logs success/failure with structured Pino logs</test>
+      <test ac="5">Integration test: Invalid field values trigger proper validation errors</test>
+      <test ac="1,2,3,4,5">Integration test: Full pipeline - partition creation → migration → data insert → validation</test>
+      <test>Timezone test: Partition boundaries align with NZ racing day (not UTC)</test>
+      <test>Timezone test: No unexpected UTC conversions on race_date_nz or start_time_nz fields</test>
+    </ideas>
+  </tests>
+</story-context>
