@@ -1,17 +1,26 @@
 import { createServer } from './api/server.js'
 import { env } from './shared/env.js'
 import { logger } from './shared/logger.js'
-import { closePool } from './database/pool.js'
+import { closePool, pool } from './database/pool.js'
 import { workerPool } from './workers/worker-pool.js'
 import {
   startScheduler as startDynamicScheduler,
   stopScheduler as stopDynamicScheduler,
 } from './scheduler/index.js'
 import { startDailyInitializationScheduler } from './initialization/scheduler.js'
+import { startPartitionScheduler } from './database/partition-scheduler.js'
 import type { Server } from 'node:http'
 
 // Create and start Express server
 const app = createServer()
+
+// Start partition scheduler (Story 2.10B - Task 1)
+// Creates daily partitions at midnight NZST before 6:00 AM data initialization
+const partitionScheduler = startPartitionScheduler({
+  pool,
+  runOnStartup: true,
+})
+
 const dailyInitializationScheduler = startDailyInitializationScheduler({
   runOnStartup: true,
   eveningCronExpression: env.EVENING_BACKFILL_ENABLED
@@ -87,6 +96,7 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
   }
 
   await dailyInitializationScheduler.stop()
+  partitionScheduler.stop()
   await stopDynamicScheduler()
   await closePool(signal)
   await workerPool.shutdown()
