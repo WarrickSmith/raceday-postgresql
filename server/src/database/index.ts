@@ -1,6 +1,6 @@
 // Database module exports
 export { pool, closePool, poolConfig } from './pool.js'
-export { withTransaction, DatabaseWriteError, type BulkUpsertResult } from './bulk-upsert.js'
+export { withTransaction, DatabaseWriteError, TransactionError } from './bulk-upsert.js'
 export {
   insertMoneyFlowHistory,
   insertOddsHistory,

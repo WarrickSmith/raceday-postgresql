@@ -23,7 +23,6 @@ import { buildOddsRecords } from './odds-utils.js'
 import {
   filterSignificantOddsChanges,
   populateOddsSnapshotFromDatabase,
-  getOddsSnapshotStats
 } from '../utils/odds-change-detection.js'
 import { env } from '../shared/env.js'
 
@@ -305,7 +304,8 @@ const persistTransformedRace = async (
     // Populate odds snapshot from database for enhanced change detection
     if (allOddsRecords.length > 0) {
       const entrantIds = [...new Set(allOddsRecords.map(r => r.entrant_id))]
-      const eventTimestamp = allOddsRecords[0]?.event_timestamp || new Date().toISOString()
+      const [firstRecord] = allOddsRecords
+      const eventTimestamp = firstRecord !== undefined ? firstRecord.event_timestamp : new Date().toISOString()
       await populateOddsSnapshotFromDatabase(client, entrantIds, eventTimestamp)
     }
 
@@ -319,7 +319,7 @@ const persistTransformedRace = async (
 
     // Story 2.10: Race pools processing
     const racePoolsResult =
-      transformed.racePools && transformed.racePools.length > 0
+      (transformed.racePools !== undefined && transformed.racePools !== null && transformed.racePools.length > 0)
         ? await bulkUpsertRacePools(transformed.racePools, client)
         : { rowCount: 0, duration: 0 }
 

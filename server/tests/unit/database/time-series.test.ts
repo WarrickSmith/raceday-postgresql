@@ -9,7 +9,6 @@ import {
   ensurePartition,
   ensureUpcomingPartitions,
   validatePartitionBeforeWrite,
-  PartitionNotFoundError,
   type OddsRecord,
 } from '../../../src/database/time-series.js'
 import type { MoneyFlowRecord } from '../../../src/workers/messages.js'
@@ -164,14 +163,14 @@ describe('time-series', () => {
       await insertMoneyFlowHistory(records)
 
       const insertCall = mockQuery.mock.calls.find((call) =>
-        String(call[0]).includes('INSERT INTO money_flow_history_')
+        String(call[0]).includes('INSERT INTO "money_flow_history_')
       )
       expect(insertCall).toBeDefined()
 
       const [sql] = insertCall ?? []
 
       // Verify append-only INSERT (no ON CONFLICT clause) - AC3
-      expect(sql).toContain('INSERT INTO money_flow_history_2025_10_13')
+      expect(sql).toContain('INSERT INTO "money_flow_history_2025_10_13"')
       expect(sql).not.toContain('ON CONFLICT')
       expect(sql).not.toContain('DO UPDATE')
     })
@@ -214,8 +213,9 @@ describe('time-series', () => {
     it('should auto-create partition if missing (Task 1.2)', async () => {
       mockQuery
         .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // BEGIN
-        .mockResolvedValueOnce({ rows: [{ exists: false }] }) // Partition check fails
-        .mockResolvedValueOnce({ rows: [] }) // Partition creation
+        .mockResolvedValueOnce({ rows: [{ exists: false }] }) // validatePartitionBeforeWrite: verifyPartitionExists check
+        .mockResolvedValueOnce({ rows: [{ exists: false }] }) // ensurePartition: verifyPartitionExists check
+        .mockResolvedValueOnce({ rows: [] }) // ensurePartition: Partition creation
         .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // INSERT
         .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // COMMIT
 
@@ -248,7 +248,7 @@ describe('time-series', () => {
 
       // Verify partition creation call
       const createCall = mockQuery.mock.calls.find((call) =>
-        String(call[0]).includes('CREATE TABLE money_flow_history_2025_10_13 PARTITION OF money_flow_history')
+        String(call[0]).includes('CREATE TABLE "money_flow_history_2025_10_13" PARTITION OF money_flow_history')
       )
       expect(createCall).toBeDefined()
 
@@ -319,7 +319,7 @@ describe('time-series', () => {
 
       // Verify two separate INSERTs to different partitions
       const insertCalls = mockQuery.mock.calls.filter((call) =>
-        String(call[0]).includes('INSERT INTO money_flow_history_')
+        String(call[0]).includes('INSERT INTO "money_flow_history_')
       )
       expect(insertCalls.length).toBe(2)
     })
@@ -349,7 +349,7 @@ describe('time-series', () => {
       await insertMoneyFlowHistory(records)
 
       const insertCall = mockQuery.mock.calls.find((call) =>
-        String(call[0]).includes('INSERT INTO money_flow_history_')
+        String(call[0]).includes('INSERT INTO "money_flow_history_')
       )
       const [sql, values] = insertCall ?? []
 
@@ -398,14 +398,14 @@ describe('time-series', () => {
       await insertOddsHistory(records)
 
       const insertCall = mockQuery.mock.calls.find((call) =>
-        String(call[0]).includes('INSERT INTO odds_history_')
+        String(call[0]).includes('INSERT INTO "odds_history_')
       )
       expect(insertCall).toBeDefined()
 
       const [sql] = insertCall ?? []
 
       // Verify append-only INSERT (no ON CONFLICT clause) - AC3
-      expect(sql).toContain('INSERT INTO odds_history_2025_10_13')
+      expect(sql).toContain('INSERT INTO "odds_history_2025_10_13"')
       expect(sql).not.toContain('ON CONFLICT')
       expect(sql).not.toContain('DO UPDATE')
     })
@@ -440,8 +440,9 @@ describe('time-series', () => {
     it('should auto-create partition if missing (Task 1.2)', async () => {
       mockQuery
         .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // BEGIN
-        .mockResolvedValueOnce({ rows: [{ exists: false }] }) // Partition check fails
-        .mockResolvedValueOnce({ rows: [] }) // Partition creation
+        .mockResolvedValueOnce({ rows: [{ exists: false }] }) // validatePartitionBeforeWrite: verifyPartitionExists check
+        .mockResolvedValueOnce({ rows: [{ exists: false }] }) // ensurePartition: verifyPartitionExists check
+        .mockResolvedValueOnce({ rows: [] }) // ensurePartition: Partition creation
         .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // INSERT
         .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // COMMIT
 
@@ -464,7 +465,7 @@ describe('time-series', () => {
 
       // Verify partition creation call
       const createCall = mockQuery.mock.calls.find((call) =>
-        String(call[0]).includes('CREATE TABLE odds_history_2025_10_13 PARTITION OF odds_history')
+        String(call[0]).includes('CREATE TABLE "odds_history_2025_10_13" PARTITION OF odds_history')
       )
       expect(createCall).toBeDefined()
 
@@ -512,7 +513,7 @@ describe('time-series', () => {
       await insertOddsHistory(records)
 
       const insertCall = mockQuery.mock.calls.find((call) =>
-        String(call[0]).includes('INSERT INTO odds_history_')
+        String(call[0]).includes('INSERT INTO "odds_history_')
       )
       const [, values] = insertCall ?? []
 
@@ -624,7 +625,7 @@ describe('time-series', () => {
 
       // Verify partition creation
       const createCall = mockQuery.mock.calls.find((call) =>
-        String(call[0]).includes('CREATE TABLE money_flow_history_2025_10_13 PARTITION OF money_flow_history')
+        String(call[0]).includes('CREATE TABLE "money_flow_history_2025_10_13" PARTITION OF money_flow_history')
       )
       expect(createCall).toBeDefined()
       expect(String(createCall?.[0])).toContain('FOR VALUES FROM (\'2025-10-13\') TO (\'2025-10-14\')')

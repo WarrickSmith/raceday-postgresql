@@ -26,6 +26,7 @@ const createProcessResult = (raceId: string): ProcessResult => ({
     entrants: 0,
     moneyFlowHistory: 0,
     oddsHistory: 0,
+    racePools: 0,
   },
 })
 

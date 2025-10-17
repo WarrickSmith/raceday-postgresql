@@ -155,6 +155,21 @@ interface TransformedRace {
   race_date_nz: string
   start_time_nz: string
   meeting_id: string | null
+  // Story 2.10 additional fields
+  actual_start?: string | null
+  tote_start_time?: string | null
+  distance?: number | null
+  track_condition?: string | null
+  track_surface?: string | null
+  weather?: string | null
+  type?: string | null
+  total_prize_money?: number | null
+  entrant_count?: number | null
+  field_size?: number | null
+  positions_paid?: number | null
+  silk_url?: string | null
+  silk_base_url?: string | null
+  video_channels?: string | null
 }
 
 /**
@@ -188,7 +203,7 @@ export const bulkUpsertRaces = async (
     const startTime = `${race.race_date_nz}T${race.start_time_nz}`
 
     valueRows.push(
-      `($${String(paramIndex)}, $${String(paramIndex + 1)}, $${String(paramIndex + 2)}, $${String(paramIndex + 3)}, $${String(paramIndex + 4)}, $${String(paramIndex + 5)}, $${String(paramIndex + 6)}, $${String(paramIndex + 7)}, $${String(paramIndex + 8)}, $${String(paramIndex + 9)}, $${String(paramIndex + 10)}, $${String(paramIndex + 11)}, $${String(paramIndex + 12)}, $${String(paramIndex + 13)}, $${String(paramIndex + 14)}, $${String(paramIndex + 15)}, $${String(paramIndex + 16)}, $${String(paramIndex + 17)}, $${String(paramIndex + 18)}, $${String(paramIndex + 19)})`
+      `($${String(paramIndex)}, $${String(paramIndex + 1)}, $${String(paramIndex + 2)}, $${String(paramIndex + 3)}, $${String(paramIndex + 4)}, $${String(paramIndex + 5)}, $${String(paramIndex + 6)}, $${String(paramIndex + 7)}, $${String(paramIndex + 8)}, $${String(paramIndex + 9)}, $${String(paramIndex + 10)}, $${String(paramIndex + 11)}, $${String(paramIndex + 12)}, $${String(paramIndex + 13)}, $${String(paramIndex + 14)}, $${String(paramIndex + 15)}, $${String(paramIndex + 16)}, $${String(paramIndex + 17)}, $${String(paramIndex + 18)}, $${String(paramIndex + 19)}, $${String(paramIndex + 20)}, $${String(paramIndex + 21)})`
     )
     values.push(
       race.race_id,
@@ -215,7 +230,7 @@ export const bulkUpsertRaces = async (
       race.silk_base_url ?? null,
       race.video_channels ?? null
     )
-    paramIndex += 20
+    paramIndex += 22
   }
 
   // Multi-row UPSERT with IS DISTINCT FROM change detection (AC4)
@@ -349,7 +364,7 @@ export const bulkUpsertEntrants = async (
 
   for (const entrant of entrants) {
     valueRows.push(
-      `($${String(paramIndex)}, $${String(paramIndex + 1)}, $${String(paramIndex + 2)}, $${String(paramIndex + 3)}, $${String(paramIndex + 4)}, $${String(paramIndex + 5)}, $${String(paramIndex + 6)}, $${String(paramIndex + 7)}, $${String(paramIndex + 8)}, $${String(paramIndex + 9)}, $${String(paramIndex + 10)}, $${String(paramIndex + 11)}, $${String(paramIndex + 12)}, $${String(paramIndex + 13)}, $${String(paramIndex + 14)}, $${String(paramIndex + 15)}, $${String(paramIndex + 16)}, $${String(paramIndex + 17)}, $${String(paramIndex + 18)}, $${String(paramIndex + 19)}, $${String(paramIndex + 20)}, $${String(paramIndex + 21)}, $${String(paramIndex + 22)}, $${String(paramIndex + 23)}, $${String(paramIndex + 24)}, $${String(paramIndex + 25)}, $${String(paramIndex + 26)})`
+      `($${String(paramIndex)}, $${String(paramIndex + 1)}, $${String(paramIndex + 2)}, $${String(paramIndex + 3)}, $${String(paramIndex + 4)}, $${String(paramIndex + 5)}, $${String(paramIndex + 6)}, $${String(paramIndex + 7)}, $${String(paramIndex + 8)}, $${String(paramIndex + 9)}, $${String(paramIndex + 10)}, $${String(paramIndex + 11)}, $${String(paramIndex + 12)}, $${String(paramIndex + 13)}, $${String(paramIndex + 14)}, $${String(paramIndex + 15)}, $${String(paramIndex + 16)}, $${String(paramIndex + 17)}, $${String(paramIndex + 18)}, $${String(paramIndex + 19)}, $${String(paramIndex + 20)}, $${String(paramIndex + 21)}, $${String(paramIndex + 22)}, $${String(paramIndex + 23)}, $${String(paramIndex + 24)}, $${String(paramIndex + 25)})`
     )
     values.push(
       entrant.entrant_id,
@@ -380,11 +395,11 @@ export const bulkUpsertEntrants = async (
       entrant.scratch_time ?? null,
       entrant.runner_change ?? null
     )
-    paramIndex += 27
+    paramIndex += 26
   }
 
   // Multi-row UPSERT with IS DISTINCT FROM change detection for ALL fields (AC4)
-  // 27 entrant fields (Story 2.4 + Story 2.10 comprehensive fields):
+  // 26 entrant fields (Story 2.4 + Story 2.10 comprehensive fields):
   //   1-4: Core identity (entrant_id, race_id, name, runner_number)
   //   5-7: Race metadata (barrier, is_scratched, is_late_scratched)
   //   8-11: Odds data (fixed_win_odds, fixed_place_odds, pool_win_odds, pool_place_odds)
@@ -548,29 +563,28 @@ export const bulkUpsertRacePools = async (
 
   for (const poolData of poolDataArray) {
     valueRows.push(
-      `($${String(paramIndex)}, $${String(paramIndex + 1)}, $${String(paramIndex + 2)}, $${String(paramIndex + 3)}, $${String(paramIndex + 4)}, $${String(paramIndex + 5)}, $${String(paramIndex + 6)}, $${String(paramIndex + 7)}, $${String(paramIndex + 8)}, $${String(paramIndex + 9)}, $${String(paramIndex + 10)})`
+      `($${String(paramIndex)}, $${String(paramIndex + 1)}, $${String(paramIndex + 2)}, $${String(paramIndex + 3)}, $${String(paramIndex + 4)}, $${String(paramIndex + 5)}, $${String(paramIndex + 6)}, $${String(paramIndex + 7)}, $${String(paramIndex + 8)}, $${String(paramIndex + 9)})`
     )
     values.push(
-      poolData.raceId,
-      poolData.winPoolTotal,
-      poolData.placePoolTotal,
-      poolData.quinellaPoolTotal,
-      poolData.trifectaPoolTotal,
-      poolData.exactaPoolTotal,
-      poolData.first4PoolTotal,
+      poolData.race_id,
+      poolData.win_pool_total,
+      poolData.place_pool_total,
+      poolData.quinella_pool_total,
+      poolData.trifecta_pool_total,
+      poolData.exacta_pool_total,
+      poolData.first4_pool_total,
       poolData.currency,
-      poolData.dataQualityScore,
-      poolData.extractedPools,
-      new Date().toISOString() // last_updated
+      poolData.data_quality_score,
+      poolData.extracted_pools
     )
-    paramIndex += 11
+    paramIndex += 10
   }
 
   // Multi-row UPSERT with IS DISTINCT FROM change detection
   const sql = `
     INSERT INTO race_pools (
       race_id, win_pool_total, place_pool_total, quinella_pool_total, trifecta_pool_total,
-      exacta_pool_total, first4_pool_total, currency, data_quality_score, extracted_pools, last_updated
+      exacta_pool_total, first4_pool_total, currency, data_quality_score, extracted_pools
     ) VALUES ${valueRows.join(', ')}
     ON CONFLICT (race_id) DO UPDATE SET
       win_pool_total = EXCLUDED.win_pool_total,
@@ -582,7 +596,7 @@ export const bulkUpsertRacePools = async (
       currency = EXCLUDED.currency,
       data_quality_score = EXCLUDED.data_quality_score,
       extracted_pools = EXCLUDED.extracted_pools,
-      last_updated = EXCLUDED.last_updated
+      last_updated = NOW()
     WHERE
       race_pools.win_pool_total IS DISTINCT FROM EXCLUDED.win_pool_total
       OR race_pools.place_pool_total IS DISTINCT FROM EXCLUDED.place_pool_total

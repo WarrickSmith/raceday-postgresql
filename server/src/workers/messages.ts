@@ -1,6 +1,5 @@
 import { z } from 'zod'
 import { RaceDataSchema } from '../clients/nztab-types.js'
-import type { RacePoolData } from '../utils/race-pools.js'
 
 export const workerRequestSchema = z.object({
   taskId: z.string().uuid(),
@@ -156,19 +155,19 @@ export const transformedRaceSchema = z.object({
     .nullable(),
   entrants: z.array(transformedEntrantSchema),
   moneyFlowRecords: z.array(moneyFlowRecordSchema),
-  // Story 2.10: Race pools data extracted from NZTAB API
+  // Story 2.10: Race pools data extracted from NZTAB API (PostgreSQL snake_case)
   racePools: z.array(z.object({
-    raceId: z.string().min(1),
-    winPoolTotal: z.number().int(),
-    placePoolTotal: z.number().int(),
-    quinellaPoolTotal: z.number().int(),
-    trifectaPoolTotal: z.number().int(),
-    exactaPoolTotal: z.number().int(),
-    first4PoolTotal: z.number().int(),
-    totalRacePool: z.number().int(),
+    race_id: z.string().min(1),
+    win_pool_total: z.number().int(),
+    place_pool_total: z.number().int(),
+    quinella_pool_total: z.number().int(),
+    trifecta_pool_total: z.number().int(),
+    exacta_pool_total: z.number().int(),
+    first4_pool_total: z.number().int(),
+    total_race_pool: z.number().int(),
     currency: z.string(),
-    dataQualityScore: z.number().int(),
-    extractedPools: z.number().int(),
+    data_quality_score: z.number().int(),
+    extracted_pools: z.number().int(),
   })).optional().nullable(),
   // Original payload for debugging/audit trail
   originalPayload: RaceDataSchema.optional(),

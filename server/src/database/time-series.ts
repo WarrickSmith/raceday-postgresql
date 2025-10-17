@@ -62,8 +62,14 @@ export const getPartitionTableName = (
 ): string => {
   // Extract date part from ISO timestamp to avoid timezone conversion issues
   // This preserves the original date from the timestamp regardless of local timezone
-  const datePart = eventTimestamp.split('T')[0] // YYYY-MM-DD format
+  const [datePart] = eventTimestamp.split('T') // YYYY-MM-DD format
+  if (datePart === undefined) {
+    throw new Error(`Invalid timestamp format: ${eventTimestamp}`)
+  }
   const [year, month, day] = datePart.split('-')
+  if (year === undefined || month === undefined || day === undefined) {
+    throw new Error(`Invalid date format: ${datePart}`)
+  }
   return `${baseTable}_${year}_${month}_${day}`
 }
 
@@ -104,8 +110,11 @@ export const ensurePartition = async (
   date: Date
 ): Promise<void> => {
   const partitionName = getPartitionTableName(tableName, date.toISOString())
-  const startDate = date.toISOString().split('T')[0] // YYYY-MM-DD
-  const endDate = new Date(date.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const [startDate] = date.toISOString().split('T')
+  const [endDate] = new Date(date.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')
+  if (startDate === undefined || endDate === undefined) {
+    throw new Error('Failed to extract date parts from ISO string')
+  }
 
   // Use a dedicated client from the pool for partition operations
   const client = await pool.connect()
@@ -124,7 +133,7 @@ export const ensurePartition = async (
 
     // Create partition for the specified date
     const createPartitionSQL = `
-      CREATE TABLE ${partitionName} PARTITION OF ${tableName}
+      CREATE TABLE "${partitionName}" PARTITION OF ${tableName}
       FOR VALUES FROM ('${startDate}') TO ('${endDate}')
     `
 
@@ -268,7 +277,11 @@ const insertMoneyFlowHistoryWithClient = async (
   // Insert to each partition separately (AC5)
   for (const [partitionName, partitionRecords] of recordsByPartition) {
     // Auto-create partition if missing (Task 1.2)
-    await validatePartitionBeforeWrite(tableName, partitionRecords[0]!.polling_timestamp)
+    const [firstRecord] = partitionRecords
+    if (firstRecord === undefined) {
+      throw new Error('Partition records array is empty')
+    }
+    await validatePartitionBeforeWrite(tableName, firstRecord.polling_timestamp)
 
     // Build parameterized multi-row INSERT (AC3)
     const values: unknown[] = []
@@ -304,7 +317,7 @@ const insertMoneyFlowHistoryWithClient = async (
 
     // Append-only INSERT (no ON CONFLICT clause) - AC3
     const sql = `
-      INSERT INTO ${partitionName} (
+      INSERT INTO "${partitionName}" (
         entrant_id, race_id, hold_percentage, bet_percentage,
         time_to_start, time_interval, interval_type,
         polling_timestamp, event_timestamp,
@@ -385,7 +398,11 @@ export const insertMoneyFlowHistory = async (
     // Insert to each partition separately (AC5)
     for (const [partitionName, partitionRecords] of recordsByPartition) {
       // Auto-create partition if missing (Task 1.2)
-      await validatePartitionBeforeWrite(tableName, partitionRecords[0]!.polling_timestamp)
+      const [firstRecord] = partitionRecords
+      if (firstRecord === undefined) {
+        throw new Error('Partition records array is empty')
+      }
+      await validatePartitionBeforeWrite(tableName, firstRecord.polling_timestamp)
 
       // Build parameterized multi-row INSERT (AC3)
       const values: unknown[] = []
@@ -421,7 +438,7 @@ export const insertMoneyFlowHistory = async (
 
       // Append-only INSERT (no ON CONFLICT clause) - AC3
       const sql = `
-        INSERT INTO ${partitionName} (
+        INSERT INTO "${partitionName}" (
           entrant_id, race_id, hold_percentage, bet_percentage,
           time_to_start, time_interval, interval_type,
           polling_timestamp, event_timestamp,
@@ -506,7 +523,11 @@ const insertOddsHistoryWithClient = async (
   // Insert to each partition separately (AC5)
   for (const [partitionName, partitionRecords] of recordsByPartition) {
     // Auto-create partition if missing (Task 1.2)
-    await validatePartitionBeforeWrite(tableName, partitionRecords[0]!.event_timestamp)
+    const [firstRecord] = partitionRecords
+    if (firstRecord === undefined) {
+      throw new Error('Partition records array is empty')
+    }
+    await validatePartitionBeforeWrite(tableName, firstRecord.event_timestamp)
 
     // Build parameterized multi-row INSERT (AC3)
     const values: unknown[] = []
@@ -528,7 +549,7 @@ const insertOddsHistoryWithClient = async (
 
     // Append-only INSERT (no ON CONFLICT clause) - AC3
     const sql = `
-      INSERT INTO ${partitionName} (
+      INSERT INTO "${partitionName}" (
         entrant_id, odds, type, event_timestamp
       ) VALUES ${valueRows.join(', ')}
     `

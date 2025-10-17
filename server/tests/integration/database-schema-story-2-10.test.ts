@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/naming-convention */
+/* eslint-disable @typescript-eslint/naming-convention, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/prefer-reduce-type-parameter */
 import {
   afterAll,
   beforeAll,
@@ -315,7 +315,7 @@ describe('Story 2.10 Database Schema Integration', () => {
             AND a.attnum > 0
         `, [field.table, field.column])
 
-        if (result.rows.length > 0 && result.rows[0]?.column_comment) {
+        if (result.rows.length > 0 && result.rows[0] !== undefined && result.rows[0].column_comment !== null && result.rows[0].column_comment !== undefined) {
           commentCount++
         }
       }

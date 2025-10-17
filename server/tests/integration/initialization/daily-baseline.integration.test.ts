@@ -32,6 +32,8 @@ const ensureCoreTables = async (): Promise<void> => {
       date DATE NOT NULL,
       track_condition TEXT,
       tote_status TEXT,
+      meeting TEXT,
+      category_name TEXT,
       status TEXT NOT NULL DEFAULT 'active',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -48,6 +50,20 @@ const ensureCoreTables = async (): Promise<void> => {
       status TEXT NOT NULL,
       race_date_nz DATE,
       start_time_nz TIME,
+      actual_start TIMESTAMPTZ,
+      tote_start_time TIMESTAMPTZ,
+      distance INTEGER,
+      track_condition TEXT,
+      track_surface TEXT,
+      weather TEXT,
+      type TEXT,
+      total_prize_money NUMERIC(12,2),
+      entrant_count INTEGER,
+      field_size INTEGER,
+      positions_paid INTEGER,
+      silk_url TEXT,
+      silk_base_url TEXT,
+      video_channels TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -77,6 +93,10 @@ const ensureCoreTables = async (): Promise<void> => {
       silk_colours TEXT,
       favourite BOOLEAN,
       mover BOOLEAN,
+      silk_url_64x64 TEXT,
+      silk_url_128x128 TEXT,
+      scratch_time INTEGER,
+      runner_change TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -104,11 +124,16 @@ const meetingFixture = {
   ],
 }
 
+// Use a date in the future to ensure the race appears in scheduler queries
+const futureDate = new Date()
+futureDate.setDate(futureDate.getDate() + 1) // Tomorrow
+const [futureDateStr] = futureDate.toISOString().split('T') // YYYY-MM-DD format
+
 const racePayload = {
   id: `${TEST_PREFIX}-race-1`,
   name: 'Integration Stakes',
   status: 'open' as const,
-  race_date_nz: '2025-10-15',
+  race_date_nz: futureDateStr,
   start_time_nz: '06:00:00',
   race_number: 1,
   meeting_id: meetingFixture.meeting,
@@ -196,6 +221,12 @@ describe('daily baseline initialization (integration)', () => {
       runner_number: 1,
     })
 
+    // Debug: Check what start_time was actually set
+    const debugRace = await pool.query(
+      'SELECT race_id, start_time, race_date_nz, start_time_nz, status FROM races WHERE race_id = $1',
+      [racePayload.id]
+    )
+
     const schedulerQuery = await pool.query(
       `
         SELECT race_id
@@ -214,6 +245,12 @@ describe('daily baseline initialization (integration)', () => {
           schedulerRaceIds.push(raceIdValue)
         }
       }
+    }
+
+    // Better error message if the race is not found
+    if (!schedulerRaceIds.includes(racePayload.id)) {
+      console.error('Debug race data:', debugRace.rows[0])
+      console.error('Scheduler race IDs:', schedulerRaceIds)
     }
 
     expect(schedulerRaceIds).toContain(racePayload.id)

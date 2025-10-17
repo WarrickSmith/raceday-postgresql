@@ -24,6 +24,7 @@ const createProcessResult = (raceId: string): ProcessResult => ({
     entrants: 0,
     moneyFlowHistory: 0,
     oddsHistory: 0,
+    racePools: 0,
   },
 })
 /* eslint-enable @typescript-eslint/naming-convention */

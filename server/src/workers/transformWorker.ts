@@ -194,7 +194,7 @@ const transformRace = (payload: RaceData): TransformedRace => {
   }
 
   // Extract comprehensive race pools data from NZTAB API (Task 3.2)
-  const racePools = extractPoolTotals(payload, payload.id)
+  const racePools = extractPoolTotals(payload as { tote_pools?: unknown }, payload.id)
 
   const entrantCount = transformedEntrants.length
   const poolFieldCount =
@@ -217,7 +217,7 @@ const transformRace = (payload: RaceData): TransformedRace => {
     race,
     entrants: transformedEntrants,
     moneyFlowRecords,
-    racePools: racePools ? [racePools] : null, // Array to match schema
+    racePools: racePools !== null ? [racePools] : null, // Array to match schema
     originalPayload: payload,
   })
 }
