@@ -8,24 +8,28 @@ import { logger } from '../shared/logger.js'
 
 /**
  * Race pool totals extracted from NZTAB API tote_pools data
+ * Uses PostgreSQL snake_case naming convention for direct DB compatibility
  */
+/* eslint-disable @typescript-eslint/naming-convention */
 export interface RacePoolData {
-  raceId: string
-  winPoolTotal: number // in cents
-  placePoolTotal: number // in cents
-  quinellaPoolTotal: number // in cents
-  trifectaPoolTotal: number // in cents
-  exactaPoolTotal: number // in cents
-  first4PoolTotal: number // in cents
-  totalRacePool: number // in cents
+  race_id: string
+  win_pool_total: number // in cents
+  place_pool_total: number // in cents
+  quinella_pool_total: number // in cents
+  trifecta_pool_total: number // in cents
+  exacta_pool_total: number // in cents
+  first4_pool_total: number // in cents
+  total_race_pool: number // in cents
   currency: string
-  dataQualityScore: number
-  extractedPools: number
+  data_quality_score: number
+  extracted_pools: number
 }
+/* eslint-enable @typescript-eslint/naming-convention */
 
 /**
  * NZTAB API pool type interface
  */
+/* eslint-disable @typescript-eslint/naming-convention */
 interface NzTabPool {
   product_type: string
   total?: number
@@ -40,160 +44,173 @@ interface NzTabPool {
  * @param raceId - Race ID for logging and association
  * @returns RacePoolData or null if no pools found
  */
-export function extractPoolTotals(apiData: any, raceId: string): RacePoolData | null {
-  if (!apiData || !apiData.tote_pools || !Array.isArray(apiData.tote_pools)) {
-    logger.debug('No tote_pools array found in API data', { raceId })
+interface ApiDataWithPools {
+  tote_pools?: unknown
+}
+/* eslint-enable @typescript-eslint/naming-convention */
+
+/* eslint-disable @typescript-eslint/naming-convention */
+export function extractPoolTotals(apiData: ApiDataWithPools, raceId: string): RacePoolData | null {
+  if (
+    apiData.tote_pools === undefined ||
+    apiData.tote_pools === null ||
+    !Array.isArray(apiData.tote_pools)
+  ) {
+    logger.debug({ raceId }, 'No tote_pools array found in API data')
     return null
   }
 
   const pools: RacePoolData = {
-    raceId,
-    winPoolTotal: 0,
-    placePoolTotal: 0,
-    quinellaPoolTotal: 0,
-    trifectaPoolTotal: 0,
-    exactaPoolTotal: 0,
-    first4PoolTotal: 0,
-    totalRacePool: 0,
+    race_id: raceId,
+    win_pool_total: 0,
+    place_pool_total: 0,
+    quinella_pool_total: 0,
+    trifecta_pool_total: 0,
+    exacta_pool_total: 0,
+    first4_pool_total: 0,
+    total_race_pool: 0,
     currency: '$',
-    dataQualityScore: 100,
-    extractedPools: 0
+    data_quality_score: 100,
+    extracted_pools: 0
   }
 
-  const totePools: NzTabPool[] = apiData.tote_pools
+  const totePools = apiData.tote_pools as NzTabPool[]
 
-  logger.debug('Processing tote_pools data', {
+  logger.debug({
     raceId,
     poolCount: totePools.length,
     productTypes: totePools.map(p => p.product_type)
-  })
+  }, 'Processing tote_pools data')
 
   totePools.forEach((pool) => {
-    const total = pool.total || pool.amount || 0
-    pools.totalRacePool += total
-    pools.extractedPools++
+    const total = pool.total ?? pool.amount ?? 0
+    pools.total_race_pool += total
+    pools.extracted_pools++
 
-    const productType = pool.product_type?.toLowerCase()
+    const productType = pool.product_type.toLowerCase()
 
     switch (productType) {
       case 'win':
-        pools.winPoolTotal = total
+        pools.win_pool_total = total
         break
       case 'place':
-        pools.placePoolTotal = total
+        pools.place_pool_total = total
         break
       case 'quinella':
-        pools.quinellaPoolTotal = total
+        pools.quinella_pool_total = total
         break
       case 'trifecta':
-        pools.trifectaPoolTotal = total
+        pools.trifecta_pool_total = total
         break
       case 'exacta':
-        pools.exactaPoolTotal = total
+        pools.exacta_pool_total = total
         break
       case 'first 4':
       case 'first four':
       case 'first4':
       case 'firstfour':
-        pools.first4PoolTotal = total
+        pools.first4_pool_total = total
         break
       default:
-        logger.debug('Unknown pool product_type', {
+        logger.debug({
           raceId,
           productType: pool.product_type,
           total
-        })
-        pools.dataQualityScore -= 5 // Reduce score for unknown types
+        }, 'Unknown pool product_type')
+        pools.data_quality_score -= 5 // Reduce score for unknown types
     }
   })
 
   // Validate minimum expected pools (Win and Place)
-  if (pools.winPoolTotal === 0 || pools.placePoolTotal === 0) {
-    pools.dataQualityScore -= 30
-    logger.debug('Missing expected pools (Win/Place)', {
+  if (pools.win_pool_total === 0 || pools.place_pool_total === 0) {
+    pools.data_quality_score -= 30
+    logger.debug({
       raceId,
-      winPoolTotal: pools.winPoolTotal,
-      placePoolTotal: pools.placePoolTotal
-    })
+      win_pool_total: pools.win_pool_total,
+      place_pool_total: pools.place_pool_total
+    }, 'Missing expected pools (Win/Place)')
   }
 
   // Convert dollar amounts to cents for database storage
-  pools.winPoolTotal = Math.round(pools.winPoolTotal * 100)
-  pools.placePoolTotal = Math.round(pools.placePoolTotal * 100)
-  pools.quinellaPoolTotal = Math.round(pools.quinellaPoolTotal * 100)
-  pools.trifectaPoolTotal = Math.round(pools.trifectaPoolTotal * 100)
-  pools.exactaPoolTotal = Math.round(pools.exactaPoolTotal * 100)
-  pools.first4PoolTotal = Math.round(pools.first4PoolTotal * 100)
-  pools.totalRacePool = Math.round(pools.totalRacePool * 100)
+  pools.win_pool_total = Math.round(pools.win_pool_total * 100)
+  pools.place_pool_total = Math.round(pools.place_pool_total * 100)
+  pools.quinella_pool_total = Math.round(pools.quinella_pool_total * 100)
+  pools.trifecta_pool_total = Math.round(pools.trifecta_pool_total * 100)
+  pools.exacta_pool_total = Math.round(pools.exacta_pool_total * 100)
+  pools.first4_pool_total = Math.round(pools.first4_pool_total * 100)
+  pools.total_race_pool = Math.round(pools.total_race_pool * 100)
 
-  logger.info('Extracted race pool totals', {
+  logger.info({
     raceId,
-    totalRacePool: pools.totalRacePool,
-    winPoolTotal: pools.winPoolTotal,
-    placePoolTotal: pools.placePoolTotal,
-    quinellaPoolTotal: pools.quinellaPoolTotal,
-    trifectaPoolTotal: pools.trifectaPoolTotal,
-    exactaPoolTotal: pools.exactaPoolTotal,
-    first4PoolTotal: pools.first4PoolTotal,
-    validationScore: pools.dataQualityScore,
-    extractedPools: pools.extractedPools,
+    total_race_pool: pools.total_race_pool,
+    win_pool_total: pools.win_pool_total,
+    place_pool_total: pools.place_pool_total,
+    quinella_pool_total: pools.quinella_pool_total,
+    trifecta_pool_total: pools.trifecta_pool_total,
+    exacta_pool_total: pools.exacta_pool_total,
+    first4_pool_total: pools.first4_pool_total,
+    data_quality_score: pools.data_quality_score,
+    extracted_pools: pools.extracted_pools,
     currency: pools.currency
-  })
+  }, 'Extracted race pool totals')
 
   return pools
 }
+/* eslint-enable @typescript-eslint/naming-convention */
 
 /**
  * Validate race pool data for consistency and completeness
  * Based on enhanced implementation validation logic
  */
+/* eslint-disable @typescript-eslint/naming-convention */
 export function validateRacePoolData(poolData: RacePoolData): {
-  isValid: boolean
+  is_valid: boolean
   warnings: string[]
   errors: string[]
-  consistencyScore: number
+  consistency_score: number
 } {
   const result = {
-    isValid: true,
+    is_valid: true,
     warnings: [] as string[],
     errors: [] as string[],
-    consistencyScore: poolData.dataQualityScore
+    consistency_score: poolData.data_quality_score
   }
 
   // Check if we have any pool data
-  if (poolData.totalRacePool === 0) {
+  if (poolData.total_race_pool === 0) {
     result.warnings.push('No pool data available - race may be too early or abandoned')
-    result.consistencyScore = 50
+    result.consistency_score = 50
   }
 
   // Validate Win and Place pools are present
-  if (poolData.winPoolTotal === 0 && poolData.placePoolTotal === 0) {
+  if (poolData.win_pool_total === 0 && poolData.place_pool_total === 0) {
     result.errors.push('Both Win and Place pools are empty')
-    result.isValid = false
-    result.consistencyScore = 0
+    result.is_valid = false
+    result.consistency_score = 0
   }
 
   // Check for reasonable pool amounts
-  if (poolData.winPoolTotal > 0 && poolData.placePoolTotal > 0) {
+  if (poolData.win_pool_total > 0 && poolData.place_pool_total > 0) {
     // Win pool should generally be larger than place pool
-    if (poolData.placePoolTotal > poolData.winPoolTotal * 2) {
+    if (poolData.place_pool_total > poolData.win_pool_total * 2) {
       result.warnings.push('Place pool unusually large compared to Win pool')
-      result.consistencyScore -= 10
+      result.consistency_score -= 10
     }
   }
 
   // Validate data quality score
-  if (poolData.dataQualityScore < 70) {
+  if (poolData.data_quality_score < 70) {
     result.warnings.push('Low data quality score detected')
   }
 
-  logger.debug('Race pool validation completed', {
-    raceId: poolData.raceId,
-    isValid: result.isValid,
-    consistencyScore: result.consistencyScore,
-    errorsCount: result.errors.length,
-    warningsCount: result.warnings.length
-  })
+  logger.debug({
+    race_id: poolData.race_id,
+    is_valid: result.is_valid,
+    consistency_score: result.consistency_score,
+    errors_count: result.errors.length,
+    warnings_count: result.warnings.length
+  }, 'Race pool validation completed')
 
   return result
 }
+/* eslint-enable @typescript-eslint/naming-convention */
