@@ -1,0 +1,243 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2.10C</storyId>
+    <title>Data Pipeline Processing</title>
+    <status>Ready</status>
+    <generatedAt>2025-10-18</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-2.10C.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>enhanced data processing with race pools, money flow, and odds change detection</iWant>
+    <soThat>complete race data flows from API to database without duplication or data loss</soThat>
+    <tasks>
+      - Task 1: Implement race pools extraction and storage (AC: 1)
+      - Task 2: Enhance money flow calculations with incremental deltas (AC: 2)
+      - Task 3: Implement odds change detection (AC: 3)
+      - Task 4: Implement data quality validation (AC: 4)
+      - Task 5: Update race processor pipeline integration (AC: 5)
+      - Task 6: Update time-series INSERT operations (AC: 2, 3)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    1. Race Pools Extraction: Extract and populate tote_pools data from NZTAB API into race_pools table
+    2. Money Flow Calculations: Implement incremental calculations and time-bucketing logic for money_flow_history
+    3. Odds Change Detection: Add change detection to prevent duplicate odds_history records when odds haven't changed
+    4. Data Quality Validation: Mathematical consistency validation and quality scoring for transformed data
+    5. Pipeline Integration: Update race processor to orchestrate enhanced processing steps with proper error handling
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Epic 2 - High-Performance Data Pipeline</title>
+        <section>Data Models and Contracts</section>
+        <snippet>race_pools table captures pool totals (win_pool_amount, place_pool_amount) and supports money-flow deltas per race. Money_flow_history columns include entrant_id, race_id, hold/odds percentages, time_to_start, interval descriptors, pool amounts, incremental deltas.</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Epic 2 - High-Performance Data Pipeline</title>
+        <section>Acceptance Criteria</section>
+        <snippet>Money-flow transform reproduces server-old calculations (hold/bet percentages, incremental deltas, interval metadata). UPSERT statements include change-detection WHERE clauses. insertMoneyFlowHistory and insertOddsHistory route each record to the correct date partition.</snippet>
+      </doc>
+      <doc>
+        <path>docs/solution-architecture.md</path>
+        <title>Solution Architecture</title>
+        <section>Epic 2: High-Performance Data Pipeline</section>
+        <snippet>Worker Thread Pool transforms raw NZ TAB race data. Bulk UPSERT Operations use multi-row INSERT with ON CONFLICT. Race Processor orchestrates fetch → transform → write pipeline.</snippet>
+      </doc>
+      <doc>
+        <path>docs/CODING-STANDARDS.md</path>
+        <title>Coding Standards</title>
+        <section>Core Principles</section>
+        <snippet>Modern ES6+ standards with arrow functions, async/await, const/let, destructuring. Functional programming with pure functions, immutability, array methods. TypeScript strict typing with no any types.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/story-2.10A.md</path>
+        <title>Story 2.10A: Code Quality Foundation</title>
+        <section>Dependencies</section>
+        <snippet>Clean codebase with passing tests. PostgreSQL-First Architecture with snake_case interfaces. All tests must pass before Story 2.10C.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/story-2.10B.md</path>
+        <title>Story 2.10B: Database Infrastructure & Partitions</title>
+        <section>Dependencies</section>
+        <snippet>Complete schema including race_pools table and time-series partitions. Migration 008 adds 30+ fields from Appwrite. Partition infrastructure automated.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <artifact>
+        <path>server/src/database/bulk-upsert.ts</path>
+        <kind>module</kind>
+        <symbol>bulkUpsertRacePools</symbol>
+        <lines>549-660</lines>
+        <reason>Existing race pools UPSERT function that needs verification/testing. Story 2.10C Task 1 enhances this for production use.</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/utils/race-pools.ts</path>
+        <kind>module</kind>
+        <symbol>extractPoolTotals</symbol>
+        <lines>1-50</lines>
+        <reason>Race pools extraction logic from NZTAB API. Task 1.3 uses this function to extract pool amounts.</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/workers/transformWorker.ts</path>
+        <kind>worker</kind>
+        <symbol>transformRace</symbol>
+        <lines>45-223</lines>
+        <reason>Worker transform function that needs enhancement for incremental money flow calculations (Task 2).</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/workers/money-flow.ts</path>
+        <kind>module</kind>
+        <symbol>calculateIncrementalDelta, calculateTimeMetadata</symbol>
+        <lines>1-100</lines>
+        <reason>Money flow calculation utilities. Task 2 enhances incremental delta calculations and time-bucketing logic.</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/pipeline/race-processor.ts</path>
+        <kind>service</kind>
+        <symbol>persistTransformedRace</symbol>
+        <lines>243-345</lines>
+        <reason>Race processor write stage. Task 3 adds odds change detection before insertOddsHistory. Task 5 integrates all pipeline steps.</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/utils/odds-change-detection.ts</path>
+        <kind>module</kind>
+        <symbol>filterSignificantOddsChanges, populateOddsSnapshotFromDatabase</symbol>
+        <lines>1-150</lines>
+        <reason>Odds change detection utilities. Task 3 implements detection logic to prevent duplicate odds_history records.</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/database/time-series.ts</path>
+        <kind>module</kind>
+        <symbol>insertMoneyFlowHistory, insertOddsHistory</symbol>
+        <lines>240-616</lines>
+        <reason>Time-series INSERT operations. Task 6 updates these to include incremental fields and conditional INSERT logic.</reason>
+      </artifact>
+      <artifact>
+        <path>server/src/workers/messages.ts</path>
+        <kind>types</kind>
+        <symbol>MoneyFlowRecord, TransformedRace</symbol>
+        <lines>1-200</lines>
+        <reason>Worker message type definitions. Task 2 may need to extend MoneyFlowRecord with incremental fields.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <node>
+        <package>pg</package>
+        <version>^8.16.3</version>
+      </node>
+      <node>
+        <package>pino</package>
+        <version>^9.5.0</version>
+      </node>
+      <node>
+        <package>zod</package>
+        <version>^3.25.76</version>
+      </node>
+      <node>
+        <package>vitest</package>
+        <version>^2.0.0</version>
+      </node>
+      <node>
+        <package>typescript</package>
+        <version>^5.7.0</version>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    - All code must use ES modules (ESM) - no CommonJS require()
+    - TypeScript strict mode with zero any types allowed
+    - Database operations must use snake_case (PostgreSQL-First Architecture from Story 2.10A)
+    - All database writes must complete within 300ms budget
+    - Single race processing must complete within 2s total time budget
+    - Worker transforms must use existing worker pool infrastructure
+    - All changes must maintain backwards compatibility with existing pipeline
+    - Structured logging required for all pipeline steps using Pino
+    - Error handling must distinguish retryable vs non-retryable failures
+    - All functions must be pure and testable (functional programming principles)
+    - Change detection WHERE clauses required for UPSERT operations
+    - Time-series writes must route to correct daily partitions
+    - No duplicate odds_history records when odds haven't changed
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>bulkUpsertRacePools</name>
+      <kind>function</kind>
+      <signature>async (poolDataArray: RacePoolData[], client?: PoolClient): Promise&lt;{ rowCount: number; duration: number }&gt;</signature>
+      <path>server/src/database/bulk-upsert.ts</path>
+    </interface>
+    <interface>
+      <name>extractPoolTotals</name>
+      <kind>function</kind>
+      <signature>(payload: { tote_pools?: unknown }, raceId: string): RacePoolData | null</signature>
+      <path>server/src/utils/race-pools.ts</path>
+    </interface>
+    <interface>
+      <name>calculateIncrementalDelta</name>
+      <kind>function</kind>
+      <signature>(currentAmounts: PoolAmounts, previousAmounts: PoolAmounts | null): IncrementalDelta</signature>
+      <path>server/src/workers/money-flow.ts</path>
+    </interface>
+    <interface>
+      <name>calculateTimeMetadata</name>
+      <kind>function</kind>
+      <signature>(raceStartDatetime: string, currentTimestamp: string): TimeMetadata</signature>
+      <path>server/src/workers/money-flow.ts</path>
+    </interface>
+    <interface>
+      <name>filterSignificantOddsChanges</name>
+      <kind>function</kind>
+      <signature>(oddsRecords: OddsRecord[]): OddsRecord[]</signature>
+      <path>server/src/utils/odds-change-detection.ts</path>
+    </interface>
+    <interface>
+      <name>insertMoneyFlowHistory</name>
+      <kind>function</kind>
+      <signature>async (records: MoneyFlowRecord[], options?: { tableName?: string; client?: PoolClient }): Promise&lt;{ rowCount: number; duration: number }&gt;</signature>
+      <path>server/src/database/time-series.ts</path>
+    </interface>
+    <interface>
+      <name>insertOddsHistory</name>
+      <kind>function</kind>
+      <signature>async (records: OddsRecord[], options?: { tableName?: string; client?: PoolClient }): Promise&lt;{ rowCount: number; duration: number }&gt;</signature>
+      <path>server/src/database/time-series.ts</path>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Vitest 2.0 testing framework with @vitest/coverage-v8 for coverage reporting. Unit tests must cover all new functions with 100% target coverage. Integration tests must verify end-to-end pipeline flow with database writes. All tests must use ES modules and TypeScript strict mode. Test files located in server/tests/unit/ and server/tests/integration/. Use describe/it/expect pattern from Vitest. Mock external dependencies (pg, worker pool) for unit tests. Use real database for integration tests.
+    </standards>
+    <locations>
+      - server/tests/unit/database/bulk-upsert.test.ts
+      - server/tests/unit/workers/transform-worker.test.ts
+      - server/tests/unit/utils/odds-change-detection.test.ts
+      - server/tests/unit/validation/data-quality.test.ts (new file)
+      - server/tests/integration/database/bulk-upsert.integration.test.ts
+      - server/tests/integration/pipeline/race-processor.integration.test.ts
+    </locations>
+    <ideas>
+      <test ac="1">Unit test: extractPoolTotals() parses NZTAB API tote_pools and returns RacePoolData</test>
+      <test ac="1">Integration test: bulkUpsertRacePools() writes race pools to database and verifies persistence</test>
+      <test ac="2">Unit test: calculateIncrementalDelta() returns positive delta when pools increase</test>
+      <test ac="2">Unit test: calculateTimeMetadata() returns correct interval_type based on time_to_start</test>
+      <test ac="2">Integration test: insertMoneyFlowHistory() includes incremental_win_amount and incremental_place_amount fields</test>
+      <test ac="3">Unit test: filterSignificantOddsChanges() filters out unchanged odds records</test>
+      <test ac="3">Integration test: odds_history table does NOT contain duplicate records when odds unchanged</test>
+      <test ac="3">Integration test: odds_history table DOES insert when odds change</test>
+      <test ac="4">Unit test: Data quality validation functions detect inconsistent percentages</test>
+      <test ac="4">Integration test: Quality warnings logged when data completeness below threshold</test>
+      <test ac="5">Integration test: Complete pipeline processes race with pools, incremental flow, odds detection, quality validation</test>
+      <test ac="5">Integration test: Pipeline completes within 2s budget with all enhancements</test>
+    </ideas>
+  </tests>
+</story-context>
