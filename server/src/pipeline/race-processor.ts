@@ -25,6 +25,7 @@ import {
   populateOddsSnapshotFromDatabase,
 } from '../utils/odds-change-detection.js'
 import { env } from '../shared/env.js'
+import { validateTransformedRaceData } from '../validation/data-quality.js'
 
 /**
  * Pipeline stage identifier used when classifying structured process errors.
@@ -482,6 +483,9 @@ export const processRace = async (
     transformedRace = await workerPool.exec(raceData)
     transformDuration = performance.now() - transformStart
 
+    // Data quality validation (Story 2.10C - AC4)
+    const qualityResult = validateTransformedRaceData(transformedRace)
+
     logger.info(
       {
         raceId,
@@ -489,6 +493,8 @@ export const processRace = async (
         transform_ms: Math.round(transformDuration),
         entrants: transformedRace.entrants.length,
         moneyFlowRecords: transformedRace.moneyFlowRecords.length,
+        qualityScore: qualityResult.quality_score,
+        qualityValid: qualityResult.is_valid,
         contextId: options.contextId,
       },
       'Transform stage completed'
