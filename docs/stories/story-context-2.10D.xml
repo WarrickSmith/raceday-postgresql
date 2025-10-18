@@ -1,0 +1,496 @@
+<story-context id="bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>10D</storyId>
+    <title>Integration & Performance Validation</title>
+    <status>Ready</status>
+    <generatedAt>2025-10-19</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-2.10D.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>end-to-end validation of the complete data pipeline</iWant>
+    <soThat>I can confirm all data flows correctly with acceptable performance</soThat>
+    <tasks>
+      <task id="1" ac="1">Implement end-to-end integration tests</task>
+      <task id="2" ac="2">Implement performance validation tests</task>
+      <task id="3" ac="3">Implement data quality validation tests</task>
+      <task id="4" ac="4">Implement load testing for concurrent processing</task>
+      <task id="5" ac="5">Validate client compatibility</task>
+      <task id="6" ac="2">Create benchmark and reporting tools</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="1">
+      <title>End-to-End Tests</title>
+      <description>Complete API-to-database flow validation</description>
+      <details>
+        - Verify all tables populated (meetings, races, entrants, race_pools, money_flow_history, odds_history)
+        - Validate data relationships (foreign keys, referential integrity)
+        - Test error handling (API failures, network timeouts, database errors)
+        - Verify partition routing for time-series tables
+      </details>
+    </criterion>
+    <criterion id="2">
+      <title>Performance Tests</title>
+      <description>5 races in &lt;15s, single race in &lt;2s targets met</description>
+      <details>
+        - Single race: &lt;2s total (fetch &lt;500ms, transform &lt;1s, write &lt;300ms)
+        - 5 concurrent races: &lt;15s max duration
+        - Performance assertions with configurable thresholds
+        - Metrics logging for baseline tracking
+      </details>
+    </criterion>
+    <criterion id="3">
+      <title>Data Quality</title>
+      <description>Mathematical consistency and completeness validation</description>
+      <details>
+        - Test mathematical consistency (pool totals, percentages)
+        - Validate money flow incremental calculations
+        - Verify odds change detection prevents duplicates
+        - Test data completeness scoring and quality warnings
+      </details>
+    </criterion>
+    <criterion id="4">
+      <title>Load Testing</title>
+      <description>Concurrent race processing validation</description>
+      <details>
+        - Concurrent processing with Promise.allSettled
+        - Monitor PostgreSQL connection pool (≤10 connections)
+        - Monitor worker thread pool utilization
+        - Test failure isolation and retry logic under load
+      </details>
+    </criterion>
+    <criterion id="5">
+      <title>Client Compatibility</title>
+      <description>Validate client applications receive complete data</description>
+      <details>
+        - Compare API response format to Appwrite contract
+        - Validate snake_case field naming consistency
+        - Verify timestamp formats (ISO 8601, Pacific/Auckland timezone)
+        - Test API endpoint performance (&lt;100ms p95)
+      </details>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <!-- Testing Standards & Frameworks -->
+      <doc>
+        <path>docs/DEFINITION-OF-DONE.md</path>
+        <title>Definition of Done</title>
+        <section>Test Coverage Requirements</section>
+        <snippet>Mandatory test criteria: unit tests, integration tests, e2e tests. Full regression suite must pass. Test quality standards: meaningful assertions, descriptive names, edge cases covered.</snippet>
+      </doc>
+
+      <!-- Performance Targets & Architecture -->
+      <doc>
+        <path>docs/architecture-specification.md</path>
+        <title>Architecture Specification</title>
+        <section>Performance Targets (Lines 609-619, 1112-1149)</section>
+        <snippet>Single race &lt;2s (fetch &lt;500ms, transform &lt;1s, write &lt;300ms). 5 concurrent races &lt;15s. API response &lt;100ms p95. Performance vs Appwrite comparison shows 2x improvement target.</snippet>
+      </doc>
+
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification Epic 2</title>
+        <section>Performance & Test Strategy (Lines 113-118, 213-221)</section>
+        <snippet>NFR001: &lt;15s for 5 concurrent races, &lt;2s per race. Integration tests validate end-to-end pipeline. Benchmarking tool for performance measurement. Regression fixtures validate against server-old.</snippet>
+      </doc>
+
+      <doc>
+        <path>docs/solution-architecture.md</path>
+        <title>Solution Architecture</title>
+        <section>Performance Optimization (Lines 532-685)</section>
+        <snippet>Bulk UPSERT strategy, connection pooling (10 max), 3-worker thread pool, parallel processing patterns, index optimization. Performance target: 2x improvement over Appwrite.</snippet>
+      </doc>
+
+      <!-- API Contracts & Client Compatibility -->
+      <doc>
+        <path>docs/architecture-specification.md</path>
+        <title>Architecture Specification</title>
+        <section>API Design (Lines 688-753)</section>
+        <snippet>REST endpoints: /api/meetings, /api/races, /api/entrants. Response format with snake_case naming. API performance &lt;100ms. Compression enabled. Must match Appwrite contract for zero-change client migration.</snippet>
+      </doc>
+
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification Epic 2</title>
+        <section>Appwrite Compatibility Audit (Lines 83-86)</section>
+        <snippet>PostgreSQL schema must match Appwrite attribute definitions (type, length, nullability). Client-side contract maintains drop-in compatibility - zero client changes required.</snippet>
+      </doc>
+
+      <!-- Data Pipeline Architecture -->
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification Epic 2</title>
+        <section>Workflows and Sequencing (Lines 102-110)</section>
+        <snippet>Pipeline: Scheduler → Fetch (NZ TAB API) → Transform (Worker Pool) → Validate (Data Quality) → Write (Bulk UPSERT + Time-Series INSERT) → PostgreSQL. 15s/30s/60s polling intervals.</snippet>
+      </doc>
+
+      <doc>
+        <path>docs/solution-architecture.md</path>
+        <title>Solution Architecture</title>
+        <section>System Architecture Diagram (Lines 44-89, 208-267)</section>
+        <snippet>Node.js monolith with dynamic scheduler, Axios fetchers, 3-worker pool, race processor orchestrator, bulk DB operations. Connection pool 10. Docker deployment 4 CPU / 4GB RAM.</snippet>
+      </doc>
+
+      <!-- Database Design -->
+      <doc>
+        <path>docs/architecture-specification.md</path>
+        <title>Architecture Specification</title>
+        <section>Database Design (Lines 322-505)</section>
+        <snippet>Core tables: meetings, races, entrants, race_pools. Partitioned time-series: money_flow_history, odds_history (daily partitions). Indexes optimized for hot path queries. Automated partition management.</snippet>
+      </doc>
+
+      <!-- Dependency Stories -->
+      <doc>
+        <path>docs/stories/story-2.10A.md</path>
+        <title>Story 2.10A: Code Quality Foundation</title>
+        <section>Complete</section>
+        <snippet>Zero lint errors, build passing, 368 tests passing (100%). PostgreSQL snake_case architecture throughout. Foundation for 2.10B-D.</snippet>
+      </doc>
+
+      <doc>
+        <path>docs/stories/story-2.10B.md</path>
+        <title>Story 2.10B: Database Infrastructure</title>
+        <section>Complete</section>
+        <snippet>Automated partition management, 50+ schema fields added, optimized indexes, migration scripts for entrant/race/meeting fields. Prerequisite for 2.10C-D.</snippet>
+      </doc>
+
+      <doc>
+        <path>docs/stories/story-2.10C.md</path>
+        <title>Story 2.10C: Data Pipeline Processing</title>
+        <section>Complete</section>
+        <snippet>Race pools extraction/UPSERT, money flow incremental calculations, odds change detection (prevents duplicates), data quality validation. All 368 tests passing. Ready for end-to-end validation.</snippet>
+      </doc>
+
+      <!-- Coding Standards -->
+      <doc>
+        <path>docs/CODING-STANDARDS.md</path>
+        <title>Coding Standards</title>
+        <section>TypeScript Best Practices</section>
+        <snippet>ES Modules, arrow functions, async/await, strict types, zero 'any' types. ESLint 9.0 with TypeScript plugin. Prettier formatting. Husky pre-commit hooks.</snippet>
+      </doc>
+
+      <!-- Test Architecture Knowledge -->
+      <doc>
+        <path>bmad/bmm/testarch/knowledge/contract-testing.md</path>
+        <title>Contract Testing Patterns</title>
+        <section>API Contract Validation</section>
+        <snippet>Pact framework patterns for consumer-driven contract testing. Validate API responses match consumer expectations. Essential for client compatibility testing (AC5).</snippet>
+      </doc>
+
+      <doc>
+        <path>bmad/bmm/testarch/knowledge/test-levels-framework.md</path>
+        <title>Test Levels Framework</title>
+        <section>Integration & E2E Testing</section>
+        <snippet>Test pyramid: unit tests (fast, isolated), integration tests (component interaction), e2e tests (full pipeline). This story focuses on integration and e2e layers.</snippet>
+      </doc>
+    </docs>
+    <code>
+      <!-- Core Pipeline Components (Testing Targets) -->
+      <artifact>
+        <path>server/src/pipeline/race-processor.ts</path>
+        <kind>service</kind>
+        <symbol>processRace, processRaces</symbol>
+        <lines>complete file</lines>
+        <reason>Main pipeline orchestrator - primary target for end-to-end integration tests (AC1, AC2). Tests must validate fetch → transform → write flow timing.</reason>
+      </artifact>
+
+      <artifact>
+        <path>server/src/clients/nztab.ts</path>
+        <kind>service</kind>
+        <symbol>fetchRaceData</symbol>
+        <lines>complete file</lines>
+        <reason>NZTAB API client with retry/timeout logic. Performance tests must measure fetch duration &lt;500ms (AC2).</reason>
+      </artifact>
+
+      <artifact>
+        <path>server/src/workers/worker-pool.ts</path>
+        <kind>service</kind>
+        <symbol>WorkerPool class</symbol>
+        <lines>complete file</lines>
+        <reason>Worker thread pool manager. Load tests must monitor worker utilization and test worker crash scenarios (AC4).</reason>
+      </artifact>
+
+      <artifact>
+        <path>server/src/database/bulk-upsert.ts</path>
+        <kind>service</kind>
+        <symbol>bulkUpsertMeetings, bulkUpsertRaces, bulkUpsertEntrants, bulkUpsertRacePools</symbol>
+        <lines>complete file</lines>
+        <reason>Bulk UPSERT operations. Performance tests must validate write duration &lt;300ms (AC2). Integration tests verify data persistence (AC1).</reason>
+      </artifact>
+
+      <artifact>
+        <path>server/src/database/time-series.ts</path>
+        <kind>service</kind>
+        <symbol>insertMoneyFlowHistory, insertOddsHistory</symbol>
+        <lines>complete file</lines>
+        <reason>Time-series INSERT operations. Integration tests must verify partition routing (AC1). Performance tests measure write duration.</reason>
+      </artifact>
+
+      <artifact>
+        <path>server/src/validation/data-quality.ts</path>
+        <kind>service</kind>
+        <symbol>validateDataQuality, calculateQualityScore</symbol>
+        <lines>complete file</lines>
+        <reason>Data quality validation. Tests must validate mathematical consistency checks and quality scoring (AC3).</reason>
+      </artifact>
+
+      <artifact>
+        <path>server/src/database/pool.ts</path>
+        <kind>service</kind>
+        <symbol>pool</symbol>
+        <lines>complete file</lines>
+        <reason>PostgreSQL connection pool (max 10). Load tests must monitor pool utilization and test connection exhaustion scenarios (AC4).</reason>
+      </artifact>
+
+      <artifact>
+        <path>server/src/api/server.ts</path>
+        <kind>service</kind>
+        <symbol>app (Express application)</symbol>
+        <lines>complete file</lines>
+        <reason>API server entry point. Client compatibility tests validate API endpoints and response formats (AC5).</reason>
+      </artifact>
+
+      <!-- Existing Test Patterns -->
+      <artifact>
+        <path>server/tests/integration/pipeline/race-processor.integration.test.ts</path>
+        <kind>test</kind>
+        <symbol>race processor integration tests</symbol>
+        <lines>complete file</lines>
+        <reason>Existing integration test pattern for race processor. Story 2.10D extends this with performance assertions and load testing.</reason>
+      </artifact>
+
+      <artifact>
+        <path>server/tests/integration/story-2-10-end-to-end.test.ts</path>
+        <kind>test</kind>
+        <symbol>Story 2.10 end-to-end tests</symbol>
+        <lines>complete file</lines>
+        <reason>Existing e2e test suite. Story 2.10D adds comprehensive performance validation and load testing to this suite.</reason>
+      </artifact>
+
+      <artifact>
+        <path>server/tests/unit/workers/worker-pool.test.ts</path>
+        <kind>test</kind>
+        <symbol>worker pool unit tests</symbol>
+        <lines>complete file</lines>
+        <reason>Worker pool testing patterns. Load tests extend this with concurrent processing and crash scenario validation.</reason>
+      </artifact>
+
+      <!-- Test Configuration & Utilities -->
+      <artifact>
+        <path>server/vitest.config.ts</path>
+        <kind>config</kind>
+        <symbol>vitest configuration</symbol>
+        <lines>complete file</lines>
+        <reason>Vitest configuration. May need updates for performance test timeouts and test environment setup.</reason>
+      </artifact>
+    </code>
+    <dependencies>
+      <runtime>
+        <package name="express" version="^4.21.2">HTTP server for API endpoints</package>
+        <package name="pg" version="^8.16.3">PostgreSQL client with connection pooling</package>
+        <package name="axios" version="^1.12.2">HTTP client for NZTAB API</package>
+        <package name="pino" version="^9.5.0">Structured logging for performance metrics</package>
+        <package name="zod" version="^3.25.76">Runtime validation for API responses</package>
+        <package name="compression" version="^1.8.1">Response compression for API</package>
+        <package name="helmet" version="^8.1.0">Security headers for API</package>
+      </runtime>
+      <testing>
+        <package name="vitest" version="^2.0.0">Test runner (unit, integration, e2e)</package>
+        <package name="@vitest/coverage-v8" version="^2.1.9">Code coverage reporting</package>
+        <package name="tsx" version="^4.19.0">TypeScript execution for tests</package>
+      </testing>
+      <quality>
+        <package name="typescript" version="^5.7.0">TypeScript compiler (strict mode)</package>
+        <package name="eslint" version="^9.0.0">Linting with TypeScript plugin</package>
+        <package name="prettier" version="^3.3.0">Code formatting</package>
+      </quality>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>All tests must use TypeScript strict mode with zero 'any' types (CODING-STANDARDS.md)</constraint>
+    <constraint>Integration tests must clean up database state (transaction rollback or test database) to prevent pollution (Dev Notes)</constraint>
+    <constraint>Performance tests must run multiple iterations (3-5) for statistical confidence (Dev Notes)</constraint>
+    <constraint>Performance assertions use configurable thresholds (e.g., 2s ± 10%) to handle timing variance (Dev Notes)</constraint>
+    <constraint>Connection pool monitoring must not exceed 10 connections during load tests (architecture-specification.md)</constraint>
+    <constraint>Worker pool configuration fixed at 3 workers for production parity (tech-spec-epic-2.md)</constraint>
+    <constraint>All timestamps must use Pacific/Auckland timezone (ISO 8601 format) per architecture (tech-spec-epic-2.md L23, story-2.10C.md)</constraint>
+    <constraint>API responses must use snake_case field naming for PostgreSQL-first architecture (story-2.10A.md)</constraint>
+    <constraint>Test database must have partitions created for test date ranges (story-2.10B.md)</constraint>
+    <constraint>Benchmark tool must export results to JSON/CSV for trend analysis (story-2.10D.md Task 6)</constraint>
+    <constraint>No flaky tests - use deterministic test data and mocked time where needed (DEFINITION-OF-DONE.md)</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>processRace</name>
+      <kind>function signature</kind>
+      <signature>async function processRace(raceId: string): Promise&lt;ProcessResult&gt;</signature>
+      <path>server/src/pipeline/race-processor.ts</path>
+      <description>Main pipeline entry point. Returns timings for fetch, transform, write, total duration.</description>
+    </interface>
+
+    <interface>
+      <name>processRaces</name>
+      <kind>function signature</kind>
+      <signature>async function processRaces(raceIds: string[]): Promise&lt;ProcessResult[]&gt;</signature>
+      <path>server/src/pipeline/race-processor.ts</path>
+      <description>Concurrent race processing using Promise.allSettled. Load tests target this function.</description>
+    </interface>
+
+    <interface>
+      <name>GET /api/meetings</name>
+      <kind>REST endpoint</kind>
+      <signature>Query params: ?date=YYYY-MM-DD&amp;raceType=thoroughbred|harness</signature>
+      <path>server/src/api/routes/meetings.ts (future)</path>
+      <description>Meetings endpoint. Client compatibility tests validate response format matches Appwrite.</description>
+    </interface>
+
+    <interface>
+      <name>GET /api/races</name>
+      <kind>REST endpoint</kind>
+      <signature>Query params: ?meetingId=string</signature>
+      <path>server/src/api/routes/races.ts (future)</path>
+      <description>Races endpoint. Must return snake_case fields with &lt;100ms p95 response time.</description>
+    </interface>
+
+    <interface>
+      <name>GET /api/entrants</name>
+      <kind>REST endpoint</kind>
+      <signature>Query params: ?raceId=string</signature>
+      <path>server/src/api/routes/entrants.ts (future)</path>
+      <description>Entrants endpoint with embedded money_flow_history and odds_history. Performance critical.</description>
+    </interface>
+
+    <interface>
+      <name>WorkerPool.exec</name>
+      <kind>function signature</kind>
+      <signature>async exec(payload: RacePayload): Promise&lt;TransformedRace&gt;</signature>
+      <path>server/src/workers/worker-pool.ts</path>
+      <description>Worker pool task execution. Load tests monitor queue depth and worker crashes.</description>
+    </interface>
+
+    <interface>
+      <name>validateDataQuality</name>
+      <kind>function signature</kind>
+      <signature>function validateDataQuality(data: RaceData): QualityResult</signature>
+      <path>server/src/validation/data-quality.ts</path>
+      <description>Data quality validation. Returns quality score 0-100 and validation warnings.</description>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      **Testing Framework:** Vitest 2.0 with @vitest/coverage-v8 for code coverage.
+
+      **Test Organization:**
+      - Unit tests: `server/tests/unit/` - fast, isolated component tests
+      - Integration tests: `server/tests/integration/` - component interaction, database operations
+      - E2E tests: `server/tests/integration/` - full pipeline validation
+
+      **Test Patterns:**
+      - Use `describe/it/expect` syntax (Vitest compatible)
+      - Async tests use `async/await` pattern
+      - Database tests use transaction rollback for cleanup
+      - Performance tests use `performance.now()` for high-resolution timing
+      - Load tests use `Promise.allSettled` for concurrent scenarios
+
+      **Quality Standards (DEFINITION-OF-DONE.md):**
+      - Meaningful assertions (no trivial tests)
+      - Descriptive test names (clear what is being tested)
+      - Edge cases covered (empty data, null values, errors)
+      - No flaky tests (deterministic data, mocked time)
+      - Full regression suite must pass (368+ tests)
+
+      **Performance Test Requirements:**
+      - Run multiple iterations (3-5) for statistical confidence
+      - Use configurable thresholds (e.g., 2s ± 10%) for timing variance
+      - Log all performance metrics for baseline tracking
+      - Export results to JSON/CSV for trend analysis
+    </standards>
+
+    <locations>
+      - Unit tests: `server/tests/unit/**/*.test.ts`
+      - Integration tests: `server/tests/integration/**/*.test.ts`
+      - New performance tests: `server/tests/integration/pipeline/performance.test.ts` (create)
+      - New load tests: `server/tests/integration/pipeline/load-test.test.ts` (create)
+      - New e2e tests: `server/tests/integration/pipeline/e2e-pipeline.test.ts` (create)
+      - New client tests: `server/tests/integration/api/client-compatibility.test.ts` (create)
+      - Benchmark tool: `server/src/scripts/benchmark.ts` (create)
+    </locations>
+
+    <ideas>
+      <idea ac="1">
+        **AC1 - End-to-End Pipeline Test:**
+        - Create `e2e-pipeline.test.ts` with complete NZTAB API → Database flow
+        - Use realistic NZTAB fixture data from `server/tests/fixtures/nztab-api/`
+        - Verify all tables populated: meetings, races, entrants, race_pools, money_flow_history, odds_history
+        - Validate foreign key relationships and referential integrity
+        - Test partition routing for time-series tables (verify correct partition used)
+        - Test error handling: mock API failure, network timeout, database error
+        - Cleanup: use transaction rollback or dedicated test database
+      </idea>
+
+      <idea ac="2">
+        **AC2 - Performance Validation Tests:**
+        - Create `performance.test.ts` with timing assertions
+        - Single race test: measure total &lt;2s (fetch &lt;500ms, transform &lt;1s, write &lt;300ms)
+        - 5-race concurrent test: measure max duration &lt;15s
+        - Use `performance.now()` for microsecond precision
+        - Run 3-5 iterations, calculate median/p95
+        - Configurable thresholds (2s ± 10% = 1.8-2.2s acceptable)
+        - Log all metrics: fetch_ms, transform_ms, write_ms, total_ms
+      </idea>
+
+      <idea ac="2">
+        **AC2 - Benchmark Tool:**
+        - Create `server/src/scripts/benchmark.ts` standalone script
+        - Support 1, 5, 10 race scenarios
+        - Collect metrics: min, max, avg, p95, p99 durations
+        - Component breakdown: fetch, transform, write
+        - Export to JSON/CSV with timestamp
+        - Pass/fail validation against targets (&lt;2s, &lt;15s)
+        - CLI usage: `npm run benchmark -- --races=5 --iterations=10`
+      </idea>
+
+      <idea ac="3">
+        **AC3 - Data Quality Tests:**
+        - Extend existing `data-quality.test.ts` with integration scenarios
+        - Test mathematical consistency: pool totals sum correctly, percentages validate
+        - Test money flow incremental calculations (delta logic)
+        - Test odds change detection prevents duplicates (unchanged odds → no INSERT)
+        - Test quality scoring: incomplete data → low score → warning logged
+        - Test edge cases: empty data, missing required fields, null values
+      </idea>
+
+      <idea ac="4">
+        **AC4 - Load Testing:**
+        - Create `load-test.test.ts` for concurrent processing
+        - Test Promise.allSettled with 5+ concurrent race IDs
+        - Monitor PostgreSQL connection pool: assert ≤10 connections used
+        - Monitor worker thread pool: track queue depth and busy workers
+        - Test failure isolation: simulate API failure for race #3, verify races #1,2,4,5 succeed
+        - Test retry logic: validate exponential backoff under load
+        - Test graceful degradation: force worker crash, verify auto-restart and task retry
+      </idea>
+
+      <idea ac="5">
+        **AC5 - Client Compatibility Tests:**
+        - Create `client-compatibility.test.ts` for API contract validation
+        - Compare API response schemas to Appwrite contract (reference: architecture-specification.md L688-753)
+        - Validate all required fields present in responses
+        - Test snake_case field naming consistency (no camelCase leakage)
+        - Verify timestamp formats: ISO 8601 with Pacific/Auckland timezone
+        - Test API endpoint performance: measure p95 response time &lt;100ms
+        - Optional: use Pact for consumer-driven contract testing (bmad/bmm/testarch/knowledge/contract-testing.md)
+      </idea>
+    </ideas>
+  </tests>
+</story-context>
