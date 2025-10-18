@@ -26,10 +26,6 @@
 - Path: `bmad/bmm/workflows/1-analysis/research/workflow.yaml`
 - Adaptive research workflow supporting multiple research types: market research, deep research prompt generation, technical/architecture evaluation, competitive intelligence, user research, and domain analysis
 
-**workflow-status**
-- Path: `bmad/bmm/workflows/1-analysis/workflow-status/workflow.yaml`
-- Universal entry point for BMM workflows. Checks for existing workflow status, displays current state, suggests next actions, or helps plan new workflow. Can be invoked by any agent (bmad-master, analyst, pm) to understand where the project is and what to do next.
-
 **gdd**
 - Path: `bmad/bmm/workflows/2-plan-workflows/gdd/workflow.yaml`
 - Game Design Document workflow for all game project levels - from small prototypes to full AAA games. Generates comprehensive GDD with game mechanics, systems, progression, and implementation guidance.
@@ -49,6 +45,10 @@
 **ux-spec**
 - Path: `bmad/bmm/workflows/2-plan-workflows/ux/workflow.yaml`
 - UX/UI specification workflow for defining user experience and interface design. Creates comprehensive UX documentation including wireframes, user flows, component specifications, and design system guidelines.
+
+**implementation-ready-check**
+- Path: `bmad/bmm/workflows/3-solutioning/implementation-ready-check/workflow.yaml`
+- Systematically validate that all planning and solutioning phases are complete and properly aligned before transitioning to Phase 4 implementation. Ensures PRD, architecture, and stories are cohesive with no gaps or contradictions.
 
 **tech-spec**
 - Path: `bmad/bmm/workflows/3-solutioning/tech-spec/workflow.yaml`
@@ -121,6 +121,14 @@
 **testarch-trace**
 - Path: `bmad/bmm/workflows/testarch/trace/workflow.yaml`
 - Generate requirements-to-tests traceability matrix, analyze coverage, and make quality gate decision (PASS/CONCERNS/FAIL/WAIVED)
+
+**workflow-init**
+- Path: `bmad/bmm/workflows/workflow-status/init/workflow.yaml`
+- Initialize a new BMM project by determining level, type, and creating workflow path
+
+**workflow-status**
+- Path: `bmad/bmm/workflows/workflow-status/workflow.yaml`
+- Lightweight status checker - answers 'what should I do now?' for any agent. Reads simple key-value status file for instant parsing. Use workflow-init for new projects.
 
 
 ## Execution
