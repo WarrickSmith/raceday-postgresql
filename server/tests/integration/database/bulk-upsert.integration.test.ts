@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
+import { describe, it, expect, afterAll, beforeEach } from 'vitest'
 import { pool } from '../../../src/database/pool.js'
 import {
   bulkUpsertMeetings,
@@ -40,80 +40,17 @@ interface ConnectionCountRow {
 }
 
 describe('bulk-upsert integration tests', () => {
-  beforeAll(async () => {
-    // Ensure test database has required schema
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS test_meetings (
-        meeting_id TEXT PRIMARY KEY,
-        meeting_name TEXT NOT NULL,
-        country TEXT NOT NULL,
-        race_type TEXT NOT NULL,
-        date DATE NOT NULL,
-        track_condition TEXT,
-        tote_status TEXT,
-        status TEXT NOT NULL DEFAULT 'active',
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `)
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS test_races (
-        race_id TEXT PRIMARY KEY,
-        meeting_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        race_number INTEGER,
-        start_time TIMESTAMPTZ NOT NULL,
-        status TEXT NOT NULL,
-        race_date_nz DATE,
-        start_time_nz TIME,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `)
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS test_entrants (
-        entrant_id TEXT PRIMARY KEY,
-        race_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        runner_number INTEGER NOT NULL,
-        barrier INTEGER,
-        is_scratched BOOLEAN NOT NULL DEFAULT FALSE,
-        is_late_scratched BOOLEAN,
-        fixed_win_odds NUMERIC(10,2),
-        fixed_place_odds NUMERIC(10,2),
-        pool_win_odds NUMERIC(10,2),
-        pool_place_odds NUMERIC(10,2),
-        hold_percentage NUMERIC(5,2),
-        bet_percentage NUMERIC(5,2),
-        win_pool_percentage NUMERIC(5,2),
-        place_pool_percentage NUMERIC(5,2),
-        win_pool_amount BIGINT,
-        place_pool_amount BIGINT,
-        jockey TEXT,
-        trainer_name TEXT,
-        silk_colours TEXT,
-        favourite BOOLEAN,
-        mover BOOLEAN,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `)
-  })
-
   beforeEach(async () => {
-    // Clean test tables before each test
-    await pool.query('TRUNCATE test_meetings CASCADE')
-    await pool.query('TRUNCATE test_races CASCADE')
-    await pool.query('TRUNCATE test_entrants CASCADE')
+    // Clean tables without acquiring conflicting truncation locks
+    await pool.query('DELETE FROM entrants')
+    await pool.query('DELETE FROM races')
+    await pool.query('DELETE FROM meetings')
   })
 
   afterAll(async () => {
-    // Clean up test tables
-    await pool.query('DROP TABLE IF EXISTS test_entrants CASCADE')
-    await pool.query('DROP TABLE IF EXISTS test_races CASCADE')
-    await pool.query('DROP TABLE IF EXISTS test_meetings CASCADE')
+    await pool.query('DELETE FROM entrants')
+    await pool.query('DELETE FROM races')
+    await pool.query('DELETE FROM meetings')
   })
 
   describe('Transaction guarantees (AC5, AC6)', () => {

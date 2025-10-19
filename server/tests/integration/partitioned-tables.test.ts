@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { Pool } from 'pg'
 import 'dotenv/config'
+import { ensurePartition } from '../../src/database/time-series.js'
 
 const buildDatabaseUrl = (): string => {
   const dbHost = process.env.DB_HOST ?? 'localhost'
@@ -14,7 +15,7 @@ const buildDatabaseUrl = (): string => {
 describe('Partitioned Tables Tests', () => {
   let pool: Pool
 
-  beforeAll(() => {
+  beforeAll(async () => {
     pool = new Pool({
       connectionString: buildDatabaseUrl(),
     })
@@ -22,6 +23,10 @@ describe('Partitioned Tables Tests', () => {
     pool.on('error', (err) => {
       console.error('Unexpected pool error:', err)
     })
+
+    const today = new Date()
+    await ensurePartition('money_flow_history', today)
+    await ensurePartition('odds_history', today)
   })
 
   afterAll(async () => {
