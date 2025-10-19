@@ -708,19 +708,23 @@ describe('processRaces', () => {
     bulkUpsertMeetingsMock.mockResolvedValue({ rowCount: 1, duration: 10 })
     bulkUpsertRacesMock.mockResolvedValue({ rowCount: 1, duration: 10 })
     bulkUpsertEntrantsMock.mockResolvedValue({ rowCount: 1, duration: 10 })
-    insertMoneyFlowHistoryMock.mockResolvedValueOnce({
-      rowCount: 1,
-      duration: 10,
-    })
-    insertMoneyFlowHistoryMock.mockImplementationOnce(async () => {
-      await new Promise((resolve) => {
-        setTimeout(resolve, 5)
-      })
-      throw new PartitionNotFoundError(
-        'money_flow_history',
-        'money_flow_history_missing',
-        '2035-01-01T00:00:00.000Z'
-      )
+    insertMoneyFlowHistoryMock.mockImplementation(async (records) => {
+      const [firstRecord] = Array.isArray(records) ? records : []
+      if (firstRecord?.race_id === failureId) {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 5)
+        })
+        throw new PartitionNotFoundError(
+          'money_flow_history',
+          'money_flow_history_missing',
+          '2035-01-01T00:00:00.000Z'
+        )
+      }
+
+      return {
+        rowCount: 1,
+        duration: 10,
+      }
     })
     insertOddsHistoryMock.mockResolvedValue({ rowCount: 2, duration: 10 })
 
