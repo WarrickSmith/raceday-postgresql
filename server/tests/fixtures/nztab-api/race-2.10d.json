@@ -1,0 +1,112 @@
+{
+  "id": "story-2-10d-race-1",
+  "name": "Story 2.10D Fixture Race",
+  "status": "open",
+  "race_date_nz": "2025-10-19",
+  "start_time_nz": "15:30:00 NZDT",
+  "meeting_id": "story-2-10d-meeting-1",
+  "distance": 1200,
+  "track_condition": "GOOD",
+  "track_surface": "Turf",
+  "weather": "Fine",
+  "type": "Group 1",
+  "total_prize_money": 1000000,
+  "actual_start": "2025-10-19T15:30:00.000+13:00",
+  "tote_start_time": "2025-10-19T10:00:00.000+13:00",
+  "positions_paid": 3,
+  "silk_url": "https://example.com/silks",
+  "silk_base_url": "https://example.com/silks/base",
+  "video_channels": "[\"channel1\", \"channel2\"]",
+  "entrants": [
+    {
+      "entrantId": "story-2-10d-race-1-entrant-1",
+      "runnerNumber": 1,
+      "name": "Fast Horse",
+      "barrier": 5,
+      "isScratched": false,
+      "isLateScratched": null,
+      "fixedWinOdds": 2.5,
+      "fixedPlaceOdds": 1.5,
+      "poolWinOdds": 2.6,
+      "poolPlaceOdds": 1.6,
+      "jockey": "Jockey One",
+      "trainerName": "Trainer One",
+      "silkColours": "Red and White",
+      "favourite": true,
+      "mover": true,
+      "scratchTime": null,
+      "runnerChange": null,
+      "silkUrl64x64": "https://example.com/silks/64x64/1.png",
+      "silkUrl128x128": "https://example.com/silks/128x128/1.png"
+    },
+    {
+      "entrantId": "story-2-10d-race-1-entrant-2",
+      "runnerNumber": 2,
+      "name": "Slow Horse",
+      "barrier": 8,
+      "isScratched": false,
+      "isLateScratched": null,
+      "fixedWinOdds": 8.0,
+      "fixedPlaceOdds": 3.2,
+      "poolWinOdds": 7.5,
+      "poolPlaceOdds": 3.0,
+      "jockey": "Jockey Two",
+      "trainerName": "Trainer Two",
+      "silkColours": "Blue and Yellow",
+      "favourite": false,
+      "mover": false,
+      "scratchTime": null,
+      "runnerChange": null,
+      "silkUrl64x64": "https://example.com/silks/64x64/2.png",
+      "silkUrl128x128": "https://example.com/silks/128x128/2.png"
+    }
+  ],
+  "money_tracker": {
+    "entrants": [
+      {
+        "entrant_id": "story-2-10d-race-1-entrant-1",
+        "hold_percentage": 0.45,
+        "bet_percentage": 0.35
+      },
+      {
+        "entrant_id": "story-2-10d-race-1-entrant-2",
+        "hold_percentage": 0.15,
+        "bet_percentage": 0.2
+      }
+    ]
+  },
+  "pools": {
+    "winPool": 250000,
+    "placePool": 150000,
+    "totalPool": 400000
+  },
+  "tote_pools": {
+    "win": {
+      "total": 250000,
+      "currency": "NZD"
+    },
+    "place": {
+      "total": 150000,
+      "currency": "NZD"
+    },
+    "exacta": {
+      "total": 75000,
+      "currency": "NZD"
+    },
+    "first4": {
+      "total": 25000,
+      "currency": "NZD"
+    }
+  },
+  "meeting": {
+    "meeting": "story-2-10d-meeting-1",
+    "name": "Story 2.10D Fixture Meeting",
+    "date": "2025-10-19",
+    "country": "NZ",
+    "category": "thoroughbred",
+    "category_name": "Thoroughbred Horse Racing",
+    "state": "active",
+    "track_condition": "GOOD",
+    "tote_status": "open"
+  }
+}
