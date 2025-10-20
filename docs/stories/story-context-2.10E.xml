@@ -14,14 +14,27 @@
     <iWant>the client application to consume data from the PostgreSQL REST API using snake_case field naming</iWant>
     <soThat>the client can integrate with the new PostgreSQL backend without transformation overhead</soThat>
     <tasks>
-      <task id="1">Remove Appwrite Dependencies (6 subtasks)</task>
-      <task id="2">Create HTTP Client Utility (5 subtasks)</task>
-      <task id="3">Update Type Interfaces to snake_case (6 subtasks)</task>
-      <task id="4">Replace API Layer with fetch calls (9 subtasks - ~13 files)</task>
-      <task id="5">Update React Components (6 subtasks)</task>
-      <task id="6">Update Test Suite (5 subtasks)</task>
-      <task id="7">Update Environment and Configuration (4 subtasks)</task>
-      <task id="8">Quality Assurance (7 subtasks)</task>
+      <task id="1" ac="1">Remove Appwrite Dependencies (6 subtasks)</task>
+      <task id="2" ac="2">Create HTTP Client Utility (5 subtasks)</task>
+      <task id="3" ac="3">Update Type Interfaces to snake_case (6 subtasks)</task>
+      <task id="4" ac="2">Replace API Layer with fetch calls (9 subtasks - ~13 files)</task>
+      <task id="5" ac="4">Update React Components (6 subtasks)</task>
+      <task id="6" ac="5,6">Update Test Suite (5 subtasks)</task>
+      <task id="7" ac="2">Update Environment and Configuration (4 subtasks)</task>
+      <task id="8" ac="6,7">Quality Assurance (7 subtasks)</task>
+      <task id="9" ac="2" critical="PREREQUISITE" blocksTask="4,5,6">Add Missing Server REST Endpoints (10 subtasks)
+        <note>CRITICAL: Task 9 MUST be completed BEFORE Tasks 4-6. Story 2.10D only implemented 3 endpoints. Need 7 more plus 2 database migrations.</note>
+        <subtask id="9.1">Create race_results table migration (JSONB: results_data, dividends_data, fixed_odds_data)</subtask>
+        <subtask id="9.2">Create user_alert_configs table migration (6 indicators with display_order 1-6)</subtask>
+        <subtask id="9.3" reference="server-old/enhanced-race-poller/src/database-utils.js:136-201">Add GET /api/race-pools endpoint</subtask>
+        <subtask id="9.4" reference="server-old/enhanced-race-poller/src/main.js:1752-1810">Add GET /api/race-results endpoint</subtask>
+        <subtask id="9.5" reference="client/src/app/api/race/[id]/money-flow-timeline/route.ts:47-283">Add GET /api/money-flow-timeline endpoint</subtask>
+        <subtask id="9.6" reference="client/src/app/api/user-alert-configs/route.ts:16-78">Add GET /api/user-alert-configs endpoint</subtask>
+        <subtask id="9.7" reference="client/src/app/api/user-alert-configs/route.ts:84-143">Add POST /api/user-alert-configs endpoint</subtask>
+        <subtask id="9.8" reference="client/src/app/api/races/upcoming/route.ts:23-85">Add GET /api/races/upcoming endpoint</subtask>
+        <subtask id="9.9" reference="client/src/app/api/race/[id]/route.ts:383-389">Add GET /api/races/next-scheduled endpoint</subtask>
+        <subtask id="9.10">Update server endpoint documentation</subtask>
+      </task>
     </tasks>
   </story>
 
@@ -229,6 +242,154 @@
     </interface>
 
     <interface>
+      <name>GET /api/race-pools</name>
+      <kind>REST endpoint</kind>
+      <signature>GET /api/race-pools?raceId={race_id}</signature>
+      <path>server/src/api/routes/client-compatibility.ts (Task 9.3 - TO IMPLEMENT)</path>
+      <status>MISSING</status>
+      <reference>server-old/enhanced-race-poller/src/database-utils.js:136-201, 1004-1037</reference>
+      <request>
+        <param name="raceId" type="string" required="true" example="NZ-Ellerslie-20251021-R1"/>
+      </request>
+      <response>
+        <field name="race_id" type="string"/>
+        <field name="win_pool_total" type="number" description="Total win pool in cents"/>
+        <field name="place_pool_total" type="number" description="Total place pool in cents"/>
+        <field name="quinella_pool_total" type="number"/>
+        <field name="trifecta_pool_total" type="number"/>
+        <field name="exacta_pool_total" type="number"/>
+        <field name="first4_pool_total" type="number"/>
+        <field name="currency" type="string" example="$"/>
+        <field name="last_updated" type="string" format="ISO 8601"/>
+      </response>
+    </interface>
+
+    <interface>
+      <name>GET /api/race-results</name>
+      <kind>REST endpoint</kind>
+      <signature>GET /api/race-results?raceId={race_id}</signature>
+      <path>server/src/api/routes/client-compatibility.ts (Task 9.4 - TO IMPLEMENT)</path>
+      <status>MISSING - requires race_results table from Task 9.1</status>
+      <reference>server-old/enhanced-race-poller/src/main.js:1752-1810</reference>
+      <request>
+        <param name="raceId" type="string" required="true"/>
+      </request>
+      <response>
+        <field name="race_id" type="string"/>
+        <field name="results_available" type="boolean"/>
+        <field name="results_data" type="object" description="JSONB array of race results"/>
+        <field name="dividends_data" type="object" description="JSONB array of dividends"/>
+        <field name="fixed_odds_data" type="object" description="JSONB fixed odds snapshot"/>
+        <field name="result_status" type="string" values="interim, final, protest"/>
+        <field name="photo_finish" type="boolean"/>
+        <field name="stewards_inquiry" type="boolean"/>
+        <field name="protest_lodged" type="boolean"/>
+        <field name="result_time" type="string" format="ISO 8601"/>
+      </response>
+    </interface>
+
+    <interface>
+      <name>GET /api/money-flow-timeline</name>
+      <kind>REST endpoint</kind>
+      <signature>GET /api/money-flow-timeline?raceId={race_id}&entrants={ids}&poolType={type}</signature>
+      <path>server/src/api/routes/client-compatibility.ts (Task 9.5 - TO IMPLEMENT)</path>
+      <status>MISSING</status>
+      <reference>client/src/app/api/race/[id]/money-flow-timeline/route.ts:47-283</reference>
+      <request>
+        <param name="raceId" type="string" required="true"/>
+        <param name="entrants" type="string" description="Comma-separated entrant IDs"/>
+        <param name="poolType" type="string" values="win, place, odds" default="win"/>
+        <param name="limit" type="number" default="200"/>
+        <param name="cursorAfter" type="string" optional="true"/>
+        <param name="createdAfter" type="string" optional="true" format="ISO 8601"/>
+      </request>
+      <response>
+        <field name="success" type="boolean"/>
+        <field name="documents" type="array" description="Money flow history records"/>
+        <field name="bucketed_data" type="boolean" description="Whether bucketed aggregation was used"/>
+        <field name="interval_coverage" type="object" description="Interval analysis"/>
+        <field name="query_optimizations" type="object"/>
+      </response>
+      <note>Must replicate complex bucketing logic: type='bucketed_aggregation', time_interval between -65 and +66. Fallback to legacy time_to_start data.</note>
+    </interface>
+
+    <interface>
+      <name>GET /api/user-alert-configs</name>
+      <kind>REST endpoint</kind>
+      <signature>GET /api/user-alert-configs?userId={user_id}</signature>
+      <path>server/src/api/routes/client-compatibility.ts (Task 9.6 - TO IMPLEMENT)</path>
+      <status>MISSING - requires user_alert_configs table from Task 9.2</status>
+      <reference>client/src/app/api/user-alert-configs/route.ts:16-78, client/src/types/alerts.ts</reference>
+      <request>
+        <param name="userId" type="string" default="Default User"/>
+      </request>
+      <response>
+        <field name="user_id" type="string"/>
+        <field name="indicators" type="array" description="6 indicator configs with display_order 1-6"/>
+        <field name="toggle_all" type="boolean"/>
+        <field name="audible_alerts_enabled" type="boolean"/>
+      </response>
+      <note>Create default 6 indicators if none exist for user. Match DEFAULT_INDICATORS structure.</note>
+    </interface>
+
+    <interface>
+      <name>POST /api/user-alert-configs</name>
+      <kind>REST endpoint</kind>
+      <signature>POST /api/user-alert-configs</signature>
+      <path>server/src/api/routes/client-compatibility.ts (Task 9.7 - TO IMPLEMENT)</path>
+      <status>MISSING</status>
+      <reference>client/src/app/api/user-alert-configs/route.ts:84-143</reference>
+      <request>
+        <body>
+          <field name="user_id" type="string"/>
+          <field name="indicators" type="array" description="Array of indicator configs"/>
+          <field name="audible_alerts_enabled" type="boolean"/>
+        </body>
+      </request>
+      <response>
+        <field name="success" type="boolean"/>
+      </response>
+      <note>Upsert logic: UPDATE existing by id, INSERT new without id using PostgreSQL INSERT...ON CONFLICT</note>
+    </interface>
+
+    <interface>
+      <name>GET /api/races/upcoming</name>
+      <kind>REST endpoint</kind>
+      <signature>GET /api/races/upcoming?windowMinutes={mins}&lookbackMinutes={mins}&limit={n}</signature>
+      <path>server/src/api/routes/client-compatibility.ts (Task 9.8 - TO IMPLEMENT)</path>
+      <status>MISSING</status>
+      <reference>client/src/app/api/races/upcoming/route.ts:23-85</reference>
+      <request>
+        <param name="windowMinutes" type="number" default="120"/>
+        <param name="lookbackMinutes" type="number" default="5"/>
+        <param name="limit" type="number" default="50" max="100"/>
+      </request>
+      <response>
+        <field name="races" type="array" description="Races within time window"/>
+        <field name="total" type="number"/>
+        <field name="timestamp" type="string" format="ISO 8601"/>
+        <field name="window" type="object" description="{ lower_bound, upper_bound }"/>
+      </response>
+      <note>Filter: start_time > (now - lookbackMinutes) AND start_time &lt;= (now + windowMinutes). Exclude status: 'abandoned', 'final', 'finalized' (case-insensitive).</note>
+    </interface>
+
+    <interface>
+      <name>GET /api/races/next-scheduled</name>
+      <kind>REST endpoint</kind>
+      <signature>GET /api/races/next-scheduled</signature>
+      <path>server/src/api/routes/client-compatibility.ts (Task 9.9 - TO IMPLEMENT)</path>
+      <status>MISSING</status>
+      <reference>client/src/app/api/race/[id]/route.ts:383-389</reference>
+      <request>
+        <param>None</param>
+      </request>
+      <response type="Race | null">
+        <note>Single race object or null if no upcoming races</note>
+      </response>
+      <note>Filter: start_time > NOW() AND status NOT IN ('abandoned', 'final', 'finalized'). Order by start_time ASC, limit 1.</note>
+    </interface>
+
+    <interface>
       <name>HTTP Client Wrapper (to be created)</name>
       <kind>Utility Function</kind>
       <signature>apiClient.get(endpoint: string, options?: RequestOptions): Promise&lt;T&gt;</signature>
@@ -320,12 +481,24 @@
 
     <ideas>
       <idea ac="AC1" description="Test that Appwrite imports are removed - verify no import statements contain 'appwrite' or 'node-appwrite' in any source files"/>
-      <idea ac="AC2" description="Test HTTP client wrapper - mock fetch() and verify requests to /api/meetings, /api/races, /api/entrants with correct query params"/>
+      <idea ac="AC2" task="9" description="Test race_results table migration - verify table exists with correct JSONB columns (results_data, dividends_data, fixed_odds_data)"/>
+      <idea ac="AC2" task="9" description="Test user_alert_configs table migration - verify 6 default indicators created with display_order 1-6"/>
+      <idea ac="AC2" task="9" description="Test GET /api/race-pools - mock race_pools table query, verify response has all pool totals in snake_case"/>
+      <idea ac="AC2" task="9" description="Test GET /api/race-results - verify JSONB fields parsed correctly, returns results_data and dividends_data as objects"/>
+      <idea ac="AC2" task="9" description="Test GET /api/money-flow-timeline - verify bucketed data filter (type='bucketed_aggregation', time_interval -65 to +66), test fallback to time_to_start"/>
+      <idea ac="AC2" task="9" description="Test GET /api/user-alert-configs - verify default indicators created if user has none, returns 6 indicators ordered by display_order"/>
+      <idea ac="AC2" task="9" description="Test POST /api/user-alert-configs - verify upsert logic (UPDATE by id, INSERT new), test audible_alerts_enabled toggle"/>
+      <idea ac="AC2" task="9" description="Test GET /api/races/upcoming - verify time window filter (windowMinutes, lookbackMinutes), exclude abandoned/final/finalized"/>
+      <idea ac="AC2" task="9" description="Test GET /api/races/next-scheduled - verify returns single next race or null, correct status filtering"/>
+      <idea ac="AC2" description="Test HTTP client wrapper - mock fetch() and verify requests to all 10 endpoints with correct query params"/>
       <idea ac="AC3" description="Test type interfaces - verify TypeScript compilation succeeds with snake_case interfaces, test that camelCase references cause type errors"/>
       <idea ac="AC4" description="Test React components - verify components render correctly with snake_case props (meeting.meeting_name, race.race_number, entrant.runner_number)"/>
       <idea ac="AC5" description="Test fixtures migration - update all test fixtures from camelCase to snake_case, verify no fixture uses old field names"/>
-      <idea ac="AC6" description="Integration test - mock /api/meetings endpoint returning snake_case JSON, verify client correctly parses and displays data"/>
+      <idea ac="AC6" description="Integration test - mock all endpoints returning snake_case JSON, verify client correctly parses and displays data"/>
       <idea ac="AC7" description="End-to-end smoke test - start both server and client, verify meetings list loads, race details load, entrant data displays without console errors"/>
+      <idea ac="AC7" task="9" description="Test race pools display - verify pools section renders with data from /api/race-pools"/>
+      <idea ac="AC7" task="9" description="Test race results display - verify results section shows dividends from /api/race-results"/>
+      <idea ac="AC7" task="9" description="Test alert configs persistence - verify indicator changes saved via POST /api/user-alert-configs"/>
       <idea ac="AC8" description="Timezone test - verify ISO 8601 timestamps with Pacific/Auckland offset (+12:00 or +13:00) are correctly parsed by JavaScript Date"/>
     </ideas>
   </tests>
