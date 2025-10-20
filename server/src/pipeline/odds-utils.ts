@@ -12,10 +12,11 @@ export const resolveOddsEventTimestamp = (
 ): string => {
   const raceMeta = transformed.race
   if (raceMeta != null) {
-    // Create a timestamp at midnight NZ time for the race date
+    // Create a timestamp at midnight for the NZ race date without timezone offset
     // This ensures odds records go into the correct NZ day partition
-    // Using midnight ensures the date is preserved regardless of UTC conversion
-    return `${raceMeta.race_date_nz}T00:00:00+13:00` // NZST (UTC+13) or NZDT (UTC+13)
+    // The date is already in NZ timezone from the NZTAB API (race_date_nz field)
+    // We preserve it as-is to match the partition naming convention
+    return `${raceMeta.race_date_nz}T00:00:00.000Z`
   }
 
   const [firstMoneyFlowRecord] = transformed.moneyFlowRecords
@@ -37,6 +38,7 @@ export const buildOddsRecords = (
   const records: OddsRecord[] = []
 
   for (const entrant of transformed.entrants) {
+    // Fixed win odds
     if (
       entrant.fixed_win_odds !== undefined &&
       entrant.fixed_win_odds !== null
@@ -49,11 +51,38 @@ export const buildOddsRecords = (
       })
     }
 
+    // Fixed place odds
+    if (
+      entrant.fixed_place_odds !== undefined &&
+      entrant.fixed_place_odds !== null
+    ) {
+      records.push({
+        entrant_id: entrant.entrant_id,
+        odds: entrant.fixed_place_odds,
+        type: 'fixed_place',
+        event_timestamp: eventTimestamp,
+      })
+    }
+
+    // Pool win odds
     if (entrant.pool_win_odds !== undefined && entrant.pool_win_odds !== null) {
       records.push({
         entrant_id: entrant.entrant_id,
         odds: entrant.pool_win_odds,
         type: 'pool_win',
+        event_timestamp: eventTimestamp,
+      })
+    }
+
+    // Pool place odds
+    if (
+      entrant.pool_place_odds !== undefined &&
+      entrant.pool_place_odds !== null
+    ) {
+      records.push({
+        entrant_id: entrant.entrant_id,
+        odds: entrant.pool_place_odds,
+        type: 'pool_place',
         event_timestamp: eventTimestamp,
       })
     }

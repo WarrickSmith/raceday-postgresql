@@ -198,9 +198,10 @@ export const bulkUpsertRaces = async (
 
   for (const race of races) {
     // Combine race_date_nz and start_time_nz into start_time timestamp
-    // start_time_nz already includes timezone info (e.g., "15:59:00 NZDT")
-    // so we just need to combine date and time without adding extra timezone info
-    const startTime = `${race.race_date_nz}T${race.start_time_nz}`
+    // race_date_nz is NZ local date (e.g., "2025-10-20")
+    // start_time_nz is NZ local time WITHOUT timezone (e.g., "21:09:00")
+    // We combine them and let PostgreSQL know this is Pacific/Auckland time for conversion to UTC
+    const startTime = `${race.race_date_nz} ${race.start_time_nz}`
 
     valueRows.push(
       `($${String(paramIndex)}, $${String(paramIndex + 1)}, $${String(paramIndex + 2)}, $${String(paramIndex + 3)}, $${String(paramIndex + 4)}, $${String(paramIndex + 5)}, $${String(paramIndex + 6)}, $${String(paramIndex + 7)}, $${String(paramIndex + 8)}, $${String(paramIndex + 9)}, $${String(paramIndex + 10)}, $${String(paramIndex + 11)}, $${String(paramIndex + 12)}, $${String(paramIndex + 13)}, $${String(paramIndex + 14)}, $${String(paramIndex + 15)}, $${String(paramIndex + 16)}, $${String(paramIndex + 17)}, $${String(paramIndex + 18)}, $${String(paramIndex + 19)}, $${String(paramIndex + 20)}, $${String(paramIndex + 21)})`
@@ -234,12 +235,26 @@ export const bulkUpsertRaces = async (
   }
 
   // Multi-row UPSERT with IS DISTINCT FROM change detection (AC4)
+  // Note: $5 (start_time) is "YYYY-MM-DD HH:MM:SS" in NZ local time, needs timezone conversion
   const sql = `
     INSERT INTO races (
       race_id, meeting_id, name, race_number, start_time, status, race_date_nz, start_time_nz,
       actual_start, tote_start_time, distance, track_condition, track_surface, weather, type,
       total_prize_money, entrant_count, field_size, positions_paid, silk_url, silk_base_url, video_channels
-    ) VALUES ${valueRows.join(', ')}
+    )
+    SELECT
+      v.race_id::text, v.meeting_id::text, v.name::text, v.race_number::integer,
+      (v.start_time_local::timestamp AT TIME ZONE 'Pacific/Auckland')::timestamptz AS start_time,
+      v.status::text, v.race_date_nz::date, v.start_time_nz::time,
+      v.actual_start::timestamptz, v.tote_start_time::timestamptz, v.distance::integer,
+      v.track_condition::text, v.track_surface::text, v.weather::text, v.type::text,
+      v.total_prize_money::numeric(12,2), v.entrant_count::integer, v.field_size::integer,
+      v.positions_paid::integer, v.silk_url::text, v.silk_base_url::text, v.video_channels::text
+    FROM (VALUES ${valueRows.join(', ')}) AS v(
+      race_id, meeting_id, name, race_number, start_time_local, status, race_date_nz, start_time_nz,
+      actual_start, tote_start_time, distance, track_condition, track_surface, weather, type,
+      total_prize_money, entrant_count, field_size, positions_paid, silk_url, silk_base_url, video_channels
+    )
     ON CONFLICT (race_id) DO UPDATE SET
       meeting_id = EXCLUDED.meeting_id,
       name = EXCLUDED.name,

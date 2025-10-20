@@ -369,11 +369,11 @@ const normalizeRaceStatus = (
     'abandoned',
   ]
 
-  if (
-    typeof status === 'string' &&
-    (allowed as readonly string[]).includes(status)
-  ) {
-    return status as NormalizedRaceForUpsert['status']
+  if (typeof status === 'string') {
+    const normalized = status.toLowerCase()
+    if ((allowed as readonly string[]).includes(normalized)) {
+      return normalized as NormalizedRaceForUpsert['status']
+    }
   }
 
   return 'open'

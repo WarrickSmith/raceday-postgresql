@@ -17,9 +17,9 @@ const fetchUpcomingRaces = async (now: Date): Promise<RaceRow[]> => {
         start_time AS "startTime",
         status
       FROM races
-      WHERE status IN ('upcoming', 'open')
+      WHERE status IN ('upcoming', 'open', 'closed', 'interim')
         AND start_time IS NOT NULL
-        AND start_time > $1::timestamptz
+        AND start_time > ($1::timestamptz - INTERVAL '2 hours')
         AND start_time < ($1::timestamptz + INTERVAL '24 hours')
       ORDER BY start_time ASC
     `,
