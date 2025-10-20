@@ -92,7 +92,7 @@ const buildTransformedRace = (
 describe('resolveOddsEventTimestamp', () => {
   it('uses race metadata when available', () => {
     const timestamp = resolveOddsEventTimestamp(buildTransformedRace())
-    expect(timestamp).toBe('2025-10-14T00:00:00+13:00')
+    expect(timestamp).toBe('2025-10-14T00:00:00.000Z')
   })
 
   it('falls back to money flow polling timestamp when race metadata missing', () => {
@@ -120,20 +120,79 @@ describe('resolveOddsEventTimestamp', () => {
 })
 
 describe('buildOddsRecords', () => {
-  it('emits records for fixed and pool odds with resolved timestamp', () => {
+  it('emits records for all four odds types when available', () => {
+    const transformed = buildTransformedRace({
+      entrants: [
+        {
+          entrant_id: 'entrant-1',
+          race_id: 'race-1',
+          runner_number: 1,
+          name: 'Runner 1',
+          barrier: null,
+          is_scratched: false,
+          is_late_scratched: null,
+          fixed_win_odds: 2.5,
+          fixed_place_odds: 1.3,
+          pool_win_odds: 3.1,
+          pool_place_odds: 1.5,
+          hold_percentage: null,
+          bet_percentage: null,
+          win_pool_percentage: null,
+          place_pool_percentage: null,
+          win_pool_amount: null,
+          place_pool_amount: null,
+          jockey: null,
+          trainer_name: null,
+          silk_colours: null,
+          favourite: null,
+          mover: null,
+        },
+      ],
+    })
+
+    const records = buildOddsRecords(transformed)
+    expect(records).toEqual([
+      {
+        entrant_id: 'entrant-1',
+        odds: 2.5,
+        type: 'fixed_win',
+        event_timestamp: '2025-10-14T00:00:00.000Z',
+      },
+      {
+        entrant_id: 'entrant-1',
+        odds: 1.3,
+        type: 'fixed_place',
+        event_timestamp: '2025-10-14T00:00:00.000Z',
+      },
+      {
+        entrant_id: 'entrant-1',
+        odds: 3.1,
+        type: 'pool_win',
+        event_timestamp: '2025-10-14T00:00:00.000Z',
+      },
+      {
+        entrant_id: 'entrant-1',
+        odds: 1.5,
+        type: 'pool_place',
+        event_timestamp: '2025-10-14T00:00:00.000Z',
+      },
+    ])
+  })
+
+  it('emits only available odds types when some are null', () => {
     const records = buildOddsRecords(buildTransformedRace())
     expect(records).toEqual([
       {
         entrant_id: 'entrant-1',
         odds: 2.5,
         type: 'fixed_win',
-        event_timestamp: '2025-10-14T00:00:00+13:00',
+        event_timestamp: '2025-10-14T00:00:00.000Z',
       },
       {
         entrant_id: 'entrant-1',
         odds: 3.1,
         type: 'pool_win',
-        event_timestamp: '2025-10-14T00:00:00+13:00',
+        event_timestamp: '2025-10-14T00:00:00.000Z',
       },
     ])
   })

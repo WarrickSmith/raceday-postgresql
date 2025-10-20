@@ -49,13 +49,20 @@ const sampleRaceWithPools = (): RaceData => {
         favourite: false,
       },
     ],
-    pools: {
-      totalPool: 80000, // $80,000
-      winPool: 50000, // $50,000
-      placePool: 30000, // $30,000
-      holdPercentage: null,
-      betPercentage: null,
-    },
+    tote_pools: [
+      {
+        product_type: 'Win',
+        total: 50000, // $50,000 in dollars (race-pools.ts converts to cents)
+      },
+      {
+        product_type: 'Place',
+        total: 30000, // $30,000 in dollars
+      },
+      {
+        product_type: 'Quinella',
+        total: 15000, // $15,000 in dollars
+      },
+    ],
     meeting: {
       meeting: 'NZ-AKL-20251010',
       name: 'Auckland Thoroughbred',
@@ -237,13 +244,16 @@ describe('Transform Worker Integration (AC6, AC9, AC11)', () => {
           isScratched: false,
         },
       ],
-      pools: {
-        totalPool: 100000,
-        winPool: 60000,
-        placePool: 40000,
-        holdPercentage: null,
-        betPercentage: null,
-      },
+      tote_pools: [
+        {
+          product_type: 'Win',
+          total: 60000, // $60,000 in dollars
+        },
+        {
+          product_type: 'Place',
+          total: 40000, // $40,000 in dollars
+        },
+      ],
       money_tracker: {
         entrants: [
           {

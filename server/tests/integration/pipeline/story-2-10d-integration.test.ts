@@ -350,7 +350,7 @@ describe('Story 2.10D – Integration pipeline validation', () => {
       races: 1,
       entrants: 2,
       moneyFlowHistory: 2,
-      oddsHistory: 4,
+      oddsHistory: 8, // 2 entrants × 4 odds types (fixed_win, fixed_place, pool_win, pool_place)
       racePools: 1,
     })
     expect(result.timings.total_ms).toBeLessThan(2000)
@@ -430,7 +430,7 @@ describe('Story 2.10D – Integration pipeline validation', () => {
       'SELECT COUNT(*) as count FROM odds_history WHERE entrant_id = ANY($1::text[])',
       [fixtureEntrantIds]
     )
-    expect(oddsCount).toBe(4)
+    expect(oddsCount).toBe(8) // 2 entrants × 4 odds types (fixed_win, fixed_place, pool_win, pool_place)
 
     const moneyFlowPartitions = await pool.query<{ partition: string }>(
       `

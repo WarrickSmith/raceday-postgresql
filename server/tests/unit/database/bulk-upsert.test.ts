@@ -254,8 +254,8 @@ describe('bulk-upsert', () => {
       expect(sql).toContain('ON CONFLICT (race_id) DO UPDATE SET')
       expect(sql).toContain('IS DISTINCT FROM')
 
-      // Verify timestamp combination (without redundant :00Z since start_time_nz already includes timezone)
-      expect(values).toContain('2025-10-12T14:30')
+      // Verify timestamp combination (space separator for PostgreSQL timezone conversion)
+      expect(values).toContain('2025-10-12 14:30')
     })
 
     it('should include IS DISTINCT FROM for all race fields (AC4)', async () => {

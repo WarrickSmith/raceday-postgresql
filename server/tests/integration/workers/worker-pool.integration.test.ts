@@ -22,11 +22,16 @@ const sampleRace = (): RaceData => {
         runnerNumber: 2,
       },
     ],
-    pools: {
-      totalPool: 2000,
-      winPool: 1200,
-      placePool: 800,
-    },
+    tote_pools: [
+      {
+        product_type: 'Win',
+        total: 1200, // $1,200 in dollars
+      },
+      {
+        product_type: 'Place',
+        total: 800, // $800 in dollars
+      },
+    ],
     meeting: {
       meeting: 'meeting-int',
       name: 'Riccarton',

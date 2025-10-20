@@ -12,6 +12,7 @@ import {
 vi.mock('axios')
 vi.mock('../../src/shared/logger.js', () => ({
   logger: {
+    debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),

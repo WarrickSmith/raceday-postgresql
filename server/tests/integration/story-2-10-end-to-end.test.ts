@@ -318,12 +318,23 @@ describe.skip('Story 2.10 End-to-End Integration Tests', () => {
         meeting_id: raceData.meeting_id,
       },
 
-      entrants: raceData.entrants?.map(entrant => ({
-        entrant_id: entrant.entrantId,
-        race_id: raceData.id,
-        runner_number: entrant.runnerNumber,
-        name: entrant.name,
-        barrier: entrant.barrier,
+      entrants: raceData.entrants?.map(entrant => {
+        // Parse barrier to number (can be string like "Fr1" or number)
+        let barrier: number | null = null
+        if (typeof entrant.barrier === 'number') {
+          barrier = entrant.barrier
+        } else if (typeof entrant.barrier === 'string') {
+          const pattern = /\d+/
+          const match = pattern.exec(entrant.barrier)
+          barrier = match !== null ? parseInt(match[0], 10) : null
+        }
+
+        return {
+          entrant_id: entrant.entrantId,
+          race_id: raceData.id,
+          runner_number: entrant.runnerNumber,
+          name: entrant.name,
+          barrier,
         is_scratched: entrant.isScratched || false,
         is_late_scratched: entrant.isLateScratched,
         fixed_win_odds: entrant.fixedWinOdds,
@@ -341,7 +352,8 @@ describe.skip('Story 2.10 End-to-End Integration Tests', () => {
         silk_colours: entrant.silkColours,
         favourite: entrant.favourite,
         mover: entrant.mover,
-      })) || [],
+      }
+      }) || [],
 
       moneyFlowRecords: raceData.entrants?.map(entrant => {
         const moneyTracker = raceData.money_tracker?.entrants?.find(mt => mt.entrant_id === entrant.entrantId)

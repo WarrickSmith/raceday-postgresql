@@ -45,9 +45,9 @@ describe('Money Flow Calculation Utilities', () => {
 
     it('should handle scratched entrant with zero hold percentage (edge case)', () => {
       const poolData: PoolData = {
-        winPoolTotal: 100000,
-        placePoolTotal: 60000,
-        totalRacePool: 160000,
+        winPoolTotal: 100000, // $100,000
+        placePoolTotal: 60000, // $60,000
+        totalRacePool: 160000, // $160,000
       }
 
       const result = calculatePoolAmounts(0, poolData)
@@ -59,9 +59,9 @@ describe('Money Flow Calculation Utilities', () => {
 
     it('should round to nearest cent for precise calculations', () => {
       const poolData: PoolData = {
-        winPoolTotal: 33333.33,
-        placePoolTotal: 22222.22,
-        totalRacePool: 55555.55,
+        winPoolTotal: 33333.33, // $33,333.33
+        placePoolTotal: 22222.22, // $22,222.22
+        totalRacePool: 55555.55, // $55,555.55
       }
 
       const result = calculatePoolAmounts(10.5, poolData)
@@ -117,7 +117,7 @@ describe('Money Flow Calculation Utilities', () => {
 
       const poolData: PoolData = {
         winPoolTotal: 0, // Zero win pool
-        placePoolTotal: 30000,
+        placePoolTotal: 30000, // $30,000
         totalRacePool: 30000,
       }
 
@@ -135,7 +135,7 @@ describe('Money Flow Calculation Utilities', () => {
       }
 
       const poolData: PoolData = {
-        winPoolTotal: 50000,
+        winPoolTotal: 50000, // $50,000
         placePoolTotal: 0, // Zero place pool
         totalRacePool: 50000,
       }
@@ -173,8 +173,8 @@ describe('Money Flow Calculation Utilities', () => {
       }
 
       const poolData: PoolData = {
-        winPoolTotal: 50000,
-        placePoolTotal: 30000,
+        winPoolTotal: 50000, // $50,000
+        placePoolTotal: 30000, // $30,000
         totalRacePool: 80000,
       }
 
