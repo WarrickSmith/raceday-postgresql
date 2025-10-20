@@ -157,7 +157,7 @@ export const EntrantSchema = z
     entrantId: z.string(),
     name: z.string(),
     runnerNumber: z.number().int().positive(),
-    barrier: z.number().int().positive().optional().nullable(),
+    barrier: z.union([z.number().int().positive(), z.string()]).optional().nullable(),
     raceId: z.string().optional(),
     // Current odds - using legacy Appwrite field names (AC7)
     fixedWinOdds: z.number().optional().nullable(),
