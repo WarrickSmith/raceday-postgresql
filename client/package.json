@@ -12,11 +12,9 @@
     "test:ci": "jest --ci --coverage --watchAll=false"
   },
   "dependencies": {
-    "appwrite": "^18.2.0",
     "country-flag-icons": "^1.5.19",
     "dotenv": "^17.2.0",
     "next": "15.4.1",
-    "node-appwrite": "^17.2.0",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },
