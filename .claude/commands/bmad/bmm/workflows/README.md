@@ -46,17 +46,13 @@
 - Path: `bmad/bmm/workflows/2-plan-workflows/ux/workflow.yaml`
 - UX/UI specification workflow for defining user experience and interface design. Creates comprehensive UX documentation including wireframes, user flows, component specifications, and design system guidelines.
 
-**implementation-ready-check**
-- Path: `bmad/bmm/workflows/3-solutioning/implementation-ready-check/workflow.yaml`
+**architecture**
+- Path: `bmad/bmm/workflows/3-solutioning/architecture/workflow.yaml`
+- Collaborative architectural decision facilitation for AI-agent consistency. Replaces template-driven architecture with intelligent, adaptive conversation that produces a decision-focused architecture document optimized for preventing agent conflicts.
+
+**solutioning-gate-check**
+- Path: `bmad/bmm/workflows/3-solutioning/solutioning-gate-check/workflow.yaml`
 - Systematically validate that all planning and solutioning phases are complete and properly aligned before transitioning to Phase 4 implementation. Ensures PRD, architecture, and stories are cohesive with no gaps or contradictions.
-
-**tech-spec**
-- Path: `bmad/bmm/workflows/3-solutioning/tech-spec/workflow.yaml`
-- Generate a comprehensive Technical Specification from PRD and Architecture with acceptance criteria and traceability mapping
-
-**solution-architecture**
-- Path: `bmad/bmm/workflows/3-solutioning/workflow.yaml`
-- Scale-adaptive solution architecture generation with dynamic template sections. Replaces legacy HLA workflow with modern BMAD Core compliance.
 
 **correct-course**
 - Path: `bmad/bmm/workflows/4-implementation/correct-course/workflow.yaml`
@@ -69,6 +65,10 @@
 **dev-story**
 - Path: `bmad/bmm/workflows/4-implementation/dev-story/workflow.yaml`
 - Execute a story by implementing tasks/subtasks, writing tests, validating, and updating the story file per acceptance criteria
+
+**tech-spec**
+- Path: `bmad/bmm/workflows/4-implementation/epic-tech-context/workflow.yaml`
+- Generate a comprehensive Technical Specification from PRD and Architecture with acceptance criteria and traceability mapping
 
 **retrospective**
 - Path: `bmad/bmm/workflows/4-implementation/retrospective/workflow.yaml`
