@@ -12,7 +12,7 @@
 ## Current State
 
 **Current Phase:** 4-Implementation
-**Current Workflow:** story-approved (Story 2.10D) - Complete
+**Current Workflow:** story-context (Story 2.10E) - Complete
 **Overall Progress:** 81%
 
 ---
@@ -52,8 +52,8 @@
 - **Story ID:** 2.10E
 - **Story Title:** Client Application PostgreSQL Migration
 - **Story File:** `story-2.10E.md`
-- **Status:** Not created (needs drafting)
-- **Action:** SM should run `create-story` workflow to draft this story, then DEV can implement
+- **Status:** Ready (drafted and approved)
+- **Action:** DEV agent should run `dev-story` workflow to implement (recommended: run `story-context` first)
 
 ### TODO (Needs Drafting)
 
@@ -110,6 +110,9 @@
 
 ## Decision Log
 
+- **2025-10-21**: Completed story-context for Story 2.10E (Client Application PostgreSQL Migration). Context file: story-context-2.10E.xml. Comprehensive context includes: REST API endpoints documentation, type migration guide (camelCase→snake_case), ~13 API routes to update, HTTP client wrapper specification, testing strategy. Next: DEV agent should run dev-story to implement.
+- **2025-10-21**: Story 2.10E (Client Application PostgreSQL Migration) marked ready for development by SM agent. Story file: story-2.10E.md. Status: Ready. Architecture clarified: Client will use HTTP fetch to PostgreSQL REST API (not direct PostgreSQL client libraries). Next: Generate story context or start implementation.
+- **2025-10-21**: Story 2.10E (Client Application PostgreSQL Migration) drafted by SM agent. Story file: story-2.10E.md. Scope: Replace Appwrite SDK with fetch calls to PostgreSQL REST API, update all types to snake_case, migrate ~13 API routes and all React components. Status: Draft (needs review via story-ready).
 - **2025-10-19**: Story 2.10D (Integration & Performance Validation) approved and marked Done by DEV agent. All acceptance criteria met, review passed, 393 tests passing. Moved IN PROGRESS → DONE. Story 2.10E moved TODO → IN PROGRESS. Story 2.11 moved BACKLOG → TODO.
 - **2025-10-19**: Completed story-context for Story 2.10D (Integration & Performance Validation). Context file: story-context-2.10D.xml. Next: DEV agent should run dev-story to implement.
 - **2025-10-19**: Story 2.10D (Integration & Performance Validation) marked ready for development by SM agent. Moved from TODO → IN PROGRESS. Next: Generate story context or start development.
@@ -127,15 +130,19 @@
 
 ## Next Action Required
 
-**What to do next:** Draft Story 2.10E (Client Application PostgreSQL Migration)
+**What to do next:** Implement Story 2.10E (Client Application PostgreSQL Migration)
 
-**Command to run:** Load SM agent and run `create-story` workflow
+**Recommended:** Generate story context first for comprehensive implementation guidance
 
-**Agent to load:** bmad/bmm/agents/sm.md
+**Command to run (option 1):** Stay with SM agent and run `story-context` workflow to generate implementation context
 
-**Story to Create:** 2.10E - Client Application PostgreSQL Migration
+**Command to run (option 2):** Load DEV agent and run `dev-story` workflow to implement directly
 
-**Note:** Story 2.10E is now IN PROGRESS but needs to be drafted first before implementation can begin
+**Agent to load:** bmad/bmm/agents/dev.md (for implementation) or stay with SM (for context generation)
+
+**Story to Implement:** 2.10E - Client Application PostgreSQL Migration
+
+**Note:** Story 2.10E is drafted and ready for development. It removes Appwrite SDK and migrates client to use PostgreSQL REST API with snake_case field names
 
 ---
 
