@@ -1,0 +1,332 @@
+<story-context id="story-2.10E-context" v="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2.10E</storyId>
+    <title>Client Application PostgreSQL Migration</title>
+    <status>Ready</status>
+    <generatedAt>2025-10-21</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/stories/story-2.10E.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>the client application to consume data from the PostgreSQL REST API using snake_case field naming</iWant>
+    <soThat>the client can integrate with the new PostgreSQL backend without transformation overhead</soThat>
+    <tasks>
+      <task id="1">Remove Appwrite Dependencies (6 subtasks)</task>
+      <task id="2">Create HTTP Client Utility (5 subtasks)</task>
+      <task id="3">Update Type Interfaces to snake_case (6 subtasks)</task>
+      <task id="4">Replace API Layer with fetch calls (9 subtasks - ~13 files)</task>
+      <task id="5">Update React Components (6 subtasks)</task>
+      <task id="6">Update Test Suite (5 subtasks)</task>
+      <task id="7">Update Environment and Configuration (4 subtasks)</task>
+      <task id="8">Quality Assurance (7 subtasks)</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">Remove Appwrite Dependencies: Remove Appwrite SDK packages and related client library files</criterion>
+    <criterion id="AC2">Replace API Layer: Replace all Appwrite SDK calls with HTTP fetch calls to PostgreSQL REST API</criterion>
+    <criterion id="AC3">Update Type Interfaces: Update all TypeScript interfaces to use snake_case matching PostgreSQL schema</criterion>
+    <criterion id="AC4">Update Components: Update all React components to use snake_case props and state</criterion>
+    <criterion id="AC5">Update Tests: Update test suite (fixtures, mocks, assertions) to use snake_case</criterion>
+    <criterion id="AC6">No Runtime Errors: Application runs without field name mismatch errors</criterion>
+    <criterion id="AC7">Data Display: All UI components correctly display data from PostgreSQL API</criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/stories/story-2.10A.md</path>
+        <title>Story 2.10A: Code Quality Foundation</title>
+        <section>Implementation Notes</section>
+        <snippet>Server migrated to PostgreSQL snake_case conventions throughout. All server-side TypeScript interfaces use snake_case naming (meeting_id, race_number, fixed_win_odds, etc.). Client migration deferred to Story 2.10E.</snippet>
+      </doc>
+      <doc>
+        <path>docs/stories/story-2.10D.md</path>
+        <title>Story 2.10D: Integration & Performance Validation</title>
+        <section>Client Compatibility API Routes</section>
+        <snippet>REST API endpoints built: GET /api/meetings, GET /api/races, GET /api/entrants. All responses use snake_case field names. Timestamps returned in ISO 8601 format with Pacific/Auckland timezone offset (+12:00 NZST or +13:00 NZDT).</snippet>
+      </doc>
+      <doc>
+        <path>docs/tech-spec-epic-2.md</path>
+        <title>Technical Specification: Epic 2 - High-Performance Data Pipeline</title>
+        <section>Data Models and Contracts</section>
+        <snippet>PostgreSQL schema uses snake_case naming convention: meeting_id, meeting_name, race_type, race_number, start_time, runner_number, fixed_win_odds, fixed_place_odds, is_scratched. All database fields follow this convention.</snippet>
+      </doc>
+      <doc>
+        <path>docs/solution-architecture.md</path>
+        <title>Solution Architecture</title>
+        <section>Epic 2: High-Performance Data Pipeline / API Endpoints</section>
+        <snippet>Express REST API provides GET /api/meetings?date&raceType, GET /api/races?meetingId, GET /api/entrants?raceId. Three-tier architecture: Client → API → Database. No direct database connections from client.</snippet>
+      </doc>
+      <doc>
+        <path>docs/epics.md</path>
+        <title>Epic Index</title>
+        <section>Story 2.10E</section>
+        <snippet>Client application migrates from Appwrite camelCase to PostgreSQL snake_case. Estimated effort: Medium (2-4 hours, ~50 files). Key interfaces to update: RacePoolData, Race, Entrant, Meeting types. No transformation layer needed - direct field pass-through.</snippet>
+      </doc>
+    </docs>
+
+    <code>
+      <artifact>
+        <path>server/src/api/routes/client-compatibility.ts</path>
+        <kind>API Route</kind>
+        <symbol>clientCompatibilityRouter</symbol>
+        <lines>1-400</lines>
+        <reason>REST API endpoints that client will call. Returns snake_case JSON responses from PostgreSQL. Reference for API contract and response format.</reason>
+      </artifact>
+      <artifact>
+        <path>client/src/lib/appwrite-client.ts</path>
+        <kind>Client Library</kind>
+        <symbol>client, databases</symbol>
+        <lines>1-22</lines>
+        <reason>Current Appwrite client SDK wrapper. TO BE DELETED and replaced with HTTP fetch wrapper.</reason>
+      </artifact>
+      <artifact>
+        <path>client/src/lib/appwrite-server.ts</path>
+        <kind>Server Library</kind>
+        <symbol>createServerClient</symbol>
+        <lines>1-22</lines>
+        <reason>Current Appwrite server SDK wrapper. TO BE DELETED and replaced with HTTP fetch wrapper.</reason>
+      </artifact>
+      <artifact>
+        <path>client/src/types/meetings.ts</path>
+        <kind>Type Definitions</kind>
+        <symbol>Meeting, Race, Entrant</symbol>
+        <lines>1-150</lines>
+        <reason>Primary type definitions using Appwrite camelCase fields ($id, $createdAt, meetingId, raceNumber, etc.). Must be updated to PostgreSQL snake_case.</reason>
+      </artifact>
+      <artifact>
+        <path>client/src/types/racePools.ts</path>
+        <kind>Type Definitions</kind>
+        <symbol>RacePoolData, RaceResult, PoolDividend</symbol>
+        <lines>all</lines>
+        <reason>Race pools and results type definitions. Must be updated to snake_case to match PostgreSQL schema.</reason>
+      </artifact>
+      <artifact>
+        <path>client/src/types/moneyFlow.ts</path>
+        <kind>Type Definitions</kind>
+        <symbol>MoneyFlowHistory, EntrantMoneyFlowTimeline</symbol>
+        <lines>all</lines>
+        <reason>Money flow history type definitions. Must be updated to snake_case (hold_percentage, fixed_win_odds, etc.).</reason>
+      </artifact>
+      <artifact>
+        <path>client/src/app/api/meetings/[meetingId]/races/route.ts</path>
+        <kind>API Route</kind>
+        <symbol>GET</symbol>
+        <lines>1-87</lines>
+        <reason>Next.js API route using databases.listDocuments(). Must be replaced with fetch() call to server /api/races endpoint.</reason>
+      </artifact>
+      <artifact>
+        <path>client/src/app/api/race/[id]/route.ts</path>
+        <kind>API Route</kind>
+        <symbol>GET</symbol>
+        <lines>all</lines>
+        <reason>Race details API route using Appwrite SDK. Must be replaced with fetch() to server /api/entrants endpoint.</reason>
+      </artifact>
+      <artifact>
+        <path>client/package.json</path>
+        <kind>Dependencies</kind>
+        <symbol>dependencies, devDependencies</symbol>
+        <lines>14-22</lines>
+        <reason>Contains appwrite@^18.2.0 and node-appwrite@^17.2.0. These packages must be removed.</reason>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <node>
+        <current>
+          <package name="appwrite" version="^18.2.0" scope="production" action="REMOVE"/>
+          <package name="node-appwrite" version="^17.2.0" scope="production" action="REMOVE"/>
+          <package name="next" version="15.4.1" scope="production" action="KEEP"/>
+          <package name="react" version="19.1.0" scope="production" action="KEEP"/>
+          <package name="react-dom" version="19.1.0" scope="production" action="KEEP"/>
+          <package name="dotenv" version="^17.2.0" scope="production" action="KEEP"/>
+          <package name="typescript" version="^5" scope="development" action="KEEP"/>
+          <package name="eslint" version="^9" scope="development" action="KEEP"/>
+          <package name="jest" version="^29" scope="development" action="KEEP"/>
+          <package name="@testing-library/react" version="^16" scope="development" action="KEEP"/>
+          <package name="@testing-library/jest-dom" version="^6" scope="development" action="KEEP"/>
+        </current>
+        <recommended>
+          <package name="axios" version="^1.7.9" scope="production" action="OPTIONAL" reason="Alternative to fetch() for HTTP requests with better TypeScript support and interceptors"/>
+        </recommended>
+      </node>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint id="C1" category="Architecture">Client MUST use HTTP fetch/axios to call REST API endpoints. Direct PostgreSQL client connections are prohibited for security (would expose DB credentials in browser).</constraint>
+    <constraint id="C2" category="Field Naming">All TypeScript interfaces MUST use snake_case matching PostgreSQL schema: meeting_id, race_number, start_time, runner_number, fixed_win_odds, is_scratched, etc.</constraint>
+    <constraint id="C3" category="Appwrite Migration">Remove ALL Appwrite SDK dependencies (appwrite, node-appwrite packages). Delete client/src/lib/appwrite-client.ts and client/src/lib/appwrite-server.ts.</constraint>
+    <constraint id="C4" category="API Endpoints">Client MUST call server REST API at NEXT_PUBLIC_API_BASE_URL (default: http://localhost:3000): GET /api/meetings, GET /api/races, GET /api/entrants.</constraint>
+    <constraint id="C5" category="Timezone">Server returns ISO 8601 timestamps with Pacific/Auckland offset (+12:00 or +13:00). Client can parse with JavaScript Date() - no UTC conversion needed.</constraint>
+    <constraint id="C6" category="Code Quality">ES6 functional TypeScript only. Zero lint errors. Strict typing, no 'any' types. All tests must pass.</constraint>
+    <constraint id="C7" category="Backward Compatibility">API responses MUST maintain structure compatibility with previous Appwrite responses (same nested arrays, same field presence) but with snake_case naming.</constraint>
+    <constraint id="C8" category="Testing">Update ALL test fixtures to snake_case. Update ALL test mocks to return snake_case responses. Update ALL test assertions to expect snake_case fields.</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>GET /api/meetings</name>
+      <kind>REST endpoint</kind>
+      <signature>GET /api/meetings?date={YYYY-MM-DD}&raceType={thoroughbred|harness}</signature>
+      <path>server/src/api/routes/client-compatibility.ts</path>
+      <request>
+        <param name="date" type="string" format="YYYY-MM-DD" optional="true"/>
+        <param name="raceType" type="string" enum="thoroughbred,harness" optional="true"/>
+      </request>
+      <response>
+        <field name="meeting_id" type="string" example="NZ-Ellerslie-20251021"/>
+        <field name="meeting_name" type="string" example="Ellerslie"/>
+        <field name="country" type="string" example="NZ"/>
+        <field name="race_type" type="string" example="thoroughbred"/>
+        <field name="date" type="string" format="YYYY-MM-DD" example="2025-10-21"/>
+        <field name="status" type="string" example="active"/>
+      </response>
+    </interface>
+
+    <interface>
+      <name>GET /api/races</name>
+      <kind>REST endpoint</kind>
+      <signature>GET /api/races?meetingId={meeting_id}</signature>
+      <path>server/src/api/routes/client-compatibility.ts</path>
+      <request>
+        <param name="meetingId" type="string" required="true" example="NZ-Ellerslie-20251021"/>
+      </request>
+      <response>
+        <field name="race_id" type="string" example="NZ-Ellerslie-20251021-R1"/>
+        <field name="race_number" type="number" example="1"/>
+        <field name="name" type="string" example="Race 1"/>
+        <field name="start_time" type="string" format="ISO 8601 with NZ offset" example="2025-10-21T13:00:00.000+13:00"/>
+        <field name="meeting_id" type="string" example="NZ-Ellerslie-20251021"/>
+        <field name="status" type="string" example="open"/>
+        <field name="distance" type="number" optional="true" example="1600"/>
+      </response>
+    </interface>
+
+    <interface>
+      <name>GET /api/entrants</name>
+      <kind>REST endpoint</kind>
+      <signature>GET /api/entrants?raceId={race_id}</signature>
+      <path>server/src/api/routes/client-compatibility.ts</path>
+      <request>
+        <param name="raceId" type="string" required="true" example="NZ-Ellerslie-20251021-R1"/>
+      </request>
+      <response>
+        <field name="entrant_id" type="string" example="entrant-123"/>
+        <field name="runner_number" type="number" example="1"/>
+        <field name="name" type="string" example="Runner Name"/>
+        <field name="fixed_win_odds" type="number" nullable="true" example="3.5"/>
+        <field name="fixed_place_odds" type="number" nullable="true" example="1.8"/>
+        <field name="is_scratched" type="boolean" example="false"/>
+        <field name="race_id" type="string" example="NZ-Ellerslie-20251021-R1"/>
+        <field name="jockey" type="string" optional="true" example="J. Smith"/>
+        <field name="weight" type="number" optional="true" example="58.5"/>
+      </response>
+    </interface>
+
+    <interface>
+      <name>HTTP Client Wrapper (to be created)</name>
+      <kind>Utility Function</kind>
+      <signature>apiClient.get(endpoint: string, options?: RequestOptions): Promise&lt;T&gt;</signature>
+      <path>client/src/lib/api-client.ts (TO BE CREATED)</path>
+      <description>Replace Appwrite databases.listDocuments() with standard fetch() wrapper. Should handle: error handling, timeout (5-10s), retry logic for transient failures, AbortController for cancellation, response parsing, TypeScript generic types.</description>
+    </interface>
+
+    <interface>
+      <name>Meeting (snake_case)</name>
+      <kind>TypeScript Interface</kind>
+      <signature>interface Meeting { meeting_id: string; meeting_name: string; race_type: string; ... }</signature>
+      <path>client/src/types/meetings.ts</path>
+      <fields>
+        <field name="meeting_id" type="string" description="Primary key"/>
+        <field name="meeting_name" type="string" description="Display name"/>
+        <field name="country" type="string" description="Country code"/>
+        <field name="race_type" type="string" description="thoroughbred or harness"/>
+        <field name="date" type="string" description="Race date YYYY-MM-DD"/>
+        <field name="status" type="string" description="active, cancelled, etc."/>
+        <field name="created_at" type="string" description="ISO 8601 timestamp"/>
+        <field name="updated_at" type="string" description="ISO 8601 timestamp"/>
+      </fields>
+      <migration>
+        <old>$id, $createdAt, $updatedAt, meetingId, meetingName, raceType</old>
+        <new>meeting_id, meeting_name, race_type, created_at, updated_at</new>
+      </migration>
+    </interface>
+
+    <interface>
+      <name>Race (snake_case)</name>
+      <kind>TypeScript Interface</kind>
+      <signature>interface Race { race_id: string; race_number: number; start_time: string; ... }</signature>
+      <path>client/src/types/meetings.ts</path>
+      <fields>
+        <field name="race_id" type="string" description="Primary key"/>
+        <field name="race_number" type="number" description="Race number in meeting"/>
+        <field name="name" type="string" description="Race name"/>
+        <field name="start_time" type="string" description="ISO 8601 with NZ offset"/>
+        <field name="actual_start" type="string" nullable="true" description="Actual start time"/>
+        <field name="meeting_id" type="string" description="Foreign key"/>
+        <field name="status" type="string" description="open, closed, interim, final, abandoned"/>
+        <field name="distance" type="number" optional="true" description="Race distance in metres"/>
+        <field name="created_at" type="string"/>
+        <field name="updated_at" type="string"/>
+      </fields>
+      <migration>
+        <old>$id, raceId, raceNumber, startTime, actualStart, meeting (relationship)</old>
+        <new>race_id, race_number, start_time, actual_start, meeting_id</new>
+      </migration>
+    </interface>
+
+    <interface>
+      <name>Entrant (snake_case)</name>
+      <kind>TypeScript Interface</kind>
+      <signature>interface Entrant { entrant_id: string; runner_number: number; ... }</signature>
+      <path>client/src/types/meetings.ts</path>
+      <fields>
+        <field name="entrant_id" type="string" description="Primary key"/>
+        <field name="runner_number" type="number" description="Saddlecloth number"/>
+        <field name="name" type="string" description="Runner name"/>
+        <field name="fixed_win_odds" type="number" nullable="true" description="Current win odds"/>
+        <field name="fixed_place_odds" type="number" nullable="true" description="Current place odds"/>
+        <field name="is_scratched" type="boolean" description="Scratched status"/>
+        <field name="race_id" type="string" description="Foreign key"/>
+        <field name="jockey" type="string" optional="true"/>
+        <field name="trainer_name" type="string" optional="true"/>
+        <field name="weight" type="number" optional="true"/>
+        <field name="created_at" type="string"/>
+        <field name="updated_at" type="string"/>
+      </fields>
+      <migration>
+        <old>$id, entrantId, runnerNumber, winOdds, placeOdds, isScratched, race (relationship)</old>
+        <new>entrant_id, runner_number, fixed_win_odds, fixed_place_odds, is_scratched, race_id</new>
+      </migration>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Client uses Jest testing framework with @testing-library/react for component testing. ES6 functional TypeScript only. All tests must use strict typing with no 'any' types. Test files follow pattern: *.test.ts or *.test.tsx. Coverage is tracked with --coverage flag. Tests run with: npm run test (watch mode) or npm run test:ci (CI mode with coverage, no watch).
+    </standards>
+
+    <locations>
+      <location>client/src/**/*.test.ts</location>
+      <location>client/src/**/*.test.tsx</location>
+      <location>client/src/__tests__/**/*</location>
+      <location>client/src/services/__tests__/**/*</location>
+    </locations>
+
+    <ideas>
+      <idea ac="AC1" description="Test that Appwrite imports are removed - verify no import statements contain 'appwrite' or 'node-appwrite' in any source files"/>
+      <idea ac="AC2" description="Test HTTP client wrapper - mock fetch() and verify requests to /api/meetings, /api/races, /api/entrants with correct query params"/>
+      <idea ac="AC3" description="Test type interfaces - verify TypeScript compilation succeeds with snake_case interfaces, test that camelCase references cause type errors"/>
+      <idea ac="AC4" description="Test React components - verify components render correctly with snake_case props (meeting.meeting_name, race.race_number, entrant.runner_number)"/>
+      <idea ac="AC5" description="Test fixtures migration - update all test fixtures from camelCase to snake_case, verify no fixture uses old field names"/>
+      <idea ac="AC6" description="Integration test - mock /api/meetings endpoint returning snake_case JSON, verify client correctly parses and displays data"/>
+      <idea ac="AC7" description="End-to-end smoke test - start both server and client, verify meetings list loads, race details load, entrant data displays without console errors"/>
+      <idea ac="AC8" description="Timezone test - verify ISO 8601 timestamps with Pacific/Auckland offset (+12:00 or +13:00) are correctly parsed by JavaScript Date"/>
+    </ideas>
+  </tests>
+</story-context>

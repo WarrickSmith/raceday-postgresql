@@ -83,6 +83,7 @@ so that **the client can integrate with the new PostgreSQL backend without trans
   - [ ] Subtask 7.4: Update deployment configuration if needed
 
 - [ ] Task 8: Quality Assurance (AC: 6, 7)
+
   - [ ] Subtask 8.1: Run `npm run lint` - verify zero lint errors
   - [ ] Subtask 8.2: Run `npm run build` - verify successful build
   - [ ] Subtask 8.3: Run `npm run test -- --run` - verify all tests pass
@@ -90,6 +91,119 @@ so that **the client can integrate with the new PostgreSQL backend without trans
   - [ ] Subtask 8.5: Manual testing - verify all entrant data displays
   - [ ] Subtask 8.6: Manual testing - verify money flow and odds display
   - [ ] Subtask 8.7: Check browser console for field name errors
+
+- [ ] Task 9: Add Missing Server REST Endpoints (AC: 2, PREREQUISITE FOR TASKS 4-6)
+
+  - [ ] Subtask 9.1: Create database migration for `race_results` table
+
+    - [ ] **Reference**: `server-old/database-setup/src/database-setup.js:876-927` for Appwrite schema
+    - [ ] Add `race_results` table with fields matching Appwrite schema:
+      - `race_id` TEXT PRIMARY KEY REFERENCES races(race_id)
+      - `results_available` BOOLEAN DEFAULT FALSE
+      - `result_status` TEXT CHECK (result_status IN ('interim', 'final', 'protest'))
+      - `result_time` TIMESTAMPTZ
+      - `results_data` JSONB (stores array of race results, max 20KB in Appwrite)
+      - `dividends_data` JSONB (stores array of dividends, max 30KB in Appwrite)
+      - `fixed_odds_data` JSONB (stores fixed odds snapshot, max 20KB in Appwrite)
+      - `photo_finish` BOOLEAN DEFAULT FALSE
+      - `stewards_inquiry` BOOLEAN DEFAULT FALSE
+      - `protest_lodged` BOOLEAN DEFAULT FALSE
+      - `created_at` TIMESTAMPTZ DEFAULT NOW()
+      - `updated_at` TIMESTAMPTZ DEFAULT NOW()
+    - [ ] Add indexes: `idx_race_results_race_id` on race_id, `idx_race_results_status` on result_status
+    - [ ] Run migration to create table
+
+  - [ ] Subtask 9.2: Create database migration for `user_alert_configs` table
+
+    - [ ] **Reference**: `server-old/database-setup/src/database-setup.js:1416-1510` for Appwrite schema
+    - [ ] Add `user_alert_configs` table with fields matching Appwrite schema:
+      - `id` SERIAL PRIMARY KEY
+      - `user_id` TEXT NOT NULL (default: 'Default User')
+      - `indicator_type` TEXT NOT NULL (value: 'percentage_range')
+      - `percentage_range_min` NUMERIC(5,2) NOT NULL (values: 5, 10, 15, 20, 25, 50)
+      - `percentage_range_max` NUMERIC(5,2) (values: 10, 15, 20, 25, 50, null for 50%+)
+      - `color` TEXT NOT NULL (hex color code like '#888888', '#3B82F6')
+      - `is_default` BOOLEAN DEFAULT TRUE
+      - `enabled` BOOLEAN NOT NULL DEFAULT TRUE
+      - `display_order` INTEGER NOT NULL (values: 1-6)
+      - `audible_alerts_enabled` BOOLEAN DEFAULT TRUE
+      - `last_updated` TIMESTAMPTZ
+      - `created_at` TIMESTAMPTZ DEFAULT NOW()
+    - [ ] Add indexes: `idx_user_alert_user_id` on user_id, `idx_user_alert_indicator_type` on indicator_type, `idx_user_alert_display_order` on display_order
+    - [ ] Run migration to create table
+
+  - [ ] Subtask 9.3: Add `GET /api/race-pools` endpoint in server
+
+    - [ ] **Reference**: `server-old/enhanced-race-poller/src/database-utils.js:136-201` for pool extraction logic
+    - [ ] **Reference**: `server-old/enhanced-race-poller/src/database-utils.js:1004-1037` for Appwrite upsert
+    - [ ] Create route handler in `server/src/api/routes/client-compatibility.ts`
+    - [ ] Query `race_pools` table by `race_id` query parameter
+    - [ ] Return snake_case response: `{ race_id, win_pool_total, place_pool_total, quinella_pool_total, trifecta_pool_total, exacta_pool_total, first4_pool_total, currency, last_updated }`
+    - [ ] Add error handling for missing race_id or no pool data found
+
+  - [ ] Subtask 9.4: Add `GET /api/race-results` endpoint in server
+
+    - [ ] **Reference**: `server-old/enhanced-race-poller/src/main.js:1752-1810` for results data structure
+    - [ ] **Reference**: `client/src/app/api/race/[id]/route.ts:133-164` for Appwrite query pattern
+    - [ ] Create route handler in `server/src/api/routes/client-compatibility.ts`
+    - [ ] Query `race_results` table by `race_id` query parameter
+    - [ ] Parse JSONB fields (`results_data`, `dividends_data`, `fixed_odds_data`) to JSON
+    - [ ] Return snake_case response with all race results fields
+    - [ ] Add error handling for missing race_id or no results found
+
+  - [ ] Subtask 9.5: Add `GET /api/money-flow-timeline` endpoint in server
+
+    - [ ] **Reference**: `client/src/app/api/race/[id]/money-flow-timeline/route.ts:47-283` for complete query logic
+    - [ ] **Reference**: Client route implements bucketing, pool type filtering, and interval coverage - replicate in server
+    - [ ] Create route handler in `server/src/api/routes/client-compatibility.ts`
+    - [ ] Query `money_flow_history` partitioned table filtered by `race_id` and `entrant_id` array
+    - [ ] Support query parameters: `entrants` (comma-separated), `poolType` (win/place/odds), `limit`, `cursorAfter`, `createdAfter`
+    - [ ] Filter for bucketed data (`type='bucketed_aggregation'`, `time_interval` between -65 and +66)
+    - [ ] Fallback to legacy `time_to_start` data if no bucketed data exists
+    - [ ] Return snake_case response with interval coverage analysis matching client route structure
+
+  - [ ] Subtask 9.6: Add `GET /api/user-alert-configs` endpoint in server
+
+    - [ ] **Reference**: `client/src/app/api/user-alert-configs/route.ts:16-78` for GET logic
+    - [ ] **Reference**: `client/src/types/alerts.ts` for DEFAULT_INDICATORS structure
+    - [ ] Create route handler in `server/src/api/routes/client-compatibility.ts`
+    - [ ] Query `user_alert_configs` table filtered by `user_id` query parameter (default: 'Default User')
+    - [ ] Order by `display_order` ASC
+    - [ ] Return snake_case response: `{ user_id, indicators: [...], toggle_all, audible_alerts_enabled }`
+    - [ ] Create default indicators (6 indicators) if none exist for user - match DEFAULT_INDICATORS
+
+  - [ ] Subtask 9.7: Add `POST /api/user-alert-configs` endpoint in server
+
+    - [ ] **Reference**: `client/src/app/api/user-alert-configs/route.ts:84-143` for POST logic
+    - [ ] Create route handler in `server/src/api/routes/client-compatibility.ts`
+    - [ ] Accept request body: `{ user_id, indicators: [...], audible_alerts_enabled }`
+    - [ ] Upsert indicators (UPDATE existing by id, INSERT new without id using PostgreSQL INSERT...ON CONFLICT)
+    - [ ] Return success response
+
+  - [ ] Subtask 9.8: Add `GET /api/races/upcoming` endpoint in server
+
+    - [ ] **Reference**: `client/src/app/api/races/upcoming/route.ts:23-85` for complete query logic
+    - [ ] Create route handler in `server/src/api/routes/client-compatibility.ts`
+    - [ ] Query `races` table with time window filters
+    - [ ] Support query parameters: `windowMinutes` (default: 120), `lookbackMinutes` (default: 5), `limit` (default: 50, max: 100)
+    - [ ] Filter by `start_time` > (now - lookbackMinutes) AND `start_time` <= (now + windowMinutes)
+    - [ ] Exclude races with status 'abandoned', 'final', 'finalized' (use LOWER() for case-insensitive)
+    - [ ] Order by `start_time` ASC
+    - [ ] Return snake_case response with races array and window metadata matching client route structure
+
+  - [ ] Subtask 9.9: Add `GET /api/races/next-scheduled` endpoint in server
+
+    - [ ] **Reference**: `client/src/app/api/race/[id]/route.ts:383-389` for navigation query pattern
+    - [ ] Create route handler in `server/src/api/routes/client-compatibility.ts`
+    - [ ] Query `races` table for single next upcoming race
+    - [ ] Filter by `start_time` > NOW() and status NOT IN ('abandoned', 'final', 'finalized')
+    - [ ] Order by `start_time` ASC, limit 1
+    - [ ] Return snake_case response with single race object or null
+
+  - [ ] Subtask 9.10: Update server endpoint documentation
+    - [ ] Document all new endpoints in server README or API docs
+    - [ ] Include request/response examples for each endpoint
+    - [ ] Document query parameters, required fields, and error responses
 
 ## Dev Notes
 
@@ -218,14 +332,15 @@ GET /api/entrants?raceId=NZ-Ellerslie-20251021-R1
 **Completion Criteria:**
 
 1. Appwrite packages removed from `package.json`
-2. All TypeScript interfaces use snake_case field names
-3. All API calls use `fetch()` to PostgreSQL REST API endpoints
-4. All React components access snake_case properties
-5. Client test suite passes with zero failures (`npm run test -- --run`)
-6. Lint passes with zero errors (`npm run lint`)
-7. Build succeeds (`npm run build`)
-8. Application runs without field name errors
-9. All UI components display data correctly
+2. All PostgreSQL REST API endpoints implemented (Task 9)
+3. All TypeScript interfaces use snake_case field names
+4. All API calls use `fetch()` to PostgreSQL REST API endpoints
+5. All React components access snake_case properties
+6. Client test suite passes with zero failures (`npm run test -- --run`)
+7. Lint passes with zero errors (`npm run lint`)
+8. Build succeeds (`npm run build`)
+9. Application runs without field name errors
+10. All UI components display data correctly
 
 ### Project Structure Notes
 
@@ -332,6 +447,76 @@ GET /api/entrants?raceId=NZ-Ellerslie-20251021-R1
 - Expect initial compilation errors (field name mismatches)
 - Use TypeScript errors as migration checklist
 - Fix systematically: types → API layer → components → tests
+
+### Task 9: Server REST API Completion (CRITICAL PREREQUISITE)
+
+**Discovery Date**: 2025-10-21
+
+**Issue Identified**: During Story 2.10E implementation, the developer correctly identified that Story 2.10D only implemented **3 basic endpoints** (`/api/meetings`, `/api/races`, `/api/entrants`), but the legacy Next.js client application expects **10+ data contracts** spread across multiple API routes.
+
+**Root Cause**: Story 2.10D documentation claimed "REST API endpoints built" but did NOT implement the complete REST contract required by the client application. The client has 13+ API route files that proxy data from Appwrite to the frontend, each with specific data requirements.
+
+**Missing PostgreSQL REST Endpoints:**
+
+| Endpoint                                             | Client Route                                                | Database Table       | Status               |
+| ---------------------------------------------------- | ----------------------------------------------------------- | -------------------- | -------------------- |
+| `GET /api/race-pools?raceId=X`                       | `client/src/app/api/race/[id]/pools/route.ts`               | `race_pools`         | Table exists ✅      |
+| `GET /api/race-results?raceId=X`                     | `client/src/app/api/race/[id]/route.ts` (comprehensive)     | `race_results`       | **Table missing** ❌ |
+| `GET /api/money-flow-timeline?raceId=X&entrants=...` | `client/src/app/api/race/[id]/money-flow-timeline/route.ts` | `money_flow_history` | Table exists ✅      |
+| `GET /api/user-alert-configs?userId=X`               | `client/src/app/api/user-alert-configs/route.ts`            | `user_alert_configs` | **Table missing** ❌ |
+| `POST /api/user-alert-configs`                       | `client/src/app/api/user-alert-configs/route.ts`            | `user_alert_configs` | **Table missing** ❌ |
+| `GET /api/races/upcoming?windowMinutes=120`          | `client/src/app/api/races/upcoming/route.ts`                | `races`              | Table exists ✅      |
+| `GET /api/races/next-scheduled`                      | `client/src/app/api/next-scheduled-race/route.ts`           | `races`              | Table exists ✅      |
+
+**Implementation Strategy:**
+
+Task 9 **MUST be completed BEFORE** Tasks 4-6 (API Layer, Components, Tests) because:
+
+1. **Database Schema**: Subtasks 9.1-9.2 create required database tables (`race_results`, `user_alert_configs`)
+2. **Server Endpoints**: Subtasks 9.3-9.9 implement server REST endpoints that replace Appwrite SDK calls
+3. **Documentation**: Subtask 9.10 documents the complete REST API contract
+4. **Client Migration**: Tasks 4-6 depend on these endpoints to replace all Appwrite SDK calls
+
+**Server-Old Code References for Compatibility:**
+
+All Task 9 subtasks include **Reference** annotations pointing to:
+
+- `server-old/database-setup/src/database-setup.js` - Appwrite collection schemas
+- `server-old/enhanced-race-poller/src/database-utils.js` - Race pools extraction logic
+- `server-old/enhanced-race-poller/src/main.js` - Race results data structure
+- `client/src/app/api/**/route.ts` - Existing Next.js API routes with query patterns
+
+These references ensure **100% compatibility** between:
+
+1. Old Appwrite document schemas → New PostgreSQL table schemas
+2. Old Appwrite SDK queries → New PostgreSQL SQL queries
+3. Old response formats → New snake_case response formats
+
+**Technical Compatibility Notes:**
+
+1. **Race Results JSONB Fields**: Appwrite stored `resultsData`, `dividendsData`, `fixedOddsData` as strings (max 20KB-30KB). PostgreSQL uses JSONB for better query performance.
+
+2. **User Alert Configs**: Appwrite used 6 indicators per user (displayOrder 1-6) with default color scheme. PostgreSQL must maintain same structure for frontend compatibility.
+
+3. **Money Flow Timeline**: Client route implements complex bucketing logic (`type='bucketed_aggregation'`, `time_interval` -65 to +66) with interval coverage analysis. Server endpoint must replicate this exactly.
+
+4. **Pool Totals**: Server-old extracted pools from NZTAB `tote_pools` array and stored totals. Server must query existing `race_pools` table populated by current pipeline.
+
+**Why This Matters:**
+
+Without Task 9 completion, the developer implementing Tasks 4-6 will encounter:
+
+- ❌ 404 errors when client calls missing `/api/race-pools` endpoint
+- ❌ Database errors from missing `race_results` and `user_alert_configs` tables
+- ❌ Unable to test client changes without working server endpoints
+- ❌ Blocked on AC2, AC4 implementation (cannot replace Appwrite SDK calls)
+
+**Next Steps:**
+
+1. Developer should implement Task 9 subtasks 9.1-9.10 in sequence
+2. Test each endpoint with curl/Postman before proceeding to client migration
+3. Verify response formats match legacy Appwrite response shapes (converted to snake_case)
+4. Once Task 9 complete, proceed with Tasks 4-6 (client-side migration)
 
 ### Known Risks & Mitigations
 
@@ -499,7 +684,11 @@ NEXT_PUBLIC_API_KEY=optional-api-key
 
 ### Debug Log References
 
-<!-- Debug logs will be added during implementation -->
+- 2025-10-21: Task 1 (AC1) plan → remove Appwrite packages from `client/package.json`, regenerate `package-lock.json` via `npm install`, and delete legacy Appwrite client/server files plus `appwriteTypes` definitions.
+- 2025-10-21: Task 1 (AC1) actions → removed Appwrite packages, regenerated `client/package-lock.json`, and deleted Appwrite client/server helper files.
+- 2025-10-21: Task 2 (AC2) plan → build `api-client` fetch wrapper with base URL from env, query param helper, structured error logging, typed response helpers, and interceptor registration hooks.
+- 2025-10-21: Task 2 (AC2) actions → added `client/src/lib/api-client.ts` exposing typed request helpers, timeout handling, logging, query param support, and interceptor registration.
+- 2025-10-21: Task 3 (AC3) plan → replace camelCase interfaces in `client/src/types` with snake_case fields (meeting_id, race_number, fixed_win_odds, etc.) and propagate property updates through consuming modules.
 
 ### Completion Notes List
 
