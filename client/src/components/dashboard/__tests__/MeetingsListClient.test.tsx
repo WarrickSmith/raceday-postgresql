@@ -3,7 +3,7 @@ import { MeetingsListClient } from '../MeetingsListClient';
 import { RacesForMeetingClient } from '../RacesForMeetingClient';
 import { useMeetingsPolling, type ConnectionState } from '@/hooks/useMeetingsPolling';
 import { Meeting } from '@/types/meetings';
-import { RACE_TYPE_CODES } from '@/constants/raceTypes';
+import { RACE_TYPE_CODES } from '@/constants/race_types';
 
 // Mock the polling hook and Next.js navigation
 jest.mock('@/hooks/useMeetingsPolling');
@@ -41,25 +41,25 @@ describe('MeetingsListClient', () => {
       $id: '1',
       $createdAt: '2024-01-01T08:00:00Z',
       $updatedAt: '2024-01-01T08:00:00Z',
-      meetingId: 'meeting1',
-      meetingName: 'Flemington Race Meeting',
+      meeting_id: 'meeting1',
+      meeting_name: 'Flemington Race Meeting',
       country: 'AUS',
-      raceType: 'Thoroughbred Horse Racing',
+      race_type: 'Thoroughbred Horse Racing',
       category: RACE_TYPE_CODES.THOROUGHBRED,
       date: '2024-01-01',
-      firstRaceTime: '2024-01-01T10:00:00Z',
+      first_race_time: '2024-01-01T10:00:00Z',
     },
     {
       $id: '2',
       $createdAt: '2024-01-01T07:00:00Z',
       $updatedAt: '2024-01-01T07:00:00Z',
-      meetingId: 'meeting2',
-      meetingName: 'Addington Harness',
+      meeting_id: 'meeting2',
+      meeting_name: 'Addington Harness',
       country: 'NZ',
-      raceType: 'Harness Horse Racing',
+      race_type: 'Harness Horse Racing',
       category: RACE_TYPE_CODES.HARNESS,
       date: '2024-01-01',
-      firstRaceTime: '2024-01-01T09:00:00Z',
+      first_race_time: '2024-01-01T09:00:00Z',
     },
   ];
 
@@ -153,7 +153,7 @@ describe('MeetingsListClient', () => {
     const updatedMeetings: Meeting[] = [
       {
         ...mockMeetings[0],
-        meetingName: 'Flemington Race Meeting',
+        meeting_name: 'Flemington Race Meeting',
       },
       mockMeetings[1],
     ];
@@ -256,13 +256,13 @@ describe('MeetingsListClient', () => {
         $id: '3',
         $createdAt: '2024-01-01T06:00:00Z',
         $updatedAt: '2024-01-01T06:00:00Z',
-        meetingId: 'meeting3',
-        meetingName: 'New Meeting',
+        meeting_id: 'meeting3',
+        meeting_name: 'New Meeting',
         country: 'AUS',
-        raceType: 'Thoroughbred Horse Racing',
+        race_type: 'Thoroughbred Horse Racing',
         category: RACE_TYPE_CODES.THOROUGHBRED,
         date: '2024-01-01',
-        firstRaceTime: '2024-01-01T08:00:00Z',
+        first_race_time: '2024-01-01T08:00:00Z',
       },
     ];
 

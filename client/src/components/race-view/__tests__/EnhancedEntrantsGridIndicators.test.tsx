@@ -41,27 +41,27 @@ const { useRace } = jest.requireMock('@/contexts/RaceContext')
 const { useGridIndicators } = jest.requireMock('@/hooks/useGridIndicators')
 
 const buildTimeline = (
-  entrantId: string,
+  entrant_id: string,
   intervals: number[]
 ): EntrantMoneyFlowTimeline => ({
-  entrantId,
+  entrant_id,
   dataPoints: intervals.map((interval) => ({
-    $id: `${entrantId}-${interval}`,
+    $id: `${entrant_id}-${interval}`,
     $createdAt: '2024-01-01T00:00:00.000Z',
     $updatedAt: '2024-01-01T00:00:00.000Z',
-    entrant: entrantId,
-    pollingTimestamp: '2024-01-01T00:00:00.000Z',
-    timeToStart: interval,
-    timeInterval: interval,
+    entrant: entrant_id,
+    polling_timestamp: '2024-01-01T00:00:00.000Z',
+    time_to_start: interval,
+    time_interval: interval,
     winPoolAmount: 0,
     placePoolAmount: 0,
-    totalPoolAmount: 0,
-    poolPercentage: 0,
-    incrementalAmount: 0,
+    total_pool_amount: 0,
+    pool_percentage: 0,
+    incremental_amount: 0,
   })),
-  latestPercentage: 0,
+  latest_percentage: 0,
   trend: 'neutral',
-  significantChange: false,
+  significant_change: false,
 })
 
 describe('EnhancedEntrantsGrid timeline indicators', () => {
@@ -73,7 +73,7 @@ describe('EnhancedEntrantsGrid timeline indicators', () => {
     }
 
     const indicator: IndicatorResult = {
-      entrantId: 'entrant-1',
+      entrant_id: 'entrant-1',
       percentageChange: 30,
       indicatorType: '25-50%',
       color: '#FECACA',
@@ -84,8 +84,8 @@ describe('EnhancedEntrantsGrid timeline indicators', () => {
     useGridIndicators.mockReturnValue({
       getIndicatorForCell: jest
         .fn()
-        .mockImplementation((interval: number, entrantId: string) => {
-          if (interval === 55 && entrantId === 'entrant-1') {
+        .mockImplementation((interval: number, entrant_id: string) => {
+          if (interval === 55 && entrant_id === 'entrant-1') {
             return indicator
           }
           return null
@@ -97,7 +97,7 @@ describe('EnhancedEntrantsGrid timeline indicators', () => {
       raceData: {
         race: {
           $id: 'race-1',
-          startTime: new Date().toISOString(),
+          start_time: new Date().toISOString(),
           status: 'Open',
         },
         entrants: null,
@@ -118,9 +118,9 @@ describe('EnhancedEntrantsGrid timeline indicators', () => {
       getEntrantDataForInterval: jest.fn(),
       getWinPoolData: jest
         .fn()
-        .mockImplementation((entrantId: string, interval: number) => {
-          if (entrantId === 'entrant-1' && interval === 60) return '$120'
-          if (entrantId === 'entrant-1' && interval === 55) return '+$45'
+        .mockImplementation((entrant_id: string, interval: number) => {
+          if (entrant_id === 'entrant-1' && interval === 60) return '$120'
+          if (entrant_id === 'entrant-1' && interval === 55) return '+$45'
           return '—'
         }),
       getPlacePoolData: jest.fn(),
@@ -141,25 +141,25 @@ describe('EnhancedEntrantsGrid timeline indicators', () => {
       $id: 'entrant-1',
       $createdAt: '2024-01-01T00:00:00.000Z',
       $updatedAt: '2024-01-01T00:00:00.000Z',
-      entrantId: 'entrant-1',
+      entrant_id: 'entrant-1',
       name: 'Runner One',
-      runnerNumber: 1,
-      isScratched: false,
+      runner_number: 1,
+      is_scratched: false,
       race: 'race-1',
-      winOdds: 2.5,
-      placeOdds: 1.5,
-      moneyFlowTimeline: undefined,
-      poolMoney: undefined,
-      previousHoldPercentage: undefined,
-      holdPercentage: undefined,
-      moneyFlowTrend: undefined,
+      win_odds: 2.5,
+      place_odds: 1.5,
+      money_flow_timeline: undefined,
+      pool_money: undefined,
+      previous_hold_percentage: undefined,
+      hold_percentage: undefined,
+      money_flow_trend: undefined,
     }
 
     await act(async () => {
       render(
         <EnhancedEntrantsGrid
           initialEntrants={[entrant]}
-          raceId="race-1"
+          race_id="race-1"
           raceStartTime={new Date().toISOString()}
         />
       )
@@ -187,52 +187,52 @@ describe('EnhancedEntrantsGrid timeline indicators', () => {
         $id: 'entrant-10',
         $createdAt: '2024-01-01T00:00:00.000Z',
         $updatedAt: '2024-01-01T00:00:00.000Z',
-        entrantId: 'entrant-10',
+        entrant_id: 'entrant-10',
         name: 'Golden Arrow',
-        runnerNumber: 10,
-        isScratched: false,
+        runner_number: 10,
+        is_scratched: false,
         race: 'race-1',
-        winOdds: 2.1,
-        placeOdds: 1.4,
-        moneyFlowTimeline: undefined,
-        poolMoney: undefined,
-        previousHoldPercentage: undefined,
-        holdPercentage: undefined,
-        moneyFlowTrend: undefined,
+        win_odds: 2.1,
+        place_odds: 1.4,
+        money_flow_timeline: undefined,
+        pool_money: undefined,
+        previous_hold_percentage: undefined,
+        hold_percentage: undefined,
+        money_flow_trend: undefined,
       },
       {
         $id: 'entrant-05',
         $createdAt: '2024-01-01T00:00:00.000Z',
         $updatedAt: '2024-01-01T00:00:00.000Z',
-        entrantId: 'entrant-05',
+        entrant_id: 'entrant-05',
         name: 'Silver Storm',
-        runnerNumber: 5,
-        isScratched: false,
+        runner_number: 5,
+        is_scratched: false,
         race: 'race-1',
-        winOdds: 3.4,
-        placeOdds: 1.9,
-        moneyFlowTimeline: undefined,
-        poolMoney: undefined,
-        previousHoldPercentage: undefined,
-        holdPercentage: undefined,
-        moneyFlowTrend: undefined,
+        win_odds: 3.4,
+        place_odds: 1.9,
+        money_flow_timeline: undefined,
+        pool_money: undefined,
+        previous_hold_percentage: undefined,
+        hold_percentage: undefined,
+        money_flow_trend: undefined,
       },
       {
         $id: 'entrant-02',
         $createdAt: '2024-01-01T00:00:00.000Z',
         $updatedAt: '2024-01-01T00:00:00.000Z',
-        entrantId: 'entrant-02',
+        entrant_id: 'entrant-02',
         name: 'Bronze Bandit',
-        runnerNumber: 2,
-        isScratched: false,
+        runner_number: 2,
+        is_scratched: false,
         race: 'race-1',
-        winOdds: 4.8,
-        placeOdds: 2.5,
-        moneyFlowTimeline: undefined,
-        poolMoney: undefined,
-        previousHoldPercentage: undefined,
-        holdPercentage: undefined,
-        moneyFlowTrend: undefined,
+        win_odds: 4.8,
+        place_odds: 2.5,
+        money_flow_timeline: undefined,
+        pool_money: undefined,
+        previous_hold_percentage: undefined,
+        hold_percentage: undefined,
+        money_flow_trend: undefined,
       },
     ]
 
@@ -240,13 +240,13 @@ describe('EnhancedEntrantsGrid timeline indicators', () => {
       raceData: {
         race: {
           $id: 'race-1',
-          startTime: new Date().toISOString(),
+          start_time: new Date().toISOString(),
           status: 'final',
-          resultStatus: 'final',
-          resultsData: [
-            { position: 1, runnerNumber: 10, runnerName: 'Golden Arrow' },
-            { position: 2, runnerNumber: 5, runnerName: 'Silver Storm' },
-            { position: 3, runnerNumber: 2, runnerName: 'Bronze Bandit' },
+          result_status: 'final',
+          results_data: [
+            { position: 1, runner_number: 10, runnerName: 'Golden Arrow' },
+            { position: 2, runner_number: 5, runnerName: 'Silver Storm' },
+            { position: 3, runner_number: 2, runnerName: 'Bronze Bandit' },
           ],
         },
         entrants,
@@ -258,14 +258,14 @@ describe('EnhancedEntrantsGrid timeline indicators', () => {
       render(
         <EnhancedEntrantsGrid
           initialEntrants={entrants}
-          raceId="race-1"
+          race_id="race-1"
           raceStartTime={new Date().toISOString()}
-          resultsData={[
-            { position: 1, runnerNumber: 10, runnerName: 'Golden Arrow' },
-            { position: 2, runnerNumber: 5, runnerName: 'Silver Storm' },
-            { position: 3, runnerNumber: 2, runnerName: 'Bronze Bandit' },
+          results_data={[
+            { position: 1, runner_number: 10, runnerName: 'Golden Arrow' },
+            { position: 2, runner_number: 5, runnerName: 'Silver Storm' },
+            { position: 3, runner_number: 2, runnerName: 'Bronze Bandit' },
           ]}
-          resultStatus="final"
+          result_status="final"
         />
       )
     })
@@ -281,8 +281,8 @@ describe('EnhancedEntrantsGrid timeline indicators', () => {
     expect(firstPlaceCell.className).toMatch(/bg-amber-100/)
     expect(firstPlaceCell.getAttribute('title')).toBe('1st place')
 
-    const runnerNumberElement = firstPlaceCell.querySelector('span.text-lg')
-    expect(runnerNumberElement?.className).toMatch(/text-amber-900/)
+    const runner_numberElement = firstPlaceCell.querySelector('span.text-lg')
+    expect(runner_numberElement?.className).toMatch(/text-amber-900/)
 
     const srOnlyElement = firstPlaceCell.querySelector('.sr-only')
     expect(srOnlyElement).toHaveTextContent('Finished first place')
@@ -302,35 +302,35 @@ describe('EnhancedEntrantsGrid timeline indicators', () => {
         $id: 'entrant-07',
         $createdAt: '2024-01-01T00:00:00.000Z',
         $updatedAt: '2024-01-01T00:00:00.000Z',
-        entrantId: 'entrant-07',
+        entrant_id: 'entrant-07',
         name: 'Swift Winner',
-        runnerNumber: 7,
-        isScratched: false,
+        runner_number: 7,
+        is_scratched: false,
         race: 'race-1',
-        winOdds: 1.8,
-        placeOdds: 1.2,
-        moneyFlowTimeline: undefined,
-        poolMoney: undefined,
-        previousHoldPercentage: undefined,
-        holdPercentage: undefined,
-        moneyFlowTrend: undefined,
+        win_odds: 1.8,
+        place_odds: 1.2,
+        money_flow_timeline: undefined,
+        pool_money: undefined,
+        previous_hold_percentage: undefined,
+        hold_percentage: undefined,
+        money_flow_trend: undefined,
       },
       {
         $id: 'entrant-12',
         $createdAt: '2024-01-01T00:00:00.000Z',
         $updatedAt: '2024-01-01T00:00:00.000Z',
-        entrantId: 'entrant-12',
+        entrant_id: 'entrant-12',
         name: 'Second Place',
-        runnerNumber: 12,
-        isScratched: false,
+        runner_number: 12,
+        is_scratched: false,
         race: 'race-1',
-        winOdds: 3.2,
-        placeOdds: 1.7,
-        moneyFlowTimeline: undefined,
-        poolMoney: undefined,
-        previousHoldPercentage: undefined,
-        holdPercentage: undefined,
-        moneyFlowTrend: undefined,
+        win_odds: 3.2,
+        place_odds: 1.7,
+        money_flow_timeline: undefined,
+        pool_money: undefined,
+        previous_hold_percentage: undefined,
+        hold_percentage: undefined,
+        money_flow_trend: undefined,
       },
     ]
 
@@ -338,10 +338,10 @@ describe('EnhancedEntrantsGrid timeline indicators', () => {
       raceData: {
         race: {
           $id: 'race-1',
-          startTime: new Date().toISOString(),
+          start_time: new Date().toISOString(),
           status: 'interim',
-          resultStatus: 'interim',
-          resultsData: null, // No results in race context - only via props
+          result_status: 'interim',
+          results_data: null, // No results in race context - only via props
         },
         entrants,
         meeting: null,
@@ -352,12 +352,12 @@ describe('EnhancedEntrantsGrid timeline indicators', () => {
       render(
         <EnhancedEntrantsGrid
           initialEntrants={entrants}
-          raceId="race-1"
+          race_id="race-1"
           raceStartTime={new Date().toISOString()}
-          resultsData={[
-            { position: 1, runnerNumber: 7, runnerName: 'Swift Winner' }
+          results_data={[
+            { position: 1, runner_number: 7, runnerName: 'Swift Winner' }
           ]}
-          resultStatus="interim"
+          result_status="interim"
         />
       )
     })

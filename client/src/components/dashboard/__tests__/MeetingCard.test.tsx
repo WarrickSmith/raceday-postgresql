@@ -1,20 +1,20 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { MeetingCard } from '../MeetingCard';
 import { Meeting } from '@/types/meetings';
-import { RACE_TYPE_CODES } from '@/constants/raceTypes';
+import { RACE_TYPE_CODES } from '@/constants/race_types';
 
 describe('MeetingCard', () => {
   const mockMeeting: Meeting = {
     $id: '1',
     $createdAt: '2024-01-01T08:00:00Z',
     $updatedAt: '2024-01-01T08:00:00Z',
-    meetingId: 'meeting1',
-    meetingName: 'Flemington Race Meeting',
+    meeting_id: 'meeting1',
+    meeting_name: 'Flemington Race Meeting',
     country: 'AUS',
-    raceType: 'Thoroughbred Horse Racing',
+    race_type: 'Thoroughbred Horse Racing',
     category: RACE_TYPE_CODES.THOROUGHBRED,
     date: '2024-01-01',
-    firstRaceTime: '2024-01-01T10:00:00Z',
+    first_race_time: '2024-01-01T10:00:00Z',
   };
 
   beforeEach(() => {
@@ -36,7 +36,7 @@ describe('MeetingCard', () => {
 
     expect(screen.getByText('Flemington Race Meeting')).toBeInTheDocument();
     expect(screen.getByText('THROUGHBRED')).toBeInTheDocument();
-    // meetingId is no longer displayed as per Task 1 requirements
+    // meeting_id is no longer displayed as per Task 1 requirements
 
     // Wait for async status to load
     await waitFor(() => {
@@ -70,7 +70,7 @@ describe('MeetingCard', () => {
   it('should show upcoming status for future races', async () => {
     const futureMeeting = {
       ...mockMeeting,
-      firstRaceTime: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
+      first_race_time: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
     };
     
     render(<MeetingCard meeting={futureMeeting} />);
@@ -84,7 +84,7 @@ describe('MeetingCard', () => {
   it('should show live status for current races', async () => {
     const liveMeeting = {
       ...mockMeeting,
-      firstRaceTime: new Date(Date.now() - 1800000).toISOString(), // 30 minutes ago
+      first_race_time: new Date(Date.now() - 1800000).toISOString(), // 30 minutes ago
     };
     
     render(<MeetingCard meeting={liveMeeting} />);
@@ -95,7 +95,7 @@ describe('MeetingCard', () => {
   });
 
   it('should handle missing first race time gracefully', async () => {
-    const meetingWithoutRaceTime = { ...mockMeeting, firstRaceTime: undefined };
+    const meetingWithoutRaceTime = { ...mockMeeting, first_race_time: undefined };
     
     render(<MeetingCard meeting={meetingWithoutRaceTime} />);
     
@@ -108,7 +108,7 @@ describe('MeetingCard', () => {
   it('should display race type correctly for Harness racing', async () => {
     const harnessMeeting = { 
       ...mockMeeting, 
-      raceType: 'Harness Horse Racing', 
+      race_type: 'Harness Horse Racing', 
       category: RACE_TYPE_CODES.HARNESS 
     };
     
@@ -140,7 +140,7 @@ describe('MeetingCard', () => {
   it('should truncate long meeting names', async () => {
     const longNameMeeting = {
       ...mockMeeting,
-      meetingName: 'Very Long Meeting Name That Should Be Truncated For Display Purposes',
+      meeting_name: 'Very Long Meeting Name That Should Be Truncated For Display Purposes',
     };
     
     render(<MeetingCard meeting={longNameMeeting} />);
@@ -230,7 +230,7 @@ describe('MeetingCard', () => {
   it('should display track condition when available', async () => {
     const meetingWithTrack = {
       ...mockMeeting,
-      trackCondition: 'Good',
+      track_condition: 'Good',
     };
     
     render(<MeetingCard meeting={meetingWithTrack} />);

@@ -2,20 +2,20 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { axe } from 'jest-axe';
 import { MeetingCard } from '../MeetingCard';
 import { Meeting } from '@/types/meetings';
-import { RACE_TYPE_CODES } from '@/constants/raceTypes';
+import { RACE_TYPE_CODES } from '@/constants/race_types';
 
 describe('MeetingCard Accessibility Tests', () => {
   const mockMeeting: Meeting = {
     $id: '1',
     $createdAt: '2024-01-01T08:00:00Z',
     $updatedAt: '2024-01-01T08:00:00Z',
-    meetingId: 'meeting1',
-    meetingName: 'Flemington Race Meeting',
+    meeting_id: 'meeting1',
+    meeting_name: 'Flemington Race Meeting',
     country: 'AUS',
-    raceType: 'Thoroughbred Horse Racing',
+    race_type: 'Thoroughbred Horse Racing',
     category: RACE_TYPE_CODES.THOROUGHBRED,
     date: '2024-01-01',
-    firstRaceTime: '2024-01-01T10:00:00Z',
+    first_race_time: '2024-01-01T10:00:00Z',
   };
 
   // Mock the meeting completion status API
@@ -156,7 +156,7 @@ describe('MeetingCard Accessibility Tests', () => {
   it('should handle missing optional data gracefully', async () => {
     const incompleteEvent: Meeting = {
       ...mockMeeting,
-      firstRaceTime: undefined,
+      first_race_time: undefined,
     };
     
     const { container } = render(<MeetingCard meeting={incompleteEvent} />);

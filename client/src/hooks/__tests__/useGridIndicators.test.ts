@@ -5,24 +5,24 @@ import type { EntrantMoneyFlowTimeline } from '@/types/moneyFlow'
 import { DEFAULT_INDICATORS } from '@/types/alerts'
 
 type PartialEntrant =
-  Pick<Entrant, '$id' | 'entrantId' | 'name' | 'runnerNumber' | 'isScratched'> &
+  Pick<Entrant, '$id' | 'entrant_id' | 'name' | 'runner_number' | 'is_scratched'> &
   Partial<Pick<Entrant, '$createdAt' | '$updatedAt'>>
 
 const buildEntrant = (overrides: PartialEntrant): Entrant => ({
   $createdAt: overrides.$createdAt ?? '2024-01-01T00:00:00.000Z',
   $updatedAt: overrides.$updatedAt ?? '2024-01-01T00:00:00.000Z',
   jockey: undefined,
-  trainerName: undefined,
+  trainer_name: undefined,
   weight: undefined,
-  silkUrl: undefined,
-  silkColours: undefined,
-  silkUrl64: undefined,
-  silkUrl128: undefined,
+  silk_url: undefined,
+  silk_colours: undefined,
+  silk_url_64: undefined,
+  silk_url_128: undefined,
   race: 'race-id',
-  entrantId: overrides.entrantId,
+  entrant_id: overrides.entrant_id,
   name: overrides.name,
-  runnerNumber: overrides.runnerNumber,
-  isScratched: overrides.isScratched,
+  runner_number: overrides.runner_number,
+  is_scratched: overrides.is_scratched,
   $id: overrides.$id,
 }) as Entrant
 
@@ -30,7 +30,7 @@ const indicatorConfigs: IndicatorConfig[] = DEFAULT_INDICATORS.map((indicator, i
   ...indicator,
   $id: `indicator-${index}`,
   userId: 'test-user',
-  lastUpdated: '2024-01-01T00:00:00.000Z',
+  last_updated: '2024-01-01T00:00:00.000Z',
   createdAt: '2024-01-01T00:00:00.000Z',
 }))
 
@@ -43,31 +43,31 @@ const createTimelinePoint = (
   $createdAt: '2024-01-01T00:00:00.000Z',
   $updatedAt: '2024-01-01T00:00:00.000Z',
   entrant,
-  pollingTimestamp: '2024-01-01T00:00:00.000Z',
-  timeToStart: interval,
-  timeInterval: interval,
+  polling_timestamp: '2024-01-01T00:00:00.000Z',
+  time_to_start: interval,
+  time_interval: interval,
   winPoolAmount: 0,
   placePoolAmount: 0,
-  totalPoolAmount: 0,
-  poolPercentage: 0,
-  incrementalAmount: values.incrementalWinAmount ?? 0,
-  incrementalWinAmount: values.incrementalWinAmount ?? 0,
-  incrementalPlaceAmount: values.incrementalPlaceAmount ?? 0,
-  fixedWinOdds: values.fixedWinOdds,
-  fixedPlaceOdds: values.fixedPlaceOdds,
-  poolWinOdds: values.poolWinOdds,
-  poolPlaceOdds: values.poolPlaceOdds,
+  total_pool_amount: 0,
+  pool_percentage: 0,
+  incremental_amount: values.incremental_win_amount ?? 0,
+  incremental_win_amount: values.incremental_win_amount ?? 0,
+  incremental_place_amount: values.incremental_place_amount ?? 0,
+  fixed_win_odds: values.fixed_win_odds,
+  fixed_place_odds: values.fixed_place_odds,
+  pool_win_odds: values.pool_win_odds,
+  pool_place_odds: values.pool_place_odds,
 })
 
 const buildTimeline = (
-  entrantId: string,
+  entrant_id: string,
   dataPoints: EntrantMoneyFlowTimeline['dataPoints']
 ): EntrantMoneyFlowTimeline => ({
-  entrantId,
+  entrant_id,
   dataPoints,
-  latestPercentage: 0,
+  latest_percentage: 0,
   trend: 'neutral',
-  significantChange: false,
+  significant_change: false,
 })
 
 describe('computeIndicatorMatrix', () => {
@@ -75,17 +75,17 @@ describe('computeIndicatorMatrix', () => {
     const entrants: Entrant[] = [
       buildEntrant({
         $id: 'a',
-        entrantId: 'a',
+        entrant_id: 'a',
         name: 'Runner A',
-        runnerNumber: 1,
-        isScratched: false,
+        runner_number: 1,
+        is_scratched: false,
       }),
       buildEntrant({
         $id: 'b',
-        entrantId: 'b',
+        entrant_id: 'b',
         name: 'Runner B',
-        runnerNumber: 2,
-        isScratched: false,
+        runner_number: 2,
+        is_scratched: false,
       }),
     ]
 
@@ -93,15 +93,15 @@ describe('computeIndicatorMatrix', () => {
       [
         'a',
         buildTimeline('a', [
-          createTimelinePoint('a', 60, { incrementalWinAmount: 100 }),
-          createTimelinePoint('a', 55, { incrementalWinAmount: 200 }),
+          createTimelinePoint('a', 60, { incremental_win_amount: 100 }),
+          createTimelinePoint('a', 55, { incremental_win_amount: 200 }),
         ]),
       ],
       [
         'b',
         buildTimeline('b', [
-          createTimelinePoint('b', 60, { incrementalWinAmount: 100 }),
-          createTimelinePoint('b', 55, { incrementalWinAmount: 50 }),
+          createTimelinePoint('b', 60, { incremental_win_amount: 100 }),
+          createTimelinePoint('b', 55, { incremental_win_amount: 50 }),
         ]),
       ],
     ])
@@ -117,7 +117,7 @@ describe('computeIndicatorMatrix', () => {
     const intervalIndicators = matrix.get(55)
 
     expect(intervalIndicators?.get('a')).toMatchObject({
-      entrantId: 'a',
+      entrant_id: 'a',
       indicatorType: '25-50%',
     })
     expect(intervalIndicators?.get('a')?.percentageChange).toBeCloseTo(30, 3)
@@ -129,17 +129,17 @@ describe('computeIndicatorMatrix', () => {
     const entrants: Entrant[] = [
       buildEntrant({
         $id: 'a',
-        entrantId: 'a',
+        entrant_id: 'a',
         name: 'Runner A',
-        runnerNumber: 1,
-        isScratched: false,
+        runner_number: 1,
+        is_scratched: false,
       }),
       buildEntrant({
         $id: 'b',
-        entrantId: 'b',
+        entrant_id: 'b',
         name: 'Runner B',
-        runnerNumber: 2,
-        isScratched: false,
+        runner_number: 2,
+        is_scratched: false,
       }),
     ]
 
@@ -147,15 +147,15 @@ describe('computeIndicatorMatrix', () => {
       [
         'a',
         buildTimeline('a', [
-          createTimelinePoint('a', 60, { incrementalPlaceAmount: 40 }),
-          createTimelinePoint('a', 55, { incrementalPlaceAmount: 90 }),
+          createTimelinePoint('a', 60, { incremental_place_amount: 40 }),
+          createTimelinePoint('a', 55, { incremental_place_amount: 90 }),
         ]),
       ],
       [
         'b',
         buildTimeline('b', [
-          createTimelinePoint('b', 60, { incrementalPlaceAmount: 40 }),
-          createTimelinePoint('b', 55, { incrementalPlaceAmount: 10 }),
+          createTimelinePoint('b', 60, { incremental_place_amount: 40 }),
+          createTimelinePoint('b', 55, { incremental_place_amount: 10 }),
         ]),
       ],
     ])
@@ -178,24 +178,24 @@ describe('computeIndicatorMatrix', () => {
     const entrants: Entrant[] = [
       buildEntrant({
         $id: 'a',
-        entrantId: 'a',
+        entrant_id: 'a',
         name: 'Runner A',
-        runnerNumber: 1,
-        isScratched: false,
+        runner_number: 1,
+        is_scratched: false,
       }),
       buildEntrant({
         $id: 'b',
-        entrantId: 'b',
+        entrant_id: 'b',
         name: 'Runner B',
-        runnerNumber: 2,
-        isScratched: false,
+        runner_number: 2,
+        is_scratched: false,
       }),
       buildEntrant({
         $id: 'c',
-        entrantId: 'c',
+        entrant_id: 'c',
         name: 'Runner C',
-        runnerNumber: 3,
-        isScratched: true,
+        runner_number: 3,
+        is_scratched: true,
       }),
     ]
 
@@ -203,22 +203,22 @@ describe('computeIndicatorMatrix', () => {
       [
         'a',
         buildTimeline('a', [
-          createTimelinePoint('a', 60, { fixedWinOdds: 12 }),
-          createTimelinePoint('a', 55, { fixedWinOdds: 6 }),
+          createTimelinePoint('a', 60, { fixed_win_odds: 12 }),
+          createTimelinePoint('a', 55, { fixed_win_odds: 6 }),
         ]),
       ],
       [
         'b',
         buildTimeline('b', [
-          createTimelinePoint('b', 60, { fixedWinOdds: 5 }),
-          createTimelinePoint('b', 55, { fixedWinOdds: 5 }),
+          createTimelinePoint('b', 60, { fixed_win_odds: 5 }),
+          createTimelinePoint('b', 55, { fixed_win_odds: 5 }),
         ]),
       ],
       [
         'c',
         buildTimeline('c', [
-          createTimelinePoint('c', 60, { fixedWinOdds: 10 }),
-          createTimelinePoint('c', 55, { fixedWinOdds: 2 }),
+          createTimelinePoint('c', 60, { fixed_win_odds: 10 }),
+          createTimelinePoint('c', 55, { fixed_win_odds: 2 }),
         ]),
       ],
     ])

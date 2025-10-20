@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { MeetingCard } from '../MeetingCard';
 import { Meeting } from '@/types/meetings';
-import { RACE_TYPE_CODES } from '@/constants/raceTypes';
+import { RACE_TYPE_CODES } from '@/constants/race_types';
 
 type MeetingStatusResponseBody = { isCompleted: boolean };
 
@@ -25,13 +25,13 @@ describe('MeetingCard Integration Tests', () => {
     $id: '1',
     $createdAt: '2024-01-01T08:00:00Z',
     $updatedAt: '2024-01-01T08:00:00Z',
-    meetingId: 'meeting1',
-    meetingName: 'Flemington Race Meeting',
+    meeting_id: 'meeting1',
+    meeting_name: 'Flemington Race Meeting',
     country: 'AUS',
-    raceType: 'Thoroughbred Horse Racing',
+    race_type: 'Thoroughbred Horse Racing',
     category: RACE_TYPE_CODES.THOROUGHBRED,
     date: '2024-01-01',
-    firstRaceTime: '2024-01-01T10:00:00Z',
+    first_race_time: '2024-01-01T10:00:00Z',
   };
 
   beforeEach(() => {
@@ -148,7 +148,7 @@ describe('MeetingCard Integration Tests', () => {
   it('should handle race type categories correctly', async () => {
     const harnessMeeting = {
       ...mockMeeting,
-      raceType: 'Harness Horse Racing',
+      race_type: 'Harness Horse Racing',
       category: RACE_TYPE_CODES.HARNESS,
     };
     
@@ -166,7 +166,7 @@ describe('MeetingCard Integration Tests', () => {
     // Test with past race time (should be live)
     const pastMeeting = {
       ...mockMeeting,
-      firstRaceTime: new Date(Date.now() - 1800000).toISOString(), // 30 minutes ago
+      first_race_time: new Date(Date.now() - 1800000).toISOString(), // 30 minutes ago
     };
     
     render(<MeetingCard meeting={pastMeeting} />);
@@ -181,9 +181,9 @@ describe('MeetingCard Integration Tests', () => {
   it('should handle missing optional data integration', async () => {
     const incompleteData = {
       ...mockMeeting,
-      firstRaceTime: undefined,
+      first_race_time: undefined,
       weather: undefined,
-      trackCondition: undefined,
+      track_condition: undefined,
     };
     
     render(<MeetingCard meeting={incompleteData} />);
@@ -203,7 +203,7 @@ describe('MeetingCard Integration Tests', () => {
     const meetingWithConditions = {
       ...mockMeeting,
       weather: 'Fine',
-      trackCondition: 'Good',
+      track_condition: 'Good',
     };
     
     render(<MeetingCard meeting={meetingWithConditions} />);

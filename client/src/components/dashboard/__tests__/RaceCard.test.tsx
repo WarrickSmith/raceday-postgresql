@@ -8,10 +8,10 @@ describe('RaceCard', () => {
     $id: 'race1',
     $createdAt: '2024-01-01T08:00:00Z',
     $updatedAt: '2024-01-01T08:00:00Z',
-    raceId: 'R001',
-    raceNumber: 1,
-    name: 'Melbourne Cup',  // Changed from raceName to name
-    startTime: '2024-01-01T15:00:00Z',
+    race_id: 'R001',
+    race_number: 1,
+    name: 'Melbourne Cup',  // Changed from race_name to name
+    start_time: '2024-01-01T15:00:00Z',
     meeting: 'meeting1',
     status: 'Open',
   };
@@ -94,7 +94,7 @@ describe('RaceCard', () => {
   it('should handle invalid time gracefully', () => {
     const raceWithInvalidTime = {
       ...mockRace,
-      startTime: 'invalid-time',
+      start_time: 'invalid-time',
     };
 
     render(<RaceCard race={raceWithInvalidTime} />);
@@ -114,8 +114,8 @@ describe('RaceCard', () => {
     const raceTitle = screen.getByText('Melbourne Cup');
     expect(raceTitle).toHaveAttribute('id', 'race-race1');
     
-    const raceNumber = screen.getByLabelText('Race number 1');
-    expect(raceNumber).toBeInTheDocument();
+    const race_number = screen.getByLabelText('Race number 1');
+    expect(race_number).toBeInTheDocument();
   });
 
   // Enhanced Status Testing

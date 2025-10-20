@@ -1,7 +1,7 @@
 import { getMeetingsData, getMeetingById } from '../meetings-data';
 import { createServerClient } from '@/lib/appwrite-server';
 import type { Databases } from 'node-appwrite';
-import { RACE_TYPE_CODES } from '@/constants/raceTypes';
+import { RACE_TYPE_CODES } from '@/constants/race_types';
 
 // Mock the Appwrite server client
 jest.mock('@/lib/appwrite-server', () => ({
@@ -39,10 +39,10 @@ describe('meetings-data', () => {
           $createdAt: '2024-01-01T08:00:00Z',
           $updatedAt: '2024-01-01T08:00:00Z',
           $permissions: [],
-          meetingId: 'meeting1',
-          meetingName: 'Meeting 1',
+          meeting_id: 'meeting1',
+          meeting_name: 'Meeting 1',
           country: 'AUS',
-          raceType: 'Thoroughbred Horse Racing',
+          race_type: 'Thoroughbred Horse Racing',
           category: RACE_TYPE_CODES.THOROUGHBRED,
           date: '2024-01-01',
         },
@@ -54,10 +54,10 @@ describe('meetings-data', () => {
           $createdAt: '2024-01-01T06:00:00Z',
           $updatedAt: '2024-01-01T06:00:00Z',
           $permissions: [],
-          meetingId: 'meeting2',
-          meetingName: 'Meeting 2',
+          meeting_id: 'meeting2',
+          meeting_name: 'Meeting 2',
           country: 'NZ',
-          raceType: 'Harness Horse Racing',
+          race_type: 'Harness Horse Racing',
           category: RACE_TYPE_CODES.HARNESS,
           date: '2024-01-01',
         },
@@ -72,7 +72,7 @@ describe('meetings-data', () => {
           $createdAt: '2024-01-01T08:00:00Z',
           $updatedAt: '2024-01-01T08:00:00Z',
           $permissions: [],
-          startTime: '2024-01-01T10:00:00Z' 
+          start_time: '2024-01-01T10:00:00Z' 
         }, // Later race for meeting1
         { 
           $id: 'race2',
@@ -82,7 +82,7 @@ describe('meetings-data', () => {
           $createdAt: '2024-01-01T08:00:00Z',
           $updatedAt: '2024-01-01T08:00:00Z',
           $permissions: [],
-          startTime: '2024-01-01T09:00:00Z' 
+          start_time: '2024-01-01T09:00:00Z' 
         }, // Earlier race for meeting2
       ];
 
@@ -94,10 +94,10 @@ describe('meetings-data', () => {
       const result = await getMeetingsData();
 
       expect(result).toHaveLength(2);
-      expect(result[0].meetingId).toBe('meeting2'); // Should be first due to earlier race time
-      expect(result[1].meetingId).toBe('meeting1');
-      expect(result[0].firstRaceTime).toBe('2024-01-01T09:00:00Z');
-      expect(result[1].firstRaceTime).toBe('2024-01-01T10:00:00Z');
+      expect(result[0].meeting_id).toBe('meeting2'); // Should be first due to earlier race time
+      expect(result[1].meeting_id).toBe('meeting1');
+      expect(result[0].first_race_time).toBe('2024-01-01T09:00:00Z');
+      expect(result[1].first_race_time).toBe('2024-01-01T10:00:00Z');
     });
 
     it('should handle empty meetings response', async () => {
@@ -144,10 +144,10 @@ describe('meetings-data', () => {
           $createdAt: '2024-01-01T08:00:00Z',
           $updatedAt: '2024-01-01T08:00:00Z',
           $permissions: [],
-          meetingId: 'meeting1',
-          meetingName: 'Meeting 1',
+          meeting_id: 'meeting1',
+          meeting_name: 'Meeting 1',
           country: 'AUS',
-          raceType: 'Thoroughbred Horse Racing',
+          race_type: 'Thoroughbred Horse Racing',
           category: RACE_TYPE_CODES.THOROUGHBRED,
           date: '2024-01-01',
         },
@@ -160,7 +160,7 @@ describe('meetings-data', () => {
       const result = await getMeetingsData();
 
       expect(result).toHaveLength(1);
-      expect(result[0].firstRaceTime).toBe('2024-01-01T08:00:00Z'); // Falls back to created time
+      expect(result[0].first_race_time).toBe('2024-01-01T08:00:00Z'); // Falls back to created time
       expect(console.error).toHaveBeenCalledWith('Error fetching races for meeting meeting1:', expect.any(Error));
     });
   });
@@ -175,9 +175,9 @@ describe('meetings-data', () => {
         $createdAt: '2024-01-01T08:00:00Z',
         $updatedAt: '2024-01-01T08:00:00Z',
         $permissions: [],
-        meetingId: 'meeting1',
-        meetingName: 'Test Meeting',
-        raceType: 'Thoroughbred Horse Racing',
+        meeting_id: 'meeting1',
+        meeting_name: 'Test Meeting',
+        race_type: 'Thoroughbred Horse Racing',
         category: RACE_TYPE_CODES.THOROUGHBRED,
         country: 'AU',
         date: '2024-01-01',

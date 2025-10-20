@@ -25,53 +25,53 @@ describe('calculatePollingIntervalMs', () => {
   })
 
   it('returns baseline interval when race start is more than 65 minutes away', () => {
-    const startTime = new Date(baseNow + 120 * MINUTE_IN_MS).toISOString()
-    const interval = calculatePollingIntervalMs(startTime, 'Open', false)
+    const start_time = new Date(baseNow + 120 * MINUTE_IN_MS).toISOString()
+    const interval = calculatePollingIntervalMs(start_time, 'Open', false)
     expect(interval).toBe(30 * MINUTE_IN_MS)
   })
 
   it('returns active interval when race start is between 5 and 65 minutes away', () => {
-    const startTime = new Date(baseNow + 30 * MINUTE_IN_MS).toISOString()
-    const interval = calculatePollingIntervalMs(startTime, 'Open', false)
+    const start_time = new Date(baseNow + 30 * MINUTE_IN_MS).toISOString()
+    const interval = calculatePollingIntervalMs(start_time, 'Open', false)
     expect(interval).toBe(2.5 * MINUTE_IN_MS)
   })
 
   it('returns active interval for the transition window between 60 and 65 minutes', () => {
-    const startTime = new Date(baseNow + 64.5 * MINUTE_IN_MS).toISOString()
-    const interval = calculatePollingIntervalMs(startTime, 'Open', false)
+    const start_time = new Date(baseNow + 64.5 * MINUTE_IN_MS).toISOString()
+    const interval = calculatePollingIntervalMs(start_time, 'Open', false)
     expect(interval).toBe(2.5 * MINUTE_IN_MS)
   })
 
   it('returns critical interval when race is within five minutes', () => {
-    const startTime = new Date(baseNow + 3 * MINUTE_IN_MS).toISOString()
-    const interval = calculatePollingIntervalMs(startTime, 'Open', false)
+    const start_time = new Date(baseNow + 3 * MINUTE_IN_MS).toISOString()
+    const interval = calculatePollingIntervalMs(start_time, 'Open', false)
     expect(interval).toBe(30 * 1000)
   })
 
   it('returns critical interval once the advertised start time has passed but status is still open', () => {
-    const startTime = new Date(baseNow - 2 * MINUTE_IN_MS).toISOString()
-    const interval = calculatePollingIntervalMs(startTime, 'Open', false)
+    const start_time = new Date(baseNow - 2 * MINUTE_IN_MS).toISOString()
+    const interval = calculatePollingIntervalMs(start_time, 'Open', false)
     expect(interval).toBe(30 * 1000)
   })
 
   it('returns critical interval for closed and running statuses regardless of start time', () => {
-    const startTime = new Date(baseNow + 90 * MINUTE_IN_MS).toISOString()
-    const closedInterval = calculatePollingIntervalMs(startTime, 'Closed', false)
-    const runningInterval = calculatePollingIntervalMs(startTime, 'Running', false)
+    const start_time = new Date(baseNow + 90 * MINUTE_IN_MS).toISOString()
+    const closedInterval = calculatePollingIntervalMs(start_time, 'Closed', false)
+    const runningInterval = calculatePollingIntervalMs(start_time, 'Running', false)
 
     expect(closedInterval).toBe(30 * 1000)
     expect(runningInterval).toBe(30 * 1000)
   })
 
   it('applies double frequency multiplier when enabled', () => {
-    const startTime = new Date(baseNow + 30 * MINUTE_IN_MS).toISOString()
-    const interval = calculatePollingIntervalMs(startTime, 'Open', true)
+    const start_time = new Date(baseNow + 30 * MINUTE_IN_MS).toISOString()
+    const interval = calculatePollingIntervalMs(start_time, 'Open', true)
     expect(interval).toBe(1.25 * MINUTE_IN_MS)
   })
 
   it('returns infinity when race is complete', () => {
-    const startTime = new Date(baseNow + 30 * MINUTE_IN_MS).toISOString()
-    const interval = calculatePollingIntervalMs(startTime, 'Final', false)
+    const start_time = new Date(baseNow + 30 * MINUTE_IN_MS).toISOString()
+    const interval = calculatePollingIntervalMs(start_time, 'Final', false)
     expect(interval).toBe(Number.POSITIVE_INFINITY)
   })
 
@@ -99,22 +99,22 @@ describe('isRaceComplete', () => {
 
 describe('useRacePolling lifecycle behaviour', () => {
   const baseNow = new Date('2024-05-01T00:00:00Z')
-  const raceId = 'race-1'
+  const race_id = 'race-1'
   let originalFetch: typeof globalThis.fetch
   let fetchMock: jest.MockedFunction<typeof globalThis.fetch>
 
   const createRaceData = (
     status: string,
-    startTime: string
+    start_time: string
   ): RaceContextData => ({
     race: {
       $id: 'doc-race-1',
       $createdAt: baseNow.toISOString(),
       $updatedAt: baseNow.toISOString(),
-      raceId,
-      raceNumber: 1,
+      race_id,
+      race_number: 1,
       name: 'Test Race',
-      startTime,
+      start_time,
       meeting: 'meeting-1',
       status,
     },
@@ -122,10 +122,10 @@ describe('useRacePolling lifecycle behaviour', () => {
       $id: 'doc-meeting-1',
       $createdAt: baseNow.toISOString(),
       $updatedAt: baseNow.toISOString(),
-      meetingId: 'meeting-1',
-      meetingName: 'Test Meeting',
+      meeting_id: 'meeting-1',
+      meeting_name: 'Test Meeting',
       country: 'NZ',
-      raceType: 'Gallops',
+      race_type: 'Gallops',
       category: 'T',
       date: baseNow.toISOString(),
     },
@@ -136,22 +136,22 @@ describe('useRacePolling lifecycle behaviour', () => {
       nextScheduledRace: null,
     },
     dataFreshness: {
-      lastUpdated: baseNow.toISOString(),
+      last_updated: baseNow.toISOString(),
       entrantsDataAge: 0,
-      oddsHistoryCount: 0,
-      moneyFlowHistoryCount: 0,
+      odds_historyCount: 0,
+      money_flow_historyCount: 0,
     },
   })
 
   const createMockResponse = (
     status: string,
-    startTime: string
+    start_time: string
   ): Response =>
     ({
       ok: true,
       status: 200,
       statusText: 'OK',
-      json: () => Promise.resolve(createRaceData(status, startTime)),
+      json: () => Promise.resolve(createRaceData(status, start_time)),
     } as Response)
 
   beforeAll(() => {
@@ -194,7 +194,7 @@ describe('useRacePolling lifecycle behaviour', () => {
 
     const { result, rerender } = renderHook((props) => useRacePolling(props), {
       initialProps: {
-        raceId,
+        race_id,
         raceStartTime: criticalStartTime,
         raceStatus: 'Open',
         hasInitialData: true,
@@ -222,7 +222,7 @@ describe('useRacePolling lifecycle behaviour', () => {
 
     act(() => {
       rerender({
-        raceId,
+        race_id,
         raceStartTime: criticalStartTime,
         raceStatus: 'Final',
         hasInitialData: true,
@@ -235,7 +235,7 @@ describe('useRacePolling lifecycle behaviour', () => {
 
     act(() => {
       rerender({
-        raceId,
+        race_id,
         raceStartTime: new Date(
           baseNow.getTime() + 30 * MINUTE_IN_MS
         ).toISOString(),

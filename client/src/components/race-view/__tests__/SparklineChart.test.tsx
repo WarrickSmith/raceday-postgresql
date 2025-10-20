@@ -8,7 +8,7 @@ interface OddsDataPoint {
   $createdAt: string;
   $updatedAt: string;
   entrant: string;
-  winOdds: number;
+  win_odds: number;
   timestamp: string;
 }
 
@@ -19,7 +19,7 @@ const mockOddsHistoryData: OddsDataPoint[] = [
     $createdAt: '2025-08-11T10:00:00Z',
     $updatedAt: '2025-08-11T10:00:00Z',
     entrant: 'entrant1',
-    winOdds: 3.5,
+    win_odds: 3.5,
     timestamp: '2025-08-11T10:00:00Z'
   },
   {
@@ -27,7 +27,7 @@ const mockOddsHistoryData: OddsDataPoint[] = [
     $createdAt: '2025-08-11T10:05:00Z',
     $updatedAt: '2025-08-11T10:05:00Z',
     entrant: 'entrant1',
-    winOdds: 3.2,
+    win_odds: 3.2,
     timestamp: '2025-08-11T10:05:00Z'
   },
   {
@@ -35,7 +35,7 @@ const mockOddsHistoryData: OddsDataPoint[] = [
     $createdAt: '2025-08-11T10:10:00Z',
     $updatedAt: '2025-08-11T10:10:00Z',
     entrant: 'entrant1',
-    winOdds: 2.8,
+    win_odds: 2.8,
     timestamp: '2025-08-11T10:10:00Z'
   }
 ];
@@ -46,7 +46,7 @@ const mockFlatOddsData: OddsDataPoint[] = [
     $createdAt: '2025-08-11T10:00:00Z',
     $updatedAt: '2025-08-11T10:00:00Z',
     entrant: 'entrant1',
-    winOdds: 3.0,
+    win_odds: 3.0,
     timestamp: '2025-08-11T10:00:00Z'
   },
   {
@@ -54,7 +54,7 @@ const mockFlatOddsData: OddsDataPoint[] = [
     $createdAt: '2025-08-11T10:05:00Z',
     $updatedAt: '2025-08-11T10:05:00Z',
     entrant: 'entrant1',
-    winOdds: 3.0,
+    win_odds: 3.0,
     timestamp: '2025-08-11T10:05:00Z'
   }
 ];

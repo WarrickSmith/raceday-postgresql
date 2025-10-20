@@ -24,10 +24,10 @@ describe('useRacesForMeeting', () => {
       $id: 'race1',
       $createdAt: '2024-01-01T08:00:00Z',
       $updatedAt: '2024-01-01T08:00:00Z',
-      raceId: 'R001',
-      raceNumber: 1,
+      race_id: 'R001',
+      race_number: 1,
       name: 'First Race',
-      startTime: '2024-01-01T15:00:00Z',
+      start_time: '2024-01-01T15:00:00Z',
       meeting: 'meeting1',
       status: 'Open',
     },
@@ -35,10 +35,10 @@ describe('useRacesForMeeting', () => {
       $id: 'race2',
       $createdAt: '2024-01-01T08:00:00Z',
       $updatedAt: '2024-01-01T08:00:00Z',
-      raceId: 'R002',
-      raceNumber: 2,
+      race_id: 'R002',
+      race_number: 2,
       name: 'Second Race',
-      startTime: '2024-01-01T16:00:00Z',
+      start_time: '2024-01-01T16:00:00Z',
       meeting: 'meeting1',
       status: 'Closed',
     },
@@ -53,7 +53,7 @@ describe('useRacesForMeeting', () => {
     mockFetchRacesForMeeting.mockResolvedValue(mockRaces);
 
     const { result } = renderHook(() =>
-      useRacesForMeeting({ meetingId: 'meeting1' })
+      useRacesForMeeting({ meeting_id: 'meeting1' })
     );
 
     // Initial state
@@ -75,7 +75,7 @@ describe('useRacesForMeeting', () => {
     mockFetchRacesForMeeting.mockRejectedValue(new Error(errorMessage));
 
     const { result } = renderHook(() =>
-      useRacesForMeeting({ meetingId: 'meeting1' })
+      useRacesForMeeting({ meeting_id: 'meeting1' })
     );
 
     // Hook has retry logic with exponential backoff (2 retries with delays up to 2s + 4s)
@@ -92,7 +92,7 @@ describe('useRacesForMeeting', () => {
     mockFetchRacesForMeeting.mockResolvedValue(mockRaces);
 
     const { result } = renderHook(() => 
-      useRacesForMeeting({ meetingId: 'meeting1', enabled: false })
+      useRacesForMeeting({ meeting_id: 'meeting1', enabled: false })
     );
 
     expect(result.current.isLoading).toBe(false);
@@ -101,11 +101,11 @@ describe('useRacesForMeeting', () => {
     expect(mockFetchRacesForMeeting).not.toHaveBeenCalled();
   });
 
-  it('should not fetch when meetingId is empty', () => {
+  it('should not fetch when meeting_id is empty', () => {
     mockFetchRacesForMeeting.mockResolvedValue(mockRaces);
 
     const { result } = renderHook(() => 
-      useRacesForMeeting({ meetingId: '' })
+      useRacesForMeeting({ meeting_id: '' })
     );
 
     expect(result.current.isLoading).toBe(false);
@@ -118,7 +118,7 @@ describe('useRacesForMeeting', () => {
     mockFetchRacesForMeeting.mockResolvedValue(mockRaces);
 
     const { result } = renderHook(() =>
-      useRacesForMeeting({ meetingId: 'meeting1' })
+      useRacesForMeeting({ meeting_id: 'meeting1' })
     );
 
     // Wait for initial fetch to complete
@@ -144,7 +144,7 @@ describe('useRacesForMeeting', () => {
     mockFetchRacesForMeeting.mockImplementation(() => new Promise(() => {}));
 
     const { unmount } = renderHook(() => 
-      useRacesForMeeting({ meetingId: 'meeting1' })
+      useRacesForMeeting({ meeting_id: 'meeting1' })
     );
 
     expect(() => unmount()).not.toThrow();

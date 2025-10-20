@@ -55,17 +55,17 @@ describe('useMoneyFlowTimeline', () => {
 
     it('should validate that all runner hold percentages sum to approximately 100%', () => {
       const runners = [
-        { name: 'Take On', holdPercentage: 13 },
-        { name: 'Runner B', holdPercentage: 15 },
-        { name: 'Runner C', holdPercentage: 12 },
-        { name: 'Runner D', holdPercentage: 18 },
-        { name: 'Runner E', holdPercentage: 22 },
-        { name: 'Runner F', holdPercentage: 8 },
-        { name: 'Runner G', holdPercentage: 12 },
+        { name: 'Take On', hold_percentage: 13 },
+        { name: 'Runner B', hold_percentage: 15 },
+        { name: 'Runner C', hold_percentage: 12 },
+        { name: 'Runner D', hold_percentage: 18 },
+        { name: 'Runner E', hold_percentage: 22 },
+        { name: 'Runner F', hold_percentage: 8 },
+        { name: 'Runner G', hold_percentage: 12 },
       ]
 
       const totalHoldPercentage = runners.reduce(
-        (sum, runner) => sum + runner.holdPercentage,
+        (sum, runner) => sum + runner.hold_percentage,
         0
       )
 
@@ -84,24 +84,24 @@ describe('useMoneyFlowTimeline', () => {
             $createdAt: '2023-01-01T00:00:00.000Z',
             $updatedAt: '2023-01-01T00:00:00.000Z',
             entrant: 'entrant-1',
-            pollingTimestamp: '2023-01-01T00:00:00.000Z',
-            timeInterval: -5,
-            timeToStart: -5,
+            polling_timestamp: '2023-01-01T00:00:00.000Z',
+            time_interval: -5,
+            time_to_start: -5,
             winPoolAmount: 500,
             placePoolAmount: 200,
-            holdPercentage: 15,
+            hold_percentage: 15,
           },
           {
             $id: 'doc-2',
             $createdAt: '2023-01-01T00:05:00.000Z',
             $updatedAt: '2023-01-01T00:05:00.000Z',
             entrant: 'entrant-1',
-            pollingTimestamp: '2023-01-01T00:05:00.000Z',
-            timeInterval: -5,
-            timeToStart: -5,
+            polling_timestamp: '2023-01-01T00:05:00.000Z',
+            time_interval: -5,
+            time_to_start: -5,
             winPoolAmount: 300,
             placePoolAmount: 150,
-            holdPercentage: 10,
+            hold_percentage: 10,
           },
         ],
       }
@@ -118,12 +118,12 @@ describe('useMoneyFlowTimeline', () => {
       expect(entrantData).toBeDefined()
 
       const consolidatedPoint = entrantData?.dataPoints.find(
-        (point) => point.timeInterval === -5
+        (point) => point.time_interval === -5
       )
 
       expect(consolidatedPoint?.winPoolAmount).toBe(300)
       expect(consolidatedPoint?.placePoolAmount).toBe(150)
-      expect(consolidatedPoint?.poolPercentage).toBe(10)
+      expect(consolidatedPoint?.pool_percentage).toBe(10)
     })
   })
 
@@ -138,24 +138,24 @@ describe('useMoneyFlowTimeline', () => {
             $createdAt: '2023-01-01T00:00:00.000Z',
             $updatedAt: '2023-01-01T00:00:00.000Z',
             entrant: 'entrant-1',
-            pollingTimestamp: '2023-01-01T00:00:00.000Z',
-            timeInterval: -5,
-            timeToStart: -5,
+            polling_timestamp: '2023-01-01T00:00:00.000Z',
+            time_interval: -5,
+            time_to_start: -5,
             winPoolAmount: 1000,
-            incrementalWinAmount: 50,
-            intervalType: '5m',
+            incremental_win_amount: 50,
+            interval_type: '5m',
           },
           {
             $id: 'doc-2',
             $createdAt: '2023-01-01T00:04:00.000Z',
             $updatedAt: '2023-01-01T00:04:00.000Z',
             entrant: 'entrant-1',
-            pollingTimestamp: '2023-01-01T00:04:00.000Z',
-            timeInterval: -1,
-            timeToStart: -1,
+            polling_timestamp: '2023-01-01T00:04:00.000Z',
+            time_interval: -1,
+            time_to_start: -1,
             winPoolAmount: 1200,
-            incrementalWinAmount: 200,
-            intervalType: '1m',
+            incremental_win_amount: 200,
+            interval_type: '1m',
           },
         ],
       }
@@ -173,14 +173,14 @@ describe('useMoneyFlowTimeline', () => {
       expect(entrantData?.dataPoints.length).toBe(2)
 
       const fiveMinutePoint = entrantData?.dataPoints.find(
-        (point) => point.timeInterval === -5
+        (point) => point.time_interval === -5
       )
       const oneMinutePoint = entrantData?.dataPoints.find(
-        (point) => point.timeInterval === -1
+        (point) => point.time_interval === -1
       )
 
-      expect(fiveMinutePoint?.incrementalAmount).toBe(50)
-      expect(oneMinutePoint?.incrementalAmount).toBe(200)
+      expect(fiveMinutePoint?.incremental_amount).toBe(50)
+      expect(oneMinutePoint?.incremental_amount).toBe(200)
     })
   })
 
@@ -228,12 +228,12 @@ describe('useMoneyFlowTimeline', () => {
             $createdAt: '2023-01-01T00:05:00.000Z',
             $updatedAt: '2023-01-01T00:05:00.000Z',
             entrant: 'entrant-1',
-            pollingTimestamp: '2023-01-01T00:05:00.000Z',
-            timeInterval: 5,
-            timeToStart: 5,
+            polling_timestamp: '2023-01-01T00:05:00.000Z',
+            time_interval: 5,
+            time_to_start: 5,
             winPoolAmount: 1000,
             placePoolAmount: 400,
-            holdPercentage: 12,
+            hold_percentage: 12,
           },
         ],
         nextCreatedAt: '2023-01-01T00:05:00.000Z',
@@ -274,12 +274,12 @@ describe('useMoneyFlowTimeline', () => {
             $createdAt: '2023-01-01T00:00:00.000Z',
             $updatedAt: '2023-01-01T00:00:00.000Z',
             entrant: 'entrant-1',
-            pollingTimestamp: '2023-01-01T00:00:00.000Z',
-            timeInterval: 10,
-            timeToStart: 10,
+            polling_timestamp: '2023-01-01T00:00:00.000Z',
+            time_interval: 10,
+            time_to_start: 10,
             winPoolAmount: 800,
             placePoolAmount: 300,
-            holdPercentage: 10,
+            hold_percentage: 10,
           },
         ],
         nextCreatedAt: '2023-01-01T00:00:00.000Z',
@@ -294,12 +294,12 @@ describe('useMoneyFlowTimeline', () => {
             $createdAt: '2023-01-01T00:00:00.000Z',
             $updatedAt: '2023-01-01T00:00:00.000Z',
             entrant: 'entrant-1',
-            pollingTimestamp: '2023-01-01T00:00:00.000Z',
-            timeInterval: 10,
-            timeToStart: 10,
+            polling_timestamp: '2023-01-01T00:00:00.000Z',
+            time_interval: 10,
+            time_to_start: 10,
             winPoolAmount: 800,
             placePoolAmount: 300,
-            holdPercentage: 10,
+            hold_percentage: 10,
           },
           // New point
           {
@@ -307,12 +307,12 @@ describe('useMoneyFlowTimeline', () => {
             $createdAt: '2023-01-01T00:03:00.000Z',
             $updatedAt: '2023-01-01T00:03:00.000Z',
             entrant: 'entrant-1',
-            pollingTimestamp: '2023-01-01T00:03:00.000Z',
-            timeInterval: 7,
-            timeToStart: 7,
+            polling_timestamp: '2023-01-01T00:03:00.000Z',
+            time_interval: 7,
+            time_to_start: 7,
             winPoolAmount: 900,
             placePoolAmount: 340,
-            holdPercentage: 11,
+            hold_percentage: 11,
           },
         ],
         nextCreatedAt: '2023-01-01T00:03:00.000Z',

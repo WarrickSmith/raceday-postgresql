@@ -8,7 +8,7 @@ const createMockPollingState = (
 ): RacePollingState => ({
   isPolling: false,
   error: null,
-  lastUpdated: null,
+  last_updated: null,
   currentIntervalMs: null,
   nextPollTimestamp: null,
   isDoubleFrequencyEnabled: false,
@@ -91,7 +91,7 @@ describe('usePollingMetrics', () => {
     // Update to polling
     const updatedState = createMockPollingState({
       isPolling: true,
-      lastUpdated: new Date(),
+      last_updated: new Date(),
     })
 
     rerender({ state: updatedState })
@@ -105,7 +105,7 @@ describe('usePollingMetrics', () => {
     const pollingState = createMockPollingState({
       isPolling: true,
       error: new Error(errorMessage),
-      lastUpdated: new Date(),
+      last_updated: new Date(),
     })
 
     const { result } = renderHook(() => usePollingMetrics(pollingState))
@@ -117,7 +117,7 @@ describe('usePollingMetrics', () => {
   it('should calculate success rate correctly', () => {
     const pollingState = createMockPollingState({
       isPolling: false,
-      lastUpdated: null,
+      last_updated: null,
     })
 
     const { result } = renderHook(() => usePollingMetrics(pollingState))
@@ -146,7 +146,7 @@ describe('usePollingMetrics', () => {
   it('should limit recent activity to maxActivityEvents', () => {
     const pollingState = createMockPollingState({
       isPolling: true,
-      lastUpdated: new Date(),
+      last_updated: new Date(),
     })
 
     const { result } = renderHook(() =>
@@ -159,7 +159,7 @@ describe('usePollingMetrics', () => {
   it('should calculate uptime percentage', () => {
     const pollingState = createMockPollingState({
       isPolling: false,
-      lastUpdated: new Date(),
+      last_updated: new Date(),
     })
 
     const { result } = renderHook(() => usePollingMetrics(pollingState))
@@ -186,9 +186,9 @@ describe('usePollingMetrics', () => {
     expect(result.current.cadence.durationSeconds).toBeGreaterThanOrEqual(0)
   })
 
-  it('should handle null lastUpdated gracefully', () => {
+  it('should handle null last_updated gracefully', () => {
     const pollingState = createMockPollingState({
-      lastUpdated: null,
+      last_updated: null,
     })
 
     const { result } = renderHook(() => usePollingMetrics(pollingState))

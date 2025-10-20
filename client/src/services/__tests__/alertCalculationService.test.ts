@@ -29,7 +29,7 @@ describe('AlertCalculationService', () => {
     ...ind,
     $id: `indicator-${index}`,
     userId: 'test-user',
-    lastUpdated: new Date().toISOString(),
+    last_updated: new Date().toISOString(),
     createdAt: new Date().toISOString(),
   }))
 
@@ -47,47 +47,47 @@ describe('AlertCalculationService', () => {
     it('calculates percentage change correctly - indicator-logic.txt T2 example', () => {
       // Example from indicator-logic.txt: Entrant 4 in T2 should show Blue (15%)
       const previousTimeframe: MoneyFlowDataPoint[] = [
-        { entrant: '1', incrementalAmount: 100 } as MoneyFlowDataPoint,
-        { entrant: '2', incrementalAmount: 80 } as MoneyFlowDataPoint,
-        { entrant: '3', incrementalAmount: 60 } as MoneyFlowDataPoint,
-        { entrant: '4', incrementalAmount: 40 } as MoneyFlowDataPoint, // 40/280 = 14%
+        { entrant: '1', incremental_amount: 100 } as MoneyFlowDataPoint,
+        { entrant: '2', incremental_amount: 80 } as MoneyFlowDataPoint,
+        { entrant: '3', incremental_amount: 60 } as MoneyFlowDataPoint,
+        { entrant: '4', incremental_amount: 40 } as MoneyFlowDataPoint, // 40/280 = 14%
       ]
 
       const currentTimeframe: MoneyFlowDataPoint[] = [
-        { entrant: '1', incrementalAmount: 100 } as MoneyFlowDataPoint,
-        { entrant: '2', incrementalAmount: 80 } as MoneyFlowDataPoint,
-        { entrant: '3', incrementalAmount: 60 } as MoneyFlowDataPoint,
-        { entrant: '4', incrementalAmount: 100 } as MoneyFlowDataPoint, // 100/340 = 29%
+        { entrant: '1', incremental_amount: 100 } as MoneyFlowDataPoint,
+        { entrant: '2', incremental_amount: 80 } as MoneyFlowDataPoint,
+        { entrant: '3', incremental_amount: 60 } as MoneyFlowDataPoint,
+        { entrant: '4', incremental_amount: 100 } as MoneyFlowDataPoint, // 100/340 = 29%
       ]
 
       const result = calculateMoneyChangePercentage({
         currentTimeframe,
         previousTimeframe,
-        entrantId: '4',
+        entrant_id: '4',
       })
 
       // Expected: 29% - 14% = 15% change
       expect(result.percentageChange).toBeCloseTo(15, 0)
       expect(result.changeType).toBe('money_increase')
       expect(result.hasChange).toBe(true)
-      expect(result.entrantId).toBe('4')
+      expect(result.entrant_id).toBe('4')
     })
 
     it('only returns positive changes (increases)', () => {
       const previousTimeframe: MoneyFlowDataPoint[] = [
-        { entrant: '1', incrementalAmount: 100 } as MoneyFlowDataPoint,
-        { entrant: '2', incrementalAmount: 50 } as MoneyFlowDataPoint, // 50/150 = 33%
+        { entrant: '1', incremental_amount: 100 } as MoneyFlowDataPoint,
+        { entrant: '2', incremental_amount: 50 } as MoneyFlowDataPoint, // 50/150 = 33%
       ]
 
       const currentTimeframe: MoneyFlowDataPoint[] = [
-        { entrant: '1', incrementalAmount: 100 } as MoneyFlowDataPoint,
-        { entrant: '2', incrementalAmount: 20 } as MoneyFlowDataPoint, // 20/120 = 17% (decrease)
+        { entrant: '1', incremental_amount: 100 } as MoneyFlowDataPoint,
+        { entrant: '2', incremental_amount: 20 } as MoneyFlowDataPoint, // 20/120 = 17% (decrease)
       ]
 
       const result = calculateMoneyChangePercentage({
         currentTimeframe,
         previousTimeframe,
-        entrantId: '2',
+        entrant_id: '2',
       })
 
       // Should return 0 for decreases
@@ -97,13 +97,13 @@ describe('AlertCalculationService', () => {
 
     it('handles missing entrant data', () => {
       const timeframe: MoneyFlowDataPoint[] = [
-        { entrant: '1', incrementalAmount: 100 } as MoneyFlowDataPoint,
+        { entrant: '1', incremental_amount: 100 } as MoneyFlowDataPoint,
       ]
 
       const result = calculateMoneyChangePercentage({
         currentTimeframe: timeframe,
         previousTimeframe: timeframe,
-        entrantId: 'missing',
+        entrant_id: 'missing',
       })
 
       expect(result.percentageChange).toBe(0)
@@ -112,17 +112,17 @@ describe('AlertCalculationService', () => {
 
     it('handles zero total amounts', () => {
       const zeroTimeframe: MoneyFlowDataPoint[] = [
-        { entrant: '1', incrementalAmount: 0 } as MoneyFlowDataPoint,
+        { entrant: '1', incremental_amount: 0 } as MoneyFlowDataPoint,
       ]
 
       const normalTimeframe: MoneyFlowDataPoint[] = [
-        { entrant: '1', incrementalAmount: 100 } as MoneyFlowDataPoint,
+        { entrant: '1', incremental_amount: 100 } as MoneyFlowDataPoint,
       ]
 
       const result = calculateMoneyChangePercentage({
         currentTimeframe: zeroTimeframe,
         previousTimeframe: normalTimeframe,
-        entrantId: '1',
+        entrant_id: '1',
       })
 
       expect(result.percentageChange).toBe(0)
@@ -131,19 +131,19 @@ describe('AlertCalculationService', () => {
 
     it('applies minimum 5% threshold for hasChange', () => {
       const previousTimeframe: MoneyFlowDataPoint[] = [
-        { entrant: '1', incrementalAmount: 50 } as MoneyFlowDataPoint, // 50%
-        { entrant: '2', incrementalAmount: 50 } as MoneyFlowDataPoint, // 50%
+        { entrant: '1', incremental_amount: 50 } as MoneyFlowDataPoint, // 50%
+        { entrant: '2', incremental_amount: 50 } as MoneyFlowDataPoint, // 50%
       ]
 
       const currentTimeframe: MoneyFlowDataPoint[] = [
-        { entrant: '1', incrementalAmount: 52 } as MoneyFlowDataPoint, // 52% (2% increase)
-        { entrant: '2', incrementalAmount: 48 } as MoneyFlowDataPoint, // 48%
+        { entrant: '1', incremental_amount: 52 } as MoneyFlowDataPoint, // 52% (2% increase)
+        { entrant: '2', incremental_amount: 48 } as MoneyFlowDataPoint, // 48%
       ]
 
       const result = calculateMoneyChangePercentage({
         currentTimeframe,
         previousTimeframe,
-        entrantId: '1',
+        entrant_id: '1',
       })
 
       expect(result.percentageChange).toBeCloseTo(2, 1)
@@ -157,14 +157,14 @@ describe('AlertCalculationService', () => {
       const result = calculateOddsChangePercentage({
         currentOdds: 7.00,
         previousOdds: 12.00,
-        entrantId: '3',
+        entrant_id: '3',
       })
 
       // Expected: (12-7)/12 = 42% shortening
       expect(result.percentageChange).toBeCloseTo(41.67, 1)
       expect(result.changeType).toBe('odds_shortening')
       expect(result.hasChange).toBe(true)
-      expect(result.entrantId).toBe('3')
+      expect(result.entrant_id).toBe('3')
     })
 
     it('only returns positive changes (shortening)', () => {
@@ -172,7 +172,7 @@ describe('AlertCalculationService', () => {
       const result = calculateOddsChangePercentage({
         currentOdds: 15.00, // Odds increased (lengthened)
         previousOdds: 10.00,
-        entrantId: '1',
+        entrant_id: '1',
       })
 
       expect(result.percentageChange).toBe(0)
@@ -183,7 +183,7 @@ describe('AlertCalculationService', () => {
       const result = calculateOddsChangePercentage({
         currentOdds: 0,
         previousOdds: 10.00,
-        entrantId: '1',
+        entrant_id: '1',
       })
 
       expect(result.percentageChange).toBe(0)
@@ -195,7 +195,7 @@ describe('AlertCalculationService', () => {
       const result = calculateOddsChangePercentage({
         currentOdds: 9.50,
         previousOdds: 10.00, // 5% shortening
-        entrantId: '1',
+        entrant_id: '1',
       })
 
       expect(result.percentageChange).toBe(5)
@@ -270,18 +270,18 @@ describe('AlertCalculationService', () => {
     it('processes multiple entrants with money and odds data', async () => {
       const moneyFlowData = {
         currentTimeframe: [
-          { entrant: '1', incrementalAmount: 100 } as MoneyFlowDataPoint,
-          { entrant: '2', incrementalAmount: 100 } as MoneyFlowDataPoint, // Will show increase
+          { entrant: '1', incremental_amount: 100 } as MoneyFlowDataPoint,
+          { entrant: '2', incremental_amount: 100 } as MoneyFlowDataPoint, // Will show increase
         ],
         previousTimeframe: [
-          { entrant: '1', incrementalAmount: 100 } as MoneyFlowDataPoint,
-          { entrant: '2', incrementalAmount: 50 } as MoneyFlowDataPoint, // 25% -> 50% = 25% increase
+          { entrant: '1', incremental_amount: 100 } as MoneyFlowDataPoint,
+          { entrant: '2', incremental_amount: 50 } as MoneyFlowDataPoint, // 25% -> 50% = 25% increase
         ],
       }
 
       const oddsData = [
-        { entrantId: '1', currentOdds: 5.0, previousOdds: 10.0 }, // 50% shortening
-        { entrantId: '2', currentOdds: 8.0, previousOdds: 8.0 }, // No change
+        { entrant_id: '1', currentOdds: 5.0, previousOdds: 10.0 }, // 50% shortening
+        { entrant_id: '2', currentOdds: 8.0, previousOdds: 8.0 }, // No change
       ]
 
       const context = {
@@ -314,10 +314,10 @@ describe('AlertCalculationService', () => {
 
       const result = await calculateBatchIndicators({
         moneyFlowData: {
-          currentTimeframe: [{ entrant: '1', incrementalAmount: 100 } as MoneyFlowDataPoint],
-          previousTimeframe: [{ entrant: '1', incrementalAmount: 50 } as MoneyFlowDataPoint],
+          currentTimeframe: [{ entrant: '1', incremental_amount: 100 } as MoneyFlowDataPoint],
+          previousTimeframe: [{ entrant: '1', incremental_amount: 50 } as MoneyFlowDataPoint],
         },
-        oddsData: [{ entrantId: '1', currentOdds: 5.0, previousOdds: 10.0 }],
+        oddsData: [{ entrant_id: '1', currentOdds: 5.0, previousOdds: 10.0 }],
         context,
       })
 
@@ -329,9 +329,9 @@ describe('AlertCalculationService', () => {
   describe('validateMoneyCalculationInput', () => {
     it('validates correct input', () => {
       const validInput = {
-        entrantId: '1',
-        currentTimeframe: [{ entrant: '1', incrementalAmount: 100 } as MoneyFlowDataPoint],
-        previousTimeframe: [{ entrant: '1', incrementalAmount: 50 } as MoneyFlowDataPoint],
+        entrant_id: '1',
+        currentTimeframe: [{ entrant: '1', incremental_amount: 100 } as MoneyFlowDataPoint],
+        previousTimeframe: [{ entrant: '1', incremental_amount: 50 } as MoneyFlowDataPoint],
       }
 
       const result = validateMoneyCalculationInput(validInput)
@@ -341,9 +341,9 @@ describe('AlertCalculationService', () => {
 
     it('validates missing entrant ID', () => {
       const invalidInput = {
-        entrantId: '',
-        currentTimeframe: [{ entrant: '1', incrementalAmount: 100 } as MoneyFlowDataPoint],
-        previousTimeframe: [{ entrant: '1', incrementalAmount: 50 } as MoneyFlowDataPoint],
+        entrant_id: '',
+        currentTimeframe: [{ entrant: '1', incremental_amount: 100 } as MoneyFlowDataPoint],
+        previousTimeframe: [{ entrant: '1', incremental_amount: 50 } as MoneyFlowDataPoint],
       }
 
       const result = validateMoneyCalculationInput(invalidInput)
@@ -353,7 +353,7 @@ describe('AlertCalculationService', () => {
 
     it('validates missing timeframe data', () => {
       const invalidInput = {
-        entrantId: '1',
+        entrant_id: '1',
         currentTimeframe: [],
         previousTimeframe: [],
       }
@@ -366,14 +366,14 @@ describe('AlertCalculationService', () => {
 
     it('validates data point structure', () => {
       const invalidInput = {
-        entrantId: '1',
-        currentTimeframe: [{ entrant: '', incrementalAmount: 'invalid' as unknown as number } as MoneyFlowDataPoint],
-        previousTimeframe: [{ entrant: '1', incrementalAmount: 50 } as MoneyFlowDataPoint],
+        entrant_id: '1',
+        currentTimeframe: [{ entrant: '', incremental_amount: 'invalid' as unknown as number } as MoneyFlowDataPoint],
+        previousTimeframe: [{ entrant: '1', incremental_amount: 50 } as MoneyFlowDataPoint],
       }
 
       const result = validateMoneyCalculationInput(invalidInput)
       expect(result.isValid).toBe(false)
-      expect(result.errors.some(err => err.includes('missing incrementalAmount'))).toBe(true)
+      expect(result.errors.some(err => err.includes('missing incremental_amount'))).toBe(true)
       expect(result.errors.some(err => err.includes('missing entrant ID'))).toBe(true)
     })
   })
@@ -381,7 +381,7 @@ describe('AlertCalculationService', () => {
   describe('validateOddsCalculationInput', () => {
     it('validates correct input', () => {
       const validInput = {
-        entrantId: '1',
+        entrant_id: '1',
         currentOdds: 5.0,
         previousOdds: 10.0,
       }
@@ -393,7 +393,7 @@ describe('AlertCalculationService', () => {
 
     it('validates missing entrant ID', () => {
       const invalidInput = {
-        entrantId: '',
+        entrant_id: '',
         currentOdds: 5.0,
         previousOdds: 10.0,
       }
@@ -405,7 +405,7 @@ describe('AlertCalculationService', () => {
 
     it('validates invalid odds values', () => {
       const invalidInput = {
-        entrantId: '1',
+        entrant_id: '1',
         currentOdds: 0,
         previousOdds: -5,
       }
@@ -421,33 +421,33 @@ describe('AlertCalculationService', () => {
     it('processes complete 3-timeframe money scenario', () => {
       // T1 data: 280 total
       const t1Data: MoneyFlowDataPoint[] = [
-        { entrant: '1', incrementalAmount: 100 } as MoneyFlowDataPoint,
-        { entrant: '2', incrementalAmount: 80 } as MoneyFlowDataPoint,
-        { entrant: '3', incrementalAmount: 60 } as MoneyFlowDataPoint,
-        { entrant: '4', incrementalAmount: 40 } as MoneyFlowDataPoint,
+        { entrant: '1', incremental_amount: 100 } as MoneyFlowDataPoint,
+        { entrant: '2', incremental_amount: 80 } as MoneyFlowDataPoint,
+        { entrant: '3', incremental_amount: 60 } as MoneyFlowDataPoint,
+        { entrant: '4', incremental_amount: 40 } as MoneyFlowDataPoint,
       ]
 
       // T2 data: 340 total
       const t2Data: MoneyFlowDataPoint[] = [
-        { entrant: '1', incrementalAmount: 100 } as MoneyFlowDataPoint,
-        { entrant: '2', incrementalAmount: 80 } as MoneyFlowDataPoint,
-        { entrant: '3', incrementalAmount: 60 } as MoneyFlowDataPoint,
-        { entrant: '4', incrementalAmount: 100 } as MoneyFlowDataPoint, // 100/340 = 29%
+        { entrant: '1', incremental_amount: 100 } as MoneyFlowDataPoint,
+        { entrant: '2', incremental_amount: 80 } as MoneyFlowDataPoint,
+        { entrant: '3', incremental_amount: 60 } as MoneyFlowDataPoint,
+        { entrant: '4', incremental_amount: 100 } as MoneyFlowDataPoint, // 100/340 = 29%
       ]
 
       // T3 data: 280 total (back to T1 pattern)
       const t3Data: MoneyFlowDataPoint[] = [
-        { entrant: '1', incrementalAmount: 100 } as MoneyFlowDataPoint,
-        { entrant: '2', incrementalAmount: 80 } as MoneyFlowDataPoint,
-        { entrant: '3', incrementalAmount: 60 } as MoneyFlowDataPoint,
-        { entrant: '4', incrementalAmount: 40 } as MoneyFlowDataPoint, // 40/280 = 14% (decrease, ignored)
+        { entrant: '1', incremental_amount: 100 } as MoneyFlowDataPoint,
+        { entrant: '2', incremental_amount: 80 } as MoneyFlowDataPoint,
+        { entrant: '3', incremental_amount: 60 } as MoneyFlowDataPoint,
+        { entrant: '4', incremental_amount: 40 } as MoneyFlowDataPoint, // 40/280 = 14% (decrease, ignored)
       ]
 
       // T1->T2: Should show Blue for Entrant 4 (15% increase)
       const t1ToT2 = calculateMoneyChangePercentage({
         currentTimeframe: t2Data,
         previousTimeframe: t1Data,
-        entrantId: '4',
+        entrant_id: '4',
       })
       expect(t1ToT2.percentageChange).toBeCloseTo(15, 0)
 
@@ -455,7 +455,7 @@ describe('AlertCalculationService', () => {
       const t2ToT3 = calculateMoneyChangePercentage({
         currentTimeframe: t3Data,
         previousTimeframe: t2Data,
-        entrantId: '4',
+        entrant_id: '4',
       })
       expect(t2ToT3.percentageChange).toBe(0)
       expect(t2ToT3.hasChange).toBe(false)
@@ -466,7 +466,7 @@ describe('AlertCalculationService', () => {
       const t1ToT2 = calculateOddsChangePercentage({
         currentOdds: 7.00,
         previousOdds: 12.00,
-        entrantId: '3',
+        entrant_id: '3',
       })
       expect(t1ToT2.percentageChange).toBeCloseTo(41.67, 1)
       expect(t1ToT2.hasChange).toBe(true)
@@ -484,7 +484,7 @@ describe('AlertCalculationService', () => {
       const t2ToT3 = calculateOddsChangePercentage({
         currentOdds: 12.00,
         previousOdds: 7.00,
-        entrantId: '3',
+        entrant_id: '3',
       })
       expect(t2ToT3.percentageChange).toBe(0)
       expect(t2ToT3.hasChange).toBe(false)

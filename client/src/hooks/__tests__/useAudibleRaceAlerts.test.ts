@@ -32,10 +32,10 @@ const buildRace = (overrides: Partial<Race> = {}): Race => ({
   $id: overrides.$id ?? 'race-doc-1',
   $createdAt: overrides.$createdAt ?? baseTime.toISOString(),
   $updatedAt: overrides.$updatedAt ?? baseTime.toISOString(),
-  raceId: overrides.raceId ?? 'race-1',
-  raceNumber: overrides.raceNumber ?? 1,
+  race_id: overrides.race_id ?? 'race-1',
+  race_number: overrides.race_number ?? 1,
   name: overrides.name ?? 'Test Race',
-  startTime: overrides.startTime ?? new Date(baseTime.getTime() + 120_000).toISOString(),
+  start_time: overrides.start_time ?? new Date(baseTime.getTime() + 120_000).toISOString(),
   meeting: overrides.meeting ?? 'meeting-1',
   status: overrides.status ?? 'Open',
 })

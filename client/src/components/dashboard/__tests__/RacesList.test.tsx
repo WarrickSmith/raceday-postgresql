@@ -10,8 +10,8 @@ const mockUseRacesForMeeting = useRacesForMeeting as jest.MockedFunction<typeof 
 // Mock RaceCard component
 jest.mock('../RaceCard', () => ({
   RaceCard: ({ race, onClick }: { race: Race; onClick?: (id: string) => void }) => (
-    <div data-testid={`race-card-${race.raceId}`} onClick={() => onClick?.(race.raceId)}>
-      {race.name} - Race {race.raceNumber}
+    <div data-testid={`race-card-${race.race_id}`} onClick={() => onClick?.(race.race_id)}>
+      {race.name} - Race {race.race_number}
     </div>
   ),
 }));
@@ -22,10 +22,10 @@ describe('RacesList', () => {
       $id: 'race1',
       $createdAt: '2024-01-01T08:00:00Z',
       $updatedAt: '2024-01-01T08:00:00Z',
-      raceId: 'R001',
-      raceNumber: 1,
-      name: 'First Race',  // Changed from raceName to name
-      startTime: '2024-01-01T15:00:00Z',
+      race_id: 'R001',
+      race_number: 1,
+      name: 'First Race',  // Changed from race_name to name
+      start_time: '2024-01-01T15:00:00Z',
       meeting: 'meeting1',
       status: 'Open',
     },
@@ -33,10 +33,10 @@ describe('RacesList', () => {
       $id: 'race2',
       $createdAt: '2024-01-01T08:00:00Z',
       $updatedAt: '2024-01-01T08:00:00Z',
-      raceId: 'R002',
-      raceNumber: 2,
-      name: 'Second Race',  // Changed from raceName to name
-      startTime: '2024-01-01T16:00:00Z',
+      race_id: 'R002',
+      race_number: 2,
+      name: 'Second Race',  // Changed from race_name to name
+      start_time: '2024-01-01T16:00:00Z',
       meeting: 'meeting1',
       status: 'Closed',
     },
@@ -54,7 +54,7 @@ describe('RacesList', () => {
       refetch: jest.fn(), isConnected: true,
     });
 
-    render(<RacesList meetingId="meeting1" />);
+    render(<RacesList meeting_id="meeting1" />);
 
     expect(screen.getByTestId('races-skeleton')).toBeInTheDocument();
     expect(screen.getByLabelText('Loading races...')).toBeInTheDocument();
@@ -68,7 +68,7 @@ describe('RacesList', () => {
       refetch: jest.fn(), isConnected: true,
     });
 
-    render(<RacesList meetingId="meeting1" />);
+    render(<RacesList meeting_id="meeting1" />);
 
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.getAllByText('Failed to load races')).toHaveLength(2);
@@ -82,7 +82,7 @@ describe('RacesList', () => {
       refetch: jest.fn(), isConnected: true,
     });
 
-    render(<RacesList meetingId="meeting1" />);
+    render(<RacesList meeting_id="meeting1" />);
 
     expect(screen.getByText('No races available')).toBeInTheDocument();
     expect(screen.getByText('This meeting has no scheduled races.')).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe('RacesList', () => {
       refetch: jest.fn(), isConnected: true,
     });
 
-    render(<RacesList meetingId="meeting1" />);
+    render(<RacesList meeting_id="meeting1" />);
 
     expect(screen.getByTestId('race-card-R001')).toBeInTheDocument();
     expect(screen.getByTestId('race-card-R002')).toBeInTheDocument();
@@ -114,7 +114,7 @@ describe('RacesList', () => {
       refetch: jest.fn(), isConnected: true,
     });
 
-    render(<RacesList meetingId="meeting1" />);
+    render(<RacesList meeting_id="meeting1" />);
 
     const raceCards = screen.getAllByTestId(/race-card-/);
     expect(raceCards).toHaveLength(2);
@@ -128,9 +128,9 @@ describe('RacesList', () => {
     const manyRaces = Array.from({ length: 12 }, (_, i) => ({
       ...mockRaces[0],
       $id: `race${i + 1}`,
-      raceId: `R${String(i + 1).padStart(3, '0')}`,
-      raceNumber: i + 1,
-      name: `Race ${i + 1}`,  // Changed from raceName to name
+      race_id: `R${String(i + 1).padStart(3, '0')}`,
+      race_number: i + 1,
+      name: `Race ${i + 1}`,  // Changed from race_name to name
     }));
 
     mockUseRacesForMeeting.mockReturnValue({
@@ -140,7 +140,7 @@ describe('RacesList', () => {
       refetch: jest.fn(), isConnected: true,
     });
 
-    render(<RacesList meetingId="meeting1" />);
+    render(<RacesList meeting_id="meeting1" />);
 
     // Should render all races without any performance notice
     expect(screen.getAllByTestId(/^race-card-/).length).toBe(12);
@@ -157,7 +157,7 @@ describe('RacesList', () => {
       refetch: jest.fn(), isConnected: true,
     });
 
-    render(<RacesList meetingId="meeting1" onRaceClick={handleRaceClick} />);
+    render(<RacesList meeting_id="meeting1" onRaceClick={handleRaceClick} />);
 
     const firstRaceCard = screen.getByTestId('race-card-R001');
     firstRaceCard.click();
@@ -173,7 +173,7 @@ describe('RacesList', () => {
       refetch: jest.fn(), isConnected: true,
     });
 
-    render(<RacesList meetingId="meeting1" />);
+    render(<RacesList meeting_id="meeting1" />);
 
     expect(screen.getByRole('region')).toBeInTheDocument();
     expect(screen.getByTestId('races-list-meeting1')).toBeInTheDocument();
@@ -193,10 +193,10 @@ describe('RacesList', () => {
       isConnected: true,
     });
 
-    render(<RacesList meetingId="meeting1" />);
+    render(<RacesList meeting_id="meeting1" />);
 
     expect(mockUseRacesForMeeting).toHaveBeenCalledWith({
-      meetingId: 'meeting1',
+      meeting_id: 'meeting1',
       enabled: true,
     });
   });

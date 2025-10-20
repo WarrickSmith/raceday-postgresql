@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { MeetingCard } from '../MeetingCard';
 import { Meeting } from '@/types/meetings';
-import { RACE_TYPE_CODES } from '@/constants/raceTypes';
+import { RACE_TYPE_CODES } from '@/constants/race_types';
 
 type MeetingStatusResponseBody = { isCompleted: boolean };
 
@@ -40,13 +40,13 @@ describe('MeetingCard Performance Tests', () => {
     $id: '1',
     $createdAt: '2024-01-01T08:00:00Z',
     $updatedAt: '2024-01-01T08:00:00Z',
-    meetingId: 'meeting1',
-    meetingName: 'Flemington Race Meeting',
+    meeting_id: 'meeting1',
+    meeting_name: 'Flemington Race Meeting',
     country: 'AUS',
-    raceType: 'Thoroughbred Horse Racing',
+    race_type: 'Thoroughbred Horse Racing',
     category: RACE_TYPE_CODES.THOROUGHBRED,
     date: '2024-01-01',
-    firstRaceTime: '2024-01-01T10:00:00Z',
+    first_race_time: '2024-01-01T10:00:00Z',
   };
 
   beforeEach(() => {
@@ -64,14 +64,14 @@ describe('MeetingCard Performance Tests', () => {
   });
 
   it('should render within performance target (<=50ms)', async () => {
-    let startTime = 0;
+    let start_time = 0;
     let endTime = 0;
     
     mockPerformance.now
       .mockReturnValueOnce(0) // Start render
       .mockReturnValueOnce(40); // End render
 
-    startTime = performance.now();
+    start_time = performance.now();
     render(<MeetingCard meeting={mockMeeting} />);
     
     // Wait for async state updates to complete
@@ -80,7 +80,7 @@ describe('MeetingCard Performance Tests', () => {
     });
     
     endTime = performance.now();
-    const renderTime = endTime - startTime;
+    const renderTime = endTime - start_time;
     
     // Should render within performance target
     expect(renderTime).toBeLessThanOrEqual(50);
@@ -116,11 +116,11 @@ describe('MeetingCard Performance Tests', () => {
     const meetings = Array.from({ length: 5 }, (_, i) => ({
       ...mockMeeting,
       $id: `meeting${i + 1}`,
-      meetingId: `meeting${i + 1}`,
-      meetingName: `Meeting ${i + 1}`,
+      meeting_id: `meeting${i + 1}`,
+      meeting_name: `Meeting ${i + 1}`,
     }));
 
-    const startTime = performance.now();
+    const start_time = performance.now();
     
     const { container } = render(
       <div>
@@ -133,12 +133,12 @@ describe('MeetingCard Performance Tests', () => {
     // Wait for all components to render
     await waitFor(() => {
       meetings.forEach((meeting) => {
-        expect(screen.getByText(meeting.meetingName)).toBeInTheDocument();
+        expect(screen.getByText(meeting.meeting_name)).toBeInTheDocument();
       });
     });
 
     const endTime = performance.now();
-    const totalRenderTime = endTime - startTime;
+    const totalRenderTime = endTime - start_time;
     
     // Should handle multiple cards efficiently
     expect(totalRenderTime).toBeLessThan(250);
@@ -225,7 +225,7 @@ describe('MeetingCard Performance Tests', () => {
         })
     );
 
-    const startTime = performance.now();
+    const start_time = performance.now();
     
     render(<MeetingCard meeting={mockMeeting} />);
     
@@ -235,7 +235,7 @@ describe('MeetingCard Performance Tests', () => {
     }, { timeout: 1000 });
     
     const endTime = performance.now();
-    const totalTime = endTime - startTime;
+    const totalTime = endTime - start_time;
     
     // Should handle async operations within reasonable time
     expect(totalTime).toBeLessThan(500);
@@ -250,7 +250,7 @@ describe('MeetingCard Performance Tests', () => {
       throw new Error('Network error');
     });
 
-    const startTime = performance.now();
+    const start_time = performance.now();
     
     render(<MeetingCard meeting={mockMeeting} />);
     
@@ -260,7 +260,7 @@ describe('MeetingCard Performance Tests', () => {
     }, { timeout: 1000 });
     
     const endTime = performance.now();
-    const totalTime = endTime - startTime;
+    const totalTime = endTime - start_time;
     
     // Should handle errors efficiently
     expect(totalTime).toBeLessThan(150);
