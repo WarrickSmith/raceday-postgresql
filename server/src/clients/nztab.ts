@@ -291,6 +291,17 @@ export async function fetchRaceData(
           })
         : undefined
 
+      // Log presence of key data fields for diagnostics
+      logger.debug({
+        raceId,
+        event: 'fetch_data_fields',
+        hasMoneyTracker: Boolean(dataSection?.money_tracker),
+        hasTotePools: Boolean(dataSection?.tote_pools),
+        hasDividends: Boolean(dataSection?.dividends),
+        hasPoolsInRace: Boolean(apiData.pools),
+        raceStatus: apiData.status,
+      })
+
       /* eslint-disable @typescript-eslint/naming-convention */
       const transformedRaceData = {
         // Only include the fields we need with our naming convention
@@ -309,6 +320,14 @@ export async function fetchRaceData(
         start_time_nz: apiData.start_time_nz,
         // Use the transformed entrants
         entrants: transformedEntrants,
+        // Include money_tracker data for money flow calculations (at dataSection level)
+        money_tracker: dataSection?.money_tracker ?? apiData.money_tracker,
+        // Include tote_pools data for race pools extraction (at dataSection level)
+        tote_pools: dataSection?.tote_pools ?? apiData.tote_pools,
+        // Include dividends for fallback pool extraction (Final races)
+        dividends: dataSection?.dividends,
+        // Include pools data for money flow calculations
+        pools: apiData.pools,
       }
       /* eslint-enable @typescript-eslint/naming-convention */
 

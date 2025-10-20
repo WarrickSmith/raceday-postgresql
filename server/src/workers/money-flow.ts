@@ -77,19 +77,19 @@ export interface IncrementalDelta {
  *
  * Formula: poolAmount = (poolTotal * (hold_percentage / 100)) * 100
  * - Divide hold_percentage by 100 to convert to decimal (e.g., 15% → 0.15)
- * - Multiply by poolTotal to get dollar amount
- * - Multiply by 100 to convert to cents for storage
+ * - Multiply by poolTotal (in dollars from transformWorker conversion)
+ * - Multiply by 100 to convert result to cents for storage
  *
  * @param holdPercentage - Entrant's hold percentage from API (e.g., 15.5)
- * @param poolData - Race pool totals from tote_pools
+ * @param poolData - Race pool totals in dollars (converted from cents in transformWorker)
  * @returns Pool amounts in cents
  *
  * @example
  * ```typescript
- * const poolData = { winPoolTotal: 50000, placePoolTotal: 30000, totalRacePool: 80000 }
+ * const poolData = { winPoolTotal: 50000, placePoolTotal: 30000, totalRacePool: 80000 } // dollars
  * const amounts = calculatePoolAmounts(15.5, poolData)
  * // amounts = { winPoolAmount: 775000, placePoolAmount: 465000, totalPoolAmount: 1240000 }
- * // (15.5% of $50,000 = $7,750 = 775,000 cents win pool)
+ * // (15.5% of $50,000 = $7,750 = 775,000 cents)
  * ```
  */
 export function calculatePoolAmounts(
@@ -118,19 +118,20 @@ export function calculatePoolAmounts(
  *
  * Formula: pool_percentage = (entrantPoolAmount / (totalPoolAmount * 100)) * 100
  * - entrantPoolAmount is in cents
- * - totalPoolAmount is in dollars, multiply by 100 to convert to cents
+ * - totalPoolAmount is in dollars (from transformWorker conversion)
+ * - Multiply totalPoolAmount by 100 to convert to cents for comparison
  * - Result is percentage of total pool
  *
  * Returns null if pool total is zero (avoid division by zero)
  *
  * @param poolAmounts - Entrant's calculated pool amounts in cents
- * @param poolData - Race pool totals in dollars
+ * @param poolData - Race pool totals in dollars (converted from cents in transformWorker)
  * @returns Pool percentages or null if pool total is zero
  *
  * @example
  * ```typescript
  * const poolAmounts = { winPoolAmount: 775000, placePoolAmount: 465000, totalPoolAmount: 1240000 }
- * const poolData = { winPoolTotal: 50000, placePoolTotal: 30000, totalRacePool: 80000 }
+ * const poolData = { winPoolTotal: 50000, placePoolTotal: 30000, totalRacePool: 80000 } // dollars
  * const percentages = calculatePoolPercentages(poolAmounts, poolData)
  * // percentages = { win_pool_percentage: 15.5, place_pool_percentage: 15.5 }
  * ```

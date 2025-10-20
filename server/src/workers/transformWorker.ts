@@ -22,6 +22,7 @@ import {
   type PoolData,
 } from './money-flow.js'
 import { extractPoolTotals } from '../utils/race-pools.js'
+import { logger } from '../shared/logger.js'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 
@@ -44,7 +45,10 @@ const port = parentPort
  * @returns TransformedRace with calculated fields and time-series records
  */
 const transformRace = (payload: RaceData): TransformedRace => {
-  const transformedAt = new Date().toISOString()
+  // Use the NZ race date for partition routing to ensure records go to correct NZ day partition
+  // The NZTAB API provides race_date_nz which is already in NZ timezone
+  // We create an ISO timestamp at midnight for this date to preserve the NZ date
+  const transformedAt = `${payload.race_date_nz}T00:00:00.000Z`
 
   // Extract normalized meeting data (AC6)
   const meeting: TransformedMeeting | null =
@@ -71,18 +75,41 @@ const transformRace = (payload: RaceData): TransformedRace => {
     meeting_id: payload.meeting_id ?? null,
   }
 
-  // Extract pool totals from payload for money flow calculations (AC3)
+  // Extract comprehensive race pools data from NZTAB API (Task 3.2)
+  // This must happen BEFORE money flow calculations to provide pool totals
+  const racePools = extractPoolTotals(payload as { tote_pools?: unknown }, payload.id)
+
+  // Extract pool totals from racePools for money flow calculations (AC3)
+  // racePools values are in cents (from race-pools.ts conversion at lines 152-159)
+  // Convert back to dollars for money flow calculations (to match old server logic)
   const poolData: PoolData = {
-    winPoolTotal: payload.pools?.winPool ?? 0,
-    placePoolTotal: payload.pools?.placePool ?? 0,
-    totalRacePool: payload.pools?.totalPool ?? 0,
+    winPoolTotal: (racePools?.win_pool_total ?? 0) / 100,
+    placePoolTotal: (racePools?.place_pool_total ?? 0) / 100,
+    totalRacePool: (racePools?.total_race_pool ?? 0) / 100,
+  }
+
+  // Log when pool data is available for money flow calculations
+  if (racePools !== null && poolData.totalRacePool > 0) {
+    logger.debug({
+      raceId: payload.id,
+      totalRacePoolDollars: poolData.totalRacePool,
+      winPoolTotalDollars: poolData.winPoolTotal,
+      placePoolTotalDollars: poolData.placePoolTotal,
+    }, 'Pool data available for money flow calculations (in dollars)')
+  } else {
+    logger.debug({
+      raceId: payload.id,
+      hasRacePools: racePools !== null,
+      totalRacePoolDollars: poolData.totalRacePool,
+    }, 'No pool data available for money flow calculations')
   }
 
   // Calculate time metadata for this polling cycle (AC5)
   // Construct race start datetime from date and time fields
-  // start_time_nz already includes timezone info (e.g., "15:59:00 NZDT")
-  // so we just need to combine date and time without adding extra timezone info
-  const raceStartDatetime = `${payload.race_date_nz}T${payload.start_time_nz}`
+  // start_time_nz includes timezone abbreviation (e.g., "15:59:00 NZDT")
+  // Strip the timezone abbreviation to create valid ISO datetime
+  const [timeOnly] = payload.start_time_nz.split(' ') // "15:59:00 NZDT" → "15:59:00"
+  const raceStartDatetime = `${payload.race_date_nz}T${timeOnly ?? ''}`
   const timeMetadata = calculateTimeMetadata(raceStartDatetime, transformedAt)
 
   // Transform entrants with money flow calculations (AC2, AC3, AC6)
@@ -92,12 +119,30 @@ const transformRace = (payload: RaceData): TransformedRace => {
   if (Array.isArray(payload.entrants) && payload.entrants.length > 0) {
     for (const entrant of payload.entrants) {
       // Build transformed entrant with base fields
+      // Parse barrier: can be number (e.g., 1) or string (e.g., "Fr1", "Sr2" for mobile starts)
+      const parseBarrier = (
+        barrierValue: number | string | null | undefined
+      ): number | null => {
+        if (typeof barrierValue === 'number') {
+          return barrierValue
+        }
+        if (typeof barrierValue === 'string') {
+          // Extract numeric part from strings like "Fr1", "Sr2" using RegExp.exec()
+          const pattern = /\d+/
+          const match = pattern.exec(barrierValue)
+          return match !== null ? parseInt(match[0], 10) : null
+        }
+        return null
+      }
+
+      const barrier = parseBarrier(entrant.barrier)
+
       const transformedEntrant: TransformedEntrant = {
         entrant_id: entrant.entrantId,
         race_id: payload.id,
         runner_number: entrant.runnerNumber,
         name: entrant.name,
-        barrier: entrant.barrier ?? null,
+        barrier,
         is_scratched: entrant.isScratched ?? false,
         is_late_scratched: entrant.isLateScratched ?? null,
         // Odds snapshot
@@ -193,14 +238,8 @@ const transformRace = (payload: RaceData): TransformedRace => {
     }
   }
 
-  // Extract comprehensive race pools data from NZTAB API (Task 3.2)
-  const racePools = extractPoolTotals(payload as { tote_pools?: unknown }, payload.id)
-
   const entrantCount = transformedEntrants.length
-  const poolFieldCount =
-    payload.pools == null
-      ? 0
-      : Object.values(payload.pools).filter((value) => value != null).length
+  const poolFieldCount = racePools !== null ? 1 : 0
 
   // Return complete TransformedRace payload (AC6)
   return transformedRaceSchema.parse({
