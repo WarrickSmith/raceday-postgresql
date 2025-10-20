@@ -52,7 +52,7 @@ const POSITION_HIGHLIGHT_STYLES: Record<number, PositionHighlightStyle> = {
 
 interface ResultHighlightInfo extends PositionHighlightStyle {
   position: number
-  runnerNumber: number
+  runner_number: number
   runnerName: string
 }
 
@@ -64,7 +64,7 @@ const WinOddsCell = memo(function WinOddsCell({
   entrant: Entrant
   formatOdds: (odds?: number) => string
 }) {
-  const { flashClasses } = useValueFlash(entrant.winOdds)
+  const { flashClasses } = useValueFlash(entrant.win_odds)
 
   return (
     <td
@@ -77,7 +77,7 @@ const WinOddsCell = memo(function WinOddsCell({
     >
       <div className="flex items-center justify-end h-full pr-2">
         <span className="text-sm font-medium text-gray-900">
-          {entrant.isScratched ? '—' : formatOdds(entrant.winOdds)}
+          {entrant.is_scratched ? '—' : formatOdds(entrant.win_odds)}
         </span>
       </div>
     </td>
@@ -92,7 +92,7 @@ const PlaceOddsCell = memo(function PlaceOddsCell({
   entrant: Entrant
   formatOdds: (odds?: number) => string
 }) {
-  const { flashClasses } = useValueFlash(entrant.placeOdds)
+  const { flashClasses } = useValueFlash(entrant.place_odds)
 
   return (
     <td
@@ -105,7 +105,7 @@ const PlaceOddsCell = memo(function PlaceOddsCell({
     >
       <div className="flex items-center justify-end h-full pr-2">
         <span className="text-sm font-medium text-gray-900">
-          {entrant.isScratched ? '—' : formatOdds(entrant.placeOdds)}
+          {entrant.is_scratched ? '—' : formatOdds(entrant.place_odds)}
         </span>
       </div>
     </td>
@@ -122,13 +122,13 @@ interface TimelineColumn {
 
 interface EnhancedEntrantsGridProps {
   initialEntrants: Entrant[]
-  raceId: string
+  race_id: string
   raceStartTime: string
   dataFreshness?: {
-    lastUpdated: string
+    last_updated: string
     entrantsDataAge: number
-    oddsHistoryCount: number // DEPRECATED: Always 0, odds data comes from MoneyFlowHistory
-    moneyFlowHistoryCount: number
+    odds_historyCount: number // DEPRECATED: Always 0, odds data comes from MoneyFlowHistory
+    money_flow_historyCount: number
   }
   className?: string
   enableMoneyFlowTimeline?: boolean
@@ -139,10 +139,10 @@ interface EnhancedEntrantsGridProps {
   // Trigger for timeline refetch when polling receives money flow updates
   moneyFlowUpdateTrigger?: number
   // Results data for position highlighting (merged from polling and persistent sources)
-  resultsData?: RaceResult[]
+  results_data?: RaceResult[]
   // Race status for determining when to show results highlighting
   raceStatus?: string
-  resultStatus?: string
+  result_status?: string
 }
 
 // Enhanced single-component architecture with integrated timeline:
@@ -153,7 +153,7 @@ interface EnhancedEntrantsGridProps {
 
 export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   initialEntrants,
-  raceId,
+  race_id,
   raceStartTime,
   className = '',
   enableMoneyFlowTimeline = true,
@@ -161,9 +161,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   lastUpdate: initialLastUpdate,
   poolData = null,
   moneyFlowUpdateTrigger,
-  resultsData,
+  results_data,
   raceStatus,
-  resultStatus,
+  result_status,
 }: EnhancedEntrantsGridProps) {
   const logger = useLogger('EnhancedEntrantsGrid');
   const { raceData } = useRace()
@@ -180,12 +180,12 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const currentEntrants = raceData?.entrants || initialEntrants
 
   const getEntrantKey = useCallback((entrant: Entrant): string => {
-    return entrant.entrantId || entrant.$id
+    return entrant.entrant_id || entrant.$id
   }, [])
 
   const currentRaceId =
-    raceData?.race.raceId || raceData?.race.$id || raceId
-  const currentRaceStartTime = raceData?.race.startTime || raceStartTime
+    raceData?.race.race_id || raceData?.race.$id || race_id
+  const currentRaceStartTime = raceData?.race.start_time || raceStartTime
   const currentRace = raceData?.race
 
   // Get actual race pool data from polling updates
@@ -201,7 +201,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const [updateCount, setUpdateCount] = useState(0)
 
   // Get money flow timeline data for all entrants
-  const entrantIds = useMemo(() => {
+  const entrant_ids = useMemo(() => {
     return currentEntrants
       .map((entrant) => getEntrantKey(entrant))
       .filter((id): id is string => Boolean(id))
@@ -215,9 +215,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   // Debug: Log entrant IDs being passed to timeline hook (development only)
   if (process.env.NODE_ENV === 'development') {
     logger.debug('Timeline hook parameters:', {
-      raceId: currentRaceId,
-      entrantIds: entrantIds.length,
-      entrantCount: entrantIds.length,
+      race_id: currentRaceId,
+      entrant_ids: entrant_ids.length,
+      entrantCount: entrant_ids.length,
       selectedView,
     })
   }
@@ -233,7 +233,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     lastUpdate: timelineLastUpdate,
   } = useMoneyFlowTimeline(
     currentRaceId,
-    entrantIds,
+    entrant_ids,
     selectedView === 'odds' ? 'win' : selectedView,
     raceStatus
   )
@@ -277,7 +277,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   })
 
   const [sortState, setSortState] = useState<GridSortState>({
-    column: 'winOdds',
+    column: 'win_odds',
     direction: 'asc', // Default: lowest to highest odds (favorites first)
     isLoading: false,
   })
@@ -314,21 +314,21 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
   // Validation function to check if timeline amounts sum to total pool
   const validateTimelineSummation = useCallback((entrant: Entrant) => {
-    if (!entrant.moneyFlowTimeline || !entrant.poolMoney) return true
+    if (!entrant.money_flow_timeline || !entrant.pool_money) return true
 
-    const timeline = entrant.moneyFlowTimeline
+    const timeline = entrant.money_flow_timeline
     if (!timeline.dataPoints || timeline.dataPoints.length === 0) return true
 
     // Sum all incremental amounts for this entrant
     const timelineSum = timeline.dataPoints.reduce(
-      (sum: number, point: { incrementalAmount?: number }) => {
-        return sum + (point.incrementalAmount || 0)
+      (sum: number, point: { incremental_amount?: number }) => {
+        return sum + (point.incremental_amount || 0)
       },
       0
     )
 
     // Compare with current pool total for this entrant
-    const poolTotal = entrant.poolMoney.total || 0
+    const poolTotal = entrant.pool_money.total || 0
     const difference = Math.abs(timelineSum - poolTotal)
     const tolerance = poolTotal * 0.05 // 5% tolerance
 
@@ -367,70 +367,70 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         ? {
             id: entrants[0].$id,
             name: entrants[0].name,
-            holdPercentage: entrants[0].holdPercentage,
-            isScratched: entrants[0].isScratched,
+            hold_percentage: entrants[0].hold_percentage,
+            is_scratched: entrants[0].is_scratched,
           }
         : null,
     })
 
     return entrants.map((entrant) => {
-      if (entrant.isScratched) {
-        logger.debug(`Scratched entrant ${entrant.name} (${entrant.runnerNumber}) - returning unchanged`)
+      if (entrant.is_scratched) {
+        logger.debug(`Scratched entrant ${entrant.name} (${entrant.runner_number}) - returning unchanged`)
         return {
           ...entrant,
-          moneyFlowTimeline: undefined, // No timeline for scratched entrants
+          money_flow_timeline: undefined, // No timeline for scratched entrants
         }
       }
 
       // NEW PRIORITY HIERARCHY (FIXED):
-      // Priority 1: Real entrant holdPercentage (must be > 0)
-      let poolPercentage: number | undefined = undefined
+      // Priority 1: Real entrant hold_percentage (must be > 0)
+      let pool_percentage: number | undefined = undefined
       let dataSource = 'none'
 
-      if (entrant.holdPercentage && entrant.holdPercentage > 0) {
-        poolPercentage = entrant.holdPercentage
+      if (entrant.hold_percentage && entrant.hold_percentage > 0) {
+        pool_percentage = entrant.hold_percentage
         dataSource = 'entrant_real_data'
-        logger.debug(`Using real entrant data for ${entrant.name}: ${poolPercentage}%`)
+        logger.debug(`Using real entrant data for ${entrant.name}: ${pool_percentage}%`)
       }
 
       // Priority 2: Timeline latest percentage (only if entrant data missing)
       const entrantTimeline = timelineData?.get(getEntrantKey(entrant))
       if (
-        !poolPercentage &&
+        !pool_percentage &&
         entrantTimeline &&
         entrantTimeline.dataPoints.length > 0
       ) {
-        const latestPercentage = entrantTimeline.latestPercentage
-        if (latestPercentage && latestPercentage > 0) {
-          poolPercentage = latestPercentage
+        const latest_percentage = entrantTimeline.latest_percentage
+        if (latest_percentage && latest_percentage > 0) {
+          pool_percentage = latest_percentage
           dataSource = 'timeline_data'
-          logger.debug(`Using timeline data for ${entrant.name}: ${poolPercentage}%`)
+          logger.debug(`Using timeline data for ${entrant.name}: ${pool_percentage}%`)
         }
       }
 
       // Priority 3: Calculate from odds if we have pool data and odds
       if (
-        !poolPercentage &&
+        !pool_percentage &&
         racePoolData &&
-        entrant.winOdds &&
-        entrant.winOdds > 0
+        entrant.win_odds &&
+        entrant.win_odds > 0
       ) {
         // Calculate implied probability from odds (odds = 1/probability)
         // Add small margin for house edge estimation
-        const impliedProbability = 1 / entrant.winOdds
+        const impliedProbability = 1 / entrant.win_odds
         const estimatedPercentage = impliedProbability * 100 * 0.85 // Adjust for house edge
 
         if (estimatedPercentage > 0 && estimatedPercentage < 100) {
-          poolPercentage = estimatedPercentage
+          pool_percentage = estimatedPercentage
           dataSource = 'calculated_from_odds'
-          logger.debug(`Calculated from odds for ${entrant.name}: ${poolPercentage.toFixed(2)}% (odds: ${entrant.winOdds})`)
+          logger.debug(`Calculated from odds for ${entrant.name}: ${pool_percentage.toFixed(2)}% (odds: ${entrant.win_odds})`)
         }
       }
 
       // Priority 4: No fallback - return undefined to show '-' instead of dummy data
-      if (!poolPercentage) {
+      if (!pool_percentage) {
         logger.debug(`No pool data available for ${entrant.name}, will display '-'`)
-        // Don't set poolPercentage - let it remain undefined so UI shows '-'
+        // Don't set pool_percentage - let it remain undefined so UI shows '-'
         dataSource = 'no_data_available'
       }
 
@@ -439,8 +439,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       let placePoolContribution = 0
       let totalPoolContribution = 0
 
-      if (poolPercentage && poolPercentage > 0) {
-        const holdPercentageDecimal = poolPercentage / 100
+      if (pool_percentage && pool_percentage > 0) {
+        const hold_percentageDecimal = pool_percentage / 100
 
         // Use fallback pool totals if no race pool data (for testing)
         const fallbackWinPool = 5000000 // $50k in cents
@@ -452,13 +452,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         const placePoolInDollars = Math.round(
           (racePoolData?.placePoolTotal || fallbackPlacePool) / 100
         )
-        winPoolContribution = winPoolInDollars * holdPercentageDecimal
-        placePoolContribution = placePoolInDollars * holdPercentageDecimal
+        winPoolContribution = winPoolInDollars * hold_percentageDecimal
+        placePoolContribution = placePoolInDollars * hold_percentageDecimal
         totalPoolContribution = winPoolContribution + placePoolContribution
       }
 
       logger.debug(`Real calculation for ${entrant.name}:`, {
-        poolPercentage,
+        pool_percentage,
         winPoolContribution: winPoolContribution.toFixed(0),
         placePoolContribution: placePoolContribution.toFixed(0),
         totalPoolContribution: totalPoolContribution.toFixed(0),
@@ -467,15 +467,15 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
       const entrantWithPoolData = {
         ...entrant,
-        moneyFlowTimeline: entrantTimeline, // Add timeline data to entrant
+        money_flow_timeline: entrantTimeline, // Add timeline data to entrant
         // Update odds with latest values from timeline data if available (NEW in Story 4.9)
-        winOdds: entrantTimeline?.latestWinOdds ?? entrant.winOdds,
-        placeOdds: entrantTimeline?.latestPlaceOdds ?? entrant.placeOdds,
-        poolMoney: poolPercentage ? {
+        win_odds: entrantTimeline?.latest_win_odds ?? entrant.win_odds,
+        place_odds: entrantTimeline?.latest_place_odds ?? entrant.place_odds,
+        pool_money: pool_percentage ? {
           win: winPoolContribution,
           place: placePoolContribution,
           total: totalPoolContribution,
-          percentage: poolPercentage,
+          percentage: pool_percentage,
         } : undefined, // Return undefined when no pool data to ensure '-' is displayed
       }
 
@@ -486,9 +486,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       if (entrant.name.toLowerCase().includes('wal')) {
         logger.debug(`DEBUG "Wal" entrant:`, {
           name: entrant.name,
-          runnerNumber: entrant.runnerNumber,
-          poolPercentage,
-          poolMoney: entrantWithPoolData.poolMoney,
+          runner_number: entrant.runner_number,
+          pool_percentage,
+          pool_money: entrantWithPoolData.pool_money,
           timelineDataPoints: entrantTimeline?.dataPoints?.length || 0,
           sampleTimelinePoint: entrantTimeline?.dataPoints?.[0] || null,
           timelineTrend: entrantTimeline?.trend || 'none',
@@ -514,11 +514,11 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
     const sorted = [...entrantsWithPoolData].sort((a, b) => {
       // Ensure scratched entrants always sort to the end (stable and explicit)
-      if (a.isScratched && !b.isScratched) return 1
-      if (!a.isScratched && b.isScratched) return -1
-      if (a.isScratched && b.isScratched) {
+      if (a.is_scratched && !b.is_scratched) return 1
+      if (!a.is_scratched && b.is_scratched) return -1
+      if (a.is_scratched && b.is_scratched) {
         // Sort scratched runners by runner number for consistency
-        return a.runnerNumber - b.runnerNumber
+        return a.runner_number - b.runner_number
       }
 
       // Use explicit numeric sentinel values for missing odds to ensure deterministic ordering
@@ -526,39 +526,39 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       let bValue: number
 
       switch (sortState.column) {
-        case 'winOdds':
+        case 'win_odds':
           aValue =
-            typeof a.winOdds === 'number' ? a.winOdds : Number.POSITIVE_INFINITY
+            typeof a.win_odds === 'number' ? a.win_odds : Number.POSITIVE_INFINITY
           bValue =
-            typeof b.winOdds === 'number' ? b.winOdds : Number.POSITIVE_INFINITY
+            typeof b.win_odds === 'number' ? b.win_odds : Number.POSITIVE_INFINITY
           break
-        case 'placeOdds':
+        case 'place_odds':
           aValue =
-            typeof a.placeOdds === 'number'
-              ? a.placeOdds
+            typeof a.place_odds === 'number'
+              ? a.place_odds
               : Number.POSITIVE_INFINITY
           bValue =
-            typeof b.placeOdds === 'number'
-              ? b.placeOdds
+            typeof b.place_odds === 'number'
+              ? b.place_odds
               : Number.POSITIVE_INFINITY
           break
-        case 'runnerNumber':
-          aValue = a.runnerNumber
-          bValue = b.runnerNumber
+        case 'runner_number':
+          aValue = a.runner_number
+          bValue = b.runner_number
           break
-        case 'holdPercentage':
+        case 'hold_percentage':
           aValue =
-            typeof a.holdPercentage === 'number'
-              ? a.holdPercentage
+            typeof a.hold_percentage === 'number'
+              ? a.hold_percentage
               : Number.NEGATIVE_INFINITY
           bValue =
-            typeof b.holdPercentage === 'number'
-              ? b.holdPercentage
+            typeof b.hold_percentage === 'number'
+              ? b.hold_percentage
               : Number.NEGATIVE_INFINITY
           break
         default:
-          aValue = a.runnerNumber
-          bValue = b.runnerNumber
+          aValue = a.runner_number
+          bValue = b.runner_number
       }
 
       const result = aValue - bValue
@@ -572,14 +572,14 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     const highlights = new Map<number, ResultHighlightInfo>()
 
     // Use props data first, fallback to race context for backward compatibility
-    const results = resultsData || currentRace?.resultsData
+    const results = results_data || currentRace?.results_data
 
     if (!Array.isArray(results) || results.length === 0) {
       return highlights
     }
 
     // Use props status first, fallback to race context
-    const status = (resultStatus || raceStatus || currentRace?.resultStatus || currentRace?.status || '')
+    const status = (result_status || raceStatus || currentRace?.result_status || currentRace?.status || '')
       .toString()
       .toLowerCase()
 
@@ -589,10 +589,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         hasResultsData: !!results,
         resultsLength: results?.length || 0,
         status,
-        fromProps: { resultsData: !!resultsData, resultStatus, raceStatus },
+        fromProps: { results_data: !!results_data, result_status, raceStatus },
         fromContext: {
-          resultsData: !!currentRace?.resultsData,
-          resultStatus: currentRace?.resultStatus,
+          results_data: !!currentRace?.results_data,
+          result_status: currentRace?.result_status,
           status: currentRace?.status
         }
       })
@@ -604,7 +604,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
     const extractRunnerNumber = (result: RaceResult): number | undefined => {
       const rawNumber =
-        (result.runnerNumber ?? result.runner_number) as
+        (result.runner_number ?? result.runner_number) as
           | number
           | string
           | undefined
@@ -632,8 +632,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         return
       }
 
-      const runnerNumber = extractRunnerNumber(result)
-      if (runnerNumber === undefined) {
+      const runner_number = extractRunnerNumber(result)
+      if (runner_number === undefined) {
         return
       }
 
@@ -647,31 +647,31 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         return
       }
 
-      if (highlights.has(runnerNumber)) {
+      if (highlights.has(runner_number)) {
         return
       }
 
       const fallbackName =
         extractRunnerName(result) ||
-        sortedEntrants.find((entrant) => entrant.runnerNumber === runnerNumber)
+        sortedEntrants.find((entrant) => entrant.runner_number === runner_number)
           ?.name ||
-        `Runner ${runnerNumber}`
+        `Runner ${runner_number}`
 
-      highlights.set(runnerNumber, {
+      highlights.set(runner_number, {
         ...style,
         position: normalizedPosition,
-        runnerNumber,
+        runner_number,
         runnerName: fallbackName,
       })
     })
 
     return highlights
   }, [
-    resultsData,
-    resultStatus,
+    results_data,
+    result_status,
     raceStatus,
-    currentRace?.resultsData,
-    currentRace?.resultStatus,
+    currentRace?.results_data,
+    currentRace?.result_status,
     currentRace?.status,
     sortedEntrants,
     logger
@@ -686,7 +686,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       .sort((a, b) => a.position - b.position)
       .map(
         (info) =>
-          `${info.shortLabel}: number ${info.runnerNumber} ${info.runnerName}`.trim()
+          `${info.shortLabel}: number ${info.runner_number} ${info.runnerName}`.trim()
       )
   }, [resultHighlights])
 
@@ -715,11 +715,11 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     entrantsCount: sortedEntrants.length,
     timelineLoading,
     timelineError: timelineError ? timelineError : null,
-    entrantIdsPreview: entrantIds.slice(0, 3),
+    entrant_idsPreview: entrant_ids.slice(0, 3),
     sampleEntrantData: sortedEntrants.slice(0, 2).map((e) => ({
       id: e.$id,
       name: e.name,
-      runnerNumber: e.runnerNumber,
+      runner_number: e.runner_number,
     })),
   })
 
@@ -783,7 +783,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       for (const [, entrantData] of timelineData) {
         if (entrantData.dataPoints && entrantData.dataPoints.length > 0) {
           const maxTimeToStart = Math.max(
-            ...entrantData.dataPoints.map((p) => Math.abs(p.timeToStart || 0))
+            ...entrantData.dataPoints.map((p) => Math.abs(p.time_to_start || 0))
           )
           maxPostStartFromData = Math.max(maxPostStartFromData, maxTimeToStart)
         }
@@ -794,7 +794,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     // const effectiveMaxPostStart = Math.max(actualPostStartMinutes, maxPostStartFromData) // Currently unused
 
     // Pre-scheduled timeline milestones (CORRECTED: positive = before start, negative = after start)
-    // Backend uses: timeToStart: 60 = 60min before start, timeToStart: -2 = 2min after start
+    // Backend uses: time_to_start: 60 = 60min before start, time_to_start: -2 = 2min after start
     const preScheduledMilestones = [
       60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 4, 3, 2, 1, 0,
     ]
@@ -886,13 +886,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           for (const [, entrantData] of timelineData) {
             if (entrantData.dataPoints && entrantData.dataPoints.length > 0) {
               entrantData.dataPoints.forEach((point) => {
-                // FIXED: Use timeInterval when available (server-calculated), fallback to timeToStart
-                const interval = point.timeInterval ?? point.timeToStart
+                // FIXED: Use time_interval when available (server-calculated), fallback to time_to_start
+                const interval = point.time_interval ?? point.time_to_start
 
                 if (interval !== undefined) {
                   // Add post-race intervals to dynamic columns (negative intervals = post-start)
                   if (interval < 0) {
-                    // Use server-calculated timeInterval directly (already properly bucketed)
+                    // Use server-calculated time_interval directly (already properly bucketed)
                     dataIntervals.add(interval)
                   }
                 }
@@ -1097,7 +1097,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         (candidate) =>
           getEntrantKey(candidate) === entrantKey || candidate.$id === entrantKey
       )
-      if (!entrant || entrant.isScratched) return '—'
+      if (!entrant || entrant.is_scratched) return '—'
 
       // Use appropriate function based on selected view
       let result: string
@@ -1125,7 +1125,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       // Debug logging to help troubleshoot data issues
       if (interval === 60 && process.env.NODE_ENV === 'development') {
         logger.debug(`Timeline data for ${entrant.name || entrant.$id} at ${interval}m:`, {
-          entrantId: getEntrantKey(entrant),
+          entrant_id: getEntrantKey(entrant),
           interval,
           selectedView,
           result,
@@ -1169,18 +1169,18 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   // Get pool amount for the currently selected view type
   const getPoolAmount = useCallback(
     (entrant: Entrant): number | undefined => {
-      if (!entrant.poolMoney) return undefined // Return undefined when no real data yet
+      if (!entrant.pool_money) return undefined // Return undefined when no real data yet
 
       switch (selectedView) {
         case 'win':
-          return entrant.poolMoney.win || 0
+          return entrant.pool_money.win || 0
         case 'place':
-          return entrant.poolMoney.place || 0
+          return entrant.pool_money.place || 0
         case 'odds':
           // For odds view, show win pool amount as it's related to win odds
-          return entrant.poolMoney.win || 0
+          return entrant.pool_money.win || 0
         default:
-          return entrant.poolMoney.total || 0
+          return entrant.pool_money.total || 0
       }
     },
     [selectedView]
@@ -1189,10 +1189,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   // Get pool percentage for the currently selected pool type
   const getPoolPercentage = useCallback(
     (entrant: Entrant): number | undefined => {
-      if (entrant.isScratched) return 0
+      if (entrant.is_scratched) return 0
 
       // Return undefined if no pool money data available yet (avoid showing dummy percentages)
-      if (!entrant.poolMoney) return undefined
+      if (!entrant.pool_money) return undefined
 
       // Calculate percentage based on selected view type
       switch (selectedView) {
@@ -1200,44 +1200,44 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           // Calculate percentage of win pool
           const totalWinPool = entrantsWithPoolData.reduce(
             (sum, e) =>
-              !e.isScratched && e.poolMoney
-                ? sum + (e.poolMoney.win || 0)
+              !e.is_scratched && e.pool_money
+                ? sum + (e.pool_money.win || 0)
                 : sum,
             0
           )
           return totalWinPool > 0
-            ? ((entrant.poolMoney.win || 0) / totalWinPool) * 100
+            ? ((entrant.pool_money.win || 0) / totalWinPool) * 100
             : 0
 
         case 'place':
           // Calculate percentage of place pool
           const totalPlacePool = entrantsWithPoolData.reduce(
             (sum, e) =>
-              !e.isScratched && e.poolMoney
-                ? sum + (e.poolMoney.place || 0)
+              !e.is_scratched && e.pool_money
+                ? sum + (e.pool_money.place || 0)
                 : sum,
             0
           )
           return totalPlacePool > 0
-            ? ((entrant.poolMoney.place || 0) / totalPlacePool) * 100
+            ? ((entrant.pool_money.place || 0) / totalPlacePool) * 100
             : 0
 
         case 'odds':
           // For odds view, show win pool percentage as it's related to win odds
           const totalWinPoolForOdds = entrantsWithPoolData.reduce(
             (sum, e) =>
-              !e.isScratched && e.poolMoney
-                ? sum + (e.poolMoney.win || 0)
+              !e.is_scratched && e.pool_money
+                ? sum + (e.pool_money.win || 0)
                 : sum,
             0
           )
           return totalWinPoolForOdds > 0
-            ? ((entrant.poolMoney.win || 0) / totalWinPoolForOdds) * 100
+            ? ((entrant.pool_money.win || 0) / totalWinPoolForOdds) * 100
             : 0
 
         default:
           // Default to existing percentage calculation
-          return entrant.poolMoney.percentage || 0
+          return entrant.pool_money.percentage || 0
       }
     },
     [selectedView, entrantsWithPoolData]
@@ -1245,12 +1245,12 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
   // Handle entrant selection
   const handleEntrantClick = useCallback(
-    (entrantId: string) => {
-      setSelectedEntrant((prev) => (prev === entrantId ? undefined : entrantId))
-      const entrant = sortedEntrants.find((e) => e.$id === entrantId)
+    (entrant_id: string) => {
+      setSelectedEntrant((prev) => (prev === entrant_id ? undefined : entrant_id))
+      const entrant = sortedEntrants.find((e) => e.$id === entrant_id)
       if (entrant) {
         screenReader?.announce(
-          `Selected ${entrant.name}, runner number ${entrant.runnerNumber}`,
+          `Selected ${entrant.name}, runner number ${entrant.runner_number}`,
           'polite'
         )
       }
@@ -1259,10 +1259,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   )
 
   const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent, entrantId: string) => {
+    (event: React.KeyboardEvent, entrant_id: string) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault()
-        handleEntrantClick(entrantId)
+        handleEntrantClick(entrant_id)
       }
     },
     [handleEntrantClick]
@@ -1470,18 +1470,18 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                   </th>
                   <th
                     className={`px-2 py-1 text-right text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 border-r border-gray-200 sticky left-[200px] top-0 z-30 ${
-                      sortState?.column === 'winOdds' ? 'bg-blue-50' : ''
+                      sortState?.column === 'win_odds' ? 'bg-blue-50' : ''
                     }`}
                     style={{
                       backgroundColor:
-                        sortState?.column === 'winOdds' ? '#eff6ff' : '#f9fafb',
+                        sortState?.column === 'win_odds' ? '#eff6ff' : '#f9fafb',
                     }}
-                    onClick={() => handleSort('winOdds')}
+                    onClick={() => handleSort('win_odds')}
                     title="Click to sort by Win odds"
                   >
                     <div className="flex items-center justify-end">
                       <span>Win</span>
-                      {sortState?.column === 'winOdds' && (
+                      {sortState?.column === 'win_odds' && (
                         <span className="ml-1">
                           {sortState.direction === 'asc' ? '↑' : '↓'}
                         </span>
@@ -1556,7 +1556,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
               <tbody className="bg-white divide-y divide-gray-100">
                 {sortedEntrants.map((entrant) => {
                   const resultHighlight = resultHighlights.get(
-                    entrant.runnerNumber
+                    entrant.runner_number
                   )
                   const runnerCellBackgroundClass =
                     resultHighlight?.backgroundClass ?? 'bg-white'
@@ -1568,7 +1568,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     <tr
                       key={entrant.$id}
                       className={`hover:bg-gray-50 focus-within:bg-blue-50 transition-colors ${
-                        entrant.isScratched ? 'opacity-50 bg-pink-50' : ''
+                        entrant.is_scratched ? 'opacity-50 bg-pink-50' : ''
                       } ${
                         selectedEntrant === entrant.$id ? 'bg-blue-100' : ''
                       } cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset`}
@@ -1581,13 +1581,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                         maxHeight: '30px',
                       }}
                       aria-label={AriaLabels.generateRunnerRowLabel(
-                        entrant.runnerNumber,
+                        entrant.runner_number,
                         entrant.name,
                         entrant.jockey || 'Unknown jockey',
-                        entrant.trainerName || 'Unknown trainer',
-                        entrant.winOdds,
-                        entrant.placeOdds,
-                        entrant.isScratched,
+                        entrant.trainer_name || 'Unknown trainer',
+                        entrant.win_odds,
+                        entrant.place_odds,
+                        entrant.is_scratched,
                         finishingAnnouncement
                       )}
                     >
@@ -1605,13 +1605,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                             {displayConfig.showJockeySilks && (
                               <JockeySilks
                                 silk={entrant.silk}
-                                runnerNumber={entrant.runnerNumber}
+                                runner_number={entrant.runner_number}
                                 runnerName={entrant.name}
                                 jockey={entrant.jockey}
                                 fallbackUrl={
-                                  entrant.silkUrl128 ||
-                                  entrant.silkUrl64 ||
-                                  entrant.silkUrl
+                                  entrant.silk_url_128 ||
+                                  entrant.silk_url_64 ||
+                                  entrant.silk_url
                                 }
                                 config={{ size: 'small' }}
                               />
@@ -1620,9 +1620,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                               <span
                                 className={`text-lg font-bold ${runnerCellTextClass}`}
                               >
-                                {entrant.runnerNumber}
+                                {entrant.runner_number}
                               </span>
-                              {entrant.isScratched && (
+                              {entrant.is_scratched && (
                                 <span className="text-xs text-red-600 font-medium">
                                   SCR
                                 </span>
@@ -1652,7 +1652,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
                       {/* Timeline Columns */}
                       {timelineColumns.map((column) => {
-                        const indicator = !entrant.isScratched
+                        const indicator = !entrant.is_scratched
                           ? getIndicatorForCell(
                               column.interval,
                               getEntrantKey(entrant)
@@ -1678,7 +1678,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                           <td
                             key={`${entrant.$id}_${column.interval}`}
                             className={`px-2 py-1 text-xs text-center border-r border-gray-100 ${
-                              entrant.isScratched
+                              entrant.is_scratched
                                 ? 'bg-pink-50'
                                 : column.isScheduledStart
                                 ? 'border-blue-200 bg-blue-100'
@@ -1686,7 +1686,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                                 ? 'bg-yellow-50'
                                 : ''
                             } ${
-                              !entrant.isScratched &&
+                              !entrant.is_scratched &&
                               isCurrentTimeColumn(column.interval)
                                 ? 'bg-green-50 border-green-200 font-medium'
                                 : ''
@@ -1715,7 +1715,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     >
                       <div className="flex items-center justify-end h-full">
                         <span className="text-sm font-medium text-gray-900">
-                          {entrant.isScratched
+                          {entrant.is_scratched
                             ? '—'
                             : (() => {
                                 const amount = getPoolAmount(entrant)
@@ -1733,7 +1733,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                     >
                       <div className="flex items-center justify-end h-full">
                         <span className="text-sm font-medium text-gray-900">
-                          {entrant.isScratched
+                          {entrant.is_scratched
                             ? '—'
                             : (() => {
                                 const percentage = getPoolPercentage(entrant)
@@ -1742,21 +1742,21 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                                   : '0%'
                               })()}
                         </span>
-                        {!entrant.isScratched &&
-                          entrant.moneyFlowTrend &&
-                          entrant.moneyFlowTrend !== 'neutral' && (
+                        {!entrant.is_scratched &&
+                          entrant.money_flow_trend &&
+                          entrant.money_flow_trend !== 'neutral' && (
                             <span
                               className={`ml-1 text-xs ${
-                                entrant.moneyFlowTrend === 'up'
+                                entrant.money_flow_trend === 'up'
                                   ? 'text-red-600'
-                                  : entrant.moneyFlowTrend === 'down'
+                                  : entrant.money_flow_trend === 'down'
                                   ? 'text-blue-600'
                                   : 'text-gray-400'
                               }`}
                             >
-                              {entrant.moneyFlowTrend === 'up'
+                              {entrant.money_flow_trend === 'up'
                                 ? '↑'
-                                : entrant.moneyFlowTrend === 'down'
+                                : entrant.money_flow_trend === 'down'
                                 ? '↓'
                                 : ''}
                             </span>

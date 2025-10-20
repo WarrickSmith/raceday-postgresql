@@ -13,19 +13,19 @@ import type { MoneyFlowDataPoint } from './moneyFlow'
 export interface MoneyCalculationInput {
   currentTimeframe: MoneyFlowDataPoint[]
   previousTimeframe: MoneyFlowDataPoint[]
-  entrantId: string
+  entrant_id: string
 }
 
 // Input data for odds calculations
 export interface OddsCalculationInput {
   currentOdds: number
   previousOdds: number
-  entrantId: string
+  entrant_id: string
 }
 
 // Result of percentage change calculation
 export interface PercentageChangeResult {
-  entrantId: string
+  entrant_id: string
   percentageChange: number
   changeType: 'money_increase' | 'odds_shortening'
   hasChange: boolean // true if change meets minimum threshold
@@ -33,7 +33,7 @@ export interface PercentageChangeResult {
 
 // Mapped indicator result after threshold matching
 export interface IndicatorResult {
-  entrantId: string
+  entrant_id: string
   percentageChange: number
   indicatorType: string // e.g. '10-15%'
   color: string // hex color from user configuration
@@ -62,7 +62,7 @@ export interface BatchCalculationInput {
     previousTimeframe: MoneyFlowDataPoint[]
   }
   oddsData: {
-    entrantId: string
+    entrant_id: string
     currentOdds: number
     previousOdds: number
   }[]

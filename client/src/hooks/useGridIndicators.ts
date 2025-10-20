@@ -41,12 +41,12 @@ const findDataPoint = (
   if (!timeline) return undefined
   return timeline.dataPoints.find((point) => {
     const interval =
-      getIntervalKey(point.timeInterval) ?? getIntervalKey(point.timeToStart)
+      getIntervalKey(point.time_interval) ?? getIntervalKey(point.time_to_start)
     return interval === targetInterval
   })
 }
 
-const getEntrantKey = (entrant: Entrant): string => entrant.entrantId || entrant.$id
+const getEntrantKey = (entrant: Entrant): string => entrant.entrant_id || entrant.$id
 
 const buildMoneyFrame = (
   entrants: Entrant[],
@@ -62,9 +62,9 @@ const buildMoneyFrame = (
     const rawAmount = (() => {
       if (!dataPoint) return 0
       if (view === 'place') {
-        return dataPoint.incrementalPlaceAmount ?? 0
+        return dataPoint.incremental_place_amount ?? 0
       }
-      return dataPoint.incrementalWinAmount ?? dataPoint.incrementalAmount ?? 0
+      return dataPoint.incremental_win_amount ?? dataPoint.incremental_amount ?? 0
     })()
 
     const basePoint: MoneyFlowDataPoint = {
@@ -72,22 +72,22 @@ const buildMoneyFrame = (
       $createdAt: dataPoint?.$createdAt ?? '1970-01-01T00:00:00.000Z',
       $updatedAt: dataPoint?.$updatedAt ?? '1970-01-01T00:00:00.000Z',
       entrant: entrantKey,
-      pollingTimestamp: dataPoint?.pollingTimestamp ?? '1970-01-01T00:00:00.000Z',
-      timeToStart: interval,
-      timeInterval: interval,
+      polling_timestamp: dataPoint?.polling_timestamp ?? '1970-01-01T00:00:00.000Z',
+      time_to_start: interval,
+      time_interval: interval,
       winPoolAmount: dataPoint?.winPoolAmount ?? 0,
       placePoolAmount: dataPoint?.placePoolAmount ?? 0,
-      totalPoolAmount: dataPoint?.totalPoolAmount ?? 0,
-      poolPercentage: dataPoint?.poolPercentage ?? 0,
-      incrementalAmount: Math.max(0, rawAmount || 0),
+      total_pool_amount: dataPoint?.total_pool_amount ?? 0,
+      pool_percentage: dataPoint?.pool_percentage ?? 0,
+      incremental_amount: Math.max(0, rawAmount || 0),
     }
 
     if (view === 'place') {
-      basePoint.incrementalPlaceAmount = basePoint.incrementalAmount
-      basePoint.incrementalWinAmount = dataPoint?.incrementalWinAmount ?? 0
+      basePoint.incremental_place_amount = basePoint.incremental_amount
+      basePoint.incremental_win_amount = dataPoint?.incremental_win_amount ?? 0
     } else {
-      basePoint.incrementalWinAmount = basePoint.incrementalAmount
-      basePoint.incrementalPlaceAmount = dataPoint?.incrementalPlaceAmount ?? 0
+      basePoint.incremental_win_amount = basePoint.incremental_amount
+      basePoint.incremental_place_amount = dataPoint?.incremental_place_amount ?? 0
     }
 
     return basePoint
@@ -118,7 +118,7 @@ const computeMoneyIndicators = (
     )
 
     entrants.forEach((entrant) => {
-      if (entrant.isScratched) {
+      if (entrant.is_scratched) {
         return
       }
 
@@ -126,7 +126,7 @@ const computeMoneyIndicators = (
       const percentageResult = calculateMoneyChangePercentage({
         currentTimeframe: currentFrame,
         previousTimeframe: previousFrame,
-        entrantId: entrantKey,
+        entrant_id: entrantKey,
       })
 
       if (!percentageResult.hasChange) {
@@ -147,7 +147,7 @@ const computeMoneyIndicators = (
         return
       }
 
-      indicator.entrantId = entrantKey
+      indicator.entrant_id = entrantKey
       indicator.percentageChange = percentageResult.percentageChange
 
       const existingIntervalMap = matrix.get(currentInterval) ?? new Map()
@@ -169,7 +169,7 @@ const computeOddsIndicators = (
     const previousInterval = intervals[idx - 1]
 
     entrants.forEach((entrant) => {
-      if (entrant.isScratched) {
+      if (entrant.is_scratched) {
         return
       }
 
@@ -178,9 +178,9 @@ const computeOddsIndicators = (
       const currentPoint = findDataPoint(timeline, currentInterval)
       const previousPoint = findDataPoint(timeline, previousInterval)
 
-      const currentOdds = currentPoint?.fixedWinOdds ?? currentPoint?.poolWinOdds
+      const currentOdds = currentPoint?.fixed_win_odds ?? currentPoint?.pool_win_odds
       const previousOdds =
-        previousPoint?.fixedWinOdds ?? previousPoint?.poolWinOdds
+        previousPoint?.fixed_win_odds ?? previousPoint?.pool_win_odds
 
       if (
         currentOdds === undefined ||
@@ -194,7 +194,7 @@ const computeOddsIndicators = (
       const oddsResult = calculateOddsChangePercentage({
         currentOdds,
         previousOdds,
-        entrantId: entrant.$id,
+        entrant_id: entrant.$id,
       })
 
       if (!oddsResult.hasChange) {
@@ -215,7 +215,7 @@ const computeOddsIndicators = (
         return
       }
 
-      indicator.entrantId = entrantKey
+      indicator.entrant_id = entrantKey
       indicator.percentageChange = oddsResult.percentageChange
 
       const intervalMap = matrix.get(currentInterval) ?? new Map()
@@ -266,7 +266,7 @@ interface UseGridIndicatorsParams {
 interface UseGridIndicatorsResult {
   getIndicatorForCell: (
     interval: number,
-    entrantId: string
+    entrant_id: string
   ) => IndicatorResult | null
   isLoading: boolean
 }
@@ -337,7 +337,7 @@ export const useGridIndicators = (
   ])
 
   const getIndicatorForCell = useCallback(
-    (interval: number, entrantId: string) => {
+    (interval: number, entrant_id: string) => {
       const intervalKey = getIntervalKey(interval)
       if (intervalKey === null) {
         return null
@@ -348,7 +348,7 @@ export const useGridIndicators = (
         return null
       }
 
-      return intervalMap.get(entrantId) ?? null
+      return intervalMap.get(entrant_id) ?? null
     },
     [indicatorMatrix]
   )

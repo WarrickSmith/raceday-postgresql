@@ -8,12 +8,12 @@ import type { Entrant } from './meetings';
 
 // Grid sorting configuration
 export type SortableColumn = 
-  | 'runnerNumber' 
+  | 'runner_number' 
   | 'runnerName' 
-  | 'winOdds' 
-  | 'placeOdds' 
-  | 'holdPercentage' 
-  | 'poolMoney' 
+  | 'win_odds' 
+  | 'place_odds' 
+  | 'hold_percentage' 
+  | 'pool_money' 
   | 'jockey';
 
 export type SortDirection = 'asc' | 'desc';
@@ -58,7 +58,7 @@ export interface EnhancedGridState {
   performance: GridPerformanceState;
   selectedEntrant?: string;
   highlightedEntrants: string[];
-  lastUpdated: string;
+  last_updated: string;
 }
 
 // Grid interaction events
@@ -66,8 +66,8 @@ export interface GridInteractionEvents {
   onSort: (column: SortableColumn, direction: SortDirection) => void;
   onPoolToggle: (pool: PoolType) => void;
   onDisplayModeChange: (mode: 'odds' | 'money' | 'percentage') => void;
-  onEntrantSelect: (entrantId: string) => void;
-  onEntrantHighlight: (entrantIds: string[]) => void;
+  onEntrantSelect: (entrant_id: string) => void;
+  onEntrantHighlight: (entrant_ids: string[]) => void;
   onColumnResize: (column: string, width: number) => void;
   onScroll: (position: number) => void;
 }
@@ -111,8 +111,8 @@ export interface EnhancedGridContext {
     updateSort: (column: SortableColumn, direction: SortDirection) => void;
     togglePool: (pool: PoolType) => void;
     updateDisplayConfig: (config: Partial<GridDisplayConfig>) => void;
-    setSelectedEntrant: (entrantId: string | undefined) => void;
-    highlightEntrants: (entrantIds: string[]) => void;
+    setSelectedEntrant: (entrant_id: string | undefined) => void;
+    highlightEntrants: (entrant_ids: string[]) => void;
     navigateKeyboard: (direction: 'up' | 'down' | 'left' | 'right') => void;
     resetState: () => void;
   };
@@ -144,13 +144,13 @@ export const DEFAULT_GRID_DISPLAY_CONFIG: GridDisplayConfig = {
   virtualScrolling: true,
   stickyColumns: true,
   columnWidths: {
-    runnerNumber: 80,
+    runner_number: 80,
     runnerName: 200,
     jockey: 150,
-    winOdds: 100,
-    placeOdds: 100,
-    holdPercentage: 120,
-    poolMoney: 140
+    win_odds: 100,
+    place_odds: 100,
+    hold_percentage: 120,
+    pool_money: 140
   }
 };
 

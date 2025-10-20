@@ -34,15 +34,15 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
   }, []);
 
   // Enhanced race click handler with pre-fetching for immediate rendering
-  const handleRaceClick = useCallback(async (raceId: string) => {
-    console.log('🎯 Race click - pre-fetching basic data for:', raceId);
+  const handleRaceClick = useCallback(async (race_id: string) => {
+    console.log('🎯 Race click - pre-fetching basic data for:', race_id);
     try {
-      await racePrefetchService.prefetchForNavigation(raceId);
-      console.log('✅ Pre-fetch completed, navigating to:', raceId);
+      await racePrefetchService.prefetchForNavigation(race_id);
+      console.log('✅ Pre-fetch completed, navigating to:', race_id);
     } catch (error) {
       console.warn('⚠️ Pre-fetch failed, proceeding with navigation:', error);
     }
-    router.push(`/race/${raceId}`);
+    router.push(`/race/${race_id}`);
   }, [router]);
 
   const handleRaceRealtimeUpdate = useCallback((event: RaceUpdateEvent) => {
@@ -96,7 +96,7 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
     }
 
     // Check if the currently selected meeting still exists in the updated meetings list
-    const matchingMeeting = meetings.find((meeting) => meeting.meetingId === selectedMeeting.meetingId);
+    const matchingMeeting = meetings.find((meeting) => meeting.meeting_id === selectedMeeting.meeting_id);
 
     if (!matchingMeeting) {
       // Only reset to first meeting if user hasn't manually selected one
@@ -111,7 +111,7 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
     // Update the selected meeting with fresh data only if there are actual changes
     // This prevents unnecessary re-renders that could interrupt race loading
     if (matchingMeeting.$updatedAt !== selectedMeeting.$updatedAt ||
-        matchingMeeting.firstRaceTime !== selectedMeeting.firstRaceTime) {
+        matchingMeeting.first_race_time !== selectedMeeting.first_race_time) {
       setSelectedMeeting(matchingMeeting);
     }
   }, [meetings, selectedMeeting, userHasSelectedMeeting]);
@@ -142,7 +142,7 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
           }
         }}
         aria-pressed={selectedMeeting?.$id === meeting.$id}
-        aria-label={`Select ${meeting.meetingName} meeting`}
+        aria-label={`Select ${meeting.meeting_name} meeting`}
       >
         <MeetingCard 
           meeting={meeting}

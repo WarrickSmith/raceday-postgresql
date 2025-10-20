@@ -38,10 +38,10 @@ const FILTER_STORAGE_KEY = 'raceday:filters'
 
 type StoredFilters = {
   countries?: string[]
-  raceTypes?: string[]
+  race_types?: string[]
   meetings?: string[]
-  meetingIds?: string[]
-  raceIds?: string[]
+  meeting_ids?: string[]
+  race_ids?: string[]
 }
 
 const extractMeetingId = (meeting: unknown): string | undefined => {
@@ -50,8 +50,8 @@ const extractMeetingId = (meeting: unknown): string | undefined => {
   }
 
   const meetingRecord = meeting as Record<string, unknown>
-  if (typeof meetingRecord.meetingId === 'string') {
-    return meetingRecord.meetingId
+  if (typeof meetingRecord.meeting_id === 'string') {
+    return meetingRecord.meeting_id
   }
   if (typeof meetingRecord.$id === 'string') {
     return meetingRecord.$id
@@ -78,8 +78,8 @@ const extractRaceType = (race: Race): string | undefined => {
     if (typeof meetingRecord.category === 'string') {
       return meetingRecord.category
     }
-    if (typeof meetingRecord.raceType === 'string') {
-      return meetingRecord.raceType
+    if (typeof meetingRecord.race_type === 'string') {
+      return meetingRecord.race_type
     }
   }
   return undefined
@@ -107,23 +107,23 @@ const buildFilterPredicateFromStorage = (): ((race: Race) => boolean) => {
 
     const {
       countries = [],
-      raceTypes = [],
+      race_types = [],
       meetings = [],
-      meetingIds = [],
-      raceIds = [],
+      meeting_ids = [],
+      race_ids = [],
     } = parsed
 
     return (race: Race) => {
-      if (raceIds.length > 0 && !raceIds.includes(race.raceId)) {
+      if (race_ids.length > 0 && !race_ids.includes(race.race_id)) {
         return false
       }
 
-      const meetingId = extractMeetingId(race.meeting)
+      const meeting_id = extractMeetingId(race.meeting)
       if (
-        meetingId &&
-        (meetingIds.length > 0 || meetings.length > 0) &&
-        !meetingIds.includes(meetingId) &&
-        !meetings.includes(meetingId)
+        meeting_id &&
+        (meeting_ids.length > 0 || meetings.length > 0) &&
+        !meeting_ids.includes(meeting_id) &&
+        !meetings.includes(meeting_id)
       ) {
         return false
       }
@@ -133,8 +133,8 @@ const buildFilterPredicateFromStorage = (): ((race: Race) => boolean) => {
         return false
       }
 
-      const raceType = extractRaceType(race)
-      if (raceTypes.length > 0 && raceType && !raceTypes.includes(raceType)) {
+      const race_type = extractRaceType(race)
+      if (race_types.length > 0 && race_type && !race_types.includes(race_type)) {
         return false
       }
 

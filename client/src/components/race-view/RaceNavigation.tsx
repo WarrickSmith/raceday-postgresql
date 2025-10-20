@@ -115,7 +115,7 @@ export const RaceNavigation = memo(function RaceNavigation({
         }
         title={
           navigationData.nextScheduledRace
-            ? `${navigationData.nextScheduledRace.name} at ${navigationData.nextScheduledRace.meetingName}`
+            ? `${navigationData.nextScheduledRace.name} at ${navigationData.nextScheduledRace.meeting_name}`
             : "No upcoming races scheduled"
         }
       >
@@ -158,7 +158,7 @@ export const RaceNavigation = memo(function RaceNavigation({
         }
         title={
           navigationData.previousRace
-            ? `${navigationData.previousRace.name} at ${navigationData.previousRace.meetingName}`
+            ? `${navigationData.previousRace.name} at ${navigationData.previousRace.meeting_name}`
             : "No previous race available"
         }
       >
@@ -201,7 +201,7 @@ export const RaceNavigation = memo(function RaceNavigation({
         }
         title={
           navigationData.nextRace
-            ? `${navigationData.nextRace.name} at ${navigationData.nextRace.meetingName}`
+            ? `${navigationData.nextRace.name} at ${navigationData.nextRace.meeting_name}`
             : "No next race available"
         }
       >

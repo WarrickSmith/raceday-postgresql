@@ -21,10 +21,10 @@ export interface RaceContextData {
   entrants: Entrant[]
   navigationData: RaceNavigationData
   dataFreshness: {
-    lastUpdated: string
+    last_updated: string
     entrantsDataAge: number
-    oddsHistoryCount: number // DEPRECATED: Always 0, odds data comes from MoneyFlowHistory
-    moneyFlowHistoryCount: number
+    odds_historyCount: number // DEPRECATED: Always 0, odds data comes from MoneyFlowHistory
+    money_flow_historyCount: number
   }
 }
 
@@ -33,8 +33,8 @@ interface RaceContextValue {
   isLoading: boolean
   error: string | null
   updateRaceData: (data: RaceContextData) => void
-  loadRaceData: (raceId: string) => Promise<void>
-  invalidateRaceCache: (raceId: string) => void
+  loadRaceData: (race_id: string) => Promise<void>
+  invalidateRaceCache: (race_id: string) => void
   refreshRaceData: () => Promise<void>
   pollingState: RacePollingState
 }
@@ -83,8 +83,8 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
 
   // Simple race data loading function (without navigation complexity)
   const loadRaceData = useCallback(
-    async (raceId: string): Promise<void> => {
-      const normalizedRaceId = raceId?.trim()
+    async (race_id: string): Promise<void> => {
+      const normalizedRaceId = race_id?.trim()
 
       if (!normalizedRaceId) {
         setError('Race ID is required')
@@ -158,8 +158,8 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
   )
 
   const invalidateRaceCache = useCallback(
-    (raceId: string) => {
-      cacheInvalidation.onRaceUpdate(raceId)
+    (race_id: string) => {
+      cacheInvalidation.onRaceUpdate(race_id)
 
       // Trigger memory cleanup when invalidating cache
       triggerCleanup()
@@ -180,8 +180,8 @@ export function RaceProvider({ children, initialData }: RaceProviderProps) {
   }, [])
 
   const pollingState = useRacePolling({
-    raceId: raceData?.race?.raceId ?? '',
-    raceStartTime: raceData?.race?.startTime ?? '',
+    race_id: raceData?.race?.race_id ?? '',
+    raceStartTime: raceData?.race?.start_time ?? '',
     raceStatus: raceData?.race?.status ?? '',
     hasInitialData: Boolean(raceData),
     onDataUpdate: updateRaceData,

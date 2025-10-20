@@ -14,7 +14,7 @@ export interface IndicatorConfig {
   isDefault: boolean
   enabled: boolean
   displayOrder: number
-  lastUpdated?: string
+  last_updated?: string
   createdAt?: string
   audibleAlertsEnabled?: boolean
 }
@@ -46,7 +46,7 @@ export const DEFAULT_INDICATOR_COLORS = {
 } as const
 
 // Default indicator configurations
-export const DEFAULT_INDICATORS: Omit<IndicatorConfig, '$id' | 'userId' | 'lastUpdated' | 'createdAt'>[] = [
+export const DEFAULT_INDICATORS: Omit<IndicatorConfig, '$id' | 'userId' | 'last_updated' | 'createdAt'>[] = [
   {
     indicatorType: 'percentage_range',
     percentageRangeMin: 5,

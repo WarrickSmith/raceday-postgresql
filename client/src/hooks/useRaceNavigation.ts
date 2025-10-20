@@ -55,9 +55,9 @@ export function useRaceNavigation({
 
   // Navigation helper function with timeout protection and fallbacks
   const navigateToRace = useCallback(
-    async (raceId: string, navigationTarget: string) => {
-      const startTime = Date.now();
-      console.log(`🚀 [${new Date().toISOString()}] Starting navigation to race ${raceId} (${navigationTarget})`);
+    async (race_id: string, navigationTarget: string) => {
+      const start_time = Date.now();
+      console.log(`🚀 [${new Date().toISOString()}] Starting navigation to race ${race_id} (${navigationTarget})`);
       
       // Clear any existing timeout
       if (timeoutRef.current) {
@@ -74,16 +74,16 @@ export function useRaceNavigation({
         await onNavigationStart?.(navigationTarget);
         
         // Navigate immediately - cleanup is non-blocking
-        router.push(`/race/${raceId}`);
+        router.push(`/race/${race_id}`);
         
         // Set timeout protection - if navigation doesn't complete in 3 seconds, try fallback
         timeoutRef.current = setTimeout(() => {
-          const elapsed = Date.now() - startTime;
-          console.warn(`⚠️ Navigation timeout after ${elapsed}ms, trying fallback for race ${raceId}`);
+          const elapsed = Date.now() - start_time;
+          console.warn(`⚠️ Navigation timeout after ${elapsed}ms, trying fallback for race ${race_id}`);
           
           // Fallback: use window.location for more reliable navigation
           try {
-            window.location.href = `/race/${raceId}`;
+            window.location.href = `/race/${race_id}`;
           } catch (fallbackError) {
             console.error('❌ Fallback navigation also failed:', fallbackError);
             setNavigationState({
@@ -96,7 +96,7 @@ export function useRaceNavigation({
         }, 3000);
         
       } catch (error) {
-        const elapsed = Date.now() - startTime;
+        const elapsed = Date.now() - start_time;
         const errorMessage = error instanceof Error ? error.message : 'Navigation failed';
         console.error(`❌ [${elapsed}ms] Navigation to ${navigationTarget} failed:`, error);
         
@@ -114,7 +114,7 @@ export function useRaceNavigation({
 
   // Navigation handlers for each button type
   const navigateToMeetings = useCallback(async () => {
-    const startTime = Date.now();
+    const start_time = Date.now();
     console.log(`🏠 [${new Date().toISOString()}] Starting navigation to meetings`);
     
     // Clear any existing timeout
@@ -134,7 +134,7 @@ export function useRaceNavigation({
       
       // Set a timeout to reset state in case the meetings page doesn't unmount this component
       timeoutRef.current = setTimeout(() => {
-        const elapsed = Date.now() - startTime;
+        const elapsed = Date.now() - start_time;
         
         if (elapsed > 2000) {
           console.warn(`⚠️ Meetings navigation timeout after ${elapsed}ms, trying fallback`);
@@ -155,7 +155,7 @@ export function useRaceNavigation({
       onNavigationComplete?.();
       }, 3000);
     } catch (error) {
-      const elapsed = Date.now() - startTime;
+      const elapsed = Date.now() - start_time;
       const errorMessage = error instanceof Error ? error.message : 'Navigation to meetings failed';
       console.error(`❌ [${elapsed}ms] Navigation to meetings failed:`, error);
       
@@ -177,7 +177,7 @@ export function useRaceNavigation({
       return;
     }
     
-    navigateToRace(navigationData.nextScheduledRace.raceId, 'next-scheduled');
+    navigateToRace(navigationData.nextScheduledRace.race_id, 'next-scheduled');
   }, [navigationData, navigateToRace, onError]);
 
   const navigateToPrevious = useCallback(() => {
@@ -188,7 +188,7 @@ export function useRaceNavigation({
       return;
     }
     
-    navigateToRace(navigationData.previousRace.raceId, 'previous');
+    navigateToRace(navigationData.previousRace.race_id, 'previous');
   }, [navigationData, navigateToRace, onError]);
 
   const navigateToNext = useCallback(() => {
@@ -199,7 +199,7 @@ export function useRaceNavigation({
       return;
     }
     
-    navigateToRace(navigationData.nextRace.raceId, 'next');
+    navigateToRace(navigationData.nextRace.race_id, 'next');
   }, [navigationData, navigateToRace, onError]);
 
   // Button availability checks

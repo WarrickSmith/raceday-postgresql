@@ -10,7 +10,7 @@ import {
 
 interface RaceCardProps {
   race: Race;
-  onClick?: (raceId: string) => void;
+  onClick?: (race_id: string) => void;
 }
 
 function RaceCardComponent({ race, onClick }: RaceCardProps) {
@@ -25,7 +25,7 @@ function RaceCardComponent({ race, onClick }: RaceCardProps) {
       // Announce status change to screen readers
       if (statusAnnouncementRef.current) {
         statusAnnouncementRef.current.textContent = 
-          `Race ${race.raceNumber} status changed from ${previousStatus} to ${race.status}. ${getRaceStatusDescription(race.status)}`;
+          `Race ${race.race_number} status changed from ${previousStatus} to ${race.status}. ${getRaceStatusDescription(race.status)}`;
       }
       
       // Trigger visual transition animation
@@ -34,7 +34,7 @@ function RaceCardComponent({ race, onClick }: RaceCardProps) {
       return () => clearTimeout(timer);
     }
     setPreviousStatus(race.status);
-  }, [race.status, previousStatus, race.raceNumber]);
+  }, [race.status, previousStatus, race.race_number]);
 
   const formatTime = (dateTimeString: string) => {
     try {
@@ -54,14 +54,14 @@ function RaceCardComponent({ race, onClick }: RaceCardProps) {
 
   const handleClick = () => {
     if (onClick) {
-      onClick(race.raceId);
+      onClick(race.race_id);
     }
   };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if ((event.key === 'Enter' || event.key === ' ') && onClick) {
       event.preventDefault();
-      onClick(race.raceId);
+      onClick(race.race_id);
     }
   };
 
@@ -211,9 +211,9 @@ function RaceCardComponent({ race, onClick }: RaceCardProps) {
           <div className="flex-shrink-0">
             <span 
               className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-800 text-sm font-bold"
-              aria-label={`Race number ${race.raceNumber}`}
+              aria-label={`Race number ${race.race_number}`}
             >
-              {race.raceNumber}
+              {race.race_number}
             </span>
           </div>
           
@@ -235,7 +235,7 @@ function RaceCardComponent({ race, onClick }: RaceCardProps) {
       <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
         <div className="flex items-center flex-wrap gap-x-3 gap-y-1 min-w-0 flex-1">
           <span className="font-medium text-gray-600">
-            ID: {race.raceId}
+            ID: {race.race_id}
           </span>
           {race.distance && (
             <span className="flex items-center">
@@ -245,30 +245,30 @@ function RaceCardComponent({ race, onClick }: RaceCardProps) {
               {race.distance}m
             </span>
           )}
-          {race.runnerCount && (
+          {race.runner_count && (
             <span className="flex items-center">
               <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
-              {race.runnerCount} runners
+              {race.runner_count} runners
             </span>
           )}
-          {race.trackCondition && (
+          {race.track_condition && (
             <span className="flex items-center">
               <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.002 4.002 0 003 15z" />
               </svg>
-              Track: {race.trackCondition}
+              Track: {race.track_condition}
             </span>
           )}
         </div>
         
         <time 
-          dateTime={race.startTime}
+          dateTime={race.start_time}
           className="font-medium text-gray-700 ml-3 flex-shrink-0"
-          aria-label={`Race starts at ${formatTime(race.startTime)}`}
+          aria-label={`Race starts at ${formatTime(race.start_time)}`}
         >
-          {formatTime(race.startTime)}
+          {formatTime(race.start_time)}
         </time>
       </div>
       
@@ -292,9 +292,9 @@ export const RaceCard = memo(RaceCardComponent, (prevProps, nextProps) => {
     prevProps.race.$id === nextProps.race.$id &&
     prevProps.race.$updatedAt === nextProps.race.$updatedAt &&
     prevProps.race.status === nextProps.race.status &&
-    prevProps.race.startTime === nextProps.race.startTime &&
+    prevProps.race.start_time === nextProps.race.start_time &&
     prevProps.race.name === nextProps.race.name &&
-    prevProps.race.raceNumber === nextProps.race.raceNumber
+    prevProps.race.race_number === nextProps.race.race_number
   );
   
   const propsEqual = prevProps.onClick === nextProps.onClick;

@@ -18,7 +18,7 @@ import { getConnectionState } from '@/state/connectionState'
 
 // Server response interface for raw database data
 interface ServerEntrant {
-  entrantId?: string
+  entrant_id?: string
   name?: string
   $id?: string
   id?: string
@@ -41,38 +41,38 @@ interface ServerMoneyFlowPoint {
   $id: string
   $createdAt: string
   $updatedAt: string
-  // Server may return either a relational `entrant` field or a scalar `entrantId`.
-  // Our API currently selects `entrantId` for performance; include both for compatibility.
+  // Server may return either a relational `entrant` field or a scalar `entrant_id`.
+  // Our API currently selects `entrant_id` for performance; include both for compatibility.
   entrant?: EntrantReference
-  entrantId?: string
+  entrant_id?: string
   eventTimestamp?: string
-  pollingTimestamp?: string
-  timeToStart?: number
-  timeInterval?: number
-  intervalType?: TimelineIntervalType
-  holdPercentage?: number
+  polling_timestamp?: string
+  time_to_start?: number
+  time_interval?: number
+  interval_type?: TimelineIntervalType
+  hold_percentage?: number
   betPercentage?: number
   winPoolAmount?: number
   placePoolAmount?: number
   type?: string
   poolType?: string
-  incrementalWinAmount?: number
-  incrementalPlaceAmount?: number
-  incrementalAmount?: number
-  totalPoolAmount?: number
+  incremental_win_amount?: number
+  incremental_place_amount?: number
+  incremental_amount?: number
+  total_pool_amount?: number
   // CONSOLIDATED ODDS DATA (NEW in Story 4.9)
-  fixedWinOdds?: number
-  fixedPlaceOdds?: number
-  poolWinOdds?: number
-  poolPlaceOdds?: number
+  fixed_win_odds?: number
+  fixed_place_odds?: number
+  pool_win_odds?: number
+  pool_place_odds?: number
 }
 
 interface MoneyFlowTimelineResponse {
   success: boolean
   documents: ServerMoneyFlowPoint[]
   total?: number
-  raceId?: string
-  entrantIds?: string[]
+  race_id?: string
+  entrant_ids?: string[]
   poolType?: string
   bucketedData?: boolean
   intervalCoverage?: Record<string, unknown>
@@ -84,9 +84,9 @@ interface MoneyFlowTimelineResponse {
 }
 
 export interface TimelineGridData {
-  [timeInterval: number]: {
-    [entrantId: string]: {
-      incrementalAmount: number
+  [time_interval: number]: {
+    [entrant_id: string]: {
+      incremental_amount: number
       poolType: TimelinePoolType
       timestamp: string
     }
@@ -94,21 +94,21 @@ export interface TimelineGridData {
 }
 
 interface UseMoneyFlowTimelineResult {
-  timelineData: Map<string, EntrantMoneyFlowTimeline> // entrantId -> timeline data
-  gridData: TimelineGridData // interval -> entrantId -> data
+  timelineData: Map<string, EntrantMoneyFlowTimeline> // entrant_id -> timeline data
+  gridData: TimelineGridData // interval -> entrant_id -> data
   isLoading: boolean
   error: string | null
   lastUpdate: Date | null
   refetch: () => Promise<void>
   getEntrantDataForInterval: (
-    entrantId: string,
+    entrant_id: string,
     interval: number,
     poolType: 'win' | 'place'
   ) => string
   // NEW: Multi-pool support functions
-  getWinPoolData: (entrantId: string, interval: number) => string
-  getPlacePoolData: (entrantId: string, interval: number) => string
-  getOddsData: (entrantId: string, interval: number, oddsType: 'fixedWin' | 'fixedPlace' | 'poolWin' | 'poolPlace') => string
+  getWinPoolData: (entrant_id: string, interval: number) => string
+  getPlacePoolData: (entrant_id: string, interval: number) => string
+  getOddsData: (entrant_id: string, interval: number, oddsType: 'fixedWin' | 'fixedPlace' | 'poolWin' | 'poolPlace') => string
 }
 
 const normalizeInterval = (
@@ -127,15 +127,15 @@ const normalizeInterval = (
 }
 
 export function useMoneyFlowTimeline(
-  raceId: string,
-  entrantIds: string[],
+  race_id: string,
+  entrant_ids: string[],
   poolType: TimelinePoolType = 'win',
   raceStatus?: string // Add race status to control post-race behavior
 ): UseMoneyFlowTimelineResult {
   const logger = useLogger('useMoneyFlowTimeline')
   const loggerRef = useRef(logger)
   loggerRef.current = logger
-  const entrantKey = useMemo(() => entrantIds.join(','), [entrantIds])
+  const entrantKey = useMemo(() => entrant_ids.join(','), [entrant_ids])
 
   // Metrics tracking
   const { recordRequest } = useEndpointMetrics(PollingEndpoint.MONEY_FLOW)
@@ -159,7 +159,7 @@ export function useMoneyFlowTimeline(
 
   // Fetch money flow timeline data for all entrants
   const fetchTimelineData = useCallback(async () => {
-    if (!raceId || entrantIds.length === 0) {
+    if (!race_id || entrant_ids.length === 0) {
       return
     }
 
@@ -220,7 +220,7 @@ export function useMoneyFlowTimeline(
           }
 
           const response = await fetch(
-            `/api/race/${raceId}/money-flow-timeline?${params.toString()}`
+            `/api/race/${race_id}/money-flow-timeline?${params.toString()}`
           )
 
           if (!response.ok) {
@@ -258,7 +258,7 @@ export function useMoneyFlowTimeline(
 
         const incomingMap = processTimelineData(
           aggregatedDocuments,
-          entrantIds,
+          entrant_ids,
           loggerRef.current
         )
         const hasIncoming =
@@ -300,12 +300,12 @@ export function useMoneyFlowTimeline(
               }
               combined.sort((a, b) => {
                 const ai =
-                  normalizeInterval(a.timeInterval) ??
-                  normalizeInterval(a.timeToStart) ??
+                  normalizeInterval(a.time_interval) ??
+                  normalizeInterval(a.time_to_start) ??
                   Number.NEGATIVE_INFINITY
                 const bi =
-                  normalizeInterval(b.timeInterval) ??
-                  normalizeInterval(b.timeToStart) ??
+                  normalizeInterval(b.time_interval) ??
+                  normalizeInterval(b.time_to_start) ??
                   Number.NEGATIVE_INFINITY
                 return bi - ai
               })
@@ -344,14 +344,14 @@ export function useMoneyFlowTimeline(
 
     pendingRequestRef.current = fetchPromise
     return fetchPromise
-  }, [raceId, entrantIds, entrantKey, raceStatus, recordRequest])
+  }, [race_id, entrant_ids, entrantKey, raceStatus, recordRequest])
 
   // Generate timeline grid data optimized for component display
   const gridData = useMemo(() => {
     const grid: TimelineGridData = {}
     const currentLogger = loggerRef.current
 
-    for (const [entrantId, entrantData] of timelineData) {
+    for (const [entrant_id, entrantData] of timelineData) {
       // Skip if no data points
       if (entrantData.dataPoints.length === 0) {
         continue
@@ -364,7 +364,7 @@ export function useMoneyFlowTimeline(
 
         // Use the incremental amount that was already calculated in the first processing loop
         // This ensures we maintain the correct chronological incremental calculations
-        const incrementalAmount = dataPoint.incrementalAmount ?? 0
+        const incremental_amount = dataPoint.incremental_amount ?? 0
 
         // Skip if this pool type doesn't match what we're displaying
         const hasValidPoolData =
@@ -372,20 +372,20 @@ export function useMoneyFlowTimeline(
           (poolType === 'place' &&
             typeof dataPoint.placePoolAmount === 'number')
 
-        if (!hasValidPoolData && !dataPoint.poolPercentage) {
+        if (!hasValidPoolData && !dataPoint.pool_percentage) {
           currentLogger.debug(`Skipping data point - no valid pool data for ${poolType}`, {
             winPoolAmount: dataPoint.winPoolAmount,
             placePoolAmount: dataPoint.placePoolAmount,
-            poolPercentage: dataPoint.poolPercentage,
+            pool_percentage: dataPoint.pool_percentage,
           })
           continue
         }
 
-        // Use timeInterval if available (bucketed data), otherwise timeToStart (legacy)
+        // Use time_interval if available (bucketed data), otherwise time_to_start (legacy)
         // This ensures compatibility with both data structures
         const intervalValue =
-          normalizeInterval(dataPoint.timeInterval) ??
-          normalizeInterval(dataPoint.timeToStart)
+          normalizeInterval(dataPoint.time_interval) ??
+          normalizeInterval(dataPoint.time_to_start)
 
         if (intervalValue === null) {
           continue
@@ -396,10 +396,10 @@ export function useMoneyFlowTimeline(
           grid[intervalValue] = {}
         }
 
-        grid[intervalValue][entrantId] = {
-          incrementalAmount,
+        grid[intervalValue][entrant_id] = {
+          incremental_amount,
           poolType,
-          timestamp: dataPoint.pollingTimestamp,
+          timestamp: dataPoint.polling_timestamp,
         }
       }
     }
@@ -410,7 +410,7 @@ export function useMoneyFlowTimeline(
   // Get formatted data for specific entrant and time interval
   const getEntrantDataForInterval = useCallback(
     (
-      entrantId: string,
+      entrant_id: string,
       interval: number,
       requestedPoolType: 'win' | 'place'
     ) => {
@@ -420,7 +420,7 @@ export function useMoneyFlowTimeline(
       }
 
       // Get entrant's timeline data directly
-      const entrantTimeline = timelineData.get(entrantId)
+      const entrantTimeline = timelineData.get(entrant_id)
       if (!entrantTimeline || entrantTimeline.dataPoints.length === 0) {
         return '—'
       }
@@ -428,8 +428,8 @@ export function useMoneyFlowTimeline(
       // Find data point for this specific interval
       const dataPoint = entrantTimeline.dataPoints.find((point) => {
         const pointInterval =
-          normalizeInterval(point.timeInterval) ??
-          normalizeInterval(point.timeToStart)
+          normalizeInterval(point.time_interval) ??
+          normalizeInterval(point.time_to_start)
         return pointInterval === interval
       })
 
@@ -437,13 +437,13 @@ export function useMoneyFlowTimeline(
         return '—'
       }
 
-      // SIMPLIFIED: Server pre-calculated everything in incrementalWinAmount/incrementalPlaceAmount
-      // For 60m: server stored absolute total in incrementalWinAmount
-      // For others: server stored true increment in incrementalWinAmount
+      // SIMPLIFIED: Server pre-calculated everything in incremental_win_amount/incremental_place_amount
+      // For 60m: server stored absolute total in incremental_win_amount
+      // For others: server stored true increment in incremental_win_amount
       const displayAmount =
         requestedPoolType === 'win'
-          ? dataPoint.incrementalWinAmount || dataPoint.incrementalAmount || 0
-          : dataPoint.incrementalPlaceAmount || dataPoint.incrementalAmount || 0
+          ? dataPoint.incremental_win_amount || dataPoint.incremental_amount || 0
+          : dataPoint.incremental_place_amount || dataPoint.incremental_amount || 0
 
       // Convert cents to dollars for display
       const amountInDollars = Math.round(displayAmount / 100)
@@ -466,7 +466,7 @@ export function useMoneyFlowTimeline(
 
   // Set up real-time subscription for money flow updates
   useEffect(() => {
-    if (!raceId || entrantIds.length === 0) return
+    if (!race_id || entrant_ids.length === 0) return
 
     // Initial fetch
     fetchTimelineData()
@@ -486,27 +486,27 @@ export function useMoneyFlowTimeline(
     // The parent component should trigger refetch when it receives money-flow-history updates
     
     loggerRef.current.debug('Money flow timeline using fetch-only mode (no subscription)', {
-      raceId,
-      entrantIds: entrantIds.length
+      race_id,
+      entrant_ids: entrant_ids.length
     })
 
     return () => {
       // No subscription cleanup needed - using unified subscription architecture
     }
-  }, [raceId, entrantIds, entrantKey, raceStatus, fetchTimelineData])
+  }, [race_id, entrant_ids, entrantKey, raceStatus, fetchTimelineData])
 
   // NEW: Get Win pool data for specific entrant and time interval
   const getWinPoolData = useCallback(
-    (entrantId: string, interval: number) => {
-      return getEntrantDataForInterval(entrantId, interval, 'win')
+    (entrant_id: string, interval: number) => {
+      return getEntrantDataForInterval(entrant_id, interval, 'win')
     },
     [getEntrantDataForInterval]
   )
 
   // NEW: Get Place pool data for specific entrant and time interval
   const getPlacePoolData = useCallback(
-    (entrantId: string, interval: number) => {
-      return getEntrantDataForInterval(entrantId, interval, 'place')
+    (entrant_id: string, interval: number) => {
+      return getEntrantDataForInterval(entrant_id, interval, 'place')
     },
     [getEntrantDataForInterval]
   )
@@ -514,7 +514,7 @@ export function useMoneyFlowTimeline(
   // NEW: Get odds data for specific entrant and time interval
   const getOddsData = useCallback(
     (
-      entrantId: string,
+      entrant_id: string,
       interval: number,
       oddsType: 'fixedWin' | 'fixedPlace' | 'poolWin' | 'poolPlace'
     ) => {
@@ -524,14 +524,14 @@ export function useMoneyFlowTimeline(
       }
 
       // Get entrant's timeline data directly
-      const entrantTimeline = timelineData.get(entrantId)
+      const entrantTimeline = timelineData.get(entrant_id)
       if (!entrantTimeline || entrantTimeline.dataPoints.length === 0) {
         return '—'
       }
 
       // Find data point for this specific interval
       const dataPoint = entrantTimeline.dataPoints.find((point) => {
-        const pointInterval = point.timeInterval ?? point.timeToStart ?? -999
+        const pointInterval = point.time_interval ?? point.time_to_start ?? -999
         return pointInterval === interval
       })
 
@@ -543,16 +543,16 @@ export function useMoneyFlowTimeline(
       let oddsValue: number | undefined
       switch (oddsType) {
         case 'fixedWin':
-          oddsValue = dataPoint.fixedWinOdds
+          oddsValue = dataPoint.fixed_win_odds
           break
         case 'fixedPlace':
-          oddsValue = dataPoint.fixedPlaceOdds
+          oddsValue = dataPoint.fixed_place_odds
           break
         case 'poolWin':
-          oddsValue = dataPoint.poolWinOdds
+          oddsValue = dataPoint.pool_win_odds
           break
         case 'poolPlace':
-          oddsValue = dataPoint.poolPlaceOdds
+          oddsValue = dataPoint.pool_place_odds
           break
         default:
           return '—'
@@ -588,44 +588,44 @@ export function useMoneyFlowTimeline(
  */
 function processTimelineData(
   documents: ServerMoneyFlowPoint[],
-  entrantIds: string[],
+  entrant_ids: string[],
   logger?: ComponentLogger
 ): Map<string, EntrantMoneyFlowTimeline> {
   const entrantDataMap = new Map<string, EntrantMoneyFlowTimeline>()
 
-  for (const entrantId of entrantIds) {
+  for (const entrant_id of entrant_ids) {
     // Extract entrant ID consistently across all data formats
     const entrantDocs = documents.filter((doc) => {
-      // Prefer scalar `entrantId` when present, fallback to relational `entrant`
-      const docEntrantId = (doc.entrantId && String(doc.entrantId)) || extractEntrantId(doc.entrant as EntrantReference)
-      return docEntrantId === entrantId
+      // Prefer scalar `entrant_id` when present, fallback to relational `entrant`
+      const docEntrantId = (doc.entrant_id && String(doc.entrant_id)) || extractEntrantId(doc.entrant as EntrantReference)
+      return docEntrantId === entrant_id
     })
 
     if (entrantDocs.length === 0) {
-      logger?.debug(`No documents found for entrant ${entrantId}`)
+      logger?.debug(`No documents found for entrant ${entrant_id}`)
       // Create empty entry to maintain consistency
-      entrantDataMap.set(entrantId, {
-        entrantId,
+      entrantDataMap.set(entrant_id, {
+        entrant_id,
         dataPoints: [],
-        latestPercentage: 0,
+        latest_percentage: 0,
         trend: 'neutral',
-        significantChange: false,
+        significant_change: false,
       })
       continue
     }
 
-    logger?.debug(`Processing entrant ${entrantId}`, { documentCount: entrantDocs.length })
+    logger?.debug(`Processing entrant ${entrant_id}`, { documentCount: entrantDocs.length })
 
     // Group documents by time interval to handle duplicates
     const intervalMap = new Map<number, ServerMoneyFlowPoint[]>()
 
     entrantDocs.forEach((doc) => {
-      // Use timeInterval if available (bucketed), otherwise timeToStart (legacy)
+      // Use time_interval if available (bucketed), otherwise time_to_start (legacy)
       const interval =
-        normalizeInterval(doc.timeInterval) ?? normalizeInterval(doc.timeToStart)
+        normalizeInterval(doc.time_interval) ?? normalizeInterval(doc.time_to_start)
 
       if (interval === null) {
-        logger?.warn(`Document missing time information for entrant ${entrantId}`)
+        logger?.warn(`Document missing time information for entrant ${entrant_id}`)
         return
       }
 
@@ -648,28 +648,28 @@ function processTimelineData(
         $id: doc.$id,
         $createdAt: doc.$createdAt,
         $updatedAt: doc.$updatedAt,
-        entrant: entrantId,
-        pollingTimestamp: doc.pollingTimestamp || doc.$createdAt,
-        timeToStart: normalizeInterval(doc.timeToStart) ?? interval,
-        timeInterval: normalizeInterval(doc.timeInterval) ?? interval,
-        intervalType: doc.intervalType || '5m',
+        entrant: entrant_id,
+        polling_timestamp: doc.polling_timestamp || doc.$createdAt,
+        time_to_start: normalizeInterval(doc.time_to_start) ?? interval,
+        time_interval: normalizeInterval(doc.time_interval) ?? interval,
+        interval_type: doc.interval_type || '5m',
         winPoolAmount: doc.winPoolAmount ?? 0,
         placePoolAmount: doc.placePoolAmount ?? 0,
-        totalPoolAmount: (doc.winPoolAmount ?? 0) + (doc.placePoolAmount ?? 0),
-        poolPercentage: doc.holdPercentage ?? doc.betPercentage ?? 0,
+        total_pool_amount: (doc.winPoolAmount ?? 0) + (doc.placePoolAmount ?? 0),
+        pool_percentage: doc.hold_percentage ?? doc.betPercentage ?? 0,
         // Use server pre-calculated incremental amounts directly
-        incrementalAmount:
-          doc.incrementalWinAmount ??
-          doc.incrementalAmount ??
+        incremental_amount:
+          doc.incremental_win_amount ??
+          doc.incremental_amount ??
           0,
-        incrementalWinAmount: doc.incrementalWinAmount ?? 0,
-        incrementalPlaceAmount: doc.incrementalPlaceAmount ?? 0,
-        pollingInterval: getPollingIntervalFromType(doc.intervalType),
+        incremental_win_amount: doc.incremental_win_amount ?? 0,
+        incremental_place_amount: doc.incremental_place_amount ?? 0,
+        polling_interval: getPollingIntervalFromType(doc.interval_type),
         // CONSOLIDATED ODDS DATA (NEW in Story 4.9)
-        fixedWinOdds: doc.fixedWinOdds,
-        fixedPlaceOdds: doc.fixedPlaceOdds,
-        poolWinOdds: doc.poolWinOdds,
-        poolPlaceOdds: doc.poolPlaceOdds,
+        fixed_win_odds: doc.fixed_win_odds,
+        fixed_place_odds: doc.fixed_place_odds,
+        pool_win_odds: doc.pool_win_odds,
+        pool_place_odds: doc.pool_place_odds,
       }
 
       timelinePoints.push(timelinePoint)
@@ -678,18 +678,18 @@ function processTimelineData(
     // Sort by time interval descending (60, 55, 50... 0, -0.5, -1)
     timelinePoints.sort((a, b) => {
       const aInterval =
-        normalizeInterval(a.timeInterval) ??
-        normalizeInterval(a.timeToStart) ??
+        normalizeInterval(a.time_interval) ??
+        normalizeInterval(a.time_to_start) ??
         Number.NEGATIVE_INFINITY
       const bInterval =
-        normalizeInterval(b.timeInterval) ??
-        normalizeInterval(b.timeToStart) ??
+        normalizeInterval(b.time_interval) ??
+        normalizeInterval(b.time_to_start) ??
         Number.NEGATIVE_INFINITY
       return bInterval - aInterval
     })
 
     // Server pre-calculated incremental amounts - no client calculation needed
-    // Per Implementation Guide: "Server pre-calculated everything in incrementalWinAmount/incrementalPlaceAmount"
+    // Per Implementation Guide: "Server pre-calculated everything in incremental_win_amount/incremental_place_amount"
 
     // Calculate trend and metadata
     const latestPoint = timelinePoints[timelinePoints.length - 1]
@@ -699,50 +699,50 @@ function processTimelineData(
         : null
 
     let trend: 'up' | 'down' | 'neutral' = 'neutral'
-    let significantChange = false
+    let significant_change = false
 
     if (latestPoint && secondLatestPoint) {
       const percentageChange =
-        latestPoint.poolPercentage - secondLatestPoint.poolPercentage
+        latestPoint.pool_percentage - secondLatestPoint.pool_percentage
       trend =
         percentageChange > 0.5
           ? 'up'
           : percentageChange < -0.5
           ? 'down'
           : 'neutral'
-      significantChange = Math.abs(percentageChange) >= 1.0 // Reduced threshold for more sensitivity
+      significant_change = Math.abs(percentageChange) >= 1.0 // Reduced threshold for more sensitivity
     }
 
     // Calculate latest odds from timeline data (NEW in Story 4.9)
-    let latestWinOdds: number | undefined
-    let latestPlaceOdds: number | undefined
+    let latest_win_odds: number | undefined
+    let latest_place_odds: number | undefined
     
     // Find the most recent odds values - timelinePoints is sorted by time interval descending (60, 55, 50... 0, -0.5, -1)
     // The LOWEST intervals (closest to 0 or negative) are the NEWEST, so iterate BACKWARDS from the end
     for (let i = timelinePoints.length - 1; i >= 0; i--) {
       const point = timelinePoints[i]
-      if (!latestWinOdds && point.fixedWinOdds !== undefined && point.fixedWinOdds > 0) {
-        latestWinOdds = point.fixedWinOdds
+      if (!latest_win_odds && point.fixed_win_odds !== undefined && point.fixed_win_odds > 0) {
+        latest_win_odds = point.fixed_win_odds
       }
-      if (!latestPlaceOdds && point.fixedPlaceOdds !== undefined && point.fixedPlaceOdds > 0) {
-        latestPlaceOdds = point.fixedPlaceOdds
+      if (!latest_place_odds && point.fixed_place_odds !== undefined && point.fixed_place_odds > 0) {
+        latest_place_odds = point.fixed_place_odds
       }
       // Break if we found both odds values
-      if (latestWinOdds && latestPlaceOdds) break
+      if (latest_win_odds && latest_place_odds) break
     }
 
-    entrantDataMap.set(entrantId, {
-      entrantId,
+    entrantDataMap.set(entrant_id, {
+      entrant_id,
       dataPoints: timelinePoints,
-      latestPercentage: latestPoint?.poolPercentage || 0,
+      latest_percentage: latestPoint?.pool_percentage || 0,
       trend,
-      significantChange,
+      significant_change,
       // Add latest odds from timeline data
-      latestWinOdds,
-      latestPlaceOdds,
+      latest_win_odds,
+      latest_place_odds,
     })
 
-    logger?.debug(`Processed entrant ${entrantId} timeline points`, {
+    logger?.debug(`Processed entrant ${entrant_id} timeline points`, {
       timelinePointsCount: timelinePoints.length,
       usingServerCalculatedData: true
     })
@@ -768,8 +768,8 @@ function extractEntrantId(entrant: EntrantReference): string {
   }
 
   if (entrant && typeof entrant === 'object') {
-    if (typeof entrant.entrantId === 'string') {
-      return entrant.entrantId
+    if (typeof entrant.entrant_id === 'string') {
+      return entrant.entrant_id
     }
     if (typeof entrant.$id === 'string') {
       return entrant.$id
@@ -785,8 +785,8 @@ function extractEntrantId(entrant: EntrantReference): string {
 /**
  * Get polling interval from interval type string
  */
-function getPollingIntervalFromType(intervalType?: TimelineIntervalType): number {
-  switch (intervalType) {
+function getPollingIntervalFromType(interval_type?: TimelineIntervalType): number {
+  switch (interval_type) {
     case '30s':
       return 0.5
     case '1m':

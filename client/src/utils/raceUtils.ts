@@ -29,18 +29,18 @@ export function getAllRacesFromMeetings(meetings: MeetingWithRaces[]): Race[] {
  */
 export function getCachedRacesFromMeetings(
   meetings: Meeting[], 
-  getRacesForMeeting: (meetingId: string) => Race[] | null
+  getRacesForMeeting: (meeting_id: string) => Race[] | null
 ): Race[] {
   const allRaces: Race[] = [];
   
   for (const meeting of meetings) {
-    const cachedRaces = getRacesForMeeting(meeting.meetingId);
+    const cachedRaces = getRacesForMeeting(meeting.meeting_id);
     if (cachedRaces) {
       // Add meeting context to races for polling integration
       const racesWithMeetingId = cachedRaces.map(race => ({
         ...race,
-        meetingId: meeting.meetingId,
-        meetingName: meeting.meetingName,
+        meeting_id: meeting.meeting_id,
+        meeting_name: meeting.meeting_name,
       }));
       allRaces.push(...racesWithMeetingId);
     }
@@ -64,7 +64,7 @@ export function getActiveRacesForPolling(races: Race[]): Race[] {
 
     try {
       // Use DST-aware calculation instead of naive date arithmetic
-      const diffMinutes = calculateDstAwareMinutesToStart(race.startTime, race.status);
+      const diffMinutes = calculateDstAwareMinutesToStart(race.start_time, race.status);
 
       if (diffMinutes === null) {
         return false;
@@ -74,7 +74,7 @@ export function getActiveRacesForPolling(races: Race[]): Race[] {
       // This gives a buffer for races that might need monitoring
       return diffMinutes >= -120 && diffMinutes <= 60;
     } catch (error) {
-      console.warn('Invalid race start time:', race.startTime, error);
+      console.warn('Invalid race start time:', race.start_time, error);
       return false;
     }
   });
@@ -112,7 +112,7 @@ export function groupRacesByPollingUrgency(races: Race[]): {
 
     try {
       // Use DST-aware calculation instead of naive date arithmetic
-      const diffMinutes = calculateDstAwareMinutesToStart(race.startTime, race.status);
+      const diffMinutes = calculateDstAwareMinutesToStart(race.start_time, race.status);
 
       if (diffMinutes === null) {
         groups.inactive.push(race);

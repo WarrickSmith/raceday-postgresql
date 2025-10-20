@@ -12,9 +12,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: raceId } = await params;
+    const { id: race_id } = await params;
     
-    if (!raceId) {
+    if (!race_id) {
       return jsonWithCompression(
         request,
         { error: 'Race ID is required' },
@@ -22,7 +22,7 @@ export async function GET(
       );
     }
 
-    const poolData = await getRacePoolData(raceId);
+    const poolData = await getRacePoolData(race_id);
     
     if (!poolData) {
       return jsonWithCompression(
@@ -35,7 +35,7 @@ export async function GET(
     // Set aggressive cache headers for live pool data
     const response = await jsonWithCompression(request, poolData);
     response.headers.set('Cache-Control', 'public, max-age=5, stale-while-revalidate=15');
-    response.headers.set('X-Pool-Data-Race-ID', raceId);
+    response.headers.set('X-Pool-Data-Race-ID', race_id);
     
     return response;
   } catch (error) {
@@ -51,7 +51,7 @@ export async function GET(
 /**
  * Fetch pool data for a specific race
  */
-async function getRacePoolData(raceId: string): Promise<RacePoolData | null> {
+async function getRacePoolData(race_id: string): Promise<RacePoolData | null> {
   try {
     const { databases } = await createServerClient();
     
@@ -59,7 +59,7 @@ async function getRacePoolData(raceId: string): Promise<RacePoolData | null> {
     const raceQuery = await databases.listDocuments(
       'raceday-db', 
       'races',
-      [Query.equal('raceId', raceId), Query.limit(1)]
+      [Query.equal('race_id', race_id), Query.limit(1)]
     );
 
     if (!raceQuery.documents.length) {
@@ -73,8 +73,8 @@ async function getRacePoolData(raceId: string): Promise<RacePoolData | null> {
       const poolQuery = await databases.listDocuments(
         'raceday-db',
         'race-pools',
-        // Match pools by scalar raceId (string), not the race document $id
-        [Query.equal('raceId', raceDoc.raceId), Query.limit(1)]
+        // Match pools by scalar race_id (string), not the race document $id
+        [Query.equal('race_id', raceDoc.race_id), Query.limit(1)]
       );
 
       if (poolQuery.documents.length > 0) {
@@ -83,7 +83,7 @@ async function getRacePoolData(raceId: string): Promise<RacePoolData | null> {
           $id: poolDoc.$id,
           $createdAt: poolDoc.$createdAt,
           $updatedAt: poolDoc.$updatedAt,
-          raceId: raceDoc.raceId,
+          race_id: raceDoc.race_id,
           winPoolTotal: poolDoc.winPoolTotal || 0,
           placePoolTotal: poolDoc.placePoolTotal || 0,
           quinellaPoolTotal: poolDoc.quinellaPoolTotal || 0,
@@ -92,7 +92,7 @@ async function getRacePoolData(raceId: string): Promise<RacePoolData | null> {
           first4PoolTotal: poolDoc.first4PoolTotal || 0,
           totalRacePool: poolDoc.totalRacePool || 0,
           currency: poolDoc.currency || '$',
-          lastUpdated: poolDoc.$updatedAt,
+          last_updated: poolDoc.$updatedAt,
           isLive: true
         };
       }
@@ -101,7 +101,7 @@ async function getRacePoolData(raceId: string): Promise<RacePoolData | null> {
     }
     
     // Generate realistic mock pool data based on race timing
-    const raceStartTime = new Date(raceDoc.startTime);
+    const raceStartTime = new Date(raceDoc.start_time);
     const now = new Date();
     const minutesToStart = Math.max(0, Math.floor((raceStartTime.getTime() - now.getTime()) / (1000 * 60)));
     
@@ -123,7 +123,7 @@ async function getRacePoolData(raceId: string): Promise<RacePoolData | null> {
       $id: `mock-pool-${raceDoc.$id}`,
       $createdAt: raceDoc.$createdAt,
       $updatedAt: new Date().toISOString(),
-      raceId: raceDoc.raceId,
+      race_id: raceDoc.race_id,
       winPoolTotal: winPool,
       placePoolTotal: placePool,
       quinellaPoolTotal: quinellaPool,
@@ -132,7 +132,7 @@ async function getRacePoolData(raceId: string): Promise<RacePoolData | null> {
       first4PoolTotal: first4Pool,
       totalRacePool: totalPool,
       currency: '$',
-      lastUpdated: new Date().toISOString(),
+      last_updated: new Date().toISOString(),
       isLive: true
     };
   } catch (error) {

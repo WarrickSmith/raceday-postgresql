@@ -13,7 +13,7 @@ export default async function RaceDetailPage({ params }: RaceDetailPageProps) {
   
   return (
     <Suspense fallback={<RaceDetailSkeleton />}>
-      <ClientRaceView raceId={id} />
+      <ClientRaceView race_id={id} />
     </Suspense>
   );
 }

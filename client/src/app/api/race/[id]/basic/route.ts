@@ -13,9 +13,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: raceId } = await params;
+    const { id: race_id } = await params;
     
-    if (!raceId) {
+    if (!race_id) {
       return jsonWithCompression(
         request,
         { error: 'Race ID is required' },
@@ -23,7 +23,7 @@ export async function GET(
       );
     }
 
-    const raceData = await getBasicRaceData(raceId);
+    const raceData = await getBasicRaceData(race_id);
     
     if (!raceData) {
       return jsonWithCompression(
@@ -48,20 +48,20 @@ export async function GET(
   }
 }
 
-async function getBasicRaceData(raceId: string): Promise<{
+async function getBasicRaceData(race_id: string): Promise<{
   race: Race; 
   meeting: Meeting; 
 } | null> {
   try {
     const { databases } = await createServerClient();
     
-    // Fetch race by raceId field (not $id). Fallback to $id for backward compatibility.
+    // Fetch race by race_id field (not $id). Fallback to $id for backward compatibility.
     let raceData: RaceDocument | null = null;
     try {
       const raceQuery = await databases.listDocuments<RaceDocument>(
         'raceday-db',
         'races',
-        [Query.equal('raceId', raceId), Query.limit(1)]
+        [Query.equal('race_id', race_id), Query.limit(1)]
       );
       if (raceQuery.documents.length > 0) {
         raceData = raceQuery.documents[0];
@@ -73,7 +73,7 @@ async function getBasicRaceData(raceId: string): Promise<{
         raceData = await databases.getDocument<RaceDocument>(
           'raceday-db',
           'races',
-          raceId
+          race_id
         );
       } catch {
         return null;
@@ -91,10 +91,10 @@ async function getBasicRaceData(raceId: string): Promise<{
     } else if (
       raceMeetingField &&
       typeof raceMeetingField === 'object' &&
-      (raceMeetingField.meetingId || raceMeetingField.$id)
+      (raceMeetingField.meeting_id || raceMeetingField.$id)
     ) {
       const castMeeting = raceMeetingField as MeetingDocument;
-      resolvedMeetingId = castMeeting.meetingId ?? castMeeting.$id ?? null;
+      resolvedMeetingId = castMeeting.meeting_id ?? castMeeting.$id ?? null;
       meetingDocument = castMeeting;
     }
 
@@ -135,14 +135,14 @@ async function getBasicRaceData(raceId: string): Promise<{
       $id: raceData.$id,
       $createdAt: raceData.$createdAt,
       $updatedAt: raceData.$updatedAt,
-      raceId: raceData.raceId ?? raceData.$id,
-      raceNumber: raceData.raceNumber ?? 0,
+      race_id: raceData.race_id ?? raceData.$id,
+      race_number: raceData.race_number ?? 0,
       name: raceData.name ?? 'Unknown Race',
-      startTime: raceData.startTime ?? raceData.$createdAt,
-      meeting: resolvedMeetingId, // return meetingId string for the Race interface
+      start_time: raceData.start_time ?? raceData.$createdAt,
+      meeting: resolvedMeetingId, // return meeting_id string for the Race interface
       status: raceData.status ?? 'Unknown',
       distance: raceData.distance,
-      trackCondition: raceData.trackCondition,
+      track_condition: raceData.track_condition,
     };
 
     if (!resolvedMeeting) {

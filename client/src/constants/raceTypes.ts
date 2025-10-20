@@ -9,7 +9,7 @@ export const RACE_TYPE_CODES = {
   GREYHOUND: 'G',
 } as const
 
-// Full race type names used in the database 'raceType' field
+// Full race type names used in the database 'race_type' field
 export const RACE_TYPE_NAMES = {
   HARNESS: 'Harness Horse Racing',
   THOROUGHBRED: 'Thoroughbred Horse Racing',
@@ -46,8 +46,8 @@ export function getRaceTypeDisplay(code: string): string {
 /**
  * Get race type code from full race type name
  */
-export function getRaceTypeCode(raceTypeName: string): string | null {
-  switch (raceTypeName) {
+export function getRaceTypeCode(race_typeName: string): string | null {
+  switch (race_typeName) {
     case RACE_TYPE_NAMES.HARNESS:
       return RACE_TYPE_CODES.HARNESS
     case RACE_TYPE_NAMES.THOROUGHBRED:

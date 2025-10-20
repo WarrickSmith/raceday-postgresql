@@ -3,7 +3,7 @@ import { Race } from '@/types/meetings';
 // Type declaration for debug function on window
 declare global {
   interface Window {
-    debugRaceFetch?: (meetingId?: string) => Promise<Race[]>;
+    debugRaceFetch?: (meeting_id?: string) => Promise<Race[]>;
   }
 }
 
@@ -17,10 +17,10 @@ declare global {
 // Debug helper - only available in development
 if (process.env.NODE_ENV === 'development') {
   if (typeof window !== 'undefined') {
-    window.debugRaceFetch = async (meetingId = '44f3707e-49a3-4b16-b6c3-456b8a1f9e9d') => {
+    window.debugRaceFetch = async (meeting_id = '44f3707e-49a3-4b16-b6c3-456b8a1f9e9d') => {
       try {
-        console.log('🔍 Debug: Testing race fetch for meetingId:', meetingId);
-        const result = await fetchRacesForMeeting(meetingId);
+        console.log('🔍 Debug: Testing race fetch for meeting_id:', meeting_id);
+        const result = await fetchRacesForMeeting(meeting_id);
         console.log('🔍 Debug: Race fetch result:', result.length, 'races');
         return result;
       } catch (error) {
@@ -33,23 +33,23 @@ if (process.env.NODE_ENV === 'development') {
 
 export interface RaceServiceError {
   message: string;
-  meetingId?: string;
+  meeting_id?: string;
   code?: string;
 }
 
 /**
  * Fetch races for a specific meeting
- * @param meetingId - The meeting ID to fetch races for
+ * @param meeting_id - The meeting ID to fetch races for
  * @returns Promise<Race[]> - Array of races ordered by race number
  */
-export async function fetchRacesForMeeting(meetingId: string): Promise<Race[]> {
+export async function fetchRacesForMeeting(meeting_id: string): Promise<Race[]> {
   try {
     if (process.env.NODE_ENV === 'development') {
-      console.log('🏁 Fetching races for meetingId:', meetingId);
+      console.log('🏁 Fetching races for meeting_id:', meeting_id);
     }
 
     // Call Next.js API route instead of Appwrite directly
-    const response = await fetch(`/api/meetings/${meetingId}/races`, {
+    const response = await fetch(`/api/meetings/${meeting_id}/races`, {
       cache: 'no-store',
     });
 
@@ -83,17 +83,17 @@ export function validateRaceData(race: unknown): race is Race {
     typeof race === 'object' &&
     race !== null &&
     '$id' in race &&
-    'raceId' in race &&
-    'raceNumber' in race &&
+    'race_id' in race &&
+    'race_number' in race &&
     'name' in race &&
-    'startTime' in race &&
+    'start_time' in race &&
     'meeting' in race &&
     'status' in race &&
     typeof (race as Record<string, unknown>).$id === 'string' &&
-    typeof (race as Record<string, unknown>).raceId === 'string' &&
-    typeof (race as Record<string, unknown>).raceNumber === 'number' &&
+    typeof (race as Record<string, unknown>).race_id === 'string' &&
+    typeof (race as Record<string, unknown>).race_number === 'number' &&
     typeof (race as Record<string, unknown>).name === 'string' &&
-    typeof (race as Record<string, unknown>).startTime === 'string' &&
+    typeof (race as Record<string, unknown>).start_time === 'string' &&
     typeof (race as Record<string, unknown>).meeting === 'object' &&
     typeof (race as Record<string, unknown>).status === 'string'
   );

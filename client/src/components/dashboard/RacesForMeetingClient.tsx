@@ -8,7 +8,7 @@ import { Meeting } from '@/types/meetings';
 
 interface RacesForMeetingClientProps {
   selectedMeeting: Meeting | null;
-  onRaceClick?: (raceId: string) => void;
+  onRaceClick?: (race_id: string) => void;
 }
 
 function RacesForMeetingClientComponent({ 
@@ -16,7 +16,7 @@ function RacesForMeetingClientComponent({
   onRaceClick 
 }: RacesForMeetingClientProps) {
   const { races, isLoading, error, isConnected } = useRacesForMeeting({
-    meetingId: selectedMeeting?.meetingId || '',
+    meeting_id: selectedMeeting?.meeting_id || '',
     enabled: !!selectedMeeting,
   });
 
@@ -61,7 +61,7 @@ function RacesForMeetingClientComponent({
       <div className="h-full bg-slate-50 rounded-lg border border-slate-200">
         <div className="p-4 border-b border-slate-200">
           <h2 className="text-lg font-semibold text-gray-900">
-            {selectedMeeting.meetingName}
+            {selectedMeeting.meeting_name}
           </h2>
           <p className="text-sm text-gray-600 mt-1">Loading races...</p>
         </div>
@@ -95,7 +95,7 @@ function RacesForMeetingClientComponent({
       {/* Header */}
       <div className="p-4 border-b border-slate-200 flex-shrink-0">
         <h2 className="text-lg font-semibold text-gray-900">
-          {selectedMeeting.meetingName}
+          {selectedMeeting.meeting_name}
         </h2>
         <div className="flex items-center justify-between mt-1">
           <p className="text-sm text-gray-600">
@@ -122,7 +122,7 @@ function RacesForMeetingClientComponent({
           <div 
             className="p-3 space-y-3"
             role="list"
-            aria-label={`Races for ${selectedMeeting.meetingName}`}
+            aria-label={`Races for ${selectedMeeting.meeting_name}`}
           >
             {racesList}
           </div>

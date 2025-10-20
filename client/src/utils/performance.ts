@@ -218,11 +218,11 @@ export const entrantComparison = (prev: Entrant, next: Entrant): boolean => {
   // Only compare fields that affect rendering
   return (
     prev.$id === next.$id &&
-    prev.winOdds === next.winOdds &&
-    prev.placeOdds === next.placeOdds &&
-    prev.isScratched === next.isScratched &&
-    prev.holdPercentage === next.holdPercentage &&
-    prev.moneyFlowTrend === next.moneyFlowTrend &&
+    prev.win_odds === next.win_odds &&
+    prev.place_odds === next.place_odds &&
+    prev.is_scratched === next.is_scratched &&
+    prev.hold_percentage === next.hold_percentage &&
+    prev.money_flow_trend === next.money_flow_trend &&
     prev.$updatedAt === next.$updatedAt
   );
 };

@@ -45,12 +45,12 @@ export async function GET(request: NextRequest) {
     const { databases } = await createServerClient();
 
     const query = [
-      Query.greaterThan('startTime', lowerBound),
-      Query.lessThanEqual('startTime', upperBound),
+      Query.greaterThan('start_time', lowerBound),
+      Query.lessThanEqual('start_time', upperBound),
       Query.notEqual('status', 'Abandoned'),
       Query.notEqual('status', 'Final'),
       Query.notEqual('status', 'Finalized'),
-      Query.orderAsc('startTime'),
+      Query.orderAsc('start_time'),
       Query.limit(limit),
     ];
 

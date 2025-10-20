@@ -50,7 +50,7 @@ export interface SilkDisplayConfig {
 // Silk rendering data for components
 export interface SilkRenderData {
   silkId: string;
-  runnerNumber: number;
+  runner_number: number;
   primaryColor: string;
   secondaryColor?: string;
   pattern: SilkPattern;
@@ -88,8 +88,8 @@ export interface SilkPatternDefinition {
 
 // Enhanced entrant with silk data
 export interface EntrantWithSilk {
-  entrantId: string;
-  runnerNumber: number;
+  entrant_id: string;
+  runner_number: number;
   name: string;
   jockey?: string;
   silk?: JockeySilk;

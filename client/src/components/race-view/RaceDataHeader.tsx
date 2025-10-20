@@ -5,7 +5,7 @@ import { useRace } from '@/contexts/RaceContext'
 import { formatDistance, formatRaceTime } from '@/utils/raceFormatters'
 import { getStatusConfig } from '@/utils/raceStatusConfig'
 import { RaceNavigation } from './RaceNavigation'
-import { getRaceTypeDisplay } from '@/constants/raceTypes'
+import { getRaceTypeDisplay } from '@/constants/race_types'
 import { ConnectionStatusBadge } from '@/components/dashboard/ConnectionStatusBadge'
 import {
   getConnectionState,
@@ -78,19 +78,19 @@ export const RaceDataHeader = memo(function RaceDataHeader({
 
   // Memoized calculations to reduce re-renders (move before early return to avoid hook call errors)
   const formattedTime = useMemo(
-    () => (race?.startTime ? formatRaceTime(race.startTime) : ''),
-    [race?.startTime]
+    () => (race?.start_time ? formatRaceTime(race.start_time) : ''),
+    [race?.start_time]
   )
   const formattedDistance = useMemo(
     () => (race?.distance ? formatDistance(race.distance) : null),
     [race?.distance]
   )
   const runnersCount = useMemo(
-    () => entrants.length || race?.runnerCount || 0,
-    [entrants.length, race?.runnerCount]
+    () => entrants.length || race?.runner_count || 0,
+    [entrants.length, race?.runner_count]
   )
   const scratchedCount = useMemo(
-    () => entrants.filter((e) => e.isScratched).length || 0,
+    () => entrants.filter((e) => e.is_scratched).length || 0,
     [entrants]
   )
   const formattedRaceType = useMemo(() => {
@@ -105,7 +105,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
     }
 
     // Priority 2: Fallback to full race type (will be truncated by CSS)
-    return meeting.raceType || ''
+    return meeting.race_type || ''
   }, [meeting])
 
   if (!race || !meeting) {
@@ -140,7 +140,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
             {navigationData && (
               <RaceNavigation
                 navigationData={navigationData}
-                currentRaceId={race.raceId}
+                currentRaceId={race.race_id}
               />
             )}
           </div>
@@ -182,7 +182,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
         {/* Row 2, Col 1: Race Title */}
         <div className="flex flex-col justify-start overflow-hidden">
           <h1 className="text-2xl font-bold text-gray-900 mb-1 leading-tight truncate whitespace-nowrap">
-            Race {race.raceNumber}: {race.name}
+            Race {race.race_number}: {race.name}
           </h1>
         </div>
 
@@ -202,7 +202,7 @@ export const RaceDataHeader = memo(function RaceDataHeader({
             TRACK COND
           </div>
           <div className="text-sm font-semibold text-green-800">
-            {race.trackCondition || 'Synthetic'}
+            {race.track_condition || 'Synthetic'}
           </div>
         </div>
 
@@ -240,11 +240,11 @@ export const RaceDataHeader = memo(function RaceDataHeader({
 
         {/* Row 3, Col 1: Meeting info */}
         <div className="flex items-center gap-1 text-sm text-gray-700 overflow-hidden">
-          <span className="font-medium">{meeting.meetingName}</span>
+          <span className="font-medium">{meeting.meeting_name}</span>
           <span>•</span>
           <span>{meeting.country}</span>
           <span>•</span>
-          <time dateTime={race.startTime} className="font-mono">
+          <time dateTime={race.start_time} className="font-mono">
             {formattedTime}
           </time>
           <span>•</span>

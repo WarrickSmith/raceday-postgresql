@@ -13,30 +13,30 @@ export interface MoneyFlowDataPoint {
   // Entrant references
   entrant?:
     | string
-    | { entrantId?: string; $id?: string; name?: string; [k: string]: unknown }
-  entrantId?: string
+    | { entrant_id?: string; $id?: string; name?: string; [k: string]: unknown }
+  entrant_id?: string
 
   // Timing / interval fields
-  timeToStart?: number // legacy minutes (may be fractional)
-  timeInterval?: number // bucketed interval (minutes or fractional)
-  intervalType?: string // e.g. '5m', '30s', '1m'
-  pollingTimestamp?: string
-  pollingInterval?: number // numeric in minutes (e.g. 0.5 for 30s)
+  time_to_start?: number // legacy minutes (may be fractional)
+  time_interval?: number // bucketed interval (minutes or fractional)
+  interval_type?: string // e.g. '5m', '30s', '1m'
+  polling_timestamp?: string
+  polling_interval?: number // numeric in minutes (e.g. 0.5 for 30s)
 
   // Pool totals (stored in cents)
   winPoolAmount?: number
   placePoolAmount?: number
-  totalPoolAmount?: number
+  total_pool_amount?: number
 
   // Percentages and metadata
-  poolPercentage?: number // holdPercentage / betPercentage etc
-  holdPercentage?: number
+  pool_percentage?: number // hold_percentage / betPercentage etc
+  hold_percentage?: number
   betPercentage?: number
 
   // Incremental deltas (stored in cents)
-  incrementalAmount?: number // generic incremental amount (fallback)
-  incrementalWinAmount?: number
-  incrementalPlaceAmount?: number
+  incremental_amount?: number // generic incremental amount (fallback)
+  incremental_win_amount?: number
+  incremental_place_amount?: number
 
   // Optional debug/linkage fields
   rawPollingData?: string | null
@@ -53,11 +53,11 @@ export interface MoneyFlowDataPoint {
  * Timeline structure for a single entrant used by components/hooks.
  */
 export interface EntrantMoneyFlowTimeline {
-  entrantId: string
+  entrant_id: string
   dataPoints: MoneyFlowDataPoint[]
-  latestPercentage: number
+  latest_percentage: number
   trend: 'up' | 'down' | 'neutral' | string
-  significantChange: boolean
+  significant_change: boolean
   // Allow additional metadata used by UI components
   [key: string]: unknown
 }

@@ -15,7 +15,7 @@ const createDefaultConfig = (userId: string): AlertsConfig => {
     ...defaultInd,
     $id: `default-${index}`,
     userId,
-    lastUpdated: new Date().toISOString(),
+    last_updated: new Date().toISOString(),
     createdAt: new Date().toISOString(),
   }))
 

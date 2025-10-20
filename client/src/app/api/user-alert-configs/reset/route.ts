@@ -38,7 +38,7 @@ export async function PUT(request: NextRequest) {
         color: defaultConfig.color,
         enabled: true,
         isDefault: true,
-        lastUpdated: new Date().toISOString(),
+        last_updated: new Date().toISOString(),
         audibleAlertsEnabled: true,
       }
 

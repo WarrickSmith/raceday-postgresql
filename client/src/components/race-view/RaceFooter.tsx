@@ -26,7 +26,7 @@ interface RaceFooterProps {
   raceStartTime: string
   raceStatus: RaceStatus
   poolData?: RacePoolData
-  resultsData?: RaceResultsData
+  results_data?: RaceResultsData
   className?: string
   showCountdown?: boolean
   showResults?: boolean
@@ -40,7 +40,7 @@ export const RaceFooter = memo(function RaceFooter({
   raceStartTime,
   raceStatus,
   poolData,
-  resultsData,
+  results_data,
   className = '',
   showCountdown = true,
   showResults = true,
@@ -49,11 +49,11 @@ export const RaceFooter = memo(function RaceFooter({
   race = null,
 }: RaceFooterProps) {
   // Use data from props (from polling updates) with fallbacks
-  const currentRaceStartTime = race?.startTime || raceStartTime
+  const currentRaceStartTime = race?.start_time || raceStartTime
   const currentRaceStatus =
     (race?.status?.toLowerCase() as RaceStatus) || raceStatus
   const currentPoolData = poolData
-  const currentResultsData = resultsData
+  const currentResultsData = results_data
 
   // Announce results availability when they become available
   useEffect(() => {
@@ -95,7 +95,7 @@ export const RaceFooter = memo(function RaceFooter({
         {/* Column 2: Results Section */}
         <div className="w-[470px] flex-shrink-0 pr-4">
           <RaceResultsSection
-            resultsData={currentResultsData}
+            results_data={currentResultsData}
             lastUpdate={lastResultsUpdate}
           />
         </div>

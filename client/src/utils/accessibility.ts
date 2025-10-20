@@ -45,8 +45,8 @@ export class ScreenReaderAnnouncer {
     }, 1000);
   }
 
-  public announceRaceNavigation(raceName: string, meetingName: string): void {
-    const message = `Navigated to ${raceName} at ${meetingName}`;
+  public announceRaceNavigation(race_name: string, meeting_name: string): void {
+    const message = `Navigated to ${race_name} at ${meeting_name}`;
     this.announce(message, 'assertive');
   }
 
@@ -174,26 +174,26 @@ export const AriaLabels = {
    * Generate comprehensive label for runner row
    */
   generateRunnerRowLabel: (
-    runnerNumber: number,
+    runner_number: number,
     runnerName: string,
     jockey: string,
     trainer: string,
-    winOdds?: number,
-    placeOdds?: number,
-    isScratched?: boolean,
+    win_odds?: number,
+    place_odds?: number,
+    is_scratched?: boolean,
     finishingPositionAnnouncement?: string
   ): string => {
-    const statusText = isScratched ? 'Scratched runner' : 'Active runner';
-    const oddsText = winOdds ? `Win odds ${winOdds.toFixed(2)}` : 'Win odds unavailable';
-    const placeOddsText = placeOdds ? `Place odds ${placeOdds.toFixed(2)}` : 'Place odds unavailable';
+    const statusText = is_scratched ? 'Scratched runner' : 'Active runner';
+    const oddsText = win_odds ? `Win odds ${win_odds.toFixed(2)}` : 'Win odds unavailable';
+    const place_oddsText = place_odds ? `Place odds ${place_odds.toFixed(2)}` : 'Place odds unavailable';
 
     const parts = [
-      `${statusText} number ${runnerNumber}`,
+      `${statusText} number ${runner_number}`,
       runnerName,
       `jockey ${jockey}`,
       `trainer ${trainer}`,
       oddsText,
-      placeOddsText,
+      place_oddsText,
     ]
 
     if (finishingPositionAnnouncement) {
@@ -208,16 +208,16 @@ export const AriaLabels = {
    */
   generateNavigationLabel: (
     direction: string,
-    raceName?: string,
-    meetingName?: string,
-    startTime?: string
+    race_name?: string,
+    meeting_name?: string,
+    start_time?: string
   ): string => {
     const baseLabel = `Navigate to ${direction} race`;
     
-    if (!raceName) return `${baseLabel} - not available`;
+    if (!race_name) return `${baseLabel} - not available`;
     
-    const timeText = startTime ? ` starting at ${new Date(startTime).toLocaleTimeString()}` : '';
-    return `${baseLabel}: ${raceName} at ${meetingName}${timeText}`;
+    const timeText = start_time ? ` starting at ${new Date(start_time).toLocaleTimeString()}` : '';
+    return `${baseLabel}: ${race_name} at ${meeting_name}${timeText}`;
   },
 
   /**

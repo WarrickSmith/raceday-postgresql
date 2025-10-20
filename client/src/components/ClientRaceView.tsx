@@ -15,10 +15,10 @@ import {
 import { ConnectionStatusPanel } from '@/components/dashboard/ConnectionStatusPanel';
 
 interface ClientRaceViewProps {
-  raceId: string;
+  race_id: string;
 }
 
-export function ClientRaceView({ raceId }: ClientRaceViewProps) {
+export function ClientRaceView({ race_id }: ClientRaceViewProps) {
   const logger = useLogger('ClientRaceView');
   const { raceData, isLoading: contextLoading, loadRaceData, error: contextError } = useRace();
   const [error, setError] = useState<string | null>(null);
@@ -65,15 +65,15 @@ export function ClientRaceView({ raceId }: ClientRaceViewProps) {
 
   // Attempt to reconnect and load race data
   const attemptReconnect = useCallback(async (): Promise<void> => {
-    logger.info('Attempting to reconnect and load race data', { raceId });
+    logger.info('Attempting to reconnect and load race data', { race_id });
     setConnectionAttempts((prev) => prev + 1);
 
     const isHealthy = await ensureConnection();
 
-    if (isHealthy && raceId) {
+    if (isHealthy && race_id) {
       // Connection restored, try loading race data
       try {
-        await loadRaceData(raceId);
+        await loadRaceData(race_id);
         setConnectionAttempts(0);
         setRetryCountdown(null);
         clearRetryTimers();
@@ -81,7 +81,7 @@ export function ClientRaceView({ raceId }: ClientRaceViewProps) {
         logger.error('Failed to load race data after reconnection', err);
       }
     }
-  }, [raceId, loadRaceData, logger, clearRetryTimers]);
+  }, [race_id, loadRaceData, logger, clearRetryTimers]);
 
   // Manual retry handler
   const handleRetry = useCallback(() => {
@@ -127,30 +127,30 @@ export function ClientRaceView({ raceId }: ClientRaceViewProps) {
   // Detect connection recovery and load race data if we don't have it
   useEffect(() => {
     // Only act when connection becomes healthy and we don't have race data yet
-    if (connectionState === 'connected' && raceId && !raceData) {
-      logger.info('Connection restored, loading race data', { raceId });
+    if (connectionState === 'connected' && race_id && !raceData) {
+      logger.info('Connection restored, loading race data', { race_id });
 
       // Clear any retry state since connection is restored
       setConnectionAttempts(0);
       setRetryCountdown(null);
 
       // Load race data
-      loadRaceData(raceId).catch((err) => {
+      loadRaceData(race_id).catch((err) => {
         logger.error('Failed to load race data after connection recovery', err);
       });
     }
-  }, [connectionState, raceId, raceData, loadRaceData, logger]);
+  }, [connectionState, race_id, raceData, loadRaceData, logger]);
 
   useEffect(() => {
-    if (!raceId) return;
+    if (!race_id) return;
 
-    const currentRaceId = raceData?.race?.raceId;
+    const currentRaceId = raceData?.race?.race_id;
     
-    logger.debug('ClientRaceView effect - URL raceId:', { raceId, currentRaceId, contextLoading });
+    logger.debug('ClientRaceView effect - URL race_id:', { race_id, currentRaceId, contextLoading });
 
     // If we don't have race data or it doesn't match the requested race ID, load it
-    if (!raceData || currentRaceId !== raceId) {
-      logger.info('Loading race data for:', { raceId });
+    if (!raceData || currentRaceId !== race_id) {
+      logger.info('Loading race data for:', { race_id });
       setError(null);
       // Schedule load on next frame to avoid dev StrictMode double-mount abort churn
       if (scheduledRef.current !== null) {
@@ -163,7 +163,7 @@ export function ClientRaceView({ raceId }: ClientRaceViewProps) {
       }
 
       const run = () => {
-        loadRaceData(raceId).catch((err) => {
+        loadRaceData(race_id).catch((err) => {
           logger.error('Failed to load race data in ClientRaceView:', err);
           setError(err instanceof Error ? err.message : 'Failed to load race data');
         });
@@ -181,7 +181,7 @@ export function ClientRaceView({ raceId }: ClientRaceViewProps) {
         }, 0) as unknown as number;
         scheduledRef.current = id;
       }
-    } else if (raceData && currentRaceId === raceId) {
+    } else if (raceData && currentRaceId === race_id) {
       logger.debug('Race data already matches URL, clearing any errors');
       setError(null);
     }
@@ -195,7 +195,7 @@ export function ClientRaceView({ raceId }: ClientRaceViewProps) {
         scheduledRef.current = null;
       }
     };
-  }, [raceId, raceData, contextLoading, loadRaceData, logger]);
+  }, [race_id, raceData, contextLoading, loadRaceData, logger]);
 
   // Show connection status panel when connection is not established or has issues
   // Priority: Show ConnectionStatusPanel if disconnected OR if we have no data and are not loading
@@ -255,7 +255,7 @@ export function ClientRaceView({ raceId }: ClientRaceViewProps) {
   }
 
   // If we have race data and it matches the requested race, render the page content
-  if (raceData && raceData.race.raceId === raceId) {
+  if (raceData && raceData.race.race_id === race_id) {
     return <RacePageContent />;
   }
 

@@ -11,13 +11,13 @@ import { DEFAULT_SILK_CONFIG, COMMON_SILK_PATTERNS } from '@/types/jockeySilks';
 
 interface JockeySilksProps {
   silk?: JockeySilk;
-  runnerNumber: number;
+  runner_number: number;
   runnerName: string;
   jockey?: string;
   fallbackUrl?: string;
   config?: Partial<SilkDisplayConfig>;
   className?: string;
-  onClick?: (runnerNumber: number) => void;
+  onClick?: (runner_number: number) => void;
 }
 
 // Silk pattern generation utilities
@@ -90,7 +90,7 @@ const SilkUtils = {
 
   // Create fallback color scheme for accessibility
   createAccessibleFallback: (silk: JockeySilk): JockeySilk => {
-    const runnerNumber = parseInt(silk.silkId.split('-').pop() || '1');
+    const runner_number = parseInt(silk.silkId.split('-').pop() || '1');
     
     // Generate high-contrast colors based on runner number
     const colors = [
@@ -102,15 +102,15 @@ const SilkUtils = {
       { name: 'Teal', hex: '#0891b2', rgb: '8, 145, 178', isLight: false },
     ];
     
-    const primaryIndex = runnerNumber % colors.length;
-    const secondaryIndex = (runnerNumber + 3) % colors.length;
+    const primaryIndex = runner_number % colors.length;
+    const secondaryIndex = (runner_number + 3) % colors.length;
     
     return {
       ...silk,
       primaryColor: colors[primaryIndex],
       secondaryColor: colors[secondaryIndex],
       pattern: 'solid' as SilkPattern,
-      description: `High contrast silk ${runnerNumber}`
+      description: `High contrast silk ${runner_number}`
     };
   }
 };
@@ -143,11 +143,11 @@ const SvgSilk = memo(function SvgSilk({
 
 // Memoized fallback silk component
 const FallbackSilk = memo(function FallbackSilk({ 
-  runnerNumber, 
+  runner_number, 
   config, 
   className 
 }: { 
-  runnerNumber: number; 
+  runner_number: number; 
   config: SilkDisplayConfig; 
   className?: string; 
 }) {
@@ -158,16 +158,16 @@ const FallbackSilk = memo(function FallbackSilk({
     'bg-blue-500', 'bg-red-500', 'bg-green-500', 'bg-yellow-500', 
     'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-orange-500'
   ];
-  const colorClass = colors[runnerNumber % colors.length];
+  const colorClass = colors[runner_number % colors.length];
 
   return (
     <div 
       className={`${size} rounded border border-gray-300 flex items-center justify-center ${colorClass} ${className}`}
-      title={`Runner ${runnerNumber} - Default silk`}
-      aria-label={`Runner ${runnerNumber} default racing silk`}
+      title={`Runner ${runner_number} - Default silk`}
+      aria-label={`Runner ${runner_number} default racing silk`}
     >
       <span className="text-white text-xs font-bold">
-        {runnerNumber}
+        {runner_number}
       </span>
     </div>
   );
@@ -176,7 +176,7 @@ const FallbackSilk = memo(function FallbackSilk({
 // Main JockeySilks component
 export const JockeySilks = memo(function JockeySilks({
   silk,
-  runnerNumber,
+  runner_number,
   runnerName,
   jockey,
   fallbackUrl,
@@ -201,9 +201,9 @@ export const JockeySilks = memo(function JockeySilks({
 
   const handleClick = useCallback(() => {
     if (onClick) {
-      onClick(runnerNumber);
+      onClick(runner_number);
     }
-  }, [onClick, runnerNumber]);
+  }, [onClick, runner_number]);
 
   const silkElement = useMemo(() => {
     // Try to render SVG silk first
@@ -239,12 +239,12 @@ export const JockeySilks = memo(function JockeySilks({
     // Final fallback to generated silk
     return (
       <FallbackSilk 
-        runnerNumber={runnerNumber} 
+        runner_number={runner_number} 
         config={displayConfig}
         className="transition-transform hover:scale-110"
       />
     );
-  }, [accessibleSilk, displayConfig, fallbackUrl, runnerName, runnerNumber]);
+  }, [accessibleSilk, displayConfig, fallbackUrl, runnerName, runner_number]);
 
   const containerClassName = useMemo(() => {
     const baseClasses = `inline-flex items-center justify-center ${className}`;
@@ -266,8 +266,8 @@ export const JockeySilks = memo(function JockeySilks({
           handleClick();
         }
       } : undefined}
-      title={`${runnerName} (${runnerNumber})${jockey ? ` - ${jockey}` : ''}`}
-      aria-label={`Racing silk for ${runnerName}, runner number ${runnerNumber}${jockey ? `, jockey ${jockey}` : ''}`}
+      title={`${runnerName} (${runner_number})${jockey ? ` - ${jockey}` : ''}`}
+      aria-label={`Racing silk for ${runnerName}, runner number ${runner_number}${jockey ? `, jockey ${jockey}` : ''}`}
     >
       {silkElement}
       
@@ -290,22 +290,22 @@ export const SilkGroup = memo(function SilkGroup({
 }: {
   silks: Array<{
     silk?: JockeySilk;
-    runnerNumber: number;
+    runner_number: number;
     runnerName: string;
     jockey?: string;
     fallbackUrl?: string;
   }>;
   config?: Partial<SilkDisplayConfig>;
   className?: string;
-  onSilkClick?: (runnerNumber: number) => void;
+  onSilkClick?: (runner_number: number) => void;
 }) {
   return (
     <div className={`flex items-center space-x-2 ${className}`}>
-      {silks.map(({ silk, runnerNumber, runnerName, jockey, fallbackUrl }) => (
+      {silks.map(({ silk, runner_number, runnerName, jockey, fallbackUrl }) => (
         <JockeySilks
-          key={runnerNumber}
+          key={runner_number}
           silk={silk}
-          runnerNumber={runnerNumber}
+          runner_number={runner_number}
           runnerName={runnerName}
           jockey={jockey}
           fallbackUrl={fallbackUrl}

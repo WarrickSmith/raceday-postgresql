@@ -3,19 +3,19 @@ import { createServerClient, Query } from '@/lib/appwrite-server';
 import { jsonWithCompression } from '@/lib/http/compression';
 
 /**
- * GET /api/meetings/[meetingId]/races
+ * GET /api/meetings/[meeting_id]/races
  *
  * Fetches all races for a specific meeting ID
  * Server-side endpoint to eliminate CORS issues and keep Appwrite credentials secure
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ meetingId: string }> }
+  { params }: { params: Promise<{ meeting_id: string }> }
 ) {
   try {
-    const { meetingId } = await params;
+    const { meeting_id } = await params;
 
-    if (!meetingId) {
+    if (!meeting_id) {
       return jsonWithCompression(
         request,
         { error: 'Meeting ID is required' },
@@ -29,8 +29,8 @@ export async function GET(
     let response;
     try {
       response = await databases.listDocuments('raceday-db', 'races', [
-        Query.equal('meeting', meetingId),
-        Query.orderAsc('raceNumber'),
+        Query.equal('meeting', meeting_id),
+        Query.orderAsc('race_number'),
         Query.limit(20),
       ]);
     } catch (directError) {
@@ -39,21 +39,21 @@ export async function GET(
         Query.limit(100)
       ]);
 
-      // Filter races by meetingId on the server side
+      // Filter races by meeting_id on the server side
       const filteredRaces = allRacesResponse.documents.filter((race: Record<string, unknown>) => {
         // Check if meeting is a string ID
         if (typeof race.meeting === 'string') {
-          return race.meeting === meetingId;
+          return race.meeting === meeting_id;
         }
 
-        // Check if meeting is an object with meetingId property
-        if (typeof race.meeting === 'object' && race.meeting && 'meetingId' in race.meeting) {
-          return (race.meeting as Record<string, unknown>).meetingId === meetingId;
+        // Check if meeting is an object with meeting_id property
+        if (typeof race.meeting === 'object' && race.meeting && 'meeting_id' in race.meeting) {
+          return (race.meeting as Record<string, unknown>).meeting_id === meeting_id;
         }
 
         // Check if meeting is an object with $id property
         if (typeof race.meeting === 'object' && race.meeting && '$id' in race.meeting) {
-          return (race.meeting as Record<string, unknown>).$id === meetingId;
+          return (race.meeting as Record<string, unknown>).$id === meeting_id;
         }
 
         return false;
@@ -61,7 +61,7 @@ export async function GET(
 
       // Sort by race number
       filteredRaces.sort((a: Record<string, unknown>, b: Record<string, unknown>) =>
-        (a.raceNumber as number) - (b.raceNumber as number)
+        (a.race_number as number) - (b.race_number as number)
       );
 
       response = { documents: filteredRaces, total: filteredRaces.length };

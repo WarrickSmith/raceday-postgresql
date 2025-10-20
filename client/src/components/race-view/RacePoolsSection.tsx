@@ -92,8 +92,8 @@ export const RacePoolsSection = memo(function RacePoolsSection({
                 hour: '2-digit',
                 minute: '2-digit',
               })
-            : currentPoolData?.lastUpdated
-            ? new Date(currentPoolData.lastUpdated).toLocaleTimeString(
+            : currentPoolData?.last_updated
+            ? new Date(currentPoolData.last_updated).toLocaleTimeString(
                 'en-US',
                 {
                   hour12: true,

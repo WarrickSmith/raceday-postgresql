@@ -1,133 +1,79 @@
-import { AppwriteException } from 'node-appwrite';
-import { createServerClient, Query } from '@/lib/appwrite-server';
-import { Meeting, Race } from '@/types/meetings';
-import { SUPPORTED_RACE_TYPE_CODES } from '@/constants/raceTypes';
-import { COUNTRY_CODES } from '@/constants/countries';
+import { apiClient, ApiError } from '@/lib/api-client'
+import type { Meeting, Race } from '@/types/meetings'
 
-export async function getMeetingsData(): Promise<Meeting[]> {
+const PACIFIC_AUCKLAND_TZ = 'Pacific/Auckland'
+
+const getTodayNzDate = (): string =>
+  new Date().toLocaleDateString('en-CA', { timeZone: PACIFIC_AUCKLAND_TZ })
+
+const fetchFirstRaceStart = async (meeting: Meeting): Promise<string | undefined> => {
   try {
-    // Check if we're in a build environment without proper env vars
-    if (!process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || !process.env.APPWRITE_API_KEY) {
-      console.warn('Appwrite environment variables not available, returning empty meetings data');
-      return [];
-    }
-    
-    const { databases } = await createServerClient();
-    
-    // Get today's date using New Zealand timezone (consistent with server functions)
-    const today = new Date().toLocaleDateString('en-CA', {
-      timeZone: 'Pacific/Auckland',
-    });
-    
-    console.log('Fetching meetings for date:', today);
-    
-    // Try multiple date formats to match database storage format
-    let meetingsResponse;
-    
-    try {
-      // Try with simple date format first
-      meetingsResponse = await databases.listDocuments(
-        'raceday-db',
-        'meetings',
-        [
-          Query.equal('date', today),
-          Query.equal('country', [COUNTRY_CODES.AUSTRALIA, COUNTRY_CODES.NEW_ZEALAND]),
-          Query.equal('category', [...SUPPORTED_RACE_TYPE_CODES]),
-          Query.orderAsc('$createdAt'),
-        ]
-      );
-    } catch (error) {
-      console.warn('Simple date format failed, trying datetime format:', error);
-      
-      // Fallback to datetime format
-      const todayDateTime = `${today}T00:00:00.000+00:00`;
-      meetingsResponse = await databases.listDocuments(
-        'raceday-db',
-        'meetings',
-        [
-          Query.equal('date', todayDateTime),
-          Query.equal('country', [COUNTRY_CODES.AUSTRALIA, COUNTRY_CODES.NEW_ZEALAND]),
-          Query.equal('category', [...SUPPORTED_RACE_TYPE_CODES]),
-          Query.orderAsc('$createdAt'),
-        ]
-      );
+    const races = await apiClient.get<Race[]>('/races', {
+      params: { meeting_id: meeting.meeting_id },
+    })
+
+    if (races.length === 0) {
+      return undefined
     }
 
-    const meetings = meetingsResponse.documents as unknown as Meeting[];
-    
-    console.log(`Found ${meetings.length} meetings for ${today}`);
-    
-    // Get first race time for each meeting to enable chronological sorting
-    const meetingsWithFirstRace = await Promise.all(
-      meetings.map(async (meeting) => {
-        try {
-          const racesResponse = await databases.listDocuments(
-            'raceday-db',
-            'races',
-            [
-              Query.equal('meeting', meeting.meetingId),
-              Query.orderAsc('startTime'),
-              Query.limit(1),
-            ]
-          );
-
-          const races = racesResponse.documents as unknown as Race[];
-          const firstRace = races[0];
-          
-          return {
-            ...meeting,
-            firstRaceTime: firstRace?.startTime || meeting.$createdAt,
-          };
-        } catch (error) {
-          console.error(`Error fetching races for meeting ${meeting.meetingId}:`, error);
-          return {
-            ...meeting,
-            firstRaceTime: meeting.$createdAt,
-          };
-        }
-      })
-    );
-
-    // Sort meetings chronologically by first race time
-    meetingsWithFirstRace.sort((a, b) => {
-      return new Date(a.firstRaceTime!).getTime() - new Date(b.firstRaceTime!).getTime();
-    });
-
-    return meetingsWithFirstRace;
+    return races
+      .map((race) => race.start_time)
+      .filter((value): value is string => Boolean(value))
+      .sort()[0]
   } catch (error) {
-    const message = error instanceof AppwriteException
-      ? `${error.code ?? 'Appwrite'} ${error.type ?? ''}`.trim() || 'Appwrite request failed'
-      : error instanceof Error
-        ? error.message
-        : 'Unknown error';
-
-    console.warn('Appwrite meetings query failed, returning empty list:', message);
-    console.debug('Appwrite meetings query environment check:', {
-      hasEndpoint: !!process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT,
-      hasProjectId: !!process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID,
-      hasApiKey: !!process.env.APPWRITE_API_KEY,
-    });
-
-    // Return empty array to prevent page crashes
-    // The real-time subscription will provide data once the client loads
-    return [];
+    console.error(`Failed to fetch races for meeting ${meeting.meeting_id}:`, error)
+    return undefined
   }
 }
 
-export async function getMeetingById(meetingId: string): Promise<Meeting | null> {
+export async function getMeetingsData(): Promise<Meeting[]> {
+  const today = getTodayNzDate()
+
   try {
-    // Check if we're in a build environment without proper env vars
-    if (!process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || !process.env.APPWRITE_API_KEY) {
-      console.warn('Appwrite environment variables not available, returning null');
-      return null;
-    }
-    
-    const { databases } = await createServerClient();
-    
-    const meeting = await databases.getDocument('raceday-db', 'meetings', meetingId);
-    return meeting as unknown as Meeting;
+    const meetings = await apiClient.get<Meeting[]>('/meetings', {
+      params: { date: today },
+    })
+
+    const meetingsWithFirstRace = await Promise.all(
+      meetings.map(async (meeting) => {
+        const firstRace = await fetchFirstRaceStart(meeting)
+        return {
+          ...meeting,
+          first_race_time: firstRace ?? meeting.created_at,
+        }
+      })
+    )
+
+    meetingsWithFirstRace.sort((a, b) => {
+      const aTime = new Date(a.first_race_time ?? a.created_at).getTime()
+      const bTime = new Date(b.first_race_time ?? b.created_at).getTime()
+      return aTime - bTime
+    })
+
+    return meetingsWithFirstRace
   } catch (error) {
-    console.error(`Error fetching meeting ${meetingId}:`, error);
-    return null;
+    const message =
+      error instanceof ApiError
+        ? `${error.status} ${error.message}`
+        : error instanceof Error
+          ? error.message
+          : 'Unknown error'
+
+    console.warn('PostgreSQL meetings query failed, returning empty list:', message)
+    return []
+  }
+}
+
+export async function getMeetingById(meeting_id: string): Promise<Meeting | null> {
+  try {
+    const meeting = await apiClient.get<Meeting>(`/meetings/${meeting_id}`)
+    return meeting
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return null
+    }
+
+    console.error(`Error fetching meeting ${meeting_id}:`, error)
+    return null
   }
 }

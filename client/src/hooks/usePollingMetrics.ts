@@ -202,10 +202,10 @@ export function usePollingMetrics(
 
     if (
       lastPollTimestampRef.current !== null &&
-      pollingState.lastUpdated !== null
+      pollingState.last_updated !== null
     ) {
       actualIntervalMs =
-        pollingState.lastUpdated.getTime() - lastPollTimestampRef.current
+        pollingState.last_updated.getTime() - lastPollTimestampRef.current
       if (targetIntervalMs > 0) {
         const deviation = Math.abs(actualIntervalMs - targetIntervalMs) / targetIntervalMs
         if (deviation > mergedConfig.cadenceTolerancePercent / 100) {
@@ -315,17 +315,17 @@ export function usePollingMetrics(
    */
   useEffect(() => {
     // Record polling activity from pollingState
-    if (pollingState.isPolling && pollingState.lastUpdated) {
+    if (pollingState.isPolling && pollingState.last_updated) {
       // Record start event first (for request counting)
       recordEvent({
-        timestamp: pollingState.lastUpdated,
+        timestamp: pollingState.last_updated,
         endpoint: PollingEndpoint.RACE,
         type: 'start',
       })
 
       // Then record outcome with latency
       recordEvent({
-        timestamp: pollingState.lastUpdated,
+        timestamp: pollingState.last_updated,
         endpoint: PollingEndpoint.RACE,
         type: pollingState.error ? 'error' : 'success',
         durationMs: pollingState.lastRequestDurationMs ?? undefined,
@@ -339,7 +339,7 @@ export function usePollingMetrics(
   }, [
     pollingState.isPolling,
     pollingState.error,
-    pollingState.lastUpdated,
+    pollingState.last_updated,
     pollingState.lastRequestDurationMs,
     recordEvent,
     calculateMetrics,

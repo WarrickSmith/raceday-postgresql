@@ -21,11 +21,11 @@ const isRaceFinalized = (race: Race) => {
 }
 
 const hasRaceStarted = (race: Race) => {
-  const startTime = new Date(race.startTime).getTime()
-  if (Number.isNaN(startTime)) {
+  const start_time = new Date(race.start_time).getTime()
+  if (Number.isNaN(start_time)) {
     return true
   }
-  return Date.now() >= startTime
+  return Date.now() >= start_time
 }
 
 export const useAudibleRaceAlerts = ({
@@ -151,7 +151,7 @@ export const useAudibleRaceAlerts = ({
       return
     }
 
-    if (triggeredRacesRef.current.has(race.raceId)) {
+    if (triggeredRacesRef.current.has(race.race_id)) {
       return
     }
 
@@ -163,17 +163,17 @@ export const useAudibleRaceAlerts = ({
       return
     }
 
-    triggeredRacesRef.current.add(race.raceId)
+    triggeredRacesRef.current.add(race.race_id)
     playAudio()
   }, [playAudio])
 
   const scheduleRace = useCallback((race: Race) => {
-    const startTime = new Date(race.startTime).getTime()
-    if (Number.isNaN(startTime)) {
+    const start_time = new Date(race.start_time).getTime()
+    if (Number.isNaN(start_time)) {
       return
     }
 
-    const triggerTime = startTime - 60_000 // 1 minute before start
+    const triggerTime = start_time - 60_000 // 1 minute before start
     const now = Date.now()
 
     if (triggerTime <= now) {
@@ -183,17 +183,17 @@ export const useAudibleRaceAlerts = ({
 
     const delay = triggerTime - now
 
-    const existingTimer = timersRef.current.get(race.raceId)
+    const existingTimer = timersRef.current.get(race.race_id)
     if (existingTimer) {
       clearTimeout(existingTimer)
     }
 
     const timer = setTimeout(() => {
-      timersRef.current.delete(race.raceId)
+      timersRef.current.delete(race.race_id)
       triggerAlert(race)
     }, delay)
 
-    timersRef.current.set(race.raceId, timer)
+    timersRef.current.set(race.race_id, timer)
   }, [triggerAlert])
 
   useEffect(() => {
@@ -210,19 +210,19 @@ export const useAudibleRaceAlerts = ({
         return
       }
 
-      const upcomingIds = new Set(races.map((race) => race.raceId))
+      const upcomingIds = new Set(races.map((race) => race.race_id))
 
       // Clear timers for races no longer upcoming
-      timersRef.current.forEach((timer, raceId) => {
-        if (!upcomingIds.has(raceId)) {
+      timersRef.current.forEach((timer, race_id) => {
+        if (!upcomingIds.has(race_id)) {
           clearTimeout(timer)
-          timersRef.current.delete(raceId)
-          triggeredRacesRef.current.delete(raceId)
+          timersRef.current.delete(race_id)
+          triggeredRacesRef.current.delete(race_id)
         }
       })
 
       races.forEach((race) => {
-        triggeredRacesRef.current.delete(race.raceId)
+        triggeredRacesRef.current.delete(race.race_id)
         scheduleRace(race)
       })
     }

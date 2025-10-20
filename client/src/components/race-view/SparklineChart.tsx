@@ -7,7 +7,7 @@ interface OddsDataPoint {
   $createdAt: string;
   $updatedAt: string;
   entrant: string;
-  winOdds: number;
+  win_odds: number;
   timestamp: string;
 }
 
@@ -45,7 +45,7 @@ export const SparklineChart = React.memo<SparklineChartProps>(function Sparkline
     }
 
     // Calculate min/max for scaling
-    const values = data.map(d => d.winOdds);
+    const values = data.map(d => d.win_odds);
     const minValue = Math.min(...values);
     const maxValue = Math.max(...values);
     const range = maxValue - minValue;
@@ -64,7 +64,7 @@ export const SparklineChart = React.memo<SparklineChartProps>(function Sparkline
     // Generate path coordinates
     const coordinates = data.map((point, index) => {
       const x = (index / (data.length - 1)) * width;
-      const y = height - ((point.winOdds - minValue) / range) * height;
+      const y = height - ((point.win_odds - minValue) / range) * height;
       return { x, y };
     });
 
@@ -99,8 +99,8 @@ export const SparklineChart = React.memo<SparklineChartProps>(function Sparkline
       return 'No odds history data available';
     }
 
-    const firstOdds = data[0].winOdds;
-    const lastOdds = data[data.length - 1].winOdds;
+    const firstOdds = data[0].win_odds;
+    const lastOdds = data[data.length - 1].win_odds;
     const change = ((lastOdds - firstOdds) / firstOdds * 100).toFixed(1);
     
     if (trendDirection === 'down') {

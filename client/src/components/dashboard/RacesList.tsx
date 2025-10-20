@@ -7,25 +7,25 @@ import { useRacesForMeeting } from '@/hooks/useRacesForMeeting';
 import { racePrefetchService } from '@/services/racePrefetchService';
 
 interface RacesListProps {
-  meetingId: string;
-  onRaceClick?: (raceId: string) => void;
+  meeting_id: string;
+  onRaceClick?: (race_id: string) => void;
   onRacesLoaded?: (races: unknown) => void;
 }
 
 function RacesListComponent({ 
-  meetingId, 
+  meeting_id, 
   onRaceClick,
   onRacesLoaded 
 }: RacesListProps) {
   // Only add debugging in development
   if (process.env.NODE_ENV === 'development') {
-    console.log('📝 RacesList rendered with meetingId:', meetingId);
+    console.log('📝 RacesList rendered with meeting_id:', meeting_id);
   }
   
   // Use the hook to fetch races for this meeting
   const { races, isLoading, error } = useRacesForMeeting({
-    meetingId,
-    enabled: !!meetingId,
+    meeting_id,
+    enabled: !!meeting_id,
   });
 
   // Call onRacesLoaded when races are loaded
@@ -38,19 +38,19 @@ function RacesListComponent({
   // Background pre-fetching of race data when races are displayed
   useEffect(() => {
     if (races.length > 0) {
-      const raceIds = races.map(race => race.raceId);
-      console.log('📋 Starting background pre-fetch for', raceIds.length, 'races in meeting:', meetingId);
+      const race_ids = races.map(race => race.race_id);
+      console.log('📋 Starting background pre-fetch for', race_ids.length, 'races in meeting:', meeting_id);
       
       // Pre-fetch race data in background with low priority
-      racePrefetchService.prefetchMultipleRaces(raceIds, { priority: 'low' })
+      racePrefetchService.prefetchMultipleRaces(race_ids, { priority: 'low' })
         .then(() => {
-          console.log('✅ Background pre-fetch completed for meeting:', meetingId);
+          console.log('✅ Background pre-fetch completed for meeting:', meeting_id);
         })
         .catch(error => {
-          console.warn('⚠️ Background pre-fetch failed for meeting:', meetingId, error);
+          console.warn('⚠️ Background pre-fetch failed for meeting:', meeting_id, error);
         });
     }
-  }, [races, meetingId]);
+  }, [races, meeting_id]);
   
   if (process.env.NODE_ENV === 'development') {
     console.log('📝 RacesList hook result:', { racesCount: races.length, isLoading, error });
@@ -74,7 +74,7 @@ function RacesListComponent({
       <div 
         className="mt-4 pl-6 border-l-2 border-red-100 bg-red-50 rounded-r-lg p-4"
         role="alert"
-        aria-labelledby={`races-error-${meetingId}`}
+        aria-labelledby={`races-error-${meeting_id}`}
       >
         <div className="flex items-center">
           <div className="flex-shrink-0">
@@ -94,7 +94,7 @@ function RacesListComponent({
           </div>
           <div className="ml-3">
             <h4 
-              id={`races-error-${meetingId}`}
+              id={`races-error-${meeting_id}`}
               className="text-sm font-medium text-red-800"
             >
               Failed to load races
@@ -114,7 +114,7 @@ function RacesListComponent({
       <div 
         className="mt-4 pl-6 border-l-2 border-gray-100 bg-gray-50 rounded-r-lg p-4"
         role="status"
-        aria-labelledby={`races-empty-${meetingId}`}
+        aria-labelledby={`races-empty-${meeting_id}`}
       >
         <div className="flex items-center">
           <div className="flex-shrink-0">
@@ -136,7 +136,7 @@ function RacesListComponent({
           </div>
           <div className="ml-3">
             <h4 
-              id={`races-empty-${meetingId}`}
+              id={`races-empty-${meeting_id}`}
               className="text-sm font-medium text-gray-800"
             >
               No races available
@@ -151,25 +151,25 @@ function RacesListComponent({
   }
 
   // Sort races by race number to ensure correct order
-  const sortedRaces = [...races].sort((a, b) => a.raceNumber - b.raceNumber);
+  const sortedRaces = [...races].sort((a, b) => a.race_number - b.race_number);
 
   return (
     <div 
       className="mt-4 pl-6 border-l-2 border-blue-100"
       role="region"
-      aria-labelledby={`races-list-${meetingId}`}
-      aria-describedby={`races-count-${meetingId}`}
+      aria-labelledby={`races-list-${meeting_id}`}
+      aria-describedby={`races-count-${meeting_id}`}
     >
       {/* Screen reader announcement */}
       <div className="sr-only">
-        <h4 id={`races-list-${meetingId}`}>Races for this meeting</h4>
-        <p id={`races-count-${meetingId}`}>
+        <h4 id={`races-list-${meeting_id}`}>Races for this meeting</h4>
+        <p id={`races-count-${meeting_id}`}>
           {sortedRaces.length} race{sortedRaces.length !== 1 ? 's' : ''} scheduled
         </p>
       </div>
 
       {/* Races list */}
-      <div className="space-y-2" data-testid={`races-list-${meetingId}`}>
+      <div className="space-y-2" data-testid={`races-list-${meeting_id}`}>
         {sortedRaces.map((race) => (
           <RaceCard 
             key={race.$id} 
@@ -186,7 +186,7 @@ function RacesListComponent({
 export const RacesList = memo(RacesListComponent, (prevProps, nextProps) => {
   // Custom comparison function for optimization
   return (
-    prevProps.meetingId === nextProps.meetingId &&
+    prevProps.meeting_id === nextProps.meeting_id &&
     prevProps.onRaceClick === nextProps.onRaceClick &&
     prevProps.onRacesLoaded === nextProps.onRacesLoaded
   );

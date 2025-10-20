@@ -9,10 +9,10 @@ import { useLogger } from '@/utils/logging';
 const AUTO_RETRY_INTERVAL_MS = 60_000;
 
 export interface RaceUpdateEvent {
-  meetingId: string;
+  meeting_id: string;
   eventType: 'create' | 'update';
-  meetingName: string;
-  firstRaceTime?: string;
+  meeting_name: string;
+  first_race_time?: string;
   timestamp: number;
 }
 
@@ -101,32 +101,32 @@ export function useMeetingsPolling({ initialData, onError, onRaceUpdate }: UseMe
 
       // Compare with previous data to detect changes
       const prevMeetings = previousMeetingsRef.current;
-      const prevMeetingMap = new Map(prevMeetings.map(m => [m.meetingId, m]));
+      const prevMeetingMap = new Map(prevMeetings.map(m => [m.meeting_id, m]));
 
       // Detect new or updated meetings
       for (const meeting of newMeetings) {
-        const prevMeeting = prevMeetingMap.get(meeting.meetingId);
+        const prevMeeting = prevMeetingMap.get(meeting.meeting_id);
 
         if (!prevMeeting) {
           // New meeting
           onRaceUpdateRef.current?.({
-            meetingId: meeting.meetingId,
+            meeting_id: meeting.meeting_id,
             eventType: 'create',
-            meetingName: meeting.meetingName,
-            firstRaceTime: meeting.firstRaceTime,
+            meeting_name: meeting.meeting_name,
+            first_race_time: meeting.first_race_time,
             timestamp: Date.now(),
           });
         } else if (
-          prevMeeting.firstRaceTime !== meeting.firstRaceTime ||
-          prevMeeting.meetingName !== meeting.meetingName ||
+          prevMeeting.first_race_time !== meeting.first_race_time ||
+          prevMeeting.meeting_name !== meeting.meeting_name ||
           prevMeeting.$updatedAt !== meeting.$updatedAt
         ) {
           // Updated meeting
           onRaceUpdateRef.current?.({
-            meetingId: meeting.meetingId,
+            meeting_id: meeting.meeting_id,
             eventType: 'update',
-            meetingName: meeting.meetingName,
-            firstRaceTime: meeting.firstRaceTime,
+            meeting_name: meeting.meeting_name,
+            first_race_time: meeting.first_race_time,
             timestamp: Date.now(),
           });
         }

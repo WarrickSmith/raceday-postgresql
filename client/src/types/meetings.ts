@@ -1,4 +1,4 @@
-import type { SUPPORTED_RACE_TYPE_CODES } from '@/constants/raceTypes'
+import type { SUPPORTED_RACE_TYPE_CODES } from '@/constants/race_types'
 import type { EntrantMoneyFlowTimeline } from './moneyFlow'
 import type { RaceResult, PoolDividend } from './racePools'
 import type { JockeySilk } from './jockeySilks'
@@ -6,63 +6,67 @@ import type { JockeySilk } from './jockeySilks'
 type SupportedRaceTypeCode = (typeof SUPPORTED_RACE_TYPE_CODES)[number]
 
 export interface Meeting {
-  $id: string
-  $createdAt: string
-  $updatedAt: string
-  meetingId: string
-  meetingName: string
+  meeting_id: string
+  meeting_name: string
   country: string
-  raceType: string
-  category: SupportedRaceTypeCode // Race type code: H or T (currently supported)
+  race_type: string
+  category?: SupportedRaceTypeCode
   date: string
-  firstRaceTime?: string
-  weather?: string // Weather conditions (e.g. "Fine", "Overcast")
-  trackCondition?: string // Track condition (e.g. "Good 3", "Heavy 8")
+  status: string
+  created_at: string
+  updated_at: string
+  first_race_time?: string
+  weather?: string
+  track_condition?: string
 }
 
 export interface Race {
-  $id: string
-  $createdAt: string
-  $updatedAt: string
-  raceId: string
-  raceNumber: number
-  name: string // Race name field from database
-  raceName?: string // Optional legacy field
-  startTime: string
-  actualStart?: string // Actual race start time from NZTAB API (actual_start_string)
-  meeting: string
+  race_id: string
+  created_at: string
+  updated_at: string
+  race_number: number
+  name: string
+  start_time: string
+  actual_start?: string | null
+  meeting_id: string
   status: string
-  distance?: number // Race distance in metres
-  trackCondition?: string // Track condition (e.g. "Good 3", "Heavy 8")
-  weather?: string // Weather conditions (e.g. "Fine", "Overcast")
-  runnerCount?: number // Number of runners in the race
-  type?: string // Race type code (T, H, G) for category display
-  // Results data fields
-  resultsAvailable?: boolean // Whether results data is available
-  resultsData?: RaceResult[] // Parsed race results array
-  dividendsData?: PoolDividend[] // Parsed dividends array
-  fixedOddsData?: Record<string, {fixed_win: number | null, fixed_place: number | null, runner_name: string | null, entrant_id: string | null}> // Fixed odds per runner at result time
-  resultStatus?: 'interim' | 'final' | 'protest' // Status of results
-  photoFinish?: boolean // Photo finish flag
-  stewardsInquiry?: boolean // Stewards inquiry flag
-  protestLodged?: boolean // Protest lodged flag
-  resultTime?: string // Time when results were declared
+  distance?: number | null
+  track_condition?: string | null
+  weather?: string | null
+  runner_count?: number | null
+  race_type?: string | null
+  results_available?: boolean
+  results_data?: RaceResult[]
+  dividends_data?: PoolDividend[]
+  fixed_odds_data?: Record<
+    string,
+    {
+      fixed_win_odds: number | null
+      fixed_place_odds: number | null
+      runner_name: string | null
+      entrant_id: string | null
+    }
+  >
+  result_status?: 'interim' | 'final' | 'protest'
+  photo_finish?: boolean
+  stewards_inquiry?: boolean
+  protest_lodged?: boolean
+  result_time?: string
 }
 
-// Race results collection interface - separate from main race data
 export interface RaceResults {
-  $id: string
-  $createdAt: string
-  $updatedAt: string
-  race: string // Relationship to races collection
-  resultsAvailable?: boolean // Whether results data is available
-  resultsData?: string // JSON-stringified race results array
-  dividendsData?: string // JSON-stringified dividends array
-  resultStatus?: 'interim' | 'final' | 'protest' // Status of results
-  photoFinish?: boolean // Photo finish flag
-  stewardsInquiry?: boolean // Stewards inquiry flag
-  protestLodged?: boolean // Protest lodged flag
-  resultTime?: string // Time when results were declared
+  race_id: string
+  results_available?: boolean
+  results_data?: string
+  dividends_data?: string
+  fixed_odds_data?: string
+  result_status?: 'interim' | 'final' | 'protest'
+  photo_finish?: boolean
+  stewards_inquiry?: boolean
+  protest_lodged?: boolean
+  result_time?: string
+  created_at: string
+  updated_at: string
 }
 
 export interface MeetingWithRaces extends Meeting {
@@ -70,99 +74,86 @@ export interface MeetingWithRaces extends Meeting {
 }
 
 export interface MeetingWithExpandState extends Meeting {
-  isExpanded?: boolean
+  is_expanded?: boolean
   races?: Race[]
 }
 
-
-// MoneyFlowHistory document interface
 export interface MoneyFlowHistory {
-  $id: string
-  $createdAt: string
-  $updatedAt: string
-  entrant?: string
-  entrantId?: string
-  raceId?: string
-  holdPercentage?: number
-  fixedWinOdds?: number
-  fixedPlaceOdds?: number
-  poolWinOdds?: number
-  poolPlaceOdds?: number
+  entry_id: string
+  created_at: string
+  updated_at: string
+  entrant_id: string
+  race_id: string
+  hold_percentage: number | null
+  fixed_win_odds: number | null
+  fixed_place_odds: number | null
+  pool_win_odds: number | null
+  pool_place_odds: number | null
 }
 
-// DEPRECATED: OddsHistory document interface for sparkline data
-// Odds data now comes from MoneyFlowHistory collection via Timeline hooks
 export interface OddsHistoryData {
-  $id: string
-  $createdAt: string
-  $updatedAt: string
-  entrant: string
-  winOdds: number
+  entry_id: string
+  created_at: string
+  updated_at: string
+  entrant_id: string
+  win_odds: number
   timestamp: string
 }
 
-
-// Navigation event handler types
 export type NavigationHandler = (direction: 'previous' | 'next') => void
 export type NavigationErrorHandler = (error: Error) => void
 
-// Race navigation data interfaces
 export interface RaceNavigationData {
-  previousRace?: {
-    raceId: string
+  previous_race?: {
+    race_id: string
     name: string
-    startTime: string
-    meetingName: string
+    start_time: string
+    meeting_name: string
   } | null
-  nextRace?: {
-    raceId: string
+  next_race?: {
+    race_id: string
     name: string
-    startTime: string
-    meetingName: string
+    start_time: string
+    meeting_name: string
   } | null
-  nextScheduledRace?: {
-    raceId: string
+  next_scheduled_race?: {
+    race_id: string
     name: string
-    startTime: string
-    meetingName: string
+    start_time: string
+    meeting_name: string
   } | null
 }
 
-
 export interface Entrant {
-  $id: string
-  $createdAt: string
-  $updatedAt: string
-  entrantId: string
-  name: string // Runner name
-  runnerNumber: number // Saddlecloth number
+  entrant_id: string
+  created_at: string
+  updated_at: string
+  name: string
+  runner_number: number
   jockey?: string
-  trainerName?: string
+  trainer_name?: string
   weight?: number
-  silkUrl?: string // Legacy field - may not be populated
-  silkColours?: string // Silk color description from NZ TAB
-  silkUrl64?: string // 64x64 silk image URL from NZ TAB
-  silkUrl128?: string // 128x128 silk image URL from NZ TAB
-  isScratched: boolean
-  race: string // Race ID this entrant belongs to
-  winOdds?: number // Current win odds
-  placeOdds?: number // Current place odds
-  // CONSOLIDATED ODDS DATA (NEW in Story 4.9)
-  poolWinOdds?: number // Pool Win odds (tote)
-  poolPlaceOdds?: number // Pool Place odds (tote)
-  holdPercentage?: number // Current money flow percentage
-  previousHoldPercentage?: number // Previous money flow for trend calculation
-  moneyFlowTrend?: 'up' | 'down' | 'neutral' // Trend direction for display
-  moneyFlowHistory?: string[] // MoneyFlowHistory collection relationship
-  oddsHistory?: OddsHistoryData[] // DEPRECATED: Array of odds history data for sparkline (use MoneyFlowTimeline instead)
-  oddsHistoryRelationship?: string[] // DEPRECATED: OddsHistory collection relationship (use MoneyFlowHistory instead)
-  // Enhanced v4.7 data
-  moneyFlowTimeline?: EntrantMoneyFlowTimeline // Timeline visualization data
-  silk?: JockeySilk // Jockey silk visual data
-  poolMoney?: {
+  silk_url?: string
+  silk_colours?: string
+  silk_url_64?: string
+  silk_url_128?: string
+  is_scratched: boolean
+  race_id: string
+  fixed_win_odds?: number | null
+  pool_win_odds?: number | null
+  fixed_place_odds?: number | null
+  pool_place_odds?: number | null
+  hold_percentage?: number | null
+  previous_hold_percentage?: number | null
+  money_flow_trend?: 'up' | 'down' | 'neutral'
+  money_flow_timeline?: EntrantMoneyFlowTimeline
+  silk?: JockeySilk
+  pool_money?: {
     win: number
     place: number
     total: number
     percentage: number
   }
+  odds_history?: OddsHistoryData[]
+  money_flow_history?: MoneyFlowHistory[]
 }

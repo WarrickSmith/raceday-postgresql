@@ -28,7 +28,7 @@ export function RacePageContent() {
   const {
     poolData,
     lastUpdate: poolLastUpdated,
-  } = useRacePools(raceData?.race?.raceId, pollingState.lastUpdated)
+  } = useRacePools(raceData?.race?.race_id, pollingState.last_updated)
 
   if (!raceData) {
     return (
@@ -54,21 +54,21 @@ export function RacePageContent() {
 
   // Build results data from persistent race data
   const currentResultsData =
-    currentRace.resultsAvailable && currentRace.resultsData
+    currentRace.results_available && currentRace.results_data
       ? {
-          raceId: currentRace.raceId,
-          results: currentRace.resultsData,
-          dividends: currentRace.dividendsData || [],
-          fixedOddsData: currentRace.fixedOddsData
-            ? typeof currentRace.fixedOddsData === 'string'
-              ? JSON.parse(currentRace.fixedOddsData)
-              : currentRace.fixedOddsData
+          race_id: currentRace.race_id,
+          results: currentRace.results_data,
+          dividends: currentRace.dividends_data || [],
+          fixed_odds_data: currentRace.fixed_odds_data
+            ? typeof currentRace.fixed_odds_data === 'string'
+              ? JSON.parse(currentRace.fixed_odds_data)
+              : currentRace.fixed_odds_data
             : {},
-          status: currentRace.resultStatus || 'interim',
-          photoFinish: currentRace.photoFinish || false,
-          stewardsInquiry: currentRace.stewardsInquiry || false,
-          protestLodged: currentRace.protestLodged || false,
-          resultTime: currentRace.resultTime || new Date().toISOString(),
+          status: currentRace.result_status || 'interim',
+          photo_finish: currentRace.photo_finish || false,
+          stewards_inquiry: currentRace.stewards_inquiry || false,
+          protest_lodged: currentRace.protest_lodged || false,
+          result_time: currentRace.result_time || new Date().toISOString(),
         }
       : undefined
 
@@ -181,29 +181,29 @@ export function RacePageContent() {
 
         <EnhancedEntrantsGrid
           initialEntrants={currentEntrants}
-          raceId={currentRace.$id}
-          raceStartTime={currentRace.startTime}
+          race_id={currentRace.$id}
+          raceStartTime={currentRace.start_time}
           dataFreshness={dataFreshness}
           enableMoneyFlowTimeline={true}
           enableJockeySilks={true}
           className="h-full"
           poolData={currentPoolData}
-          moneyFlowUpdateTrigger={pollingState.lastUpdated?.getTime()}
-          resultsData={currentResultsData?.results}
+          moneyFlowUpdateTrigger={pollingState.last_updated?.getTime()}
+          results_data={currentResultsData?.results}
           raceStatus={currentRace.status}
-          resultStatus={currentResultsData?.status || currentRace.resultStatus}
+          result_status={currentResultsData?.status || currentRace.result_status}
         />
       </main>
 
       {/* Footer - Summary panels based on fetched race data */}
       <footer className="race-layout-footer">
         <RaceFooter
-          raceStartTime={currentRace.startTime}
+          raceStartTime={currentRace.start_time}
           raceStatus={
             (currentRace.status?.toLowerCase() as RaceStatus) || raceStatus
           }
           poolData={currentPoolData || undefined}
-          resultsData={currentResultsData || undefined}
+          results_data={currentResultsData || undefined}
           showCountdown={true}
           showResults={true}
           race={currentRace}

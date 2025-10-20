@@ -126,10 +126,10 @@ export function convertToNzTime(raceStartTimeIso: string): string | null {
  * Create a time window for race detection that accounts for DST
  * @param {number} hoursBack - Hours before current time
  * @param {number} hoursForward - Hours after current time
- * @returns {Object} Object with startTime and endTime in UTC ISO format
+ * @returns {Object} Object with start_time and endTime in UTC ISO format
  */
 export function createNzAwareTimeWindow(hoursBack: number = 1, hoursForward: number = 1): {
-  startTime: string
+  start_time: string
   endTime: string
   nzStartTime: string
   nzEndTime: string
@@ -138,14 +138,14 @@ export function createNzAwareTimeWindow(hoursBack: number = 1, hoursForward: num
   const now = new Date()
 
   // Calculate the time window in UTC
-  const startTime = new Date(now.getTime() - (hoursBack * 60 * 60 * 1000))
+  const start_time = new Date(now.getTime() - (hoursBack * 60 * 60 * 1000))
   const endTime = new Date(now.getTime() + (hoursForward * 60 * 60 * 1000))
 
   return {
-    startTime: startTime.toISOString(),
+    start_time: start_time.toISOString(),
     endTime: endTime.toISOString(),
     // Also provide NZ times for logging
-    nzStartTime: startTime.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
+    nzStartTime: start_time.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
     nzEndTime: endTime.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' }),
     currentNzTime: now.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' })
   }
@@ -158,7 +158,7 @@ export function createNzAwareTimeWindow(hoursBack: number = 1, hoursForward: num
  * @returns {Object} Extended time window
  */
 export function createExtendedRaceWindow(baseHours: number = 1): {
-  startTime: string
+  start_time: string
   endTime: string
   nzStartTime: string
   nzEndTime: string

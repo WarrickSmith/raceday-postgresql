@@ -31,10 +31,10 @@ export const RaceTimingSection = memo(function RaceTimingSection({
   const [delayedTime, setDelayedTime] = useState<string | null>(null)
 
   // Use real-time race data from unified subscription with fallbacks
-  const currentStartTime = race?.startTime || raceStartTime
+  const currentStartTime = race?.start_time || raceStartTime
   const currentStatus =
     (race?.status?.toLowerCase() as RaceStatus) || raceStatus || 'open'
-  const actualStartTime = race?.actualStart
+  const actual_startTime = race?.actual_start
 
   const calculateTimeRemaining = useCallback(() => {
     if (!currentStartTime) return
@@ -156,7 +156,7 @@ export const RaceTimingSection = memo(function RaceTimingSection({
             </div>
             <div className="text-lg font-extrabold text-blue-600">
               {new Date(
-                actualStartTime || currentStartTime || new Date()
+                actual_startTime || currentStartTime || new Date()
               ).toLocaleTimeString('en-US', {
                 hour12: true,
                 hour: 'numeric',

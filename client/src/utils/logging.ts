@@ -145,12 +145,12 @@ export function logError(message: string, error?: unknown, component?: string): 
  */
 export function logPerformance(
   operation: string,
-  startTime: number,
+  start_time: number,
   metrics: Record<string, unknown> = {},
   component?: string
 ): void {
   if (isLogLevelEnabled('ERROR')) {
-    const duration = Date.now() - startTime;
+    const duration = Date.now() - start_time;
     const perfData = {
       durationMs: duration,
       ...metrics,
@@ -276,8 +276,8 @@ export function createComponentLogger(componentName: string) {
     warn: (message: string, data?: unknown) => logWarn(message, data, componentName),
     error: (message: string, error?: unknown) => logError(message, error, componentName),
     render: (props?: Record<string, unknown>) => logRender(componentName, props),
-    performance: (operation: string, startTime: number, metrics?: Record<string, unknown>) =>
-      logPerformance(operation, startTime, metrics, componentName),
+    performance: (operation: string, start_time: number, metrics?: Record<string, unknown>) =>
+      logPerformance(operation, start_time, metrics, componentName),
     realtime: (event: 'connect' | 'disconnect' | 'update' | 'error', details?: unknown) =>
       logRealtime(event, details, componentName),
     api: (method: string, url: string, status?: number, timing?: number) =>

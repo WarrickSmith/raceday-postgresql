@@ -11,11 +11,11 @@ interface NextScheduledRaceButtonProps {
 }
 
 interface NextScheduledRace {
-  raceId: string;
+  race_id: string;
   name: string;
-  startTime: string;
-  meetingName: string;
-  raceNumber: number;
+  start_time: string;
+  meeting_name: string;
+  race_number: number;
 }
 
 interface NextScheduledRaceApiResponse {
@@ -67,7 +67,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
     
     if (nextScheduledRace) {
       const now = new Date();
-      const raceTime = new Date(nextScheduledRace.startTime);
+      const raceTime = new Date(nextScheduledRace.start_time);
       const minutesUntilRace = (raceTime.getTime() - now.getTime()) / (1000 * 60);
       
       // Increase polling frequency as race approaches
@@ -161,7 +161,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
     let hasTriggeredNextFetch = false;
     const updateInterval = setInterval(() => {
       const now = new Date();
-      const raceTime = new Date(nextScheduledRace.startTime);
+      const raceTime = new Date(nextScheduledRace.start_time);
       const diff = raceTime.getTime() - now.getTime();
 
       // If race has started (passed start time), fetch updated next race ONLY ONCE
@@ -186,8 +186,8 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
     setIsLoading(true);
     
     try {
-      console.log('🎯 Navigating to next scheduled race:', nextScheduledRace.raceId);
-      router.push(`/race/${nextScheduledRace.raceId}`);
+      console.log('🎯 Navigating to next scheduled race:', nextScheduledRace.race_id);
+      router.push(`/race/${nextScheduledRace.race_id}`);
     } catch (error) {
       console.error('❌ Failed to navigate to next scheduled race:', error);
     } finally {
@@ -233,7 +233,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
     if (!nextScheduledRace) return null;
     
     const now = new Date();
-    const raceTime = new Date(nextScheduledRace.startTime);
+    const raceTime = new Date(nextScheduledRace.start_time);
     const diff = raceTime.getTime() - now.getTime();
     
     if (diff <= 0) {
@@ -267,7 +267,7 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
       }`}
       aria-label={
         nextScheduledRace
-          ? `Jump to next scheduled race: ${nextScheduledRace.name} at ${nextScheduledRace.meetingName} starting at ${formatTime(nextScheduledRace.startTime)}`
+          ? `Jump to next scheduled race: ${nextScheduledRace.name} at ${nextScheduledRace.meeting_name} starting at ${formatTime(nextScheduledRace.start_time)}`
           : 'No upcoming races available'
       }
     >
@@ -289,19 +289,19 @@ export function NextScheduledRaceButton({ meetings, isRealtimeConnected, raceUpd
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold">Next Race</span>
             <span className={`text-sm font-medium ${isDisabled ? 'text-gray-400' : 'text-blue-100'}`}>
-              in {getTimeUntilRace(nextScheduledRace.startTime)}
+              in {getTimeUntilRace(nextScheduledRace.start_time)}
             </span>
             {getRaceStatusIndicator()}
             <span className={`text-xs font-normal ${isDisabled ? 'text-gray-400' : 'text-blue-200'}`}>
-              @ {formatTime(nextScheduledRace.startTime)}
+              @ {formatTime(nextScheduledRace.start_time)}
             </span>
             <span className={`text-sm font-normal ${isDisabled ? 'text-gray-400' : 'text-blue-100'}`}>
-              in {nextScheduledRace.meetingName}
+              in {nextScheduledRace.meeting_name}
             </span>
           </div>
           {/* Race details row */}
           <span className={`text-sm font-normal leading-tight ${isDisabled ? 'text-gray-400' : 'text-blue-100'}`}>
-            R{nextScheduledRace.raceNumber} - {nextScheduledRace.name}
+            R{nextScheduledRace.race_number} - {nextScheduledRace.name}
           </span>
         </div>
       ) : (

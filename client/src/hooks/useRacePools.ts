@@ -21,7 +21,7 @@ interface UseRacePoolsResult {
  * - Defers initial fetch to avoid dev StrictMode double-invoke aborts
  */
 export function useRacePools(
-  raceId?: string,
+  race_id?: string,
   trigger?: unknown
 ): UseRacePoolsResult {
   const [poolData, setPoolData] = useState<RacePoolData | null>(null)
@@ -49,7 +49,7 @@ export function useRacePools(
   }
 
   const startFetch = useCallback(async () => {
-    if (!raceId) return
+    if (!race_id) return
 
     // Check connection state before attempting fetch
     const connectionState = getConnectionState()
@@ -73,7 +73,7 @@ export function useRacePools(
 
     const promise = (async () => {
       try {
-        const response = await fetch(`/api/race/${raceId}/pools`, {
+        const response = await fetch(`/api/race/${race_id}/pools`, {
           signal: controller.signal,
           cache: 'no-store',
           headers: { 'X-Pools-Fetch': 'true' },
@@ -129,11 +129,11 @@ export function useRacePools(
 
     pendingRequestRef.current = promise
     return promise
-  }, [raceId, recordRequest])
+  }, [race_id, recordRequest])
 
   const scheduleFetch = useCallback(() => {
     clearScheduled()
-    if (!raceId) return
+    if (!race_id) return
 
     // Defer to next frame to avoid dev StrictMode immediate abort churn
     if (typeof requestAnimationFrame !== 'undefined') {
@@ -149,11 +149,11 @@ export function useRacePools(
       }, 0) as unknown as number
       scheduledRef.current = id
     }
-  }, [raceId, startFetch])
+  }, [race_id, startFetch])
 
-  // Trigger fetch on raceId change or external trigger (e.g., polling tick)
+  // Trigger fetch on race_id change or external trigger (e.g., polling tick)
   useEffect(() => {
-    if (!raceId) {
+    if (!race_id) {
       setPoolData(null)
       setLastUpdate(null)
       setIsLoading(false)
@@ -171,7 +171,7 @@ export function useRacePools(
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [raceId, trigger])
+  }, [race_id, trigger])
 
   useEffect(() => {
     // Reset unmounted flag on mount. In React StrictMode the effect cleanup
@@ -190,7 +190,7 @@ export function useRacePools(
   }, [])
 
   const refetch = useCallback(async () => {
-    if (!raceId) return
+    if (!race_id) return
     // Cancel any pending scheduled fetch and in-flight request
     clearScheduled()
     if (abortControllerRef.current) {
@@ -198,7 +198,7 @@ export function useRacePools(
       abortControllerRef.current = null
     }
     await startFetch()
-  }, [raceId, startFetch])
+  }, [race_id, startFetch])
 
   return { poolData, isLoading, error, lastUpdate, refetch }
 }

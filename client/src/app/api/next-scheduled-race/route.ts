@@ -13,9 +13,9 @@ export async function GET(request: NextRequest) {
       'raceday-db',
       'races',
       [
-        Query.greaterThan('startTime', now.toISOString()),
+        Query.greaterThan('start_time', now.toISOString()),
         Query.notEqual('status', 'Abandoned'),
-        Query.orderAsc('startTime'),
+        Query.orderAsc('start_time'),
         Query.limit(1)
       ]
     );
@@ -30,11 +30,11 @@ export async function GET(request: NextRequest) {
     const nextRaceDoc = nextScheduledRaceQuery.documents[0];
     
     const nextScheduledRace = {
-      raceId: nextRaceDoc.raceId,
+      race_id: nextRaceDoc.race_id,
       name: nextRaceDoc.name,
-      startTime: nextRaceDoc.startTime,
-      meetingName: nextRaceDoc.meeting?.meetingName || 'Unknown Meeting',
-      raceNumber: nextRaceDoc.raceNumber
+      start_time: nextRaceDoc.start_time,
+      meeting_name: nextRaceDoc.meeting?.meeting_name || 'Unknown Meeting',
+      race_number: nextRaceDoc.race_number
     };
 
     // Set cache headers for optimal performance

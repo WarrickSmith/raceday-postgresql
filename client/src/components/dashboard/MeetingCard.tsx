@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useState } from 'react';
 import { Meeting } from '@/types/meetings';
-import { getRaceTypeDisplay } from '@/constants/raceTypes';
+import { getRaceTypeDisplay } from '@/constants/race_types';
 import { getCountryInfo, normalizeCountryCode } from '@/constants/countries';
 
 interface MeetingCardProps {
@@ -21,7 +21,7 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
     const checkMeetingCompletion = async () => {
       try {
         // Make a lightweight API call to check race statuses
-        const response = await fetch(`/api/meetings/${meeting.meetingId}/status`);
+        const response = await fetch(`/api/meetings/${meeting.meeting_id}/status`);
         if (response.ok) {
           const data: MeetingStatusResponse = await response.json();
           setIsCompleted(data.isCompleted);
@@ -29,10 +29,10 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
       } catch (error) {
         console.log('Failed to check meeting completion status:', error);
         // Fallback to time-based heuristic for old meetings
-        if (meeting.firstRaceTime) {
+        if (meeting.first_race_time) {
           const now = new Date();
-          const firstRaceTime = new Date(meeting.firstRaceTime);
-          const hoursSinceFirstRace = (now.getTime() - firstRaceTime.getTime()) / (1000 * 60 * 60);
+          const first_race_time = new Date(meeting.first_race_time);
+          const hoursSinceFirstRace = (now.getTime() - first_race_time.getTime()) / (1000 * 60 * 60);
           // Assume meeting is completed if it started more than 6 hours ago
           setIsCompleted(hoursSinceFirstRace > 6);
         }
@@ -40,7 +40,7 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
     };
 
     void checkMeetingCompletion();
-  }, [meeting.meetingId, meeting.firstRaceTime]);
+  }, [meeting.meeting_id, meeting.first_race_time]);
   const formatTime = (dateTimeString: string) => {
     try {
       const date = new Date(dateTimeString);
@@ -82,15 +82,15 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
   };
 
   const getDisplayRaceType = (meeting: Meeting): string => {
-    // Use category code for consistent display, fallback to raceType for legacy data
-    return meeting.category ? getRaceTypeDisplay(meeting.category) : meeting.raceType;
+    // Use category code for consistent display, fallback to race_type for legacy data
+    return meeting.category ? getRaceTypeDisplay(meeting.category) : meeting.race_type;
   };
 
   const getMeetingStatus = () => {
-    if (!meeting.firstRaceTime) return 'upcoming';
+    if (!meeting.first_race_time) return 'upcoming';
     
     const now = new Date();
-    const firstRaceTime = new Date(meeting.firstRaceTime);
+    const first_race_time = new Date(meeting.first_race_time);
     
     // Check completion status from API/heuristic check
     if (isCompleted === true) {
@@ -98,8 +98,8 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
     }
     
     // Fallback to time-based logic
-    if (firstRaceTime > now) return 'upcoming';
-    if (firstRaceTime <= now) return 'live';
+    if (first_race_time > now) return 'upcoming';
+    if (first_race_time <= now) return 'live';
     
     return 'upcoming';
   };
@@ -124,15 +124,15 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
               id={`meeting-${meeting.$id}`}
               className="text-lg font-semibold text-gray-900 truncate"
             >
-              {meeting.meetingName}
+              {meeting.meeting_name}
             </h3>
 
             <time
-              dateTime={meeting.firstRaceTime}
+              dateTime={meeting.first_race_time}
               className="text-sm font-medium text-gray-900 flex-shrink-0"
-              aria-label={`First race at ${formatTime(meeting.firstRaceTime || meeting.$createdAt)}`}
+              aria-label={`First race at ${formatTime(meeting.first_race_time || meeting.$createdAt)}`}
             >
-              {formatTime(meeting.firstRaceTime || meeting.$createdAt)}
+              {formatTime(meeting.first_race_time || meeting.$createdAt)}
             </time>
 
             <span className="text-sm text-gray-600">
@@ -159,9 +159,9 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
               </span>
             )}
 
-            {meeting.trackCondition && (
+            {meeting.track_condition && (
               <span className="text-xs text-gray-600">
-                Track: {meeting.trackCondition}
+                Track: {meeting.track_condition}
               </span>
             )}
           </div>
@@ -185,6 +185,6 @@ export const MeetingCard = memo(MeetingCardComponent, (prevProps, nextProps) => 
   return (
     prevProps.meeting.$id === nextProps.meeting.$id &&
     prevProps.meeting.$updatedAt === nextProps.meeting.$updatedAt &&
-    prevProps.meeting.firstRaceTime === nextProps.meeting.firstRaceTime
+    prevProps.meeting.first_race_time === nextProps.meeting.first_race_time
   );
 });

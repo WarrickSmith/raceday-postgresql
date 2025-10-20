@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
         enabled: indicator.enabled,
         color: indicator.color,
         isDefault: indicator.isDefault,
-        lastUpdated: new Date().toISOString(),
+        last_updated: new Date().toISOString(),
         audibleAlertsEnabled,
       }
 
@@ -162,7 +162,7 @@ async function createDefaultIndicators(
       enabled: defaultConfig.enabled,
       displayOrder: defaultConfig.displayOrder,
       createdAt: timestamp,
-      lastUpdated: timestamp,
+      last_updated: timestamp,
       audibleAlertsEnabled: true,
     }
 
@@ -204,7 +204,7 @@ async function createMissingIndicators(
       enabled: defaultConfig.enabled,
       displayOrder: defaultConfig.displayOrder,
       createdAt: timestamp,
-      lastUpdated: timestamp,
+      last_updated: timestamp,
       audibleAlertsEnabled: true,
     }
 
@@ -244,8 +244,8 @@ function mapDocumentToIndicator(document: Models.Document): IndicatorConfig {
     isDefault: Boolean(doc.isDefault),
     enabled: Boolean(doc.enabled),
     displayOrder: Number(doc.displayOrder ?? 1),
-    lastUpdated:
-      typeof doc.lastUpdated === 'string' ? doc.lastUpdated : undefined,
+    last_updated:
+      typeof doc.last_updated === 'string' ? doc.last_updated : undefined,
     createdAt: typeof doc.$createdAt === 'string' ? doc.$createdAt : undefined,
     audibleAlertsEnabled:
       typeof doc.audibleAlertsEnabled === 'boolean'

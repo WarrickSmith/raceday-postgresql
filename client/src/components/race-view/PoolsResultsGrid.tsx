@@ -3,7 +3,7 @@ import type { RacePoolData, RaceResultsData } from '@/types/racePools'
 
 interface Props {
   poolData?: RacePoolData
-  resultsData?: RaceResultsData
+  results_data?: RaceResultsData
   className?: string
 }
 
@@ -18,12 +18,12 @@ const formatPoolAmount = (cents?: number) => {
 
 export const PoolsResultsGrid: React.FC<Props> = ({
   poolData,
-  resultsData,
+  results_data,
   className = '',
 }) => {
   // helpers to find dividend by poolType (handle different API field names)
   const findDividend = (type: string) =>
-    resultsData?.dividends.find((d) => {
+    results_data?.dividends.find((d) => {
       const poolTypeField =
         d.poolType || d.product_name || d.product_type || d.pool_type || d.type
       if (!poolTypeField) return false
@@ -47,24 +47,24 @@ export const PoolsResultsGrid: React.FC<Props> = ({
             <div className="flex justify-between">
               <div className="text-xs text-gray-400">1st</div>
               <div className="text-sm font-bold">
-                {resultsData && resultsData.results[0]
-                  ? `#${resultsData.results[0].runnerNumber} ${resultsData.results[0].runnerName}`
+                {results_data && results_data.results[0]
+                  ? `#${results_data.results[0].runner_number} ${results_data.results[0].runnerName}`
                   : '—'}
               </div>
             </div>
             <div className="flex justify-between">
               <div className="text-xs text-gray-400">2nd</div>
               <div className="text-sm font-bold">
-                {resultsData && resultsData.results[1]
-                  ? `#${resultsData.results[1].runnerNumber} ${resultsData.results[1].runnerName}`
+                {results_data && results_data.results[1]
+                  ? `#${results_data.results[1].runner_number} ${results_data.results[1].runnerName}`
                   : '—'}
               </div>
             </div>
             <div className="flex justify-between">
               <div className="text-xs text-gray-400">3rd</div>
               <div className="text-sm font-bold">
-                {resultsData && resultsData.results[2]
-                  ? `#${resultsData.results[2].runnerNumber} ${resultsData.results[2].runnerName}`
+                {results_data && results_data.results[2]
+                  ? `#${results_data.results[2].runner_number} ${results_data.results[2].runnerName}`
                   : '—'}
               </div>
             </div>
@@ -139,7 +139,7 @@ export const PoolsResultsGrid: React.FC<Props> = ({
           {poolData && (
             <span>
               Updated:{' '}
-              {new Date(poolData.lastUpdated).toLocaleTimeString('en-US', {
+              {new Date(poolData.last_updated).toLocaleTimeString('en-US', {
                 hour12: true,
                 hour: 'numeric',
                 minute: '2-digit',

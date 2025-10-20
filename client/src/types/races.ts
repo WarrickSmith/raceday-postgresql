@@ -21,12 +21,12 @@ export interface RaceLoadingState {
 // Race display props
 export interface RaceCardProps {
   race: Race;
-  onClick?: (raceId: string) => void;
+  onClick?: (race_id: string) => void;
 }
 
 // Races list props
 export interface RacesListProps {
-  meetingId: string;
+  meeting_id: string;
   races?: Race[];
   isLoading?: boolean;
   error?: string | null;

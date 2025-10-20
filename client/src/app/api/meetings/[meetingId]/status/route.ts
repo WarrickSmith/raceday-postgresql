@@ -4,10 +4,10 @@ import { jsonWithCompression } from '@/lib/http/compression';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ meetingId: string }> }
+  { params }: { params: Promise<{ meeting_id: string }> }
 ) {
   try {
-    const { meetingId } = await params;
+    const { meeting_id } = await params;
     const { databases } = await createServerClient();
     
     // Fetch races for this meeting with minimal data
@@ -15,7 +15,7 @@ export async function GET(
       'raceday-db',
       'races',
       [
-        Query.equal('meeting', meetingId),
+        Query.equal('meeting', meeting_id),
         Query.select(['status']), // Only fetch the status field for performance
         Query.limit(50)
       ]

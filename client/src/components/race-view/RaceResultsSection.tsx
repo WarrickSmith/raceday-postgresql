@@ -6,7 +6,7 @@ import type { RaceResultsData } from '@/types/racePools'
 // Type for race result objects from various API formats
 interface RaceResult {
   runner_number?: number
-  runnerNumber?: number
+  runner_number?: number
   number?: number
   no?: number
   name?: string
@@ -24,20 +24,20 @@ interface FixedOddsEntry {
 }
 
 interface RaceResultsSectionProps {
-  resultsData?: RaceResultsData
+  results_data?: RaceResultsData
   className?: string
   lastUpdate?: Date | null
 }
 
 export const RaceResultsSection = memo(function RaceResultsSection({
-  resultsData,
+  results_data,
   className = '',
   lastUpdate,
 }: RaceResultsSectionProps) {
   // Enhanced helper function to extract runner number from various API field formats
   const getRunnerNumber = (result: RaceResult): number | undefined => {
     return (
-      result.runner_number || result.runnerNumber || result.number || result.no
+      result.runner_number || result.runner_number || result.number || result.no
     )
   }
 
@@ -55,27 +55,27 @@ export const RaceResultsSection = memo(function RaceResultsSection({
   // Helper function to get fixed odds for a specific position and bet type
   const getFixedOdds = (position: number, type: 'win' | 'place'): string => {
     if (
-      !resultsData ||
-      !resultsData.results ||
-      resultsData.results.length === 0
+      !results_data ||
+      !results_data.results ||
+      results_data.results.length === 0
     ) {
       return '—'
     }
 
-    if (!resultsData.results[position - 1] || !resultsData.fixedOddsData) {
+    if (!results_data.results[position - 1] || !results_data.fixed_odds_data) {
       return '—'
     }
 
-    const result = resultsData.results[position - 1]
-    const entrantId = result.entrant_id
+    const result = results_data.results[position - 1]
+    const entrant_id = result.entrant_id
 
-    if (!entrantId) {
+    if (!entrant_id) {
       return '—'
     }
 
     // Find the fixed odds data by entrant ID
-    const fixedOddsEntry = Object.values(resultsData.fixedOddsData).find(
-      (entry: FixedOddsEntry) => entry.entrant_id === entrantId
+    const fixedOddsEntry = Object.values(results_data.fixed_odds_data).find(
+      (entry: FixedOddsEntry) => entry.entrant_id === entrant_id
     )
 
     if (!fixedOddsEntry) {
@@ -94,14 +94,14 @@ export const RaceResultsSection = memo(function RaceResultsSection({
   }
 
   // Status change monitoring for results component
-  if (process.env.NODE_ENV === 'development' && resultsData) {
+  if (process.env.NODE_ENV === 'development' && results_data) {
     console.log('🏆 RACE RESULTS SECTION - Status Update:', {
-      status: resultsData.status,
-      hasResults: resultsData.results.length > 0,
-      hasDividends: resultsData.dividends.length > 0,
+      status: results_data.status,
+      hasResults: results_data.results.length > 0,
+      hasDividends: results_data.dividends.length > 0,
       hasFixedOdds:
-        !!resultsData.fixedOddsData &&
-        Object.keys(resultsData.fixedOddsData).length > 0,
+        !!results_data.fixed_odds_data &&
+        Object.keys(results_data.fixed_odds_data).length > 0,
       lastUpdate: lastUpdate?.toISOString(),
       position2PlaceOdds: getFixedOdds(2, 'place'),
       position3PlaceOdds: getFixedOdds(3, 'place'),
@@ -124,19 +124,19 @@ export const RaceResultsSection = memo(function RaceResultsSection({
 
   // Helper function to determine if results are complete (final vs interim)
   const areResultsComplete = (): boolean => {
-    if (!resultsData) return false
+    if (!results_data) return false
 
     // Check if status explicitly indicates final results
-    if (resultsData.status === 'final') return true
-    if (resultsData.status === 'interim') return false
+    if (results_data.status === 'final') return true
+    if (results_data.status === 'interim') return false
 
     // Fall back to checking if dividends are available (indicates final results)
-    return resultsData.dividends && resultsData.dividends.length > 0
+    return results_data.dividends && results_data.dividends.length > 0
   }
 
   // Status indicator for result type
   const getResultStatusIndicator = () => {
-    if (!resultsData) return ''
+    if (!results_data) return ''
 
     const isComplete = areResultsComplete()
     if (isComplete) {
@@ -152,7 +152,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
     }
   }
 
-  if (!resultsData || resultsData.results.length === 0) {
+  if (!results_data || results_data.results.length === 0) {
     return (
       <div className={`${className}`}>
         <div className="text-sm text-gray-500 uppercase tracking-wide font-semibold mb-1">
@@ -237,7 +237,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
 
   // Helper function to find dividend by poolType - handles NZTAB product_name format
   const findDividend = (type: string) => {
-    return resultsData?.dividends.find((d) => {
+    return results_data?.dividends.find((d) => {
       // Handle different possible field names from NZTAB API
       const poolTypeField =
         d.poolType || d.product_name || d.product_type || d.pool_type || d.type
@@ -277,7 +277,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
           </div>
           {getResultStatusIndicator()}
         </div>
-        {(lastUpdate || resultsData?.resultTime) && (
+        {(lastUpdate || results_data?.result_time) && (
           <div className="ml-2 text-xs text-gray-400">
             Last update:{' '}
             {lastUpdate
@@ -286,8 +286,8 @@ export const RaceResultsSection = memo(function RaceResultsSection({
                   hour: '2-digit',
                   minute: '2-digit',
                 })
-              : resultsData?.resultTime
-              ? new Date(resultsData.resultTime).toLocaleTimeString('en-US', {
+              : results_data?.result_time
+              ? new Date(results_data.result_time).toLocaleTimeString('en-US', {
                   hour12: true,
                   hour: '2-digit',
                   minute: '2-digit',
@@ -321,13 +321,13 @@ export const RaceResultsSection = memo(function RaceResultsSection({
         <div className="grid grid-cols-12 gap-2 items-baseline text-sm">
           <div className="col-span-1 text-blue-500 font-bold">1st</div>
           <div className="col-span-1 text-gray-900 font-bold">
-            {resultsData?.results[0]
-              ? getRunnerNumber(resultsData.results[0]) || '—'
+            {results_data?.results[0]
+              ? getRunnerNumber(results_data.results[0]) || '—'
               : '—'}
           </div>
           <div className="col-span-3 text-gray-900 truncate">
-            {resultsData?.results[0]
-              ? formatRunnerName(getRunnerName(resultsData.results[0]))
+            {results_data?.results[0]
+              ? formatRunnerName(getRunnerName(results_data.results[0]))
               : '—'}
           </div>
           <div className="col-span-2 text-gray-900 font-bold leading-none text-right font-tnum  mr-2">
@@ -348,13 +348,13 @@ export const RaceResultsSection = memo(function RaceResultsSection({
         <div className="grid grid-cols-12 gap-2 items-baseline text-sm">
           <div className="col-span-1 text-blue-500 font-bold">2nd</div>
           <div className="col-span-1 text-gray-900 font-bold">
-            {resultsData?.results[1]
-              ? getRunnerNumber(resultsData.results[1]) || '—'
+            {results_data?.results[1]
+              ? getRunnerNumber(results_data.results[1]) || '—'
               : '—'}
           </div>
           <div className="col-span-3 text-gray-900 truncate">
-            {resultsData?.results[1]
-              ? formatRunnerName(getRunnerName(resultsData.results[1]))
+            {results_data?.results[1]
+              ? formatRunnerName(getRunnerName(results_data.results[1]))
               : '—'}
           </div>
           <div className="col-span-2 text-gray-900 font-bold leading-none text-right font-tnum"></div>
@@ -373,13 +373,13 @@ export const RaceResultsSection = memo(function RaceResultsSection({
         <div className="grid grid-cols-12 gap-2 items-baseline text-sm">
           <div className="col-span-1 text-blue-500 font-bold">3rd</div>
           <div className="col-span-1 text-gray-900 font-bold">
-            {resultsData?.results[2]
-              ? getRunnerNumber(resultsData.results[2]) || '—'
+            {results_data?.results[2]
+              ? getRunnerNumber(results_data.results[2]) || '—'
               : '—'}
           </div>
           <div className="col-span-3 text-gray-900 truncate">
-            {resultsData?.results[2]
-              ? formatRunnerName(getRunnerName(resultsData.results[2]))
+            {results_data?.results[2]
+              ? formatRunnerName(getRunnerName(results_data.results[2]))
               : '—'}
           </div>
           <div className="col-span-2 text-gray-900 font-bold leading-none text-right font-tnum"></div>

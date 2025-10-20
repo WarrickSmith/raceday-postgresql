@@ -7,25 +7,25 @@ const TIMELINE_SELECT_FIELDS = [
   '$id',
   '$createdAt',
   '$updatedAt',
-  'raceId',
-  'entrantId',
+  'race_id',
+  'entrant_id',
   'type',
-  'timeInterval',
-  'timeToStart',
-  'intervalType',
-  'holdPercentage',
-  'incrementalWinAmount',
-  'incrementalPlaceAmount',
+  'time_interval',
+  'time_to_start',
+  'interval_type',
+  'hold_percentage',
+  'incremental_win_amount',
+  'incremental_place_amount',
   'winPoolAmount',
   'placePoolAmount',
   'winPoolPercentage',
   'placePoolPercentage',
-  'fixedWinOdds',
-  'fixedPlaceOdds',
-  'poolWinOdds',
-  'poolPlaceOdds',
+  'fixed_win_odds',
+  'fixed_place_odds',
+  'pool_win_odds',
+  'pool_place_odds',
   'eventTimestamp',
-  'pollingTimestamp',
+  'polling_timestamp',
 ]
 
 const DEFAULT_TIMELINE_LIMIT = 200
@@ -35,13 +35,13 @@ const MAX_TIMELINE_LIMIT = 2000
 const VALID_POOL_TYPES = ['win', 'place', 'odds'] as const
 type PoolType = typeof VALID_POOL_TYPES[number]
 
-type EntrantValue = string | { entrantId?: string; $id?: string; id?: string | number }
+type EntrantValue = string | { entrant_id?: string; $id?: string; id?: string | number }
 
 interface MoneyFlowDocument {
   entrant?: EntrantValue
-  entrantId?: string
-  timeInterval?: number
-  timeToStart?: number
+  entrant_id?: string
+  time_interval?: number
+  time_to_start?: number
 }
 
 export async function GET(
@@ -49,9 +49,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { searchParams } = new URL(request.url)
-  const entrantIds = searchParams.get('entrants')?.split(',') || []
+  const entrant_ids = searchParams.get('entrants')?.split(',') || []
   const poolTypeParam = searchParams.get('poolType') || 'win'
-  const { id: raceId } = await params
+  const { id: race_id } = await params
   
   try {
 
@@ -70,7 +70,7 @@ export async function GET(
 
     const poolType = poolTypeParam as PoolType
 
-    if (!raceId) {
+    if (!race_id) {
       return jsonWithCompression(
         request,
         { error: 'Race ID is required' },
@@ -78,7 +78,7 @@ export async function GET(
       )
     }
 
-    if (entrantIds.length === 0) {
+    if (entrant_ids.length === 0) {
       return jsonWithCompression(
         request,
         { error: 'Entrant IDs are required' },
@@ -99,8 +99,8 @@ export async function GET(
 
     const buildBaseQueries = () => {
       const queries = [
-        Query.equal('raceId', raceId),
-        Query.equal('entrantId', entrantIds),
+        Query.equal('race_id', race_id),
+        Query.equal('entrant_id', entrant_ids),
         Query.select(TIMELINE_SELECT_FIELDS),
         Query.orderAsc('$createdAt'),
         Query.limit(limit),
@@ -117,7 +117,7 @@ export async function GET(
       return queries
     }
 
-    // Try bucketed data first (with timeInterval field)
+    // Try bucketed data first (with time_interval field)
     let response
     try {
       response = await databases.listDocuments(
@@ -126,9 +126,9 @@ export async function GET(
         [
           ...buildBaseQueries(),
           Query.equal('type', 'bucketed_aggregation'),
-          Query.isNotNull('timeInterval'),
-          Query.greaterThan('timeInterval', -65),
-          Query.lessThan('timeInterval', 66),
+          Query.isNotNull('time_interval'),
+          Query.greaterThan('time_interval', -65),
+          Query.lessThan('time_interval', 66),
         ]
       )
     } catch (error) {
@@ -139,10 +139,10 @@ export async function GET(
       response = { documents: [], total: 0 }
     }
 
-    // If no bucketed data found, fall back to legacy timeToStart data
+    // If no bucketed data found, fall back to legacy time_to_start data
     if (response.documents.length === 0) {
       console.log(
-        '📊 No bucketed data found, falling back to legacy timeToStart data'
+        '📊 No bucketed data found, falling back to legacy time_to_start data'
       )
 
       try {
@@ -150,8 +150,8 @@ export async function GET(
           databaseId,
           'money-flow-history',
           [
-            Query.equal('raceId', raceId),
-            Query.equal('entrantId', entrantIds),
+            Query.equal('race_id', race_id),
+            Query.equal('entrant_id', entrant_ids),
             Query.limit(10),
           ]
         )
@@ -167,8 +167,8 @@ export async function GET(
             )
           )
           console.log(
-            '📊 Sample document timeToStart values:',
-            broadResponse.documents.map((d) => d.timeToStart).slice(0, 5)
+            '📊 Sample document time_to_start values:',
+            broadResponse.documents.map((d) => d.time_to_start).slice(0, 5)
           )
         }
 
@@ -177,9 +177,9 @@ export async function GET(
           'money-flow-history',
           [
             ...buildBaseQueries(),
-            Query.isNotNull('timeToStart'),
-            Query.greaterThan('timeToStart', -65),
-            Query.lessThan('timeToStart', 66),
+            Query.isNotNull('time_to_start'),
+            Query.greaterThan('time_to_start', -65),
+            Query.lessThan('time_to_start', 66),
           ]
         )
       } catch (legacyError) {
@@ -201,8 +201,8 @@ export async function GET(
         success: true,
         documents: sortedDocuments,
         total: response.total,
-        raceId,
-        entrantIds,
+        race_id,
+        entrant_ids,
         poolType, // Include requested pool type in response
         bucketedData: false, // Indicate this is legacy data
         nextCursor,
@@ -223,7 +223,7 @@ export async function GET(
     )
     const intervalCoverage = analyzeIntervalCoverage(
       sortedDocuments,
-      entrantIds
+      entrant_ids
     )
     const { nextCursor, nextCreatedAt } = getNextCursorMetadata(
       response.documents
@@ -235,8 +235,8 @@ export async function GET(
       success: true,
       documents: sortedDocuments,
       total: response.total,
-      raceId,
-      entrantIds,
+      race_id,
+      entrant_ids,
       poolType, // Include requested pool type in response
       bucketedData: true,
       intervalCoverage,
@@ -258,9 +258,9 @@ export async function GET(
       error: 'Failed to fetch money flow timeline data',
       details: error instanceof Error ? error.message : 'Unknown error',
       context: {
-        raceId: raceId || 'unknown',
+        race_id: race_id || 'unknown',
         poolType: poolTypeParam || 'unknown',
-        entrantCount: entrantIds?.length || 0
+        entrantCount: entrant_ids?.length || 0
       }
     }
 
@@ -290,9 +290,9 @@ function getPoolTypeOptimizations(
   bucketedData: boolean
 ): string[] {
   const baseOptimizations = [
-    'Scalar filters on raceId and entrantId',
+    'Scalar filters on race_id and entrant_id',
     'Time interval filtering',
-    bucketedData ? 'Bucketed storage' : 'Legacy timeToStart data',
+    bucketedData ? 'Bucketed storage' : 'Legacy time_to_start data',
     bucketedData ? 'Pre-calculated incrementals' : 'Raw data fallback',
     'Cursor-based incremental retrieval ($createdAt + cursorAfter)',
     'Extended range (-65 to +66)',
@@ -300,19 +300,19 @@ function getPoolTypeOptimizations(
 
   const poolSpecificOptimizations = {
     win: [
-      'Consolidated data includes Win pool fields (incrementalWinAmount, winPoolAmount, winPoolPercentage)',
-      'Consolidated data includes Fixed Win odds (fixedWinOdds)',
-      'Consolidated data includes Pool Win odds (poolWinOdds)',
+      'Consolidated data includes Win pool fields (incremental_win_amount, winPoolAmount, winPoolPercentage)',
+      'Consolidated data includes Fixed Win odds (fixed_win_odds)',
+      'Consolidated data includes Pool Win odds (pool_win_odds)',
       'Client-side filtering for Win pool view'
     ],
     place: [
-      'Consolidated data includes Place pool fields (incrementalPlaceAmount, placePoolAmount, placePoolPercentage)', 
-      'Consolidated data includes Fixed Place odds (fixedPlaceOdds)',
-      'Consolidated data includes Pool Place odds (poolPlaceOdds)',
+      'Consolidated data includes Place pool fields (incremental_place_amount, placePoolAmount, placePoolPercentage)', 
+      'Consolidated data includes Fixed Place odds (fixed_place_odds)',
+      'Consolidated data includes Pool Place odds (pool_place_odds)',
       'Client-side filtering for Place pool view'
     ],
     odds: [
-      'Consolidated data includes all odds types (fixedWinOdds, fixedPlaceOdds, poolWinOdds, poolPlaceOdds)',
+      'Consolidated data includes all odds types (fixed_win_odds, fixed_place_odds, pool_win_odds, pool_place_odds)',
       'Consolidated data includes Win pool reference fields (winPoolAmount, winPoolPercentage)',
       'Client-side filtering for Odds timeline view'
     ]
@@ -326,12 +326,12 @@ function getPoolTypeOptimizations(
  */
 function sortTimelineDocuments(documents: MoneyFlowDocument[]) {
   const getIntervalValue = (doc: MoneyFlowDocument) => {
-    if (typeof doc.timeInterval === 'number') {
-      return doc.timeInterval
+    if (typeof doc.time_interval === 'number') {
+      return doc.time_interval
     }
 
-    if (typeof doc.timeToStart === 'number') {
-      return doc.timeToStart
+    if (typeof doc.time_to_start === 'number') {
+      return doc.time_to_start
     }
 
     return Number.MAX_SAFE_INTEGER
@@ -367,7 +367,7 @@ function getNextCursorMetadata(
 
 function analyzeIntervalCoverage(
   documents: MoneyFlowDocument[],
-  entrantIds: string[]
+  entrant_ids: string[]
 ) {
   if (!documents || documents.length === 0) {
     return {
@@ -375,7 +375,7 @@ function analyzeIntervalCoverage(
       entrantsCovered: 0,
       intervalsCovered: [] as number[],
       criticalPeriodGaps: [] as {
-        entrantId: string
+        entrant_id: string
         missingIntervals: number[]
       }[],
       coverageReport: 'No documents to analyze',
@@ -397,23 +397,23 @@ function analyzeIntervalCoverage(
   }
   const entrantCoverage = new Map<string, EntrantCoverage>()
 
-  entrantIds.forEach((entrantId: string) => {
+  entrant_ids.forEach((entrant_id: string) => {
     const entrantDocs = documents.filter((doc) => {
-      const docEntrantId = doc.entrantId || resolveEntrantId(doc.entrant)
-      return docEntrantId === entrantId
+      const docEntrantId = doc.entrant_id || resolveEntrantId(doc.entrant)
+      return docEntrantId === entrant_id
     })
 
     const intervals: number[] = entrantDocs
       .map((doc) =>
-        typeof doc.timeInterval === 'number'
-          ? doc.timeInterval
-          : typeof doc.timeToStart === 'number'
-          ? doc.timeToStart
+        typeof doc.time_interval === 'number'
+          ? doc.time_interval
+          : typeof doc.time_to_start === 'number'
+          ? doc.time_to_start
           : -999
       )
       .filter((interval) => interval !== -999)
 
-    entrantCoverage.set(entrantId, {
+    entrantCoverage.set(entrant_id, {
       documentCount: entrantDocs.length,
       intervalsCovered: [...new Set(intervals)].sort((a, b) => b - a),
       criticalPeriodCoverage: criticalIntervals.filter((interval) =>
@@ -426,14 +426,14 @@ function analyzeIntervalCoverage(
   })
 
   // Identify gaps in critical 5m-0s period
-  const criticalGaps: { entrantId: string; missingIntervals: number[] }[] = []
-  entrantCoverage.forEach((coverage, entrantId) => {
+  const criticalGaps: { entrant_id: string; missingIntervals: number[] }[] = []
+  entrantCoverage.forEach((coverage, entrant_id) => {
     const missing5mTo0s = coverage.missingCriticalIntervals.filter(
       (interval: number) => interval >= 0 && interval <= 5
     )
     if (missing5mTo0s.length > 0) {
       criticalGaps.push({
-        entrantId: entrantId.slice(-8), // Show last 8 chars for privacy
+        entrant_id: entrant_id.slice(-8), // Show last 8 chars for privacy
         missingIntervals: missing5mTo0s,
       })
     }
@@ -446,22 +446,22 @@ function analyzeIntervalCoverage(
       ...new Set(
         documents
           .map((doc) =>
-            typeof doc.timeInterval === 'number'
-              ? doc.timeInterval
-              : doc.timeToStart
+            typeof doc.time_interval === 'number'
+              ? doc.time_interval
+              : doc.time_to_start
           )
           .filter((interval): interval is number => typeof interval === 'number')
       ),
     ].sort((a, b) => b - a),
     criticalPeriodGaps: criticalGaps,
-    entrantSampleCoverage: entrantIds.slice(0, 2).map((id) => ({
-      entrantId: id.slice(-8),
+    entrantSampleCoverage: entrant_ids.slice(0, 2).map((id) => ({
+      entrant_id: id.slice(-8),
       ...(entrantCoverage.get(id) || {
         documentCount: 0,
         intervalsCovered: [],
       }),
     })),
-    coverageReport: `${entrantCoverage.size}/${entrantIds.length} entrants have timeline data, ${criticalGaps.length} have 5m-0s gaps`,
+    coverageReport: `${entrantCoverage.size}/${entrant_ids.length} entrants have timeline data, ${criticalGaps.length} have 5m-0s gaps`,
   }
 }
 
@@ -471,8 +471,8 @@ function resolveEntrantId(entrant?: EntrantValue): string {
   }
 
   if (entrant && typeof entrant === 'object') {
-    if (typeof entrant.entrantId === 'string') {
-      return entrant.entrantId
+    if (typeof entrant.entrant_id === 'string') {
+      return entrant.entrant_id
     }
     if (typeof entrant.$id === 'string') {
       return entrant.$id
