@@ -365,6 +365,9 @@ Ready to proceed to Story 2.10D (Integration & Performance Validation)
 
 | Date       | Change                                                          | Author  |
 | ---------- | --------------------------------------------------------------- | ------- |
+| 2025-10-20 | Post-implementation learnings documented (runtime fixes)        | Claude  |
+| 2025-10-20 | Fixed timezone conversion, race lifecycle, barrier types        | Claude  |
+| 2025-10-20 | Fixed odds completeness (added fixed_place, pool_place)         | Claude  |
 | 2025-10-18 | Senior Developer Review (AI) - APPROVED                         | Claude  |
 | 2025-10-18 | Fixed database migrations - All 368 tests now passing (100%)    | Claude  |
 | 2025-10-18 | Story implementation complete - All ACs satisfied               | Claude  |
@@ -500,4 +503,182 @@ Story 2.10C successfully delivers all acceptance criteria with exceptional imple
 **Review Status:** ✅ **APPROVED - Ready for Story 2.10D**
 
 All acceptance criteria satisfied, tests passing, no blocking issues. Excellent implementation quality with proper architectural alignment. Story is ready to be marked complete.
+
+---
+
+## Post-Implementation Learnings (2025-10-20)
+
+### Critical Runtime Issues Fixed
+
+After Story 2.10C was marked complete, runtime testing with live NZTAB API data revealed several critical issues that required fixes. These learnings are documented here to prevent similar issues in future stories.
+
+---
+
+#### Learning 1: NZ Timezone Handling vs UTC Conversion
+
+**Problem:** Confusion between "NZ race day alignment" and "NZTAB API returning NZ local fields"
+
+**Root Cause:**
+- The requirement states: "Process races in the current local New Zealand race day"
+- The NZTAB API **already returns** `race_date_nz` and `start_time_nz` in NZ local time
+- Code was incorrectly treating these as UTC, causing timezone conversion errors
+
+**Incorrect Assumption:**
+```typescript
+// WRONG: Treating NZ local time as UTC
+const startTime = `${race.race_date_nz}T${race.start_time_nz}` // "2025-10-20T21:09:00"
+// PostgreSQL interprets this as UTC → race appears 13 hours in future!
+```
+
+**Correct Implementation:**
+```typescript
+// RIGHT: Tell PostgreSQL this is Pacific/Auckland time
+const startTime = `${race.race_date_nz} ${race.start_time_nz}` // "2025-10-20 21:09:00"
+// Then explicitly convert: (startTime::timestamp AT TIME ZONE 'Pacific/Auckland')::timestamptz
+```
+
+**Files Fixed:**
+- `server/src/database/bulk-upsert.ts` (lines 200-257): Added explicit timezone conversion in SQL
+- `server/src/workers/transformWorker.ts` (line 49): Strip timezone abbreviation from `start_time_nz`
+- `server/tests/unit/database/bulk-upsert.test.ts` (line 257): Updated test expectations
+
+**Key Insight:**
+NZTAB API fields with `_nz` suffix are **already in NZ local time**. Don't convert them again. Use them directly for partition routing and display, but convert to UTC for PostgreSQL `timestamptz` storage.
+
+---
+
+#### Learning 2: Race Lifecycle Status Management
+
+**Problem:** Races stopped polling after they started, causing zero data in production tables
+
+**Root Cause:**
+- Scheduler query filtered: `WHERE status IN ('upcoming', 'open')`
+- When race starts, NZTAB API changes status to **"Closed"** or **"Interim"**
+- Active races were excluded from scheduler, so they never polled
+- Additionally, query used `start_time > NOW()` which excluded races that already started
+
+**Incorrect Assumptions:**
+1. Races only need polling before they start
+2. Status remains "open" during race
+3. Case-sensitive status matching is sufficient
+
+**Correct Implementation:**
+```typescript
+// Include ALL active race statuses
+WHERE status IN ('upcoming', 'open', 'closed', 'interim')
+  AND start_time > ($1::timestamptz - INTERVAL '2 hours') // Look back 2 hours
+  AND start_time < ($1::timestamptz + INTERVAL '24 hours')
+```
+
+**Case-Insensitive Status Normalization:**
+```typescript
+// API returns "Closed" but we expect "closed"
+const normalized = status.toLowerCase()
+if (allowed.includes(normalized)) {
+  return normalized as NormalizedRaceForUpsert['status']
+}
+```
+
+**Files Fixed:**
+- `server/src/scheduler/index.ts` (lines 20-22): Added 'closed'/'interim' statuses, 2-hour lookback
+- `server/src/initialization/daily-baseline.ts` (lines 372-376): Case-insensitive normalization
+- `server/src/initialization/evening-backfill.ts` (lines 269-273): Case-insensitive normalization
+
+**Key Insight:**
+Races must continue polling **throughout their lifecycle** (before, during, and after) until status becomes "final" or "abandoned". The scheduler needs a lookback window to catch races that have already started.
+
+---
+
+#### Learning 3: Barrier Field Type Variation (Harness Racing)
+
+**Problem:** Transform failed with ZodError: "Expected number, received string" for barrier field
+
+**Root Cause:**
+- Thoroughbred/Greyhound racing: `barrier` is a number (1, 2, 3...)
+- Harness racing (mobile starts): `barrier` is a string ("Fr1", "Sr2", "Fr3")
+- Zod schema only expected `number` type
+
+**Incorrect Schema:**
+```typescript
+barrier: z.number().int().positive().optional().nullable()
+```
+
+**Correct Schema:**
+```typescript
+barrier: z.union([z.number().int().positive(), z.string()]).optional().nullable()
+```
+
+**Parsing Logic:**
+```typescript
+const parseBarrier = (barrierValue: number | string | null | undefined): number | null => {
+  if (typeof barrierValue === 'number') return barrierValue
+  if (typeof barrierValue === 'string') {
+    const pattern = /\d+/
+    const match = pattern.exec(barrierValue)
+    return match !== null ? parseInt(match[0], 10) : null
+  }
+  return null
+}
+```
+
+**Files Fixed:**
+- `server/src/clients/nztab-types.ts` (line 160): Union type for barrier
+- `server/src/workers/transformWorker.ts` (lines 123-138): Barrier parsing function
+- `server/tests/integration/story-2-10-end-to-end.test.ts` (lines 322-356): Test barrier parsing
+
+**Key Insight:**
+API response field types can vary based on race type. Always check NZTAB OpenAPI spec and sample responses for all race categories (T/H/G) before defining Zod schemas.
+
+---
+
+#### Learning 4: Odds Types Completeness
+
+**Problem:** Only `fixed_win` and `pool_win` odds were stored; `fixed_place` and `pool_place` were missing
+
+**Root Cause:**
+- Original implementation only extracted 2 of 4 odds types
+- Integration test expected 4 records but only verified count, not types
+
+**Files Fixed:**
+- `server/src/pipeline/odds-utils.ts` (lines 40-92): Added fixed_place and pool_place extraction
+- `server/tests/unit/pipeline/odds-utils.test.ts`: Added test for all 4 odds types
+- `server/tests/integration/pipeline/story-2-10d-integration.test.ts` (lines 353, 433): Updated expectations
+
+**Key Insight:**
+Verify data completeness against API spec, not just test count assertions. All 4 odds types must be captured for complete betting data.
+
+---
+
+### Lessons Learned Summary
+
+**For Future Stories:**
+
+1. **Timezone Handling:**
+   - NZTAB API `_nz` fields are already in NZ local time
+   - Don't double-convert; use them directly for NZ day alignment
+   - Explicitly specify timezone when converting to UTC for PostgreSQL
+
+2. **Race Lifecycle:**
+   - Races need polling from 2 hours before start until "final"/"abandoned"
+   - Status changes during race: "open" → "closed" → "interim" → "final"
+   - Always include ALL active statuses in scheduler queries
+   - Case-insensitive status matching is essential
+
+3. **API Field Variations:**
+   - Check OpenAPI spec for ALL race types (T/H/G)
+   - Some fields have different types based on race type
+   - Use union types when field format varies
+
+4. **Data Completeness:**
+   - Verify against API spec, not just test counts
+   - Test with live API responses during active races
+   - Check all tables populate correctly during runtime
+
+**Testing Recommendations:**
+- Run dev server during live NZ race day (not just unit tests)
+- Verify scheduler polls active races (status "closed"/"interim")
+- Check PostgreSQL tables populate during actual race polling
+- Test with different race types (T/H/G) to catch type variations
+
+---
 
