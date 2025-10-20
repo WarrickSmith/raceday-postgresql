@@ -45,7 +45,7 @@ export class EnhancedCache<T> {
     fetcher: () => Promise<K>, 
     ttl: number = this.defaultTTL
   ): Promise<K> {
-    const startTime = performance.now();
+    const start_time = performance.now();
     this.metrics.totalRequests++;
 
     const cached = this.cache.get(key);
@@ -57,7 +57,7 @@ export class EnhancedCache<T> {
       cached.lastAccessed = now;
       this.metrics.hits++;
       
-      const responseTime = performance.now() - startTime;
+      const responseTime = performance.now() - start_time;
       this.updateMetrics(responseTime);
       
       return cached.data as K;
@@ -70,7 +70,7 @@ export class EnhancedCache<T> {
       const data = await fetcher();
       this.set(key, data, ttl);
       
-      const responseTime = performance.now() - startTime;
+      const responseTime = performance.now() - start_time;
       this.updateMetrics(responseTime);
       
       return data;
@@ -202,27 +202,27 @@ export const resultsCache = new EnhancedCache(cacheConfig.results.size, cacheCon
 
 // Cache invalidation strategies
 export const cacheInvalidation = {
-  onRaceUpdate: (raceId: string) => {
-    raceCache.invalidate(`race:${raceId}`);
-    entrantsCache.invalidate(`entrants:${raceId}`);
-    poolsCache.invalidatePattern(new RegExp(`pools:${raceId}`));
+  onRaceUpdate: (race_id: string) => {
+    raceCache.invalidate(`race:${race_id}`);
+    entrantsCache.invalidate(`entrants:${race_id}`);
+    poolsCache.invalidatePattern(new RegExp(`pools:${race_id}`));
   },
 
-  onEntrantUpdate: (raceId: string, entrantId: string) => {
-    void entrantId;
-    entrantsCache.invalidate(`entrants:${raceId}`);
-    poolsCache.invalidatePattern(new RegExp(`pools:${raceId}`));
+  onEntrantUpdate: (race_id: string, entrant_id: string) => {
+    void entrant_id;
+    entrantsCache.invalidate(`entrants:${race_id}`);
+    poolsCache.invalidatePattern(new RegExp(`pools:${race_id}`));
   },
 
-  onRaceStatusChange: (raceId: string) => {
-    raceCache.invalidate(`race:${raceId}`);
-    navigationCache.invalidatePattern(new RegExp(`navigation:.*${raceId}`));
-    poolsCache.invalidatePattern(new RegExp(`pools:${raceId}`));
+  onRaceStatusChange: (race_id: string) => {
+    raceCache.invalidate(`race:${race_id}`);
+    navigationCache.invalidatePattern(new RegExp(`navigation:.*${race_id}`));
+    poolsCache.invalidatePattern(new RegExp(`pools:${race_id}`));
   },
 
-  onMeetingUpdate: (meetingId: string) => {
-    navigationCache.invalidatePattern(new RegExp(`navigation:${meetingId}`));
-    raceCache.invalidatePattern(new RegExp(`race:.*${meetingId}`));
+  onMeetingUpdate: (meeting_id: string) => {
+    navigationCache.invalidatePattern(new RegExp(`navigation:${meeting_id}`));
+    raceCache.invalidatePattern(new RegExp(`race:.*${meeting_id}`));
   }
 };
 
