@@ -44,45 +44,9 @@ type StoredFilters = {
   race_ids?: string[]
 }
 
-const extractMeetingId = (meeting: unknown): string | undefined => {
-  if (!meeting || typeof meeting !== 'object') {
-    return typeof meeting === 'string' ? meeting : undefined
-  }
-
-  const meetingRecord = meeting as Record<string, unknown>
-  if (typeof meetingRecord.meeting_id === 'string') {
-    return meetingRecord.meeting_id
-  }
-  if (typeof meetingRecord.$id === 'string') {
-    return meetingRecord.$id
-  }
-  return undefined
-}
-
-const extractMeetingCountry = (meeting: unknown): string | undefined => {
-  if (meeting && typeof meeting === 'object') {
-    const meetingRecord = meeting as Record<string, unknown>
-    if (typeof meetingRecord.country === 'string') {
-      return meetingRecord.country
-    }
-  }
-  return undefined
-}
-
+// Helper function to extract race type from Race object
 const extractRaceType = (race: Race): string | undefined => {
-  if (race.type) {
-    return race.type
-  }
-  if (race && typeof race === 'object' && race.meeting && typeof race.meeting === 'object') {
-    const meetingRecord = race.meeting as Record<string, unknown>
-    if (typeof meetingRecord.category === 'string') {
-      return meetingRecord.category
-    }
-    if (typeof meetingRecord.race_type === 'string') {
-      return meetingRecord.race_type
-    }
-  }
-  return undefined
+  return race.race_type ?? undefined
 }
 
 const buildFilterPredicateFromStorage = (): ((race: Race) => boolean) => {
@@ -106,7 +70,6 @@ const buildFilterPredicateFromStorage = (): ((race: Race) => boolean) => {
     }
 
     const {
-      countries = [],
       race_types = [],
       meetings = [],
       meeting_ids = [],
@@ -118,7 +81,8 @@ const buildFilterPredicateFromStorage = (): ((race: Race) => boolean) => {
         return false
       }
 
-      const meeting_id = extractMeetingId(race.meeting)
+      // Race now has meeting_id directly (not nested meeting object)
+      const meeting_id = race.meeting_id
       if (
         meeting_id &&
         (meeting_ids.length > 0 || meetings.length > 0) &&
@@ -128,10 +92,9 @@ const buildFilterPredicateFromStorage = (): ((race: Race) => boolean) => {
         return false
       }
 
-      const meetingCountry = extractMeetingCountry(race.meeting)
-      if (countries.length > 0 && meetingCountry && !countries.includes(meetingCountry)) {
-        return false
-      }
+      // Note: Country filtering is not available on Race object alone
+      // Would need to join with Meeting data to filter by country
+      // For now, skip country filtering when only Race data is available
 
       const race_type = extractRaceType(race)
       if (race_types.length > 0 && race_type && !race_types.includes(race_type)) {
@@ -208,7 +171,7 @@ export const AudibleAlertProvider = ({ children }: AudibleAlertProviderProps) =>
     []
   )
 
-  const isEnabled = config?.audibleAlertsEnabled ?? false
+  const isEnabled = config?.audible_alerts_enabled ?? false
 
   const { primeAudio, primeAudioDuringGesture } = useAudibleRaceAlerts({
     enabled: isEnabled && !isLoading,
@@ -221,13 +184,13 @@ export const AudibleAlertProvider = ({ children }: AudibleAlertProviderProps) =>
       const currentConfig = await ensureConfig()
       if (!currentConfig) return
 
-      if (currentConfig.audibleAlertsEnabled === enabled) {
+      if (currentConfig.audible_alerts_enabled === enabled) {
         return
       }
 
       const optimisticConfig = {
         ...currentConfig,
-        audibleAlertsEnabled: enabled,
+        audible_alerts_enabled: enabled,
       }
 
       setConfig(optimisticConfig)
@@ -255,7 +218,7 @@ export const AudibleAlertProvider = ({ children }: AudibleAlertProviderProps) =>
   )
 
   const toggle = useCallback(async () => {
-    const current = configRef.current?.audibleAlertsEnabled ?? false
+    const current = configRef.current?.audible_alerts_enabled ?? false
     await setEnabled(!current)
   }, [setEnabled])
 

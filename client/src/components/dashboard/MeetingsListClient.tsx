@@ -110,7 +110,7 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
 
     // Update the selected meeting with fresh data only if there are actual changes
     // This prevents unnecessary re-renders that could interrupt race loading
-    if (matchingMeeting.$updatedAt !== selectedMeeting.$updatedAt ||
+    if (matchingMeeting.updated_at !== selectedMeeting.updated_at ||
         matchingMeeting.first_race_time !== selectedMeeting.first_race_time) {
       setSelectedMeeting(matchingMeeting);
     }
@@ -126,10 +126,10 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
   const meetingsList = useMemo(() => {
     return meetings.map((meeting) => (
       <div
-        key={meeting.$id}
+        key={meeting.meeting_id}
         className={`cursor-pointer transition-all duration-200 rounded-lg ${
-          selectedMeeting?.$id === meeting.$id 
-            ? 'ring-2 ring-blue-500 ring-opacity-50' 
+          selectedMeeting?.meeting_id === meeting.meeting_id
+            ? 'ring-2 ring-blue-500 ring-opacity-50'
             : ''
         }`}
         onClick={() => handleMeetingClick(meeting)}
@@ -141,7 +141,7 @@ export function MeetingsListClient({ initialData }: MeetingsListClientProps) {
             handleMeetingClick(meeting);
           }
         }}
-        aria-pressed={selectedMeeting?.$id === meeting.$id}
+        aria-pressed={selectedMeeting?.meeting_id === meeting.meeting_id}
         aria-label={`Select ${meeting.meeting_name} meeting`}
       >
         <MeetingCard 

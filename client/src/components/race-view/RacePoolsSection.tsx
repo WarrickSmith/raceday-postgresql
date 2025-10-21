@@ -52,26 +52,26 @@ export const RacePoolsSection = memo(function RacePoolsSection({
 
   // Build layout: Three paired rows: Win <-> Quinella, Place <-> Trifecta, Total <-> FirstFour
   const leftTypes: { key: string; label: string; value?: number }[] = [
-    { key: 'win', label: 'Win', value: currentPoolData.winPoolTotal },
-    { key: 'place', label: 'Place', value: currentPoolData.placePoolTotal },
-    { key: 'total', label: 'Total', value: currentPoolData.totalRacePool },
+    { key: 'win', label: 'Win', value: currentPoolData.win_pool_total },
+    { key: 'place', label: 'Place', value: currentPoolData.place_pool_total },
+    { key: 'total', label: 'Total', value: currentPoolData.total_race_pool },
   ]
 
   const rightRowTypes: { key: string; label: string; value?: number }[] = [
     {
       key: 'quinella',
       label: 'Quinella',
-      value: currentPoolData.quinellaPoolTotal,
+      value: currentPoolData.quinella_pool_total,
     },
     {
       key: 'trifecta',
       label: 'Trifecta',
-      value: currentPoolData.trifectaPoolTotal,
+      value: currentPoolData.trifecta_pool_total,
     },
     {
       key: 'first4',
       label: 'FirstFour',
-      value: currentPoolData.first4PoolTotal,
+      value: currentPoolData.first4_pool_total,
     },
   ]
 

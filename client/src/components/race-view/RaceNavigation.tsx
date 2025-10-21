@@ -21,9 +21,9 @@ export const RaceNavigation = memo(function RaceNavigation({
     currentRaceId,
     hasNavigationData: !!navigationData,
     navigationData: navigationData ? {
-      hasPrevious: !!navigationData.previousRace,
-      hasNext: !!navigationData.nextRace,
-      hasNextScheduled: !!navigationData.nextScheduledRace
+      hasPrevious: !!navigationData.previous_race,
+      hasNext: !!navigationData.next_race,
+      hasNextScheduled: !!navigationData.next_scheduled_race
     } : null
   });
   
@@ -109,13 +109,13 @@ export const RaceNavigation = memo(function RaceNavigation({
         onClick={navigateToNextScheduled}
         disabled={navigationState.isNavigating || !canNavigateToNextScheduled}
         aria-label={
-          canNavigateToNextScheduled 
-            ? `Navigate to next scheduled race: ${navigationData.nextScheduledRace?.name}` 
+          canNavigateToNextScheduled
+            ? `Navigate to next scheduled race: ${navigationData.next_scheduled_race?.name}`
             : "No next scheduled race available"
         }
         title={
-          navigationData.nextScheduledRace
-            ? `${navigationData.nextScheduledRace.name} at ${navigationData.nextScheduledRace.meeting_name}`
+          navigationData.next_scheduled_race
+            ? `${navigationData.next_scheduled_race.name} at ${navigationData.next_scheduled_race.meeting_name}`
             : "No upcoming races scheduled"
         }
       >
@@ -152,13 +152,13 @@ export const RaceNavigation = memo(function RaceNavigation({
         onClick={navigateToPrevious}
         disabled={navigationState.isNavigating || !canNavigateToPrevious}
         aria-label={
-          canNavigateToPrevious 
-            ? `Navigate to previous race: ${navigationData.previousRace?.name}` 
+          canNavigateToPrevious
+            ? `Navigate to previous race: ${navigationData.previous_race?.name}`
             : "No previous race available"
         }
         title={
-          navigationData.previousRace
-            ? `${navigationData.previousRace.name} at ${navigationData.previousRace.meeting_name}`
+          navigationData.previous_race
+            ? `${navigationData.previous_race.name} at ${navigationData.previous_race.meeting_name}`
             : "No previous race available"
         }
       >
@@ -195,13 +195,13 @@ export const RaceNavigation = memo(function RaceNavigation({
         onClick={navigateToNext}
         disabled={navigationState.isNavigating || !canNavigateToNext}
         aria-label={
-          canNavigateToNext 
-            ? `Navigate to next race: ${navigationData.nextRace?.name}` 
+          canNavigateToNext
+            ? `Navigate to next race: ${navigationData.next_race?.name}`
             : "No next race available"
         }
         title={
-          navigationData.nextRace
-            ? `${navigationData.nextRace.name} at ${navigationData.nextRace.meeting_name}`
+          navigationData.next_race
+            ? `${navigationData.next_race.name} at ${navigationData.next_race.meeting_name}`
             : "No next race available"
         }
       >

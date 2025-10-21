@@ -23,8 +23,8 @@ function RacesForMeetingClientComponent({
   // Memoize the races list to prevent unnecessary re-renders
   const racesList = useMemo(() => {
     return races.map((race) => (
-      <RaceCard 
-        key={race.$id} 
+      <RaceCard
+        key={race.race_id}
         race={race}
         onClick={onRaceClick}
       />
@@ -150,8 +150,8 @@ function RacesForMeetingClientComponent({
 // Memoize component to prevent unnecessary re-renders
 export const RacesForMeetingClient = memo(RacesForMeetingClientComponent, (prevProps, nextProps) => {
   const meetingEqual = (
-    prevProps.selectedMeeting?.$id === nextProps.selectedMeeting?.$id &&
-    prevProps.selectedMeeting?.$updatedAt === nextProps.selectedMeeting?.$updatedAt
+    prevProps.selectedMeeting?.meeting_id === nextProps.selectedMeeting?.meeting_id &&
+    prevProps.selectedMeeting?.updated_at === nextProps.selectedMeeting?.updated_at
   );
   
   const callbackEqual = prevProps.onRaceClick === nextProps.onRaceClick;

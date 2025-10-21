@@ -114,10 +114,10 @@ export const RaceFooter = memo(function RaceFooter({
       {/* Accessibility announcements */}
       <div className="sr-only" aria-live="polite">
         Race status: {STATUS_CONFIG[currentRaceStatus]?.description}.
-        {currentPoolData &&
-          ` Total pool: ${currentPoolData.currency}${formatPoolAmount(
-            currentPoolData.totalRacePool
-          )}.`}
+          {currentPoolData &&
+            ` Total pool: ${currentPoolData.currency}${formatPoolAmount(
+              currentPoolData.total_race_pool ?? 0
+            )}.`}
         {currentResultsData &&
           currentResultsData.results.length > 0 &&
           ` Results available with ${currentResultsData.results.length} positions.`}

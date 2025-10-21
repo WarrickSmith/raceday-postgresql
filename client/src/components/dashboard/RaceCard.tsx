@@ -204,7 +204,7 @@ function RaceCardComponent({ race, onClick }: RaceCardProps) {
       tabIndex={onClick ? 0 : undefined}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
-      aria-labelledby={`race-${race.$id}`}
+      aria-labelledby={`race-${race.race_id}`}
     >
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center space-x-3">
@@ -218,8 +218,8 @@ function RaceCardComponent({ race, onClick }: RaceCardProps) {
           </div>
           
           <div className="flex-1 min-w-0">
-            <h4 
-              id={`race-${race.$id}`}
+            <h4
+              id={`race-${race.race_id}`}
               className="text-sm font-medium text-gray-900 truncate"
             >
               {race.name}
@@ -289,8 +289,8 @@ function RaceCardComponent({ race, onClick }: RaceCardProps) {
 export const RaceCard = memo(RaceCardComponent, (prevProps, nextProps) => {
   // Custom comparison function optimized for status changes and real-time updates
   const raceFieldsEqual = (
-    prevProps.race.$id === nextProps.race.$id &&
-    prevProps.race.$updatedAt === nextProps.race.$updatedAt &&
+    prevProps.race.race_id === nextProps.race.race_id &&
+    prevProps.race.updated_at === nextProps.race.updated_at &&
     prevProps.race.status === nextProps.race.status &&
     prevProps.race.start_time === nextProps.race.start_time &&
     prevProps.race.name === nextProps.race.name &&

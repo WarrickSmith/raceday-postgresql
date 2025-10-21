@@ -37,31 +37,31 @@ export const AlertsConfigModal = ({
 }: AlertsConfigModalProps) => {
   const [state, setState] = useState<AlertsModalState>({
     indicators: [],
-    toggleAll: true,
-    isLoading: true,
-    isSaving: false,
-    hasChanges: false,
-    audibleAlertsEnabled: true,
+    toggle_all: true,
+    is_loading: true,
+    is_saving: false,
+    has_changes: false,
+    audible_alerts_enabled: true,
   })
 
   const [originalConfig, setOriginalConfig] = useState<AlertsConfig | null>(null)
 
   const loadConfiguration = useCallback(async () => {
     try {
-      setState(prev => ({ ...prev, isLoading: true }))
+      setState(prev => ({ ...prev, is_loading: true }))
       const config = await loadUserAlertConfig(userId)
       setState(prev => ({
         ...prev,
         indicators: config.indicators,
-        toggleAll: config.toggleAll,
-        isLoading: false,
-        hasChanges: false,
-        audibleAlertsEnabled: config.audibleAlertsEnabled,
+        toggle_all: config.toggle_all,
+        is_loading: false,
+        has_changes: false,
+        audible_alerts_enabled: config.audible_alerts_enabled,
       }))
       setOriginalConfig(config)
     } catch (error) {
       console.error('Failed to load configuration:', error)
-      setState(prev => ({ ...prev, isLoading: false }))
+      setState(prev => ({ ...prev, is_loading: false }))
     }
   }, [userId])
 
@@ -74,89 +74,89 @@ export const AlertsConfigModal = ({
 
   // Handle toggle all indicators
   const handleToggleAll = useCallback(async () => {
-    const newToggleState = !state.toggleAll
+    const newToggleState = !state.toggle_all
 
     setState(prev => ({
       ...prev,
       indicators: prev.indicators.map(ind => ({ ...ind, enabled: newToggleState })),
-      toggleAll: newToggleState,
-      hasChanges: true,
+      toggle_all: newToggleState,
+      has_changes: true,
     }))
-  }, [state.toggleAll])
+  }, [state.toggle_all])
 
   // Handle individual indicator toggle
-  const handleIndicatorToggle = useCallback((displayOrder: number) => {
+  const handleIndicatorToggle = useCallback((display_order: number) => {
     setState(prev => {
       const updatedIndicators = prev.indicators.map(ind =>
-        ind.displayOrder === displayOrder ? { ...ind, enabled: !ind.enabled } : ind
+        ind.display_order === display_order ? { ...ind, enabled: !ind.enabled } : ind
       )
       const newToggleAll = updatedIndicators.every(ind => ind.enabled)
 
       return {
         ...prev,
         indicators: updatedIndicators,
-        toggleAll: newToggleAll,
-        hasChanges: true,
+        toggle_all: newToggleAll,
+        has_changes: true,
       }
     })
   }, [])
 
   // Handle color change
-  const handleColorChange = useCallback((displayOrder: number, color: string) => {
+  const handleColorChange = useCallback((display_order: number, color: string) => {
     setState(prev => ({
       ...prev,
       indicators: prev.indicators.map(ind =>
-        ind.displayOrder === displayOrder
-          ? { ...ind, color, isDefault: false }
+        ind.display_order === display_order
+          ? { ...ind, color, is_default: false }
           : ind
       ),
-      hasChanges: true,
+      has_changes: true,
     }))
   }, [])
 
   // Handle reset to defaults
   const handleResetToDefaults = async () => {
     try {
-      setState(prev => ({ ...prev, isSaving: true }))
+      setState(prev => ({ ...prev, is_saving: true }))
       const resetConfig = await resetToDefaults(userId)
       setState(prev => ({
         ...prev,
         indicators: resetConfig.indicators,
-        toggleAll: resetConfig.toggleAll,
-        isSaving: false,
-        hasChanges: false,
-        audibleAlertsEnabled: resetConfig.audibleAlertsEnabled,
+        toggle_all: resetConfig.toggle_all,
+        is_saving: false,
+        has_changes: false,
+        audible_alerts_enabled: resetConfig.audible_alerts_enabled,
       }))
       setOriginalConfig(resetConfig)
     } catch (error) {
       console.error('Failed to reset to defaults:', error)
-      setState(prev => ({ ...prev, isSaving: false }))
+      setState(prev => ({ ...prev, is_saving: false }))
     }
   }
 
   // Handle save
   const handleSave = async () => {
     try {
-      setState(prev => ({ ...prev, isSaving: true }))
+      setState(prev => ({ ...prev, is_saving: true }))
 
       const configToSave: AlertsConfig = {
-        userId,
+        user_id: userId,
         indicators: state.indicators,
-        toggleAll: state.toggleAll,
-        audibleAlertsEnabled: state.audibleAlertsEnabled,
+        toggle_all: state.toggle_all,
+        audible_alerts_enabled: state.audible_alerts_enabled,
       }
 
       await saveUserAlertConfig(configToSave)
       setOriginalConfig(configToSave)
       setState(prev => ({
         ...prev,
-        isSaving: false,
-        hasChanges: false,
+        is_saving: false,
+        has_changes: false,
       }))
       onClose()
     } catch (error) {
       console.error('Failed to save configuration:', error)
-      setState(prev => ({ ...prev, isSaving: false }))
+      setState(prev => ({ ...prev, is_saving: false }))
     }
   }
 
@@ -166,9 +166,9 @@ export const AlertsConfigModal = ({
       setState(prev => ({
         ...prev,
         indicators: originalConfig.indicators,
-        toggleAll: originalConfig.toggleAll,
-        hasChanges: false,
-        audibleAlertsEnabled: originalConfig.audibleAlertsEnabled,
+        toggle_all: originalConfig.toggle_all,
+        has_changes: false,
+        audible_alerts_enabled: originalConfig.audible_alerts_enabled,
       }))
     }
     onClose()
@@ -215,7 +215,7 @@ export const AlertsConfigModal = ({
 
         {/* Content */}
         <div className="px-6 py-4">
-          {state.isLoading ? (
+          {state.is_loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
               <span className="ml-2 text-gray-600">Loading...</span>
@@ -227,7 +227,7 @@ export const AlertsConfigModal = ({
                 <label className="flex items-center cursor-pointer flex-1">
                   <input
                     type="checkbox"
-                    checked={state.toggleAll}
+                    checked={state.toggle_all}
                     onChange={handleToggleAll}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
@@ -241,7 +241,7 @@ export const AlertsConfigModal = ({
               <div className="space-y-3">
                 {state.indicators.map((indicator) => (
                   <div
-                    key={indicator.displayOrder}
+                    key={indicator.display_order}
                     className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
                   >
                     {/* Checkbox */}
@@ -249,7 +249,7 @@ export const AlertsConfigModal = ({
                       <input
                         type="checkbox"
                         checked={indicator.enabled}
-                        onChange={() => handleIndicatorToggle(indicator.displayOrder)}
+                        onChange={() => handleIndicatorToggle(indicator.display_order)}
                         className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       />
                     </label>
@@ -266,7 +266,7 @@ export const AlertsConfigModal = ({
                     <div className="flex-1">
                       <select
                         value={indicator.color}
-                        onChange={(e) => handleColorChange(indicator.displayOrder, e.target.value)}
+                        onChange={(e) => handleColorChange(indicator.display_order, e.target.value)}
                         className="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                         aria-label={`Color for ${formatPercentageRange(indicator)} range`}
                       >
@@ -286,7 +286,7 @@ export const AlertsConfigModal = ({
                         title={`Current color: ${indicator.color}`}
                       />
                       <span className="ml-1 text-xs text-gray-500">
-                        {indicator.displayOrder}
+                        {indicator.display_order}
                       </span>
                     </div>
                   </div>
@@ -297,10 +297,10 @@ export const AlertsConfigModal = ({
               <div className="pt-2">
                 <button
                   onClick={handleResetToDefaults}
-                  disabled={state.isSaving}
+                  disabled={state.is_saving}
                   className="w-full px-4 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {state.isSaving ? 'Resetting...' : 'Default'}
+                  {state.is_saving ? 'Resetting...' : 'Default'}
                 </button>
               </div>
             </div>
@@ -311,17 +311,17 @@ export const AlertsConfigModal = ({
         <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
           <button
             onClick={handleCancel}
-            disabled={state.isSaving}
+            disabled={state.is_saving}
             className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            disabled={state.isSaving || !state.hasChanges}
+            disabled={state.is_saving || !state.has_changes}
             className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {state.isSaving ? 'Saving...' : 'Save'}
+            {state.is_saving ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>

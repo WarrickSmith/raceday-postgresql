@@ -62,7 +62,7 @@ const WinOddsCell = memo(function WinOddsCell({
   formatOdds,
 }: {
   entrant: Entrant
-  formatOdds: (odds?: number) => string
+  formatOdds: (odds?: number | null) => string
 }) {
   const { flashClasses } = useValueFlash(entrant.win_odds)
 
@@ -90,7 +90,7 @@ const PlaceOddsCell = memo(function PlaceOddsCell({
   formatOdds,
 }: {
   entrant: Entrant
-  formatOdds: (odds?: number) => string
+  formatOdds: (odds?: number | null) => string
 }) {
   const { flashClasses } = useValueFlash(entrant.place_odds)
 
@@ -180,11 +180,11 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const currentEntrants = raceData?.entrants || initialEntrants
 
   const getEntrantKey = useCallback((entrant: Entrant): string => {
-    return entrant.entrant_id || entrant.$id
+    return entrant.entrant_id || 'unknown'
   }, [])
 
   const currentRaceId =
-    raceData?.race.race_id || raceData?.race.$id || race_id
+    raceData?.race.race_id || race_id
   const currentRaceStartTime = raceData?.race.start_time || raceStartTime
   const currentRace = raceData?.race
 
@@ -317,10 +317,11 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     if (!entrant.money_flow_timeline || !entrant.pool_money) return true
 
     const timeline = entrant.money_flow_timeline
-    if (!timeline.dataPoints || timeline.dataPoints.length === 0) return true
+    const timelinePoints = timeline?.data_points ?? []
+    if (timelinePoints.length === 0) return true
 
     // Sum all incremental amounts for this entrant
-    const timelineSum = timeline.dataPoints.reduce(
+    const timelineSum = timelinePoints.reduce(
       (sum: number, point: { incremental_amount?: number }) => {
         return sum + (point.incremental_amount || 0)
       },
@@ -359,13 +360,13 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
       racePoolDataAvailable: !!racePoolData,
       racePoolData: racePoolData
         ? {
-            winPoolTotal: racePoolData.winPoolTotal,
-            placePoolTotal: racePoolData.placePoolTotal,
+            win_pool_total: racePoolData.win_pool_total,
+            place_pool_total: racePoolData.place_pool_total,
           }
         : null,
       sampleEntrant: entrants[0]
         ? {
-            id: entrants[0].$id,
+            id: entrants[0].entrant_id,
             name: entrants[0].name,
             hold_percentage: entrants[0].hold_percentage,
             is_scratched: entrants[0].is_scratched,
@@ -395,10 +396,11 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
       // Priority 2: Timeline latest percentage (only if entrant data missing)
       const entrantTimeline = timelineData?.get(getEntrantKey(entrant))
+      const entrantTimelinePoints = entrantTimeline?.data_points ?? []
       if (
         !pool_percentage &&
         entrantTimeline &&
-        entrantTimeline.dataPoints.length > 0
+        entrantTimelinePoints.length > 0
       ) {
         const latest_percentage = entrantTimeline.latest_percentage
         if (latest_percentage && latest_percentage > 0) {
@@ -447,10 +449,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         const fallbackPlacePool = 2000000 // $20k in cents
 
         const winPoolInDollars = Math.round(
-          (racePoolData?.winPoolTotal || fallbackWinPool) / 100
+          (racePoolData?.win_pool_total || fallbackWinPool) / 100
         )
         const placePoolInDollars = Math.round(
-          (racePoolData?.placePoolTotal || fallbackPlacePool) / 100
+          (racePoolData?.place_pool_total || fallbackPlacePool) / 100
         )
         winPoolContribution = winPoolInDollars * hold_percentageDecimal
         placePoolContribution = placePoolInDollars * hold_percentageDecimal
@@ -489,8 +491,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
           runner_number: entrant.runner_number,
           pool_percentage,
           pool_money: entrantWithPoolData.pool_money,
-          timelineDataPoints: entrantTimeline?.dataPoints?.length || 0,
-          sampleTimelinePoint: entrantTimeline?.dataPoints?.[0] || null,
+          timelineDataPoints: entrantTimelinePoints.length,
+          sampleTimelinePoint: entrantTimelinePoints[0] || null,
           timelineTrend: entrantTimeline?.trend || 'none',
         })
       }
@@ -622,7 +624,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     }
 
     const extractRunnerName = (result: RaceResult): string | undefined => {
-      return result.runnerName || result.name
+      return result.runner_name || result.name
     }
 
     const maxTrackedPositions = 3
@@ -717,7 +719,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     timelineError: timelineError ? timelineError : null,
     entrant_idsPreview: entrant_ids.slice(0, 3),
     sampleEntrantData: sortedEntrants.slice(0, 2).map((e) => ({
-      id: e.$id,
+      id: e.entrant_id,
       name: e.name,
       runner_number: e.runner_number,
     })),
@@ -781,9 +783,10 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     let maxPostStartFromData = 0
     if (timelineData && timelineData.size > 0) {
       for (const [, entrantData] of timelineData) {
-        if (entrantData.dataPoints && entrantData.dataPoints.length > 0) {
+        const entrantPoints = entrantData?.data_points ?? []
+        if (entrantPoints.length > 0) {
           const maxTimeToStart = Math.max(
-            ...entrantData.dataPoints.map((p) => Math.abs(p.time_to_start || 0))
+            ...entrantPoints.map((p) => Math.abs(p.time_to_start || 0))
           )
           maxPostStartFromData = Math.max(maxPostStartFromData, maxTimeToStart)
         }
@@ -884,8 +887,9 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
         const dataIntervals = new Set<number>()
         if (timelineData && timelineData.size > 0) {
           for (const [, entrantData] of timelineData) {
-            if (entrantData.dataPoints && entrantData.dataPoints.length > 0) {
-              entrantData.dataPoints.forEach((point) => {
+            const entrantPoints = entrantData?.data_points ?? []
+            if (entrantPoints.length > 0) {
+              entrantPoints.forEach((point) => {
                 // FIXED: Use time_interval when available (server-calculated), fallback to time_to_start
                 const interval = point.time_interval ?? point.time_to_start
 
@@ -1095,7 +1099,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
     (entrantKey: string, interval: number): string => {
       const entrant = sortedEntrants.find(
         (candidate) =>
-          getEntrantKey(candidate) === entrantKey || candidate.$id === entrantKey
+          getEntrantKey(candidate) === entrantKey
       )
       if (!entrant || entrant.is_scratched) return '—'
 
@@ -1124,7 +1128,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
       // Debug logging to help troubleshoot data issues
       if (interval === 60 && process.env.NODE_ENV === 'development') {
-        logger.debug(`Timeline data for ${entrant.name || entrant.$id} at ${interval}m:`, {
+        logger.debug(`Timeline data for ${entrant.name || entrant.entrant_id} at ${interval}m:`, {
           entrant_id: getEntrantKey(entrant),
           interval,
           selectedView,
@@ -1149,7 +1153,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   )
 
   // Utility functions
-  const formatOdds = useCallback((odds?: number) => {
+  const formatOdds = useCallback((odds?: number | null) => {
     if (odds === undefined || odds === null) return '—'
     return odds.toFixed(2)
   }, [])
@@ -1247,7 +1251,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
   const handleEntrantClick = useCallback(
     (entrant_id: string) => {
       setSelectedEntrant((prev) => (prev === entrant_id ? undefined : entrant_id))
-      const entrant = sortedEntrants.find((e) => e.$id === entrant_id)
+      const entrant = sortedEntrants.find((e) => e.entrant_id === entrant_id)
       if (entrant) {
         screenReader?.announce(
           `Selected ${entrant.name}, runner number ${entrant.runner_number}`,
@@ -1566,14 +1570,14 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
                   return (
                     <tr
-                      key={entrant.$id}
+                      key={entrant.entrant_id}
                       className={`hover:bg-gray-50 focus-within:bg-blue-50 transition-colors ${
                         entrant.is_scratched ? 'opacity-50 bg-pink-50' : ''
                       } ${
-                        selectedEntrant === entrant.$id ? 'bg-blue-100' : ''
+                        selectedEntrant === entrant.entrant_id ? 'bg-blue-100' : ''
                       } cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset`}
-                      onClick={() => handleEntrantClick(entrant.$id)}
-                      onKeyDown={(e) => handleKeyDown(e, entrant.$id)}
+                      onClick={() => handleEntrantClick(getEntrantKey(entrant))}
+                      onKeyDown={(e) => handleKeyDown(e, getEntrantKey(entrant))}
                       tabIndex={0}
                       style={{
                         height: '30px',
@@ -1585,8 +1589,8 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                         entrant.name,
                         entrant.jockey || 'Unknown jockey',
                         entrant.trainer_name || 'Unknown trainer',
-                        entrant.win_odds,
-                        entrant.place_odds,
+                        entrant.win_odds ?? undefined,
+                        entrant.place_odds ?? undefined,
                         entrant.is_scratched,
                         finishingAnnouncement
                       )}
@@ -1662,12 +1666,12 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                           ? mapIndicatorColorToCellStyle(indicator.color)
                           : null
                         const indicatorTitle = indicator
-                          ? `${indicator.indicatorType} (${indicator.percentageChange.toFixed(
+                          ? `${indicator.indicator_type} (${indicator.percentage_change.toFixed(
                               1
                             )}%)`
                           : undefined
                         const indicatorChange = indicator
-                          ? indicator.percentageChange.toFixed(2)
+                          ? indicator.percentage_change.toFixed(2)
                           : undefined
                         const cellValue = getTimelineData(
                           getEntrantKey(entrant),
@@ -1676,7 +1680,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
 
                         return (
                           <td
-                            key={`${entrant.$id}_${column.interval}`}
+                            key={`${entrant.entrant_id}_${column.interval}`}
                             className={`px-2 py-1 text-xs text-center border-r border-gray-100 ${
                               entrant.is_scratched
                                 ? 'bg-pink-50'
@@ -1698,7 +1702,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
                                 indicatorStyle ? '' : 'text-gray-900'
                               } ${indicatorStyle?.className ?? ''}`.trim()}
                               style={indicatorStyle?.style}
-                              data-indicator={indicator ? indicator.indicatorType : undefined}
+                              data-indicator={indicator ? indicator.indicator_type : undefined}
                               data-indicator-change={indicatorChange}
                               title={indicatorTitle}
                             >
@@ -1792,7 +1796,7 @@ export const EnhancedEntrantsGrid = memo(function EnhancedEntrantsGrid({
             {selectedEntrant && (
               <span className="text-blue-600">
                 Selected:{' '}
-                {sortedEntrants.find((e) => e.$id === selectedEntrant)?.name}
+                {sortedEntrants.find((e) => e.entrant_id === selectedEntrant)?.name}
               </span>
             )}
           </div>

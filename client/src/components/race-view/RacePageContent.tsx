@@ -181,7 +181,7 @@ export function RacePageContent() {
 
         <EnhancedEntrantsGrid
           initialEntrants={currentEntrants}
-          race_id={currentRace.$id}
+          race_id={currentRace.race_id ?? ''}
           raceStartTime={currentRace.start_time}
           dataFreshness={dataFreshness}
           enableMoneyFlowTimeline={true}

@@ -30,16 +30,16 @@ const SilkUtils = {
     if (!pattern) {
       // Fallback to solid pattern
       return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-        <rect width="100%" height="100%" fill="${silk.primaryColor.hex}"/>
+        <rect width="100%" height="100%" fill="${silk.primary_color.hex}"/>
       </svg>`;
     }
     
-    let svgTemplate = pattern.svgTemplate;
-    svgTemplate = svgTemplate.replace(/\{primaryColor\}/g, silk.primaryColor.hex);
+    let svgTemplate = pattern.svg_template;
+    svgTemplate = svgTemplate.replace(/\{primaryColor\}/g, silk.primary_color.hex);
     
-    if (pattern.requiresSecondaryColor && silk.secondaryColor) {
-      svgTemplate = svgTemplate.replace(/\{secondaryColor\}/g, silk.secondaryColor.hex);
-    } else if (pattern.requiresSecondaryColor) {
+    if (pattern.requires_secondary_color && silk.secondary_color) {
+      svgTemplate = svgTemplate.replace(/\{secondaryColor\}/g, silk.secondary_color.hex);
+    } else if (pattern.requires_secondary_color) {
       // Use white as fallback secondary color
       svgTemplate = svgTemplate.replace(/\{secondaryColor\}/g, '#FFFFFF');
     }
@@ -90,7 +90,7 @@ const SilkUtils = {
 
   // Create fallback color scheme for accessibility
   createAccessibleFallback: (silk: JockeySilk): JockeySilk => {
-    const runner_number = parseInt(silk.silkId.split('-').pop() || '1');
+    const runner_number = parseInt(silk.silk_id.split('-').pop() || '1');
     
     // Generate high-contrast colors based on runner number
     const colors = [
@@ -107,8 +107,8 @@ const SilkUtils = {
     
     return {
       ...silk,
-      primaryColor: colors[primaryIndex],
-      secondaryColor: colors[secondaryIndex],
+      primary_color: colors[primaryIndex],
+      secondary_color: colors[secondaryIndex],
       pattern: 'solid' as SilkPattern,
       description: `High contrast silk ${runner_number}`
     };
@@ -191,7 +191,7 @@ export const JockeySilks = memo(function JockeySilks({
 
   const isAccessible = useMemo(() => {
     if (!silk) return true;
-    return SilkUtils.isAccessible(silk.primaryColor.hex, silk.secondaryColor?.hex);
+    return SilkUtils.isAccessible(silk.primary_color.hex, silk.secondary_color?.hex);
   }, [silk]);
 
   const accessibleSilk = useMemo(() => {

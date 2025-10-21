@@ -171,9 +171,9 @@ function RacesListComponent({
       {/* Races list */}
       <div className="space-y-2" data-testid={`races-list-${meeting_id}`}>
         {sortedRaces.map((race) => (
-          <RaceCard 
-            key={race.$id} 
-            race={race} 
+          <RaceCard
+            key={race.race_id}
+            race={race}
             onClick={onRaceClick}
           />
         ))}

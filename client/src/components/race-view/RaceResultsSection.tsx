@@ -1,11 +1,10 @@
 'use client'
 
 import { memo } from 'react'
-import type { RaceResultsData } from '@/types/racePools'
+import type { RaceResultsData, FixedOddsRunner } from '@/types/racePools'
 
 // Type for race result objects from various API formats
-interface RaceResult {
-  runner_number?: number
+interface RaceResultRow {
   runner_number?: number
   number?: number
   no?: number
@@ -14,13 +13,6 @@ interface RaceResult {
   horse_name?: string
   horseName?: string
   entrant_id?: string
-}
-
-// Type for fixed odds data entries
-interface FixedOddsEntry {
-  entrant_id: string
-  fixed_win?: number
-  fixed_place?: number
 }
 
 interface RaceResultsSectionProps {
@@ -35,14 +27,12 @@ export const RaceResultsSection = memo(function RaceResultsSection({
   lastUpdate,
 }: RaceResultsSectionProps) {
   // Enhanced helper function to extract runner number from various API field formats
-  const getRunnerNumber = (result: RaceResult): number | undefined => {
-    return (
-      result.runner_number || result.runner_number || result.number || result.no
-    )
+  const getRunnerNumber = (result: RaceResultRow): number | undefined => {
+    return result.runner_number || result.number || result.no
   }
 
   // Enhanced helper function to extract runner name from various API field formats
-  const getRunnerName = (result: RaceResult): string => {
+  const getRunnerName = (result: RaceResultRow): string => {
     return (
       result.name ||
       result.runnerName ||
@@ -75,7 +65,7 @@ export const RaceResultsSection = memo(function RaceResultsSection({
 
     // Find the fixed odds data by entrant ID
     const fixedOddsEntry = Object.values(results_data.fixed_odds_data).find(
-      (entry: FixedOddsEntry) => entry.entrant_id === entrant_id
+      (entry: FixedOddsRunner) => entry.entrant_id === entrant_id
     )
 
     if (!fixedOddsEntry) {
@@ -83,7 +73,9 @@ export const RaceResultsSection = memo(function RaceResultsSection({
     }
 
     const oddsValue =
-      type === 'win' ? fixedOddsEntry.fixed_win : fixedOddsEntry.fixed_place
+      type === 'win'
+        ? fixedOddsEntry.fixed_win_odds
+        : fixedOddsEntry.fixed_place_odds
 
     if (typeof oddsValue === 'number' && oddsValue > 0) {
       // Fixed odds data is already in dollar format - no conversion needed
@@ -235,12 +227,12 @@ export const RaceResultsSection = memo(function RaceResultsSection({
     )
   }
 
-  // Helper function to find dividend by poolType - handles NZTAB product_name format
+  // Helper function to find dividend by pool_type - handles NZTAB product_name format
   const findDividend = (type: string) => {
     return results_data?.dividends.find((d) => {
       // Handle different possible field names from NZTAB API
       const poolTypeField =
-        d.poolType || d.product_name || d.product_type || d.pool_type || d.type
+        d.pool_type || d.product_name || d.product_type || d.type
       if (!poolTypeField) return false
 
       const fieldLower = poolTypeField.toLowerCase()

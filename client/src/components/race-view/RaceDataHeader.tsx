@@ -5,7 +5,7 @@ import { useRace } from '@/contexts/RaceContext'
 import { formatDistance, formatRaceTime } from '@/utils/raceFormatters'
 import { getStatusConfig } from '@/utils/raceStatusConfig'
 import { RaceNavigation } from './RaceNavigation'
-import { getRaceTypeDisplay } from '@/constants/race_types'
+import { getRaceTypeDisplay } from '@/constants/raceTypes'
 import { ConnectionStatusBadge } from '@/components/dashboard/ConnectionStatusBadge'
 import {
   getConnectionState,

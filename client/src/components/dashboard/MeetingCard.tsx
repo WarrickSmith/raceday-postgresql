@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useState } from 'react';
 import { Meeting } from '@/types/meetings';
-import { getRaceTypeDisplay } from '@/constants/race_types';
+import { getRaceTypeDisplay } from '@/constants/raceTypes';
 import { getCountryInfo, normalizeCountryCode } from '@/constants/countries';
 
 interface MeetingCardProps {
@@ -115,13 +115,13 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
     <article
       className={`border border-slate-200/50 rounded-lg p-4 shadow-sm transition-all duration-200 hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-opacity-50 ${statusColors[status]}`}
       role="article"
-      aria-labelledby={`meeting-${meeting.$id}`}
+      aria-labelledby={`meeting-${meeting.meeting_id}`}
     >
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h3
-              id={`meeting-${meeting.$id}`}
+              id={`meeting-${meeting.meeting_id}`}
               className="text-lg font-semibold text-gray-900 truncate"
             >
               {meeting.meeting_name}
@@ -130,9 +130,9 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
             <time
               dateTime={meeting.first_race_time}
               className="text-sm font-medium text-gray-900 flex-shrink-0"
-              aria-label={`First race at ${formatTime(meeting.first_race_time || meeting.$createdAt)}`}
+              aria-label={`First race at ${formatTime(meeting.first_race_time || meeting.created_at)}`}
             >
-              {formatTime(meeting.first_race_time || meeting.$createdAt)}
+              {formatTime(meeting.first_race_time || meeting.created_at)}
             </time>
 
             <span className="text-sm text-gray-600">
@@ -183,8 +183,8 @@ function MeetingCardComponent({ meeting }: MeetingCardProps) {
 export const MeetingCard = memo(MeetingCardComponent, (prevProps, nextProps) => {
   // Custom comparison function for optimization
   return (
-    prevProps.meeting.$id === nextProps.meeting.$id &&
-    prevProps.meeting.$updatedAt === nextProps.meeting.$updatedAt &&
+    prevProps.meeting.meeting_id === nextProps.meeting.meeting_id &&
+    prevProps.meeting.updated_at === nextProps.meeting.updated_at &&
     prevProps.meeting.first_race_time === nextProps.meeting.first_race_time
   );
 });
