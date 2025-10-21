@@ -253,6 +253,110 @@ describe('Story 2.10 Database Schema Integration', () => {
     })
   })
 
+  describe('Race Results Table Schema', () => {
+    it('includes JSONB payload columns for client compatibility (Task 9.1)', async () => {
+      const result = await pool.query(`
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns
+        WHERE table_name = 'race_results'
+          AND column_name IN (
+            'results_data', 'dividends_data', 'fixed_odds_data',
+            'result_status', 'photo_finish', 'stewards_inquiry',
+            'protest_lodged', 'result_time'
+          )
+        ORDER BY column_name
+      `)
+
+      expect(result.rows).toHaveLength(8)
+      const fields = result.rows.reduce((acc, row) => {
+        acc[row.column_name] = row
+        return acc
+      }, {} as Record<string, any>)
+
+      expect(fields.results_data).toMatchObject({
+        column_name: 'results_data',
+        data_type: 'jsonb',
+        is_nullable: 'YES',
+      })
+
+      expect(fields.dividends_data).toMatchObject({
+        column_name: 'dividends_data',
+        data_type: 'jsonb',
+        is_nullable: 'YES',
+      })
+
+      expect(fields.fixed_odds_data).toMatchObject({
+        column_name: 'fixed_odds_data',
+        data_type: 'jsonb',
+        is_nullable: 'YES',
+      })
+
+      expect(fields.result_status).toMatchObject({
+        column_name: 'result_status',
+        data_type: 'text',
+        is_nullable: 'YES',
+      })
+
+      expect(fields.photo_finish).toMatchObject({
+        column_name: 'photo_finish',
+        data_type: 'boolean',
+        is_nullable: 'NO',
+      })
+    })
+  })
+
+  describe('User Alert Configs Table Schema', () => {
+    it('stores percentage range indicators with ordering constraints (Task 9.2)', async () => {
+      const result = await pool.query(`
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns
+        WHERE table_name = 'user_alert_configs'
+          AND column_name IN (
+            'indicator_id', 'user_id', 'indicator_type',
+            'percentage_range_min', 'percentage_range_max',
+            'color', 'display_order', 'audible_alerts_enabled'
+          )
+        ORDER BY column_name
+      `)
+
+      expect(result.rows).toHaveLength(8)
+      const fields = result.rows.reduce((acc, row) => {
+        acc[row.column_name] = row
+        return acc
+      }, {} as Record<string, any>)
+
+      expect(fields.indicator_id).toMatchObject({
+        column_name: 'indicator_id',
+        data_type: 'uuid',
+        is_nullable: 'NO',
+      })
+
+      expect(fields.percentage_range_min).toMatchObject({
+        column_name: 'percentage_range_min',
+        data_type: 'numeric',
+        is_nullable: 'NO',
+      })
+
+      expect(fields.percentage_range_max).toMatchObject({
+        column_name: 'percentage_range_max',
+        data_type: 'numeric',
+        is_nullable: 'YES',
+      })
+
+      expect(fields.display_order).toMatchObject({
+        column_name: 'display_order',
+        data_type: 'integer',
+        is_nullable: 'NO',
+      })
+
+      expect(fields.audible_alerts_enabled).toMatchObject({
+        column_name: 'audible_alerts_enabled',
+        data_type: 'boolean',
+        is_nullable: 'NO',
+      })
+    })
+  })
+
   describe('Performance Indexes', () => {
     it('has new performance indexes for Story 2.10 fields', async () => {
       const expectedIndexes = [
