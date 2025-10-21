@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { MeetingCard } from '../MeetingCard';
 import { Meeting } from '@/types/meetings';
-import { RACE_TYPE_CODES } from '@/constants/race_types';
+import { RACE_TYPE_CODES } from '@/constants/raceTypes';
 
 type MeetingStatusResponseBody = { isCompleted: boolean };
 

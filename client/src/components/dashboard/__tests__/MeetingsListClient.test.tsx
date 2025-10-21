@@ -3,7 +3,7 @@ import { MeetingsListClient } from '../MeetingsListClient';
 import { RacesForMeetingClient } from '../RacesForMeetingClient';
 import { useMeetingsPolling, type ConnectionState } from '@/hooks/useMeetingsPolling';
 import { Meeting } from '@/types/meetings';
-import { RACE_TYPE_CODES } from '@/constants/race_types';
+import { RACE_TYPE_CODES } from '@/constants/raceTypes';
 
 // Mock the polling hook and Next.js navigation
 jest.mock('@/hooks/useMeetingsPolling');

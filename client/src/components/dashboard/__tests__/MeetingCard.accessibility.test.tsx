@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { axe } from 'jest-axe';
 import { MeetingCard } from '../MeetingCard';
 import { Meeting } from '@/types/meetings';
-import { RACE_TYPE_CODES } from '@/constants/race_types';
+import { RACE_TYPE_CODES } from '@/constants/raceTypes';
 
 describe('MeetingCard Accessibility Tests', () => {
   const mockMeeting: Meeting = {

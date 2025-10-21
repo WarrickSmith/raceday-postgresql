@@ -119,7 +119,7 @@ export function useMeetingsPolling({ initialData, onError, onRaceUpdate }: UseMe
         } else if (
           prevMeeting.first_race_time !== meeting.first_race_time ||
           prevMeeting.meeting_name !== meeting.meeting_name ||
-          prevMeeting.$updatedAt !== meeting.$updatedAt
+          prevMeeting.updated_at !== meeting.updated_at
         ) {
           // Updated meeting
           onRaceUpdateRef.current?.({

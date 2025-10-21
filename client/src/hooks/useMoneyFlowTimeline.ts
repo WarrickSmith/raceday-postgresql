@@ -20,7 +20,6 @@ import { getConnectionState } from '@/state/connectionState'
 interface ServerEntrant {
   entrant_id?: string
   name?: string
-  $id?: string
   id?: string
   [key: string]: unknown
 }
@@ -38,9 +37,9 @@ type TimelinePoolType =
 type TimelineIntervalType = '30s' | '1m' | '5m' | string
 
 interface ServerMoneyFlowPoint {
-  $id: string
-  $createdAt: string
-  $updatedAt: string
+  id: string
+  created_at: string
+  updated_at: string
   // Server may return either a relational `entrant` field or a scalar `entrant_id`.
   // Our API currently selects `entrant_id` for performance; include both for compatibility.
   entrant?: EntrantReference
@@ -55,7 +54,7 @@ interface ServerMoneyFlowPoint {
   winPoolAmount?: number
   placePoolAmount?: number
   type?: string
-  poolType?: string
+  pool_type?: string
   incremental_win_amount?: number
   incremental_place_amount?: number
   incremental_amount?: number
@@ -73,21 +72,21 @@ interface MoneyFlowTimelineResponse {
   total?: number
   race_id?: string
   entrant_ids?: string[]
-  poolType?: string
-  bucketedData?: boolean
-  intervalCoverage?: Record<string, unknown>
+  pool_type?: string
+  bucketed_data?: boolean
+  interval_coverage?: Record<string, unknown>
   message?: string
-  queryOptimizations?: string[]
+  query_optimizations?: string[]
   // Incremental fetch cursors
-  nextCursor?: string | null
-  nextCreatedAt?: string | null
+  next_cursor?: string | null
+  next_created_at?: string | null
 }
 
 export interface TimelineGridData {
   [time_interval: number]: {
     [entrant_id: string]: {
       incremental_amount: number
-      poolType: TimelinePoolType
+      pool_type: TimelinePoolType
       timestamp: string
     }
   }
@@ -103,7 +102,7 @@ interface UseMoneyFlowTimelineResult {
   getEntrantDataForInterval: (
     entrant_id: string,
     interval: number,
-    poolType: 'win' | 'place'
+    pool_type: 'win' | 'place'
   ) => string
   // NEW: Multi-pool support functions
   getWinPoolData: (entrant_id: string, interval: number) => string
@@ -129,7 +128,7 @@ const normalizeInterval = (
 export function useMoneyFlowTimeline(
   race_id: string,
   entrant_ids: string[],
-  poolType: TimelinePoolType = 'win',
+  pool_type: TimelinePoolType = 'win',
   raceStatus?: string // Add race status to control post-race behavior
 ): UseMoneyFlowTimelineResult {
   const logger = useLogger('useMoneyFlowTimeline')
@@ -149,8 +148,8 @@ export function useMoneyFlowTimeline(
   const isFetchingRef = useRef(false)
   const pendingRequestRef = useRef<Promise<void> | null>(null)
   // Incremental fetch tracking
-  const nextCursorRef = useRef<string | null>(null)
-  const nextCreatedAtRef = useRef<string | null>(null)
+  const next_cursorRef = useRef<string | null>(null)
+  const next_created_atRef = useRef<string | null>(null)
   const lastEntrantKeyRef = useRef<string>('')
 
   useEffect(() => {
@@ -198,8 +197,8 @@ export function useMoneyFlowTimeline(
         // Reset cursors when entrant set changes
         const entrantsChangedThisFetch = lastEntrantKeyRef.current !== entrantKey
         if (entrantsChangedThisFetch) {
-          nextCursorRef.current = null
-          nextCreatedAtRef.current = null
+          next_cursorRef.current = null
+          next_created_atRef.current = null
           lastEntrantKeyRef.current = entrantKey
         }
 
@@ -215,8 +214,8 @@ export function useMoneyFlowTimeline(
           params.set('entrants', entrantKey)
           if (pageCursor) {
             params.set('cursorAfter', pageCursor)
-          } else if (nextCreatedAtRef.current) {
-            params.set('createdAfter', nextCreatedAtRef.current)
+          } else if (next_created_atRef.current) {
+            params.set('createdAfter', next_created_atRef.current)
           }
 
           const response = await fetch(
@@ -233,10 +232,10 @@ export function useMoneyFlowTimeline(
           const pageDocuments = pageData.documents ?? []
 
           if (page === 0) {
-            if (pageData.intervalCoverage) {
+            if (pageData.interval_coverage) {
               loggerRef.current.debug(
                 'Money flow interval coverage received',
-                pageData.intervalCoverage
+                pageData.interval_coverage
               )
             }
 
@@ -249,8 +248,8 @@ export function useMoneyFlowTimeline(
 
           aggregatedDocuments.push(...pageDocuments)
 
-          pageNextCursor = pageData.nextCursor ?? null
-          pageNextCreatedAt = pageData.nextCreatedAt ?? pageNextCreatedAt
+          pageNextCursor = pageData.next_cursor ?? null
+          pageNextCreatedAt = pageData.next_created_at ?? pageNextCreatedAt
 
           pageCursor = pageNextCursor
           page += 1
@@ -265,25 +264,25 @@ export function useMoneyFlowTimeline(
           aggregatedDocuments.length > 0 && incomingMap.size > 0
 
         const lastAggregatedCreatedAt = aggregatedDocuments.length > 0
-          ? aggregatedDocuments[aggregatedDocuments.length - 1]?.$createdAt ?? null
+          ? aggregatedDocuments[aggregatedDocuments.length - 1]?.created_at ?? null
           : null
 
         // Update cursors for next incremental request only when we received new data
         if (hasIncoming) {
-          nextCursorRef.current = pageNextCursor ?? nextCursorRef.current
-          nextCreatedAtRef.current =
-            pageNextCreatedAt ?? lastAggregatedCreatedAt ?? nextCreatedAtRef.current
+          next_cursorRef.current = pageNextCursor ?? next_cursorRef.current
+          next_created_atRef.current =
+            pageNextCreatedAt ?? lastAggregatedCreatedAt ?? next_created_atRef.current
         }
 
         if (entrantsChangedThisFetch) {
           // For entrant set changes, replace with whatever we have (can be empty)
           setTimelineData(incomingMap)
         } else if (hasIncoming) {
-          if (!nextCreatedAtRef.current || timelineDataRef.current.size === 0) {
+          if (!next_created_atRef.current || timelineDataRef.current.size === 0) {
             // Initial load or no cursor provided -> replace
             setTimelineData(incomingMap)
           } else {
-            // Incremental load -> merge into existing map by $id
+            // Incremental load -> merge into existing map by id
             const merged = new Map(timelineDataRef.current)
             for (const [eid, newData] of incomingMap) {
               const prev = merged.get(eid)
@@ -291,10 +290,12 @@ export function useMoneyFlowTimeline(
                 merged.set(eid, newData)
                 continue
               }
-              const seen = new Set(prev.dataPoints.map((p) => p.$id))
-              const combined = [...prev.dataPoints]
-              for (const p of newData.dataPoints) {
-                if (p.$id && !seen.has(p.$id)) {
+              const prevPoints = prev.data_points ?? []
+              const newPoints = newData.data_points ?? []
+              const seen = new Set(prevPoints.map((p) => p.id))
+              const combined = [...prevPoints]
+              for (const p of newPoints) {
+                if (p.id && !seen.has(p.id)) {
                   combined.push(p)
                 }
               }
@@ -309,7 +310,11 @@ export function useMoneyFlowTimeline(
                   Number.NEGATIVE_INFINITY
                 return bi - ai
               })
-              merged.set(eid, { ...prev, ...newData, dataPoints: combined })
+              merged.set(eid, {
+                ...prev,
+                ...newData,
+                data_points: combined,
+              })
             }
             setTimelineData(merged)
           }
@@ -352,15 +357,16 @@ export function useMoneyFlowTimeline(
     const currentLogger = loggerRef.current
 
     for (const [entrant_id, entrantData] of timelineData) {
+      const timelinePoints = entrantData?.data_points ?? []
       // Skip if no data points
-      if (entrantData.dataPoints.length === 0) {
+      if (timelinePoints.length === 0) {
         continue
       }
 
       // Use the already calculated incremental amounts from dataPoints
       // The data points are already sorted chronologically and have incremental amounts calculated
-      for (let i = 0; i < entrantData.dataPoints.length; i++) {
-        const dataPoint = entrantData.dataPoints[i]
+      for (let i = 0; i < timelinePoints.length; i++) {
+        const dataPoint = timelinePoints[i]
 
         // Use the incremental amount that was already calculated in the first processing loop
         // This ensures we maintain the correct chronological incremental calculations
@@ -368,12 +374,12 @@ export function useMoneyFlowTimeline(
 
         // Skip if this pool type doesn't match what we're displaying
         const hasValidPoolData =
-          (poolType === 'win' && typeof dataPoint.winPoolAmount === 'number') ||
-          (poolType === 'place' &&
+          (pool_type === 'win' && typeof dataPoint.winPoolAmount === 'number') ||
+          (pool_type === 'place' &&
             typeof dataPoint.placePoolAmount === 'number')
 
         if (!hasValidPoolData && !dataPoint.pool_percentage) {
-          currentLogger.debug(`Skipping data point - no valid pool data for ${poolType}`, {
+          currentLogger.debug(`Skipping data point - no valid pool data for ${pool_type}`, {
             winPoolAmount: dataPoint.winPoolAmount,
             placePoolAmount: dataPoint.placePoolAmount,
             pool_percentage: dataPoint.pool_percentage,
@@ -398,14 +404,14 @@ export function useMoneyFlowTimeline(
 
         grid[intervalValue][entrant_id] = {
           incremental_amount,
-          poolType,
-          timestamp: dataPoint.polling_timestamp,
+          pool_type,
+          timestamp: dataPoint.polling_timestamp ?? '',
         }
       }
     }
 
     return grid
-  }, [timelineData, poolType])
+  }, [timelineData, pool_type])
 
   // Get formatted data for specific entrant and time interval
   const getEntrantDataForInterval = useCallback(
@@ -420,13 +426,15 @@ export function useMoneyFlowTimeline(
       }
 
       // Get entrant's timeline data directly
-      const entrantTimeline = timelineData.get(entrant_id)
-      if (!entrantTimeline || entrantTimeline.dataPoints.length === 0) {
-        return '—'
-      }
+    const entrantTimeline = timelineData.get(entrant_id)
+    const timelinePoints =
+      entrantTimeline?.data_points ?? []
+    if (!entrantTimeline || timelinePoints.length === 0) {
+      return '—'
+    }
 
-      // Find data point for this specific interval
-      const dataPoint = entrantTimeline.dataPoints.find((point) => {
+    // Find data point for this specific interval
+    const dataPoint = timelinePoints.find((point) => {
         const pointInterval =
           normalizeInterval(point.time_interval) ??
           normalizeInterval(point.time_to_start)
@@ -525,12 +533,14 @@ export function useMoneyFlowTimeline(
 
       // Get entrant's timeline data directly
       const entrantTimeline = timelineData.get(entrant_id)
-      if (!entrantTimeline || entrantTimeline.dataPoints.length === 0) {
+      const timelinePoints =
+        entrantTimeline?.data_points ?? []
+      if (!entrantTimeline || timelinePoints.length === 0) {
         return '—'
       }
 
       // Find data point for this specific interval
-      const dataPoint = entrantTimeline.dataPoints.find((point) => {
+      const dataPoint = timelinePoints.find((point) => {
         const pointInterval = point.time_interval ?? point.time_to_start ?? -999
         return pointInterval === interval
       })
@@ -606,7 +616,7 @@ function processTimelineData(
       // Create empty entry to maintain consistency
       entrantDataMap.set(entrant_id, {
         entrant_id,
-        dataPoints: [],
+        data_points: [],
         latest_percentage: 0,
         trend: 'neutral',
         significant_change: false,
@@ -645,16 +655,16 @@ function processTimelineData(
 
       // Trust server pre-calculated data - no client processing needed
       const timelinePoint: MoneyFlowDataPoint = {
-        $id: doc.$id,
-        $createdAt: doc.$createdAt,
-        $updatedAt: doc.$updatedAt,
-        entrant: entrant_id,
-        polling_timestamp: doc.polling_timestamp || doc.$createdAt,
+        entry_id: doc.id,
+        created_at: doc.created_at,
+        updated_at: doc.updated_at,
+        entrant_id: entrant_id,
+        polling_timestamp: doc.polling_timestamp || doc.created_at,
         time_to_start: normalizeInterval(doc.time_to_start) ?? interval,
         time_interval: normalizeInterval(doc.time_interval) ?? interval,
         interval_type: doc.interval_type || '5m',
-        winPoolAmount: doc.winPoolAmount ?? 0,
-        placePoolAmount: doc.placePoolAmount ?? 0,
+        win_pool_amount: doc.winPoolAmount ?? 0,
+        place_pool_amount: doc.placePoolAmount ?? 0,
         total_pool_amount: (doc.winPoolAmount ?? 0) + (doc.placePoolAmount ?? 0),
         pool_percentage: doc.hold_percentage ?? doc.betPercentage ?? 0,
         // Use server pre-calculated incremental amounts directly
@@ -703,7 +713,8 @@ function processTimelineData(
 
     if (latestPoint && secondLatestPoint) {
       const percentageChange =
-        latestPoint.pool_percentage - secondLatestPoint.pool_percentage
+        (latestPoint.pool_percentage ?? 0) -
+        (secondLatestPoint.pool_percentage ?? 0)
       trend =
         percentageChange > 0.5
           ? 'up'
@@ -733,7 +744,7 @@ function processTimelineData(
 
     entrantDataMap.set(entrant_id, {
       entrant_id,
-      dataPoints: timelinePoints,
+      data_points: timelinePoints,
       latest_percentage: latestPoint?.pool_percentage || 0,
       trend,
       significant_change,
@@ -751,7 +762,7 @@ function processTimelineData(
   logger?.debug('Timeline processing complete', {
     entrantsProcessed: entrantDataMap.size,
     totalDataPoints: Array.from(entrantDataMap.values()).reduce(
-      (sum, data) => sum + data.dataPoints.length,
+      (sum, data) => sum + (data.data_points?.length ?? 0),
       0
     ),
   })
@@ -771,8 +782,8 @@ function extractEntrantId(entrant: EntrantReference): string {
     if (typeof entrant.entrant_id === 'string') {
       return entrant.entrant_id
     }
-    if (typeof entrant.$id === 'string') {
-      return entrant.$id
+    if (typeof entrant.id === 'string') {
+      return entrant.id
     }
     if (typeof entrant.id === 'string') {
       return entrant.id

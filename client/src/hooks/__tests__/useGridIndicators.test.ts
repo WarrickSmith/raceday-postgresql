@@ -37,8 +37,8 @@ const indicatorConfigs: IndicatorConfig[] = DEFAULT_INDICATORS.map((indicator, i
 const createTimelinePoint = (
   entrant: string,
   interval: number,
-  values: Partial<EntrantMoneyFlowTimeline['dataPoints'][number]>
-): EntrantMoneyFlowTimeline['dataPoints'][number] => ({
+  values: Partial<EntrantMoneyFlowTimeline['data_points'][number]>
+): EntrantMoneyFlowTimeline['data_points'][number] => ({
   $id: `${entrant}-${interval}`,
   $createdAt: '2024-01-01T00:00:00.000Z',
   $updatedAt: '2024-01-01T00:00:00.000Z',
@@ -61,10 +61,10 @@ const createTimelinePoint = (
 
 const buildTimeline = (
   entrant_id: string,
-  dataPoints: EntrantMoneyFlowTimeline['dataPoints']
+  data_points: EntrantMoneyFlowTimeline['data_points']
 ): EntrantMoneyFlowTimeline => ({
   entrant_id,
-  dataPoints,
+  data_points,
   latest_percentage: 0,
   trend: 'neutral',
   significant_change: false,
@@ -118,9 +118,9 @@ describe('computeIndicatorMatrix', () => {
 
     expect(intervalIndicators?.get('a')).toMatchObject({
       entrant_id: 'a',
-      indicatorType: '25-50%',
+      indicator_type: '25-50%',
     })
-    expect(intervalIndicators?.get('a')?.percentageChange).toBeCloseTo(30, 3)
+    expect(intervalIndicators?.get('a')?.percentage_change).toBeCloseTo(30, 3)
     expect(intervalIndicators?.has('b')).toBe(false)
     expect(matrix.get(60)).toBeUndefined()
   })
@@ -170,8 +170,8 @@ describe('computeIndicatorMatrix', () => {
 
     const indicator = matrix.get(55)?.get('a')
     expect(indicator).toBeDefined()
-    expect(indicator?.indicatorType).toBe('25-50%')
-    expect(indicator?.percentageChange).toBeCloseTo(40, 3)
+    expect(indicator?.indicator_type).toBe('25-50%')
+    expect(indicator?.percentage_change).toBeCloseTo(40, 3)
   })
 
   it('detects odds shortening and ignores scratched entrants', () => {
@@ -233,8 +233,8 @@ describe('computeIndicatorMatrix', () => {
 
     const indicator = matrix.get(55)?.get('a')
     expect(indicator).toBeDefined()
-    expect(indicator?.indicatorType).toBe('50%+')
-    expect(indicator?.percentageChange).toBeCloseTo(50, 3)
+    expect(indicator?.indicator_type).toBe('50%+')
+    expect(indicator?.percentage_change).toBeCloseTo(50, 3)
 
     expect(matrix.get(55)?.has('b')).toBe(false)
     expect(matrix.get(55)?.has('c')).toBe(false)

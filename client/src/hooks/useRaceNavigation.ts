@@ -170,42 +170,42 @@ export function useRaceNavigation({
   }, [router, onNavigationStart, onNavigationComplete, onError]);
 
   const navigateToNextScheduled = useCallback(() => {
-    console.log('🎯 Navigate to next scheduled clicked', { navigationData: !!navigationData, nextScheduledRace: !!navigationData?.nextScheduledRace });
-    if (!navigationData?.nextScheduledRace) {
+    console.log('🎯 Navigate to next scheduled clicked', { navigationData: !!navigationData, nextScheduledRace: !!navigationData?.next_scheduled_race });
+    if (!navigationData?.next_scheduled_race) {
       console.log('❌ No next scheduled race available');
       onError?.(new Error('No next scheduled race available'));
       return;
     }
     
-    navigateToRace(navigationData.nextScheduledRace.race_id, 'next-scheduled');
+    navigateToRace(navigationData.next_scheduled_race.race_id, 'next-scheduled');
   }, [navigationData, navigateToRace, onError]);
 
   const navigateToPrevious = useCallback(() => {
-    console.log('🎯 Navigate to previous clicked', { navigationData: !!navigationData, previousRace: !!navigationData?.previousRace });
-    if (!navigationData?.previousRace) {
+    console.log('🎯 Navigate to previous clicked', { navigationData: !!navigationData, previousRace: !!navigationData?.previous_race });
+    if (!navigationData?.previous_race) {
       console.log('❌ No previous race available');
       onError?.(new Error('No previous race available'));
       return;
     }
     
-    navigateToRace(navigationData.previousRace.race_id, 'previous');
+    navigateToRace(navigationData.previous_race.race_id, 'previous');
   }, [navigationData, navigateToRace, onError]);
 
   const navigateToNext = useCallback(() => {
-    console.log('🎯 Navigate to next clicked', { navigationData: !!navigationData, nextRace: !!navigationData?.nextRace });
-    if (!navigationData?.nextRace) {
+    console.log('🎯 Navigate to next clicked', { navigationData: !!navigationData, nextRace: !!navigationData?.next_race });
+    if (!navigationData?.next_race) {
       console.log('❌ No next race available');
       onError?.(new Error('No next race available'));
       return;
     }
     
-    navigateToRace(navigationData.nextRace.race_id, 'next');
+    navigateToRace(navigationData.next_race.race_id, 'next');
   }, [navigationData, navigateToRace, onError]);
 
   // Button availability checks
-  const canNavigateToNextScheduled = Boolean(navigationData?.nextScheduledRace);
-  const canNavigateToPrevious = Boolean(navigationData?.previousRace);
-  const canNavigateToNext = Boolean(navigationData?.nextRace);
+  const canNavigateToNextScheduled = Boolean(navigationData?.next_scheduled_race);
+  const canNavigateToPrevious = Boolean(navigationData?.previous_race);
+  const canNavigateToNext = Boolean(navigationData?.next_race);
 
   return {
     navigationState,

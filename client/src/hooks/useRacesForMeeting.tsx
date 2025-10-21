@@ -268,8 +268,8 @@ export function useRacesForMeeting({
 export function updateRaceInCache(meeting_id: string, updatedRace: Race): void {
   const cached = racesCache.get(meeting_id);
   if (cached) {
-    const updatedRaces = cached.races.map(race => 
-      race.$id === updatedRace.$id ? updatedRace : race
+    const updatedRaces = cached.races.map(race =>
+      race.race_id === updatedRace.race_id ? updatedRace : race
     );
     racesCache.set(meeting_id, { 
       races: updatedRaces, 

@@ -39,14 +39,14 @@ const findDataPoint = (
   targetInterval: number
 ) => {
   if (!timeline) return undefined
-  return timeline.dataPoints.find((point) => {
+  return timeline.data_points.find((point) => {
     const interval =
       getIntervalKey(point.time_interval) ?? getIntervalKey(point.time_to_start)
     return interval === targetInterval
   })
 }
 
-const getEntrantKey = (entrant: Entrant): string => entrant.entrant_id || entrant.$id
+const getEntrantKey = (entrant: Entrant): string => entrant.entrant_id
 
 const buildMoneyFrame = (
   entrants: Entrant[],
@@ -68,15 +68,15 @@ const buildMoneyFrame = (
     })()
 
     const basePoint: MoneyFlowDataPoint = {
-      $id: `${entrantKey}-${interval}-${view}`,
-      $createdAt: dataPoint?.$createdAt ?? '1970-01-01T00:00:00.000Z',
-      $updatedAt: dataPoint?.$updatedAt ?? '1970-01-01T00:00:00.000Z',
-      entrant: entrantKey,
+      entry_id: `${entrantKey}-${interval}-${view}`,
+      created_at: dataPoint?.created_at ?? '1970-01-01T00:00:00.000Z',
+      updated_at: dataPoint?.updated_at ?? '1970-01-01T00:00:00.000Z',
+      entrant_id: entrantKey,
       polling_timestamp: dataPoint?.polling_timestamp ?? '1970-01-01T00:00:00.000Z',
       time_to_start: interval,
-      time_interval: interval,
-      winPoolAmount: dataPoint?.winPoolAmount ?? 0,
-      placePoolAmount: dataPoint?.placePoolAmount ?? 0,
+      time_interval: dataPoint?.time_interval ?? interval,
+      win_pool_amount: dataPoint?.win_pool_amount ?? 0,
+      place_pool_amount: dataPoint?.place_pool_amount ?? 0,
       total_pool_amount: dataPoint?.total_pool_amount ?? 0,
       pool_percentage: dataPoint?.pool_percentage ?? 0,
       incremental_amount: Math.max(0, rawAmount || 0),
@@ -129,12 +129,12 @@ const computeMoneyIndicators = (
         entrant_id: entrantKey,
       })
 
-      if (!percentageResult.hasChange) {
+      if (!percentageResult.has_change) {
         return
       }
 
       const indicator = mapPercentageToIndicator(
-        percentageResult.percentageChange,
+        percentageResult.percentage_change,
         indicatorConfigs,
         'money_increase'
       )
@@ -148,7 +148,7 @@ const computeMoneyIndicators = (
       }
 
       indicator.entrant_id = entrantKey
-      indicator.percentageChange = percentageResult.percentageChange
+      indicator.percentage_change = percentageResult.percentage_change
 
       const existingIntervalMap = matrix.get(currentInterval) ?? new Map()
       existingIntervalMap.set(entrantKey, indicator)
@@ -194,15 +194,15 @@ const computeOddsIndicators = (
       const oddsResult = calculateOddsChangePercentage({
         currentOdds,
         previousOdds,
-        entrant_id: entrant.$id,
+        entrant_id: entrant.entrant_id,
       })
 
-      if (!oddsResult.hasChange) {
+      if (!oddsResult.has_change) {
         return
       }
 
       const indicator = mapPercentageToIndicator(
-        oddsResult.percentageChange,
+        oddsResult.percentage_change,
         indicatorConfigs,
         'odds_shortening'
       )
@@ -216,22 +216,27 @@ const computeOddsIndicators = (
       }
 
       indicator.entrant_id = entrantKey
-      indicator.percentageChange = oddsResult.percentageChange
+      indicator.percentage_change = oddsResult.percentage_change
+      indicator.change_type = 'odds_shortening'
 
-      const intervalMap = matrix.get(currentInterval) ?? new Map()
-      intervalMap.set(entrantKey, indicator)
-      matrix.set(currentInterval, intervalMap)
+      const existingIntervalMap = matrix.get(currentInterval) ?? new Map()
+      existingIntervalMap.set(entrantKey, indicator)
+      matrix.set(currentInterval, existingIntervalMap)
     })
   }
 }
 
-export const computeIndicatorMatrix = (
-  params: ComputeIndicatorParams
-): IndicatorMatrix => {
-  const { intervals, selectedView, timelineData, entrants, indicatorConfigs } =
-    params
-  const normalizedIntervals = Array.from(new Set(intervals))
-    .map((interval) => getIntervalKey(interval))
+export const computeIndicatorMatrix = (params: ComputeIndicatorParams): IndicatorMatrix => {
+  const {
+    timelineData,
+    entrants,
+    intervals,
+    selectedView,
+    indicatorConfigs,
+  } = params
+
+  const normalizedIntervals = intervals
+    .map(getIntervalKey)
     .filter((interval): interval is number => interval !== null)
     .sort((a, b) => b - a)
 

@@ -8,39 +8,30 @@ jest.mock('@/services/races', () => ({
   validateRaceData: jest.fn((race) => race && typeof race === 'object'),
 }));
 
-// Mock the appwrite client to prevent actual database calls in tests
-jest.mock('@/lib/appwrite-client', () => ({
-  databases: {
-    listDocuments: jest.fn()
-  }
-}));
-
 import { fetchRacesForMeeting } from '@/services/races';
 const mockFetchRacesForMeeting = fetchRacesForMeeting as jest.MockedFunction<typeof fetchRacesForMeeting>;
 
 describe('useRacesForMeeting', () => {
   const mockRaces: Race[] = [
     {
-      $id: 'race1',
-      $createdAt: '2024-01-01T08:00:00Z',
-      $updatedAt: '2024-01-01T08:00:00Z',
       race_id: 'R001',
+      created_at: '2024-01-01T08:00:00Z',
+      updated_at: '2024-01-01T08:00:00Z',
       race_number: 1,
       name: 'First Race',
       start_time: '2024-01-01T15:00:00Z',
-      meeting: 'meeting1',
-      status: 'Open',
+      meeting_id: 'meeting1',
+      status: 'open',
     },
     {
-      $id: 'race2',
-      $createdAt: '2024-01-01T08:00:00Z',
-      $updatedAt: '2024-01-01T08:00:00Z',
       race_id: 'R002',
+      created_at: '2024-01-01T08:00:00Z',
+      updated_at: '2024-01-01T08:00:00Z',
       race_number: 2,
       name: 'Second Race',
       start_time: '2024-01-01T16:00:00Z',
-      meeting: 'meeting1',
-      status: 'Closed',
+      meeting_id: 'meeting1',
+      status: 'closed',
     },
   ];
 
