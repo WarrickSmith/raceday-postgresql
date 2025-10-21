@@ -48,12 +48,6 @@ const nextConfig: NextConfig = {
               priority: 5,
               reuseExistingChunk: true,
             },
-            appwrite: {
-              test: /[\\/]node_modules[\\/](appwrite|node-appwrite)[\\/]/,
-              name: 'appwrite',
-              chunks: 'all',
-              priority: 20,
-            },
           },
         },
       };
@@ -98,7 +92,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  serverExternalPackages: ['node-appwrite'],
   // Tell Next.js to output a full server build rather than static
   output: 'standalone',
   // Security headers configuration

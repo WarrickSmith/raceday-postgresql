@@ -5,34 +5,34 @@
 
 export interface IndicatorConfig {
   // Database fields
-  $id?: string
-  userId: string
-  indicatorType: 'percentage_range'
-  percentageRangeMin: number
-  percentageRangeMax: number | null // null for 50%+
+  indicator_id?: string
+  user_id: string
+  indicator_type: 'percentage_range'
+  percentage_range_min: number
+  percentage_range_max: number | null // null for 50%+
   color: string // Hex color code
-  isDefault: boolean
+  is_default: boolean
   enabled: boolean
-  displayOrder: number
+  display_order: number
   last_updated?: string
-  createdAt?: string
-  audibleAlertsEnabled?: boolean
+  created_at?: string
+  audible_alerts_enabled?: boolean
 }
 
 export interface AlertsModalState {
   indicators: IndicatorConfig[]
-  toggleAll: boolean
-  isLoading: boolean
-  isSaving: boolean
-  hasChanges: boolean
-  audibleAlertsEnabled: boolean
+  toggle_all: boolean
+  is_loading: boolean
+  is_saving: boolean
+  has_changes: boolean
+  audible_alerts_enabled: boolean
 }
 
 export interface AlertsConfig {
-  userId: string
+  user_id: string
   indicators: IndicatorConfig[]
-  toggleAll: boolean
-  audibleAlertsEnabled: boolean
+  toggle_all: boolean
+  audible_alerts_enabled: boolean
 }
 
 // Default color constants tuned to soft pastel tones for calmer visuals
@@ -46,60 +46,60 @@ export const DEFAULT_INDICATOR_COLORS = {
 } as const
 
 // Default indicator configurations
-export const DEFAULT_INDICATORS: Omit<IndicatorConfig, '$id' | 'userId' | 'last_updated' | 'createdAt'>[] = [
+export const DEFAULT_INDICATORS: Omit<IndicatorConfig, 'indicator_id' | 'user_id' | 'last_updated' | 'created_at'>[] = [
   {
-    indicatorType: 'percentage_range',
-    percentageRangeMin: 5,
-    percentageRangeMax: 10,
+    indicator_type: 'percentage_range',
+    percentage_range_min: 5,
+    percentage_range_max: 10,
     color: DEFAULT_INDICATOR_COLORS['5-10'],
-    isDefault: true,
+    is_default: true,
     enabled: true,
-    displayOrder: 1,
+    display_order: 1,
   },
   {
-    indicatorType: 'percentage_range',
-    percentageRangeMin: 10,
-    percentageRangeMax: 15,
+    indicator_type: 'percentage_range',
+    percentage_range_min: 10,
+    percentage_range_max: 15,
     color: DEFAULT_INDICATOR_COLORS['10-15'],
-    isDefault: true,
+    is_default: true,
     enabled: true,
-    displayOrder: 2,
+    display_order: 2,
   },
   {
-    indicatorType: 'percentage_range',
-    percentageRangeMin: 15,
-    percentageRangeMax: 20,
+    indicator_type: 'percentage_range',
+    percentage_range_min: 15,
+    percentage_range_max: 20,
     color: DEFAULT_INDICATOR_COLORS['15-20'],
-    isDefault: true,
+    is_default: true,
     enabled: true,
-    displayOrder: 3,
+    display_order: 3,
   },
   {
-    indicatorType: 'percentage_range',
-    percentageRangeMin: 20,
-    percentageRangeMax: 25,
+    indicator_type: 'percentage_range',
+    percentage_range_min: 20,
+    percentage_range_max: 25,
     color: DEFAULT_INDICATOR_COLORS['20-25'],
-    isDefault: true,
+    is_default: true,
     enabled: true,
-    displayOrder: 4,
+    display_order: 4,
   },
   {
-    indicatorType: 'percentage_range',
-    percentageRangeMin: 25,
-    percentageRangeMax: 50,
+    indicator_type: 'percentage_range',
+    percentage_range_min: 25,
+    percentage_range_max: 50,
     color: DEFAULT_INDICATOR_COLORS['25-50'],
-    isDefault: true,
+    is_default: true,
     enabled: true,
-    displayOrder: 5,
+    display_order: 5,
   },
   {
-    indicatorType: 'percentage_range',
-    percentageRangeMin: 50,
-    percentageRangeMax: null, // 50%+
+    indicator_type: 'percentage_range',
+    percentage_range_min: 50,
+    percentage_range_max: null, // 50%+
     color: DEFAULT_INDICATOR_COLORS['50+'],
-    isDefault: true,
+    is_default: true,
     enabled: true,
-    displayOrder: 6,
+    display_order: 6,
   },
 ]
 
@@ -135,10 +135,10 @@ export const INDICATOR_COLOR_PALETTE: ColorOption[] = [
 
 // Helper functions
 export const formatPercentageRange = (indicator: IndicatorConfig): string => {
-  if (indicator.percentageRangeMax === null) {
-    return `${indicator.percentageRangeMin}%+`
+  if (indicator.percentage_range_max === null) {
+    return `${indicator.percentage_range_min}%+`
   }
-  return `${indicator.percentageRangeMin}-${indicator.percentageRangeMax}%`
+  return `${indicator.percentage_range_min}-${indicator.percentage_range_max}%`
 }
 
 export const getIndicatorLabel = (indicator: IndicatorConfig): string => {
@@ -156,21 +156,21 @@ export const isValidHexColor = (color: string): boolean => {
 export const validateIndicatorConfig = (indicator: IndicatorConfig): string[] => {
   const errors: string[] = []
 
-  if (!indicator.userId) {
+  if (!indicator.user_id) {
     errors.push('User ID is required')
   }
 
-  if (indicator.percentageRangeMin < 0 || indicator.percentageRangeMin > 100) {
+  if (indicator.percentage_range_min < 0 || indicator.percentage_range_min > 100) {
     errors.push('Percentage range minimum must be between 0 and 100')
   }
 
-  if (indicator.percentageRangeMax !== null &&
-      (indicator.percentageRangeMax < 0 || indicator.percentageRangeMax > 100)) {
+  if (indicator.percentage_range_max !== null &&
+      (indicator.percentage_range_max < 0 || indicator.percentage_range_max > 100)) {
     errors.push('Percentage range maximum must be between 0 and 100')
   }
 
-  if (indicator.percentageRangeMax !== null &&
-      indicator.percentageRangeMax <= indicator.percentageRangeMin) {
+  if (indicator.percentage_range_max !== null &&
+      indicator.percentage_range_max <= indicator.percentage_range_min) {
     errors.push('Percentage range maximum must be greater than minimum')
   }
 
@@ -178,7 +178,7 @@ export const validateIndicatorConfig = (indicator: IndicatorConfig): string[] =>
     errors.push('Color must be a valid hex color code')
   }
 
-  if (indicator.displayOrder < 1 || indicator.displayOrder > 6) {
+  if (indicator.display_order < 1 || indicator.display_order > 6) {
     errors.push('Display order must be between 1 and 6')
   }
 

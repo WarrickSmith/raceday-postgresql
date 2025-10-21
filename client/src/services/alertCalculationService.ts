@@ -28,15 +28,19 @@ export const calculateMoneyChangePercentage = (input: MoneyCalculationInput): Pe
   const { currentTimeframe, previousTimeframe, entrant_id } = input
 
   // Find entrant data in both timeframes
-  const currentEntrant = currentTimeframe.find(dp => dp.entrant === entrant_id)
-  const previousEntrant = previousTimeframe.find(dp => dp.entrant === entrant_id)
+  const currentEntrant = currentTimeframe.find(
+    (dp) => dp.entrant_id === entrant_id
+  )
+  const previousEntrant = previousTimeframe.find(
+    (dp) => dp.entrant_id === entrant_id
+  )
 
   if (!currentEntrant || !previousEntrant) {
     return {
       entrant_id,
-      percentageChange: 0,
-      changeType: 'money_increase',
-      hasChange: false,
+      percentage_change: 0,
+      change_type: 'money_increase',
+      has_change: false,
     }
   }
 
@@ -47,24 +51,26 @@ export const calculateMoneyChangePercentage = (input: MoneyCalculationInput): Pe
   if (currentTotal === 0 || previousTotal === 0) {
     return {
       entrant_id,
-      percentageChange: 0,
-      changeType: 'money_increase',
-      hasChange: false,
+      percentage_change: 0,
+      change_type: 'money_increase',
+      has_change: false,
     }
   }
 
   // Calculate percentages of timeframe totals
-  const currentPercentage = (currentEntrant.incremental_amount / currentTotal) * 100
-  const previousPercentage = (previousEntrant.incremental_amount / previousTotal) * 100
+  const currentPercentage =
+    ((currentEntrant.incremental_amount ?? 0) / currentTotal) * 100
+  const previousPercentage =
+    ((previousEntrant.incremental_amount ?? 0) / previousTotal) * 100
 
   // Calculate change - only positive changes (increases)
   const percentageChange = currentPercentage - previousPercentage
 
   return {
     entrant_id,
-    percentageChange: Math.max(0, percentageChange), // Only increases
-    changeType: 'money_increase',
-    hasChange: percentageChange > 0 && percentageChange >= 5, // Minimum 5% threshold
+    percentage_change: Math.max(0, percentageChange), // Only increases
+    change_type: 'money_increase',
+    has_change: percentageChange > 0 && percentageChange >= 5, // Minimum 5% threshold
   }
 }
 
@@ -79,9 +85,9 @@ export const calculateOddsChangePercentage = (input: OddsCalculationInput): Perc
   if (!currentOdds || !previousOdds || previousOdds === 0) {
     return {
       entrant_id,
-      percentageChange: 0,
-      changeType: 'odds_shortening',
-      hasChange: false,
+      percentage_change: 0,
+      change_type: 'odds_shortening',
+      has_change: false,
     }
   }
 
@@ -94,9 +100,9 @@ export const calculateOddsChangePercentage = (input: OddsCalculationInput): Perc
 
   return {
     entrant_id,
-    percentageChange: shorteningPercentage,
-    changeType: 'odds_shortening',
-    hasChange: shorteningPercentage > 0 && shorteningPercentage >= 5, // Minimum 5% threshold
+    percentage_change: shorteningPercentage,
+    change_type: 'odds_shortening',
+    has_change: shorteningPercentage > 0 && shorteningPercentage >= 5, // Minimum 5% threshold
   }
 }
 
@@ -105,22 +111,22 @@ export const calculateOddsChangePercentage = (input: OddsCalculationInput): Perc
  * Returns indicator type and color based on user configuration
  */
 export const mapPercentageToIndicator = (
-  percentageChange: number,
-  userIndicators: IndicatorConfig[],
-  changeType: 'money_increase' | 'odds_shortening'
+  percentage_change: number,
+  user_indicators: IndicatorConfig[],
+  change_type: 'money_increase' | 'odds_shortening'
 ): IndicatorResult | null => {
-  if (percentageChange < 5) {
+  if (percentage_change < 5) {
     return null // Below minimum threshold
   }
 
   // Find matching threshold range
-  const matchingIndicator = userIndicators.find(indicator => {
-    const { percentageRangeMin, percentageRangeMax } = indicator
-    if (percentageRangeMax === null) {
+  const matchingIndicator = user_indicators.find(indicator => {
+    const { percentage_range_min, percentage_range_max } = indicator
+    if (percentage_range_max === null) {
       // 50%+ range
-      return percentageChange >= percentageRangeMin
+      return percentage_change >= percentage_range_min
     }
-    return percentageChange >= percentageRangeMin && percentageChange < percentageRangeMax
+    return percentage_change >= percentage_range_min && percentage_change < percentage_range_max
   })
 
   if (!matchingIndicator) {
@@ -129,11 +135,11 @@ export const mapPercentageToIndicator = (
 
   return {
     entrant_id: '', // Will be set by caller
-    percentageChange,
-    indicatorType: formatPercentageRange(matchingIndicator),
+    percentage_change,
+    indicator_type: formatPercentageRange(matchingIndicator),
     color: matchingIndicator.color,
     enabled: matchingIndicator.enabled,
-    changeType,
+    change_type,
   }
 }
 
@@ -141,10 +147,10 @@ export const mapPercentageToIndicator = (
  * Format percentage range for display
  */
 const formatPercentageRange = (indicator: IndicatorConfig): string => {
-  if (indicator.percentageRangeMax === null) {
-    return `${indicator.percentageRangeMin}%+`
+  if (indicator.percentage_range_max === null) {
+    return `${indicator.percentage_range_min}%+`
   }
-  return `${indicator.percentageRangeMin}-${indicator.percentageRangeMax}%`
+  return `${indicator.percentage_range_min}-${indicator.percentage_range_max}%`
 }
 
 /**
@@ -152,13 +158,13 @@ const formatPercentageRange = (indicator: IndicatorConfig): string => {
  */
 export const createCalculationContext = async (
   userId?: string,
-  enabledOnly = true
+  enabled_only = true
 ): Promise<CalculationContext> => {
   const alertsConfig = await loadUserAlertConfig(userId)
 
   return {
-    userIndicators: alertsConfig.indicators,
-    enabledOnly,
+    user_indicators: alertsConfig.indicators,
+    enabled_only,
   }
 }
 
@@ -168,34 +174,42 @@ export const createCalculationContext = async (
 export const calculateBatchIndicators = async (
   input: BatchCalculationInput
 ): Promise<BatchCalculationResult> => {
-  const { moneyFlowData, oddsData, context } = input
-  const { userIndicators, enabledOnly } = context
+  const { money_flow_data, odds_data, context } = input
+  const { user_indicators, enabled_only } = context
 
   const moneyIndicators: IndicatorResult[] = []
   const oddsIndicators: IndicatorResult[] = []
 
   // Get unique entrant IDs from money flow data
   const entrant_ids = new Set([
-    ...moneyFlowData.currentTimeframe.map(dp => dp.entrant),
-    ...moneyFlowData.previousTimeframe.map(dp => dp.entrant),
+    ...money_flow_data.current_timeframe.map((dp) => dp.entrant_id),
+    ...money_flow_data.previous_timeframe.map((dp) => dp.entrant_id),
   ])
 
   // Calculate money indicators
-  for (const entrant_id of entrant_ids) {
+  for (const entrant of entrant_ids) {
+    const entrant_id =
+      typeof entrant === 'string' && entrant.length > 0
+        ? entrant
+        : String(entrant ?? '').trim()
+
+    if (!entrant_id) {
+      continue
+    }
     const moneyResult = calculateMoneyChangePercentage({
-      currentTimeframe: moneyFlowData.currentTimeframe,
-      previousTimeframe: moneyFlowData.previousTimeframe,
+      currentTimeframe: money_flow_data.current_timeframe,
+      previousTimeframe: money_flow_data.previous_timeframe,
       entrant_id,
     })
 
-    if (moneyResult.hasChange) {
+    if (moneyResult.has_change) {
       const indicator = mapPercentageToIndicator(
-        moneyResult.percentageChange,
-        userIndicators,
+        moneyResult.percentage_change,
+        user_indicators,
         'money_increase'
       )
 
-      if (indicator && (!enabledOnly || indicator.enabled)) {
+      if (indicator && (!enabled_only || indicator.enabled)) {
         moneyIndicators.push({
           ...indicator,
           entrant_id,
@@ -205,17 +219,21 @@ export const calculateBatchIndicators = async (
   }
 
   // Calculate odds indicators
-  for (const oddsEntry of oddsData) {
-    const oddsResult = calculateOddsChangePercentage(oddsEntry)
+  for (const oddsEntry of odds_data) {
+    const oddsResult = calculateOddsChangePercentage({
+      currentOdds: oddsEntry.current_odds,
+      previousOdds: oddsEntry.previous_odds,
+      entrant_id: oddsEntry.entrant_id,
+    })
 
-    if (oddsResult.hasChange) {
+    if (oddsResult.has_change) {
       const indicator = mapPercentageToIndicator(
-        oddsResult.percentageChange,
-        userIndicators,
+        oddsResult.percentage_change,
+        user_indicators,
         'odds_shortening'
       )
 
-      if (indicator && (!enabledOnly || indicator.enabled)) {
+      if (indicator && (!enabled_only || indicator.enabled)) {
         oddsIndicators.push({
           ...indicator,
           entrant_id: oddsEntry.entrant_id,
@@ -225,10 +243,10 @@ export const calculateBatchIndicators = async (
   }
 
   return {
-    moneyIndicators,
-    oddsIndicators,
-    calculationTimestamp: new Date().toISOString(),
-    totalEntrants: entrant_ids.size,
+    money_indicators: moneyIndicators,
+    odds_indicators: oddsIndicators,
+    calculation_timestamp: new Date().toISOString(),
+    total_entrants: entrant_ids.size,
   }
 }
 
@@ -255,7 +273,11 @@ export const validateMoneyCalculationInput = (input: MoneyCalculationInput): Val
     if (typeof dp.incremental_amount !== 'number') {
       errors.push(`Current timeframe data point ${index} missing incremental_amount`)
     }
-    if (!dp.entrant?.trim()) {
+    const entrantIdValue =
+      typeof dp.entrant_id === 'string'
+        ? dp.entrant_id.trim()
+        : String(dp.entrant_id ?? '').trim()
+    if (!entrantIdValue) {
       errors.push(`Current timeframe data point ${index} missing entrant ID`)
     }
   })
@@ -264,13 +286,17 @@ export const validateMoneyCalculationInput = (input: MoneyCalculationInput): Val
     if (typeof dp.incremental_amount !== 'number') {
       errors.push(`Previous timeframe data point ${index} missing incremental_amount`)
     }
-    if (!dp.entrant?.trim()) {
+    const entrantIdValue =
+      typeof dp.entrant_id === 'string'
+        ? dp.entrant_id.trim()
+        : String(dp.entrant_id ?? '').trim()
+    if (!entrantIdValue) {
       errors.push(`Previous timeframe data point ${index} missing entrant ID`)
     }
   })
 
   return {
-    isValid: errors.length === 0,
+    is_valid: errors.length === 0,
     errors,
   }
 }
@@ -291,7 +317,7 @@ export const validateOddsCalculationInput = (input: OddsCalculationInput): Valid
   }
 
   return {
-    isValid: errors.length === 0,
+    is_valid: errors.length === 0,
     errors,
   }
 }

@@ -143,6 +143,9 @@ export interface Entrant {
   pool_win_odds?: number | null
   fixed_place_odds?: number | null
   pool_place_odds?: number | null
+  // Display fields - computed from fixed or pool odds based on context
+  win_odds?: number | null
+  place_odds?: number | null
   hold_percentage?: number | null
   previous_hold_percentage?: number | null
   money_flow_trend?: 'up' | 'down' | 'neutral'

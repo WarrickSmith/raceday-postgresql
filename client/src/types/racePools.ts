@@ -50,7 +50,6 @@ export interface RaceResult {
 
 // Pool dividends for completed races
 export interface PoolDividend {
-  pool_type?: PoolType;
   dividend: number;
   investment?: number; // minimum investment (e.g., $1, $2)
   winners?: string[]; // array of runner numbers or combinations
@@ -58,7 +57,7 @@ export interface PoolDividend {
   // NZTAB API fields
   product_name?: string; // e.g., "Pool Win", "Pool Place"
   product_type?: string;
-  pool_type?: string;
+  pool_type?: string; // can be PoolType enum value or NZTAB product name
   type?: string;
   id?: string;
   tote?: string;

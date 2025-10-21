@@ -23,9 +23,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build-time arguments for Next.js environment variables
 # These are passed from docker-compose build args
-ARG NEXT_PUBLIC_APPWRITE_ENDPOINT
-ARG NEXT_PUBLIC_APPWRITE_PROJECT_ID
-ARG APPWRITE_API_KEY
+ARG NEXT_PUBLIC_API_BASE_URL
+ARG API_BASE_URL
 ARG NEXT_PUBLIC_LOG_LEVEL
 ARG NEXT_PUBLIC_DOUBLE_POLLING_FREQUENCY
 ARG DOUBLE_POLLING_FREQUENCY
@@ -37,9 +36,8 @@ ARG NEXT_PUBLIC_ENABLE_HEALTH_MONITORING
 ARG NEXT_PUBLIC_HEALTH_CHECK_INTERVAL_MS
 
 # Convert build args to environment variables for Next.js build
-ENV NEXT_PUBLIC_APPWRITE_ENDPOINT=${NEXT_PUBLIC_APPWRITE_ENDPOINT}
-ENV NEXT_PUBLIC_APPWRITE_PROJECT_ID=${NEXT_PUBLIC_APPWRITE_PROJECT_ID}
-ENV APPWRITE_API_KEY=${APPWRITE_API_KEY}
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+ENV API_BASE_URL=${API_BASE_URL}
 ENV NEXT_PUBLIC_LOG_LEVEL=${NEXT_PUBLIC_LOG_LEVEL}
 ENV NEXT_PUBLIC_DOUBLE_POLLING_FREQUENCY=${NEXT_PUBLIC_DOUBLE_POLLING_FREQUENCY}
 ENV DOUBLE_POLLING_FREQUENCY=${DOUBLE_POLLING_FREQUENCY}
@@ -71,8 +69,8 @@ COPY --from=builder /app/public ./public
 # Copy package.json for runtime initialization
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
-# Install only the dependencies needed for setup scripts (dotenv and node-appwrite)
-RUN npm install dotenv node-appwrite
+# Install runtime setup dependencies
+RUN npm install dotenv
 
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing

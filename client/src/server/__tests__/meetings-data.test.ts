@@ -1,206 +1,210 @@
-import { getMeetingsData, getMeetingById } from '../meetings-data';
-import { createServerClient } from '@/lib/appwrite-server';
-import type { Databases } from 'node-appwrite';
-import { RACE_TYPE_CODES } from '@/constants/race_types';
+import { getMeetingsData, getMeetingById } from '../meetings-data'
+import { apiClient } from '@/lib/api-client'
+import { RACE_TYPE_CODES } from '@/constants/raceTypes'
 
-// Mock the Appwrite server client
-jest.mock('@/lib/appwrite-server', () => ({
-  createServerClient: jest.fn(),
-  Query: {
-    equal: jest.fn((field, value) => ({ field, value, type: 'equal' })),
-    orderAsc: jest.fn((field) => ({ field, type: 'orderAsc' })),
-    limit: jest.fn((count) => ({ count, type: 'limit' })),
-  },
-}));
+jest.mock('@/lib/api-client', () => {
+  class ApiError extends Error {
+    status: number
+    url: string
+    constructor(message: string, status: number, url: string) {
+      super(message)
+      this.name = 'ApiError'
+      this.status = status
+      this.url = url
+    }
+  }
 
-const mockDatabases = {
-  listDocuments: jest.fn(),
-  getDocument: jest.fn(),
-} as jest.Mocked<Pick<Databases, 'listDocuments' | 'getDocument'>>;
+  return {
+    apiClient: {
+      get: jest.fn(),
+    },
+    ApiError,
+  }
+})
 
-const mockCreateServerClient = createServerClient as jest.MockedFunction<typeof createServerClient>;
+const mockApiClient = apiClient as jest.Mocked<typeof apiClient>
 
 describe('meetings-data', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    mockCreateServerClient.mockResolvedValue({
-      databases: mockDatabases as unknown as Databases,
-    });
-  });
+    jest.clearAllMocks()
+  })
 
   describe('getMeetingsData', () => {
-    it('should fetch and sort meetings by first race time', async () => {
-      const mockMeetings = [
+    it('fetches meetings and sorts by first race start time', async () => {
+      const todayMeetings = [
         {
-          $id: '1',
-          $sequence: 1,
-          $collectionId: 'meetings',
-          $databaseId: 'raceday-db',
-          $createdAt: '2024-01-01T08:00:00Z',
-          $updatedAt: '2024-01-01T08:00:00Z',
-          $permissions: [],
           meeting_id: 'meeting1',
           meeting_name: 'Meeting 1',
           country: 'AUS',
           race_type: 'Thoroughbred Horse Racing',
           category: RACE_TYPE_CODES.THOROUGHBRED,
           date: '2024-01-01',
+          status: 'active',
+          created_at: '2024-01-01T08:00:00Z',
+          updated_at: '2024-01-01T08:00:00Z',
         },
         {
-          $id: '2',
-          $sequence: 2,
-          $collectionId: 'meetings',
-          $databaseId: 'raceday-db',
-          $createdAt: '2024-01-01T06:00:00Z',
-          $updatedAt: '2024-01-01T06:00:00Z',
-          $permissions: [],
           meeting_id: 'meeting2',
           meeting_name: 'Meeting 2',
           country: 'NZ',
           race_type: 'Harness Horse Racing',
           category: RACE_TYPE_CODES.HARNESS,
           date: '2024-01-01',
+          status: 'active',
+          created_at: '2024-01-01T06:00:00Z',
+          updated_at: '2024-01-01T06:00:00Z',
         },
-      ];
+      ]
 
-      const mockRaces = [
-        { 
-          $id: 'race1',
-          $sequence: 1,
-          $collectionId: 'races',
-          $databaseId: 'raceday-db',
-          $createdAt: '2024-01-01T08:00:00Z',
-          $updatedAt: '2024-01-01T08:00:00Z',
-          $permissions: [],
-          start_time: '2024-01-01T10:00:00Z' 
-        }, // Later race for meeting1
-        { 
-          $id: 'race2',
-          $sequence: 2,
-          $collectionId: 'races',
-          $databaseId: 'raceday-db',
-          $createdAt: '2024-01-01T08:00:00Z',
-          $updatedAt: '2024-01-01T08:00:00Z',
-          $permissions: [],
-          start_time: '2024-01-01T09:00:00Z' 
-        }, // Earlier race for meeting2
-      ];
-
-      mockDatabases.listDocuments
-        .mockResolvedValueOnce({ documents: mockMeetings, total: mockMeetings.length })
-        .mockResolvedValueOnce({ documents: [mockRaces[0]], total: 1 }) // meeting1 races
-        .mockResolvedValueOnce({ documents: [mockRaces[1]], total: 1 }); // meeting2 races
-
-      const result = await getMeetingsData();
-
-      expect(result).toHaveLength(2);
-      expect(result[0].meeting_id).toBe('meeting2'); // Should be first due to earlier race time
-      expect(result[1].meeting_id).toBe('meeting1');
-      expect(result[0].first_race_time).toBe('2024-01-01T09:00:00Z');
-      expect(result[1].first_race_time).toBe('2024-01-01T10:00:00Z');
-    });
-
-    it('should handle empty meetings response', async () => {
-      mockDatabases.listDocuments.mockResolvedValueOnce({ documents: [], total: 0 });
-
-      const result = await getMeetingsData();
-
-      expect(result).toEqual([]);
-    });
-
-    it('should handle database errors gracefully', async () => {
-      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-      const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
-
-      mockDatabases.listDocuments.mockRejectedValueOnce(new Error('Database error'));
-
-      const result = await getMeetingsData();
-
-      expect(result).toEqual([]);
-      expect(warnSpy).toHaveBeenCalledWith(
-        'Appwrite meetings query failed, returning empty list:',
-        expect.any(String)
-      );
-      expect(debugSpy).toHaveBeenCalledWith('Appwrite meetings query environment check:', {
-        hasEndpoint: expect.any(Boolean),
-        hasProjectId: expect.any(Boolean),
-        hasApiKey: expect.any(Boolean),
-      });
-
-      warnSpy.mockRestore();
-      debugSpy.mockRestore();
-    });
-
-    it('should handle race fetching errors for individual meetings', async () => {
-      // Mock console.error to suppress expected error output
-      console.error = jest.fn();
-      
-      const mockMeetings = [
+      const meeting1Races = [
         {
-          $id: '1',
-          $sequence: 1,
-          $collectionId: 'meetings',
-          $databaseId: 'raceday-db',
-          $createdAt: '2024-01-01T08:00:00Z',
-          $updatedAt: '2024-01-01T08:00:00Z',
-          $permissions: [],
+          race_id: 'race1',
+          race_number: 1,
+          name: 'Race 1',
+          start_time: '2024-01-01T10:00:00Z',
           meeting_id: 'meeting1',
-          meeting_name: 'Meeting 1',
-          country: 'AUS',
-          race_type: 'Thoroughbred Horse Racing',
-          category: RACE_TYPE_CODES.THOROUGHBRED,
-          date: '2024-01-01',
+          status: 'open',
+          created_at: '2024-01-01T08:00:00Z',
+          updated_at: '2024-01-01T08:00:00Z',
         },
-      ];
+      ]
 
-      mockDatabases.listDocuments
-        .mockResolvedValueOnce({ documents: mockMeetings, total: mockMeetings.length })
-        .mockRejectedValueOnce(new Error('Race fetch error'));
+      const meeting2Races = [
+        {
+          race_id: 'race2',
+          race_number: 1,
+          name: 'Race 1',
+          start_time: '2024-01-01T09:00:00Z',
+          meeting_id: 'meeting2',
+          status: 'open',
+          created_at: '2024-01-01T07:00:00Z',
+          updated_at: '2024-01-01T07:00:00Z',
+        },
+      ]
 
-      const result = await getMeetingsData();
+      mockApiClient.get
+        .mockResolvedValueOnce(todayMeetings) // meetings list
+        .mockResolvedValueOnce(meeting1Races) // races for meeting1
+        .mockResolvedValueOnce(meeting2Races) // races for meeting2
 
-      expect(result).toHaveLength(1);
-      expect(result[0].first_race_time).toBe('2024-01-01T08:00:00Z'); // Falls back to created time
-      expect(console.error).toHaveBeenCalledWith('Error fetching races for meeting meeting1:', expect.any(Error));
-    });
-  });
+      const result = await getMeetingsData()
 
-  describe('getMeetingById', () => {
-    it('should fetch meeting by ID', async () => {
-      const mockMeeting = {
-        $id: '1',
-        $sequence: 1,
-        $collectionId: 'meetings',
-        $databaseId: 'raceday-db',
-        $createdAt: '2024-01-01T08:00:00Z',
-        $updatedAt: '2024-01-01T08:00:00Z',
-        $permissions: [],
+      expect(result).toHaveLength(2)
+      expect(result[0].meeting_id).toBe('meeting2')
+      expect(result[0].first_race_time).toBe('2024-01-01T09:00:00Z')
+      expect(result[1].meeting_id).toBe('meeting1')
+      expect(result[1].first_race_time).toBe('2024-01-01T10:00:00Z')
+    })
+
+    it('returns empty array when meetings API returns none', async () => {
+      mockApiClient.get.mockResolvedValueOnce([])
+
+      const result = await getMeetingsData()
+
+      expect(result).toEqual([])
+    })
+
+    it('gracefully handles API errors', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const error = new (jest.requireMock('@/lib/api-client').ApiError)(
+        'Upstream failure',
+        503,
+        '/meetings'
+      )
+      mockApiClient.get.mockRejectedValueOnce(error)
+
+      const result = await getMeetingsData()
+
+      expect(result).toEqual([])
+      expect(warnSpy).toHaveBeenCalledWith(
+        'PostgreSQL meetings query failed, returning empty list:',
+        '503 Upstream failure'
+      )
+
+      warnSpy.mockRestore()
+    })
+
+    it('falls back to meeting created_at when race fetch fails', async () => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+
+      const meeting = {
         meeting_id: 'meeting1',
-        meeting_name: 'Test Meeting',
+        meeting_name: 'Meeting 1',
+        country: 'AUS',
         race_type: 'Thoroughbred Horse Racing',
         category: RACE_TYPE_CODES.THOROUGHBRED,
-        country: 'AU',
         date: '2024-01-01',
-      };
+        status: 'active',
+        created_at: '2024-01-01T08:00:00Z',
+        updated_at: '2024-01-01T08:00:00Z',
+      }
 
-      mockDatabases.getDocument.mockResolvedValueOnce(mockMeeting);
+      mockApiClient.get
+        .mockResolvedValueOnce([meeting])
+        .mockRejectedValueOnce(new Error('Race fetch error'))
 
-      const result = await getMeetingById('1');
+      const result = await getMeetingsData()
 
-      expect(result).toEqual(mockMeeting);
-      expect(mockDatabases.getDocument).toHaveBeenCalledWith('raceday-db', 'meetings', '1');
-    });
+      expect(result).toHaveLength(1)
+      expect(result[0].first_race_time).toBe(meeting.created_at)
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Failed to fetch races for meeting meeting1:',
+        expect.any(Error)
+      )
 
-    it('should return null on error', async () => {
-      // Mock console.error to suppress expected error output
-      console.error = jest.fn();
-      
-      mockDatabases.getDocument.mockRejectedValueOnce(new Error('Not found'));
+      errorSpy.mockRestore()
+    })
+  })
 
-      const result = await getMeetingById('invalid-id');
+  describe('getMeetingById', () => {
+    it('returns meeting for valid id', async () => {
+      const meeting = {
+        meeting_id: 'meeting1',
+        meeting_name: 'Test Meeting',
+        country: 'NZ',
+        race_type: 'Thoroughbred Horse Racing',
+        category: RACE_TYPE_CODES.THOROUGHBRED,
+        date: '2024-01-01',
+        status: 'active',
+        created_at: '2024-01-01T08:00:00Z',
+        updated_at: '2024-01-01T08:00:00Z',
+      }
 
-      expect(result).toBeNull();
-      expect(console.error).toHaveBeenCalledWith('Error fetching meeting invalid-id:', expect.any(Error));
-    });
-  });
-});
+      mockApiClient.get.mockResolvedValueOnce(meeting)
+
+      const result = await getMeetingById('meeting1')
+
+      expect(result).toEqual(meeting)
+      expect(mockApiClient.get).toHaveBeenCalledWith('/meetings/meeting1')
+    })
+
+    it('returns null for missing meeting', async () => {
+      const apiError = new (jest.requireMock('@/lib/api-client').ApiError)(
+        'Not Found',
+        404,
+        '/meetings/unknown'
+      )
+      mockApiClient.get.mockRejectedValueOnce(apiError)
+
+      const result = await getMeetingById('unknown')
+
+      expect(result).toBeNull()
+    })
+
+    it('logs and returns null for other errors', async () => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+      mockApiClient.get.mockRejectedValueOnce(new Error('Network failure'))
+
+      const result = await getMeetingById('meeting1')
+
+      expect(result).toBeNull()
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Error fetching meeting meeting1:',
+        expect.any(Error)
+      )
+
+      errorSpy.mockRestore()
+    })
+  })
+})

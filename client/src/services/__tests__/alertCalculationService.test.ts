@@ -67,9 +67,9 @@ describe('AlertCalculationService', () => {
       })
 
       // Expected: 29% - 14% = 15% change
-      expect(result.percentageChange).toBeCloseTo(15, 0)
-      expect(result.changeType).toBe('money_increase')
-      expect(result.hasChange).toBe(true)
+      expect(result.percentage_change).toBeCloseTo(15, 0)
+      expect(result.change_type).toBe('money_increase')
+      expect(result.has_change).toBe(true)
       expect(result.entrant_id).toBe('4')
     })
 
@@ -91,8 +91,8 @@ describe('AlertCalculationService', () => {
       })
 
       // Should return 0 for decreases
-      expect(result.percentageChange).toBe(0)
-      expect(result.hasChange).toBe(false)
+      expect(result.percentage_change).toBe(0)
+      expect(result.has_change).toBe(false)
     })
 
     it('handles missing entrant data', () => {
@@ -106,8 +106,8 @@ describe('AlertCalculationService', () => {
         entrant_id: 'missing',
       })
 
-      expect(result.percentageChange).toBe(0)
-      expect(result.hasChange).toBe(false)
+      expect(result.percentage_change).toBe(0)
+      expect(result.has_change).toBe(false)
     })
 
     it('handles zero total amounts', () => {
@@ -125,8 +125,8 @@ describe('AlertCalculationService', () => {
         entrant_id: '1',
       })
 
-      expect(result.percentageChange).toBe(0)
-      expect(result.hasChange).toBe(false)
+      expect(result.percentage_change).toBe(0)
+      expect(result.has_change).toBe(false)
     })
 
     it('applies minimum 5% threshold for hasChange', () => {
@@ -146,8 +146,8 @@ describe('AlertCalculationService', () => {
         entrant_id: '1',
       })
 
-      expect(result.percentageChange).toBeCloseTo(2, 1)
-      expect(result.hasChange).toBe(false) // Below 5% threshold
+      expect(result.percentage_change).toBeCloseTo(2, 1)
+      expect(result.has_change).toBe(false) // Below 5% threshold
     })
   })
 
@@ -161,9 +161,9 @@ describe('AlertCalculationService', () => {
       })
 
       // Expected: (12-7)/12 = 42% shortening
-      expect(result.percentageChange).toBeCloseTo(41.67, 1)
-      expect(result.changeType).toBe('odds_shortening')
-      expect(result.hasChange).toBe(true)
+      expect(result.percentage_change).toBeCloseTo(41.67, 1)
+      expect(result.change_type).toBe('odds_shortening')
+      expect(result.has_change).toBe(true)
       expect(result.entrant_id).toBe('3')
     })
 
@@ -175,8 +175,8 @@ describe('AlertCalculationService', () => {
         entrant_id: '1',
       })
 
-      expect(result.percentageChange).toBe(0)
-      expect(result.hasChange).toBe(false)
+      expect(result.percentage_change).toBe(0)
+      expect(result.has_change).toBe(false)
     })
 
     it('handles invalid odds values', () => {
@@ -186,8 +186,8 @@ describe('AlertCalculationService', () => {
         entrant_id: '1',
       })
 
-      expect(result.percentageChange).toBe(0)
-      expect(result.hasChange).toBe(false)
+      expect(result.percentage_change).toBe(0)
+      expect(result.has_change).toBe(false)
     })
 
     it('applies minimum 5% threshold for hasChange', () => {
@@ -198,8 +198,8 @@ describe('AlertCalculationService', () => {
         entrant_id: '1',
       })
 
-      expect(result.percentageChange).toBe(5)
-      expect(result.hasChange).toBe(true) // Exactly at 5% threshold
+      expect(result.percentage_change).toBe(5)
+      expect(result.has_change).toBe(true) // Exactly at 5% threshold
     })
   })
 
@@ -211,7 +211,7 @@ describe('AlertCalculationService', () => {
       expect(result).toBeDefined()
       expect(result!.indicatorType).toBe('15-20%')
       expect(result!.color).toBe('#FEF3C7') // Pale Amber
-      expect(result!.changeType).toBe('money_increase')
+      expect(result!.change_type).toBe('money_increase')
     })
 
     it('maps 50%+ range correctly', () => {
@@ -220,7 +220,7 @@ describe('AlertCalculationService', () => {
       expect(result).toBeDefined()
       expect(result!.indicatorType).toBe('50%+')
       expect(result!.color).toBe('#F3E8FF') // Lavender
-      expect(result!.changeType).toBe('odds_shortening')
+      expect(result!.change_type).toBe('odds_shortening')
     })
 
     it('returns null for percentages below minimum threshold', () => {
@@ -449,7 +449,7 @@ describe('AlertCalculationService', () => {
         previousTimeframe: t1Data,
         entrant_id: '4',
       })
-      expect(t1ToT2.percentageChange).toBeCloseTo(15, 0)
+      expect(t1ToT2.percentage_change).toBeCloseTo(15, 0)
 
       // T2->T3: Should show no change for Entrant 4 (decrease ignored)
       const t2ToT3 = calculateMoneyChangePercentage({
@@ -457,8 +457,8 @@ describe('AlertCalculationService', () => {
         previousTimeframe: t2Data,
         entrant_id: '4',
       })
-      expect(t2ToT3.percentageChange).toBe(0)
-      expect(t2ToT3.hasChange).toBe(false)
+      expect(t2ToT3.percentage_change).toBe(0)
+      expect(t2ToT3.has_change).toBe(false)
     })
 
     it('processes complete 3-timeframe odds scenario', () => {
@@ -468,12 +468,12 @@ describe('AlertCalculationService', () => {
         previousOdds: 12.00,
         entrant_id: '3',
       })
-      expect(t1ToT2.percentageChange).toBeCloseTo(41.67, 1)
-      expect(t1ToT2.hasChange).toBe(true)
+      expect(t1ToT2.percentage_change).toBeCloseTo(41.67, 1)
+      expect(t1ToT2.has_change).toBe(true)
 
       // Map to indicator - should be Red (25-50% range)
       const indicator = mapPercentageToIndicator(
-        t1ToT2.percentageChange,
+        t1ToT2.percentage_change,
         mockUserIndicators,
         'odds_shortening'
       )
@@ -486,8 +486,8 @@ describe('AlertCalculationService', () => {
         previousOdds: 7.00,
         entrant_id: '3',
       })
-      expect(t2ToT3.percentageChange).toBe(0)
-      expect(t2ToT3.hasChange).toBe(false)
+      expect(t2ToT3.percentage_change).toBe(0)
+      expect(t2ToT3.has_change).toBe(false)
     })
   })
 })

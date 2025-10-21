@@ -24,7 +24,7 @@ const customJestConfig = {
     '!scripts/**/*.test.{js,jsx,ts,tsx}',
   ],
   transformIgnorePatterns: [
-    'node_modules/(?!(node-appwrite|node-fetch-native-with-agent|@appwrite)/)',
+    'node_modules/(?!(node-fetch-native-with-agent)/)',
   ],
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
   globals: {

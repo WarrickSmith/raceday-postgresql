@@ -252,8 +252,8 @@ const request = async <T>(
     return undefined as T
   }
 
-  const contentType = finalResponse.headers.get('content-type') ?? ''
-  if (contentType.includes('application/json')) {
+  const responseContentType = finalResponse.headers.get('content-type') ?? ''
+  if (responseContentType.includes('application/json')) {
     return (await finalResponse.json()) as T
   }
 

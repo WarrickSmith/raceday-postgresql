@@ -13,17 +13,17 @@ import { DEFAULT_INDICATORS as DEFAULT_INDICATOR_CONFIGS, DEFAULT_USER_ID } from
 const createDefaultConfig = (userId: string): AlertsConfig => {
   const defaultIndicators = DEFAULT_INDICATOR_CONFIGS.map((defaultInd, index) => ({
     ...defaultInd,
-    $id: `default-${index}`,
-    userId,
+    indicator_id: `default-${index}`,
+    user_id: userId,
     last_updated: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
+    created_at: new Date().toISOString(),
   }))
 
   return {
-    userId,
+    user_id: userId,
     indicators: defaultIndicators,
-    toggleAll: true,
-    audibleAlertsEnabled: true,
+    toggle_all: true,
+    audible_alerts_enabled: true,
   }
 }
 
@@ -58,8 +58,8 @@ export const loadUserAlertConfig = async (userId: string = DEFAULT_USER_ID): Pro
 
       const config = await response.json()
       const audibleAlertsEnabled =
-        config.audibleAlertsEnabled ??
-        config.indicators?.[0]?.audibleAlertsEnabled ??
+        config.audible_alerts_enabled ??
+        config.indicators?.[0]?.audible_alerts_enabled ??
         true
 
       return {
@@ -85,7 +85,7 @@ export const loadUserAlertConfig = async (userId: string = DEFAULT_USER_ID): Pro
  * Updates all 6 indicator configurations for the user
  */
 export const saveUserAlertConfig = async (config: AlertsConfig): Promise<void> => {
-  const key = `save:${config.userId}`
+  const key = `save:${config.user_id}`
   const existing = inFlight.get(key)
   if (existing) return existing as Promise<void>
 
@@ -102,9 +102,9 @@ export const saveUserAlertConfig = async (config: AlertsConfig): Promise<void> =
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: config.userId,
+          userId: config.user_id,
           indicators: config.indicators,
-          audibleAlertsEnabled: config.audibleAlertsEnabled,
+          audible_alerts_enabled: config.audible_alerts_enabled,
         }),
       })
 
@@ -153,8 +153,8 @@ export const resetToDefaults = async (userId: string = DEFAULT_USER_ID): Promise
 
       const resetConfig = await response.json()
       const audibleAlertsEnabled =
-        resetConfig.audibleAlertsEnabled ??
-        resetConfig.indicators?.[0]?.audibleAlertsEnabled ??
+        resetConfig.audible_alerts_enabled ??
+        resetConfig.indicators?.[0]?.audible_alerts_enabled ??
         true
       return {
         ...resetConfig,
@@ -176,7 +176,7 @@ export const resetToDefaults = async (userId: string = DEFAULT_USER_ID): Promise
 export const validateAlertConfig = (config: AlertsConfig): string[] => {
   const errors: string[] = []
 
-  if (!config.userId) {
+  if (!config.user_id) {
     errors.push('User ID is required')
   }
 
@@ -184,17 +184,17 @@ export const validateAlertConfig = (config: AlertsConfig): string[] => {
     errors.push('Exactly 6 indicators are required')
   }
 
-  if (typeof config.audibleAlertsEnabled !== 'boolean') {
+  if (typeof config.audible_alerts_enabled !== 'boolean') {
     errors.push('Audible alerts enabled flag must be a boolean')
   }
 
   // Validate each indicator
   config.indicators?.forEach((indicator, index) => {
-    if (indicator.displayOrder !== index + 1) {
+    if (indicator.display_order !== index + 1) {
       errors.push(`Indicator ${index + 1} has incorrect display order`)
     }
 
-    if (indicator.userId !== config.userId) {
+    if (indicator.user_id !== config.user_id) {
       errors.push(`Indicator ${index + 1} has mismatched user ID`)
     }
 
