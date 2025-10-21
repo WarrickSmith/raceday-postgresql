@@ -1,51 +1,53 @@
-import { NextRequest } from 'next/server';
-import { createServerClient, Query } from '@/lib/appwrite-server';
-import { jsonWithCompression } from '@/lib/http/compression';
+import { NextRequest } from 'next/server'
+import { apiClient, ApiError } from '@/lib/api-client'
+import type { Race } from '@/types/meetings'
+import { jsonWithCompression } from '@/lib/http/compression'
+
+const FINAL_STATUSES = new Set(['final', 'finalized', 'abandoned'])
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ meeting_id: string }> }
 ) {
   try {
-    const { meeting_id } = await params;
-    const { databases } = await createServerClient();
-    
-    // Fetch races for this meeting with minimal data
-    const racesQuery = await databases.listDocuments(
-      'raceday-db',
-      'races',
-      [
-        Query.equal('meeting', meeting_id),
-        Query.select(['status']), // Only fetch the status field for performance
-        Query.limit(50)
-      ]
-    );
+    const { meeting_id } = await params
 
-    if (racesQuery.documents.length === 0) {
-      return jsonWithCompression(request, { isCompleted: false });
+    if (!meeting_id) {
+      return jsonWithCompression(
+        request,
+        { error: 'Meeting ID is required' },
+        { status: 400 }
+      )
     }
 
-    // Check if all races are finalized
-    const allRacesFinalized = racesQuery.documents.every((race) => {
-      const raceData = race as unknown as { status: string };
-      return raceData.status === 'Final' || raceData.status === 'Abandoned';
-    });
+    const races = await apiClient.get<Race[]>('/api/races', {
+      params: { meetingId: meeting_id },
+      cache: 'no-store',
+    })
+
+    if (races.length === 0) {
+      return jsonWithCompression(request, { isCompleted: false })
+    }
+
+    const finalizedRaces = races.filter((race) =>
+      FINAL_STATUSES.has((race.status ?? '').toLowerCase())
+    )
+    const allFinalized = finalizedRaces.length === races.length
 
     return jsonWithCompression(request, {
-      isCompleted: allRacesFinalized,
-      totalRaces: racesQuery.documents.length,
-      finalizedRaces: racesQuery.documents.filter((race) => {
-        const raceData = race as unknown as { status: string };
-        return raceData.status === 'Final' || raceData.status === 'Abandoned';
-      }).length,
-    });
-    
+      isCompleted: allFinalized,
+      totalRaces: races.length,
+      finalizedRaces: finalizedRaces.length,
+    })
   } catch (error) {
-    console.error('Error checking meeting status:', error);
+    console.error('Error checking meeting status:', error)
+
+    const status = error instanceof ApiError ? error.status : 500
+
     return jsonWithCompression(
       request,
       { isCompleted: false },
-      { status: 500 }
-    );
+      { status }
+    )
   }
 }

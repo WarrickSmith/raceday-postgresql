@@ -1,60 +1,36 @@
-import { NextRequest } from 'next/server';
-import { AppwriteException } from 'node-appwrite';
-import { createServerClient, Query } from '@/lib/appwrite-server';
-import { jsonWithCompression } from '@/lib/http/compression';
+import { NextRequest } from 'next/server'
+import { apiClient, ApiError } from '@/lib/api-client'
+import { jsonWithCompression } from '@/lib/http/compression'
 
 interface HealthResponse {
-  status: 'healthy' | 'unconfigured' | 'unhealthy';
-  timestamp: string;
-  uptime?: number;
-  error?: string;
+  status: 'healthy' | 'unhealthy'
+  timestamp: string
+  database?: string
+  workers?: string
+  error?: string
 }
 
 export async function GET(request: NextRequest) {
-  const timestamp = new Date().toISOString();
-
   try {
-    const hasRequiredEnv = Boolean(
-      process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT &&
-        process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID &&
-        process.env.APPWRITE_API_KEY
-    );
+    const payload = await apiClient.get<HealthResponse>('/health', {
+      cache: 'no-store',
+    })
 
-    if (!hasRequiredEnv) {
-      const body: HealthResponse = {
-        status: 'unconfigured',
-        timestamp,
-      };
-
-      return jsonWithCompression(request, body, { status: 200 });
-    }
-
-    const { databases } = await createServerClient();
-
-    await databases.listDocuments('raceday-db', 'meetings', [Query.limit(1)]);
-
-    const body: HealthResponse = {
-      status: 'healthy',
-      timestamp,
-      uptime: process.uptime(),
-    };
-
-    return jsonWithCompression(request, body, { status: 200 });
+    return jsonWithCompression(request, payload, { status: 200 })
   } catch (error) {
-    let errorMessage = 'Unknown error';
-
-    if (error instanceof AppwriteException) {
-      errorMessage = `${error.code ?? 'Appwrite'}: ${error.message}`;
-    } else if (error instanceof Error) {
-      errorMessage = error.message;
+    const fallback: HealthResponse = {
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error:
+        error instanceof ApiError
+          ? `${error.status} ${error.message}`
+          : error instanceof Error
+            ? error.message
+            : 'Unknown error contacting health endpoint',
     }
 
-    const body: HealthResponse = {
-      status: 'unhealthy',
-      timestamp,
-      error: errorMessage,
-    };
+    const status = error instanceof ApiError ? error.status : 503
 
-    return jsonWithCompression(request, body, { status: 503 });
+    return jsonWithCompression(request, fallback, { status })
   }
 }

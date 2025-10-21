@@ -1,13 +1,10 @@
-import { NextRequest } from 'next/server';
-import { createServerClient, Query } from '@/lib/appwrite-server';
-import { jsonWithCompression } from '@/lib/http/compression';
+import { NextRequest } from 'next/server'
+import { apiClient, ApiError } from '@/lib/api-client'
+import { jsonWithCompression } from '@/lib/http/compression'
 
-const DATABASE_ID = 'raceday-db';
-const RACES_COLLECTION_ID = 'races';
-
-const DEFAULT_WINDOW_MINUTES = 120;
-const DEFAULT_LOOKBACK_MINUTES = 5;
-const DEFAULT_LIMIT = 50;
+const DEFAULT_WINDOW_MINUTES = 120
+const DEFAULT_LOOKBACK_MINUTES = 5
+const DEFAULT_LIMIT = 50
 
 /**
  * GET /api/races/upcoming
@@ -22,64 +19,72 @@ const DEFAULT_LIMIT = 50;
  */
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
+    const searchParams = request.nextUrl.searchParams
 
-    // Parse query parameters with defaults
-    const windowMinutes = Number(searchParams.get('windowMinutes')) || DEFAULT_WINDOW_MINUTES;
-    const lookbackMinutes = Number(searchParams.get('lookbackMinutes')) || DEFAULT_LOOKBACK_MINUTES;
-    const limit = Math.min(Number(searchParams.get('limit')) || DEFAULT_LIMIT, 100); // Cap at 100
+    const windowMinutes =
+      Number(searchParams.get('windowMinutes')) || DEFAULT_WINDOW_MINUTES
+    const lookbackMinutes =
+      Number(searchParams.get('lookbackMinutes')) || DEFAULT_LOOKBACK_MINUTES
+    const limitRaw = Number(searchParams.get('limit'))
+    const limit = Math.min(
+      Number.isFinite(limitRaw) && limitRaw > 0 ? limitRaw : DEFAULT_LIMIT,
+      100
+    )
 
-    // Validate parameters
     if (windowMinutes < 0 || lookbackMinutes < 0 || limit < 1) {
       return jsonWithCompression(
         request,
         { error: 'Invalid query parameters' },
         { status: 400 }
-      );
+      )
     }
 
-    const now = Date.now();
-    const lowerBound = new Date(now - lookbackMinutes * 60_000).toISOString();
-    const upperBound = new Date(now + windowMinutes * 60_000).toISOString();
-
-    const { databases } = await createServerClient();
-
-    const query = [
-      Query.greaterThan('start_time', lowerBound),
-      Query.lessThanEqual('start_time', upperBound),
-      Query.notEqual('status', 'Abandoned'),
-      Query.notEqual('status', 'Final'),
-      Query.notEqual('status', 'Finalized'),
-      Query.orderAsc('start_time'),
-      Query.limit(limit),
-    ];
-
-    const response = await databases.listDocuments(
-      DATABASE_ID,
-      RACES_COLLECTION_ID,
-      query
-    );
-
-    return jsonWithCompression(request, {
-      races: response.documents,
-      total: response.total,
-      timestamp: new Date().toISOString(),
+    const payload = await apiClient.get<{
+      races: unknown[]
+      total: number
+      timestamp: string
       window: {
-        lowerBound,
-        upperBound,
+        lower_bound: string
+        upper_bound: string
+        window_minutes: number
+        lookback_minutes: number
+      }
+    }>('/api/races/upcoming', {
+      params: {
         windowMinutes,
         lookbackMinutes,
+        limit,
       },
-    });
-  } catch (error) {
-    console.error('Error fetching upcoming races:', error);
+      cache: 'no-store',
+    })
 
-    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch upcoming races';
+    return jsonWithCompression(request, {
+      races: payload.races,
+      total: payload.total,
+      timestamp: payload.timestamp,
+      window: {
+        lowerBound: payload.window.lower_bound,
+        upperBound: payload.window.upper_bound,
+        windowMinutes: payload.window.window_minutes,
+        lookbackMinutes: payload.window.lookback_minutes,
+      },
+    })
+  } catch (error) {
+    console.error('Error fetching upcoming races:', error)
+
+    const errorMessage =
+      error instanceof ApiError
+        ? `${error.status} ${error.message}`
+        : error instanceof Error
+          ? error.message
+          : 'Failed to fetch upcoming races'
+
+    const status = error instanceof ApiError ? error.status : 500
 
     return jsonWithCompression(
       request,
       { error: errorMessage },
-      { status: 500 }
-    );
+      { status }
+    )
   }
 }

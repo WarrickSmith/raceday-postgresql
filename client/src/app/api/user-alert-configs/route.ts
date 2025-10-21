@@ -1,96 +1,113 @@
 import { NextRequest } from 'next/server'
-import { createServerClient, Query } from '@/lib/appwrite-server'
-import { ID } from 'node-appwrite'
-import type { Databases, Models } from 'node-appwrite'
-import type { IndicatorConfig } from '@/types/alerts'
-import { DEFAULT_INDICATORS, DEFAULT_USER_ID } from '@/types/alerts'
+import { apiClient, ApiError } from '@/lib/api-client'
+import type { AlertsConfig, IndicatorConfig } from '@/types/alerts'
+import { DEFAULT_USER_ID, validateIndicatorConfig } from '@/types/alerts'
 import { jsonWithCompression } from '@/lib/http/compression'
 
-const DATABASE_ID = 'raceday-db'
-const COLLECTION_ID = 'user-alert-configs'
+interface ServerIndicator {
+  indicator_id: string | null
+  user_id: string
+  indicator_type: 'percentage_range'
+  percentage_range_min: number
+  percentage_range_max: number | null
+  color: string
+  is_default: boolean
+  enabled: boolean
+  display_order: number
+  audible_alerts_enabled?: boolean
+  created_at?: string
+  updated_at?: string
+}
 
-/**
- * GET /api/user-alert-configs?userId=Default%20User
- * Load user alert configuration
- */
+interface ServerAlertsConfig {
+  user_id: string
+  indicators: ServerIndicator[]
+  toggle_all: boolean
+  audible_alerts_enabled: boolean
+}
+
+const toClientIndicator = (indicator: ServerIndicator): IndicatorConfig => ({
+  indicator_id: indicator.indicator_id ?? undefined,
+  user_id: indicator.user_id,
+  indicator_type: indicator.indicator_type,
+  percentage_range_min: indicator.percentage_range_min,
+  percentage_range_max: indicator.percentage_range_max,
+  color: indicator.color,
+  is_default: indicator.is_default,
+  enabled: indicator.enabled,
+  display_order: indicator.display_order,
+  created_at: indicator.created_at,
+  last_updated: indicator.updated_at,
+  audible_alerts_enabled: indicator.audible_alerts_enabled ?? true,
+})
+
+const toClientConfig = (config: ServerAlertsConfig): AlertsConfig => ({
+  user_id: config.user_id,
+  indicators: config.indicators.map(toClientIndicator),
+  toggle_all: config.toggle_all,
+  audible_alerts_enabled: config.audible_alerts_enabled,
+})
+
+const toServerIndicator = (
+  indicator: IndicatorConfig,
+  fallbackUserId: string
+): ServerIndicator => ({
+  indicator_id: indicator.indicator_id ?? null,
+  user_id: indicator.user_id ?? fallbackUserId,
+  indicator_type: indicator.indicator_type,
+  percentage_range_min: indicator.percentage_range_min,
+  percentage_range_max: indicator.percentage_range_max,
+  color: indicator.color,
+  is_default: indicator.is_default,
+  enabled: indicator.enabled,
+  display_order: indicator.display_order,
+  audible_alerts_enabled: indicator.audible_alerts_enabled ?? true,
+})
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId') || DEFAULT_USER_ID
+    const userId = searchParams.get('userId') ?? DEFAULT_USER_ID
 
-    const { databases } = await createServerClient()
-
-    // Query for all indicators for this user
-    const response = await databases.listDocuments(
-      DATABASE_ID,
-      COLLECTION_ID,
-      [
-        Query.equal('userId', userId),
-        Query.equal('indicatorType', 'percentage_range'),
-        Query.orderAsc('displayOrder')
-      ]
+    const payload = await apiClient.get<ServerAlertsConfig>(
+      '/api/user-alert-configs',
+      {
+        params: { userId },
+        cache: 'no-store',
+      }
     )
 
-    const indicators = response.documents.map((document) =>
-      mapDocumentToIndicator(document as Models.Document)
-    )
-
-    // If no indicators found, create defaults
-    if (indicators.length === 0) {
-      const defaultIndicators = await createDefaultIndicators(databases, userId)
-      return jsonWithCompression(request, {
-        userId,
-        indicators: defaultIndicators,
-        toggleAll: true,
-        audibleAlertsEnabled: true,
-      })
-    }
-
-    // Check if we have all 6 indicators, create missing ones
-    const existingOrders = indicators.map(ind => ind.displayOrder)
-    const missingOrders = [1, 2, 3, 4, 5, 6].filter(order => !existingOrders.includes(order))
-
-    if (missingOrders.length > 0) {
-      const missingIndicators = await createMissingIndicators(databases, userId, missingOrders)
-      indicators.push(...missingIndicators)
-      indicators.sort((a, b) => a.displayOrder - b.displayOrder)
-    }
-
-    // Calculate toggleAll state (true if all are enabled)
-    const toggleAll = indicators.every(ind => ind.enabled)
-    const audibleAlertsEnabled =
-      indicators[0]?.audibleAlertsEnabled ?? true
-
-    return jsonWithCompression(request, {
-      userId,
-      indicators,
-      toggleAll,
-      audibleAlertsEnabled,
-    })
+    return jsonWithCompression(request, toClientConfig(payload))
   } catch (error) {
     console.error('Failed to load user alert config:', error)
+
+    const status = error instanceof ApiError ? error.status : 500
+    const message =
+      error instanceof ApiError
+        ? `${error.status} ${error.message}`
+        : error instanceof Error
+          ? error.message
+          : 'Failed to load alert configuration'
+
     return jsonWithCompression(
       request,
-      { error: 'Failed to load alert configuration' },
-      { status: 500 }
+      { error: message },
+      { status }
     )
   }
 }
 
-/**
- * POST /api/user-alert-configs
- * Save user alert configuration
- */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    const body = (await request.json()) as AlertsConfig
     const {
-      userId = DEFAULT_USER_ID,
+      user_id = DEFAULT_USER_ID,
       indicators,
-      audibleAlertsEnabled = true,
+      audible_alerts_enabled = true,
+      toggle_all = true,
     } = body
 
-    if (!indicators || !Array.isArray(indicators)) {
+    if (!Array.isArray(indicators) || indicators.length === 0) {
       return jsonWithCompression(
         request,
         { error: 'Invalid indicators data' },
@@ -98,158 +115,40 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { databases } = await createServerClient()
+    const validationErrors = indicators.flatMap(validateIndicatorConfig)
+    if (validationErrors.length > 0) {
+      return jsonWithCompression(
+        request,
+        { error: validationErrors.join('; ') },
+        { status: 400 }
+      )
+    }
 
-    // Update each indicator
-    const updatePromises = indicators.map(async (indicator: IndicatorConfig) => {
-      const updateData = {
-        enabled: indicator.enabled,
-        color: indicator.color,
-        isDefault: indicator.isDefault,
-        last_updated: new Date().toISOString(),
-        audibleAlertsEnabled,
-      }
-
-      if (indicator.$id) {
-        // Update existing indicator
-        return databases.updateDocument(DATABASE_ID, COLLECTION_ID, indicator.$id, updateData)
-      } else {
-        // Create new indicator
-        const createData = {
-          ...updateData,
-          userId: indicator.userId ?? userId,
-          indicatorType: indicator.indicatorType,
-          percentageRangeMin: indicator.percentageRangeMin,
-          percentageRangeMax: indicator.percentageRangeMax,
-          displayOrder: indicator.displayOrder,
-          createdAt: new Date().toISOString(),
-          audibleAlertsEnabled,
-        }
-        return databases.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), createData)
-      }
+    await apiClient.post('/api/user-alert-configs', {
+      user_id: user_id,
+      indicators: indicators.map((indicator) =>
+        toServerIndicator(indicator, user_id)
+      ),
+      audible_alerts_enabled: audible_alerts_enabled,
+      toggle_all: toggle_all,
     })
-
-    await Promise.all(updatePromises)
 
     return jsonWithCompression(request, { success: true })
   } catch (error) {
     console.error('Failed to save user alert config:', error)
+
+    const status = error instanceof ApiError ? error.status : 500
+    const message =
+      error instanceof ApiError
+        ? `${error.status} ${error.message}`
+        : error instanceof Error
+          ? error.message
+          : 'Failed to save alert configuration'
+
     return jsonWithCompression(
       request,
-      { error: 'Failed to save alert configuration' },
-      { status: 500 }
+      { error: message },
+      { status }
     )
-  }
-}
-
-
-// Helper function to create default indicators for a new user
-async function createDefaultIndicators(
-  databases: Databases,
-  userId: string
-): Promise<IndicatorConfig[]> {
-  const createPromises = DEFAULT_INDICATORS.map(async (defaultConfig) => {
-    const timestamp = new Date().toISOString()
-    const indicatorId = ID.unique()
-
-    const createPayload: Omit<IndicatorConfig, '$id'> = {
-      userId,
-      indicatorType: defaultConfig.indicatorType,
-      percentageRangeMin: defaultConfig.percentageRangeMin,
-      percentageRangeMax: defaultConfig.percentageRangeMax,
-      color: defaultConfig.color,
-      isDefault: defaultConfig.isDefault,
-      enabled: defaultConfig.enabled,
-      displayOrder: defaultConfig.displayOrder,
-      createdAt: timestamp,
-      last_updated: timestamp,
-      audibleAlertsEnabled: true,
-    }
-
-    await databases.createDocument(
-      DATABASE_ID,
-      COLLECTION_ID,
-      indicatorId,
-      createPayload
-    )
-
-    return { $id: indicatorId, ...createPayload }
-  })
-
-  return Promise.all(createPromises)
-}
-
-// Helper function to create missing indicators
-async function createMissingIndicators(
-  databases: Databases,
-  userId: string,
-  missingOrders: number[]
-): Promise<IndicatorConfig[]> {
-  const createPromises = missingOrders.map(async (order) => {
-    const defaultConfig = DEFAULT_INDICATORS[order - 1]
-    if (!defaultConfig) {
-      throw new Error(`Missing default indicator configuration for order ${order}`)
-    }
-
-    const timestamp = new Date().toISOString()
-    const indicatorId = ID.unique()
-
-    const createPayload: Omit<IndicatorConfig, '$id'> = {
-      userId,
-      indicatorType: defaultConfig.indicatorType,
-      percentageRangeMin: defaultConfig.percentageRangeMin,
-      percentageRangeMax: defaultConfig.percentageRangeMax,
-      color: defaultConfig.color,
-      isDefault: defaultConfig.isDefault,
-      enabled: defaultConfig.enabled,
-      displayOrder: defaultConfig.displayOrder,
-      createdAt: timestamp,
-      last_updated: timestamp,
-      audibleAlertsEnabled: true,
-    }
-
-    await databases.createDocument(
-      DATABASE_ID,
-      COLLECTION_ID,
-      indicatorId,
-      createPayload
-    )
-
-    return { $id: indicatorId, ...createPayload }
-  })
-
-  return Promise.all(createPromises)
-}
-
-function mapDocumentToIndicator(document: Models.Document): IndicatorConfig {
-  // Cast document to safely access dynamic properties from Appwrite
-  const doc = document as Record<string, unknown>
-
-  const percentageRangeMaxValue =
-    doc.percentageRangeMax === null || doc.percentageRangeMax === undefined
-      ? null
-      : Number(doc.percentageRangeMax)
-
-  return {
-    $id: document.$id,
-    userId:
-      typeof doc.userId === 'string' ? doc.userId : DEFAULT_USER_ID,
-    indicatorType: 'percentage_range',
-    percentageRangeMin: Number(doc.percentageRangeMin ?? 0),
-    percentageRangeMax: percentageRangeMaxValue,
-    color:
-      typeof doc.color === 'string'
-        ? doc.color
-        : DEFAULT_INDICATORS[0].color,
-    isDefault: Boolean(doc.isDefault),
-    enabled: Boolean(doc.enabled),
-    displayOrder: Number(doc.displayOrder ?? 1),
-    last_updated:
-      typeof doc.last_updated === 'string' ? doc.last_updated : undefined,
-    createdAt: typeof doc.$createdAt === 'string' ? doc.$createdAt : undefined,
-    audibleAlertsEnabled:
-      typeof doc.audibleAlertsEnabled === 'boolean'
-        ? doc.audibleAlertsEnabled
-        : undefined,
   }
 }
